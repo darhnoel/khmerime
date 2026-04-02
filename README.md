@@ -1,8 +1,7 @@
 # Roman Lookup
 
 Standalone Rust lookup engine with:
-- a separated lexicon in
-[data/<lexicon>.tsv](data/<lexicon>.tsv).
+- a separate TSV lexicon such as `data/your_lexicon.tsv`
 - a Dioxus MVP that runs on web and desktop
 
 ## Layout
@@ -10,8 +9,7 @@ Standalone Rust lookup engine with:
 - Core logic: [src/roman_lookup.rs](src/roman_lookup.rs)
 - Dioxus app: [src/main.rs](src/main.rs)
 - CLI: [src/bin/lookup_cli.rs](src/bin/lookup_cli.rs)
-- Default embedded data: [data/<lexicon>.tsv](data/<lexicon>.tsv)
-- Detailed algorithm notes: [algorithm.md](algorithm.md)
+- Default embedded data: `data/your_lexicon.tsv`
 
 ## Usage
 
@@ -60,7 +58,7 @@ $ cargo run --bin lookup_cli -- suggest tver
 Use a different lexicon file:
 
 ```
-$ cargo run --bin lookup_cli -- --data data/<lexicon>.tsv suggest tver
+$ cargo run --bin lookup_cli -- --data data/your_lexicon.tsv suggest tver
 ```
 
 ## Behavior
