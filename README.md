@@ -2,7 +2,7 @@
 
 Standalone Rust lookup engine with:
 - a separated lexicon in
-[data/roman_lookup_v3.tsv](data/roman_lookup_v3.tsv).
+[data/<lexicon>.tsv](data/<lexicon>.tsv).
 - a Dioxus MVP that runs on web and desktop
 
 ## Layout
@@ -10,7 +10,7 @@ Standalone Rust lookup engine with:
 - Core logic: [src/roman_lookup.rs](src/roman_lookup.rs)
 - Dioxus app: [src/main.rs](src/main.rs)
 - CLI: [src/bin/lookup_cli.rs](src/bin/lookup_cli.rs)
-- Default embedded data: [data/roman_lookup_v3.tsv](data/roman_lookup_v3.tsv)
+- Default embedded data: [data/<lexicon>.tsv](data/<lexicon>.tsv)
 - Detailed algorithm notes: [algorithm.md](algorithm.md)
 
 ## Usage

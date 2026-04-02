@@ -17,7 +17,7 @@ dioxus = { version = "0.7.4", default-features = false, features = ["desktop", "
 console_error_panic_hook = "0.1.7"
 dioxus = { version = "0.7.4", default-features = false, features = ["web", "document", "signals", "hooks", "html", "macro", "asset", "launch"] }
 js-sys = "0.3.77"
-web-sys = { version = "0.3.77", features = ["Document", "HtmlTextAreaElement", "KeyboardEvent", "Location", "Storage", "Window"] }
+web-sys = { version = "0.3.77", features = ["CssStyleDeclaration", "Document", "DomRect", "Element", "HtmlElement", "HtmlTextAreaElement", "KeyboardEvent", "Location", "Node", "Storage", "Window"] }
 
 # [patch.crates-io]
 # muda = { path = "vendor/muda" }
