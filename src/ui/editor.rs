@@ -5,9 +5,7 @@ use roman_lookup::{DecoderMode, ShadowObservation, Transliterator};
 
 use crate::ui::platform::{current_editor_caret, editor_composition_mark, editor_popup_position};
 use crate::ui::storage::{save_editor_text, save_history};
-use crate::{
-    engine, CompositionMark, SuggestionPopup, FALLBACK_POPUP_LEFT, FALLBACK_POPUP_TOP,
-};
+use crate::{engine, CompositionMark, SuggestionPopup, FALLBACK_POPUP_LEFT, FALLBACK_POPUP_TOP};
 
 fn slice_chars(input: &str, range: std::ops::Range<usize>) -> String {
     input
@@ -44,9 +42,7 @@ pub(crate) async fn update_candidates(
         return;
     }
 
-    let caret = current_editor_caret()
-        .await
-        .unwrap_or_else(|| value.chars().count());
+    let caret = current_editor_caret().await.unwrap_or_else(|| value.chars().count());
     if live_text() != value {
         return;
     }

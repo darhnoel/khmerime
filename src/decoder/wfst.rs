@@ -4,8 +4,8 @@ use std::collections::{HashMap, HashSet};
 use crate::roman_lookup::{normalize, similarity, Entry};
 
 use super::{
-    elapsed_decode_us, start_decode_timer, DecodeCandidate, DecodeFailure, DecodeRequest, DecodeResult,
-    DecodeSegment, Decoder,
+    elapsed_decode_us, start_decode_timer, DecodeCandidate, DecodeFailure, DecodeRequest, DecodeResult, DecodeSegment,
+    Decoder,
 };
 
 const PREFIX_LIMIT: usize = 64;
@@ -272,11 +272,7 @@ impl Decoder for WfstDecoder {
         let started_at = start_decode_timer();
         let normalized = normalize(request.input);
         if normalized.is_empty() {
-            return DecodeResult::failed(
-                self.name(),
-                DecodeFailure::EmptyResult,
-                elapsed_decode_us(started_at),
-            );
+            return DecodeResult::failed(self.name(), DecodeFailure::EmptyResult, elapsed_decode_us(started_at));
         }
 
         let mut candidates = self.exact_or_prefix_candidates(&normalized);

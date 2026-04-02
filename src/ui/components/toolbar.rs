@@ -4,12 +4,8 @@ use dioxus::prelude::*;
 use roman_lookup::{DecoderMode, ShadowObservation};
 
 use crate::ui::editor::update_candidates;
-use crate::ui::storage::{
-    save_decoder_mode, save_editor_text, save_enabled, save_font_size,
-};
-use crate::{
-    CompositionMark, MAX_FONT_SIZE, MIN_FONT_SIZE, SuggestionPopup,
-};
+use crate::ui::storage::{save_decoder_mode, save_editor_text, save_enabled, save_font_size};
+use crate::{CompositionMark, SuggestionPopup, MAX_FONT_SIZE, MIN_FONT_SIZE};
 
 #[component]
 pub(crate) fn AppToolbar(

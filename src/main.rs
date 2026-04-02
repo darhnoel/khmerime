@@ -7,13 +7,9 @@ use roman_lookup::{DecoderConfig, DecoderMode, ShadowObservation, Transliterator
 mod ui;
 
 use self::ui::components::{AppToolbar, EditorCard, GuidePanel, WorkspaceBody};
-use self::ui::editor::{
-    refresh_popup_position,
-};
+use self::ui::editor::refresh_popup_position;
 use self::ui::platform::set_editor_caret;
-use self::ui::storage::{
-    load_decoder_mode, load_editor_text, load_enabled, load_font_size, load_history,
-};
+use self::ui::storage::{load_decoder_mode, load_editor_text, load_enabled, load_font_size, load_history};
 
 static STYLES: Asset = asset!("/assets/main.css");
 static LEGACY_TRANSLITERATOR: OnceLock<Transliterator> = OnceLock::new();

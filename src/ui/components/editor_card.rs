@@ -5,9 +5,8 @@ use dioxus::prelude::*;
 use roman_lookup::{DecoderMode, ShadowObservation};
 
 use crate::ui::editor::{
-    commit_selection, composition_preview_style, composition_style, is_space_key, popup_style,
-    shortcut_index, shortcut_label, should_exit_number_pick, update_candidates,
-    visible_page_start,
+    commit_selection, composition_preview_style, composition_style, is_space_key, popup_style, shortcut_index,
+    shortcut_label, should_exit_number_pick, update_candidates, visible_page_start,
 };
 use crate::ui::storage::{save_editor_text, save_enabled};
 use crate::{CompositionMark, SuggestionPopup, EDITOR_ID, VISIBLE_SUGGESTIONS};

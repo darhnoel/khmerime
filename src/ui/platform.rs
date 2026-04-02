@@ -4,9 +4,7 @@ use dioxus::document;
 #[cfg(target_arch = "wasm32")]
 use web_sys::wasm_bindgen::JsCast;
 #[cfg(target_arch = "wasm32")]
-use web_sys::{
-    window, CssStyleDeclaration, Document, Element, HtmlElement, HtmlTextAreaElement,
-};
+use web_sys::{window, CssStyleDeclaration, Document, Element, HtmlElement, HtmlTextAreaElement};
 
 use crate::{CompositionMark, SuggestionPopup, EDITOR_ID};
 
@@ -74,8 +72,7 @@ fn estimated_popup_position(
 ) -> SuggestionPopup {
     let chars_per_line = estimated_chars_per_line(client_width, font_size);
     let left = POPUP_HORIZONTAL_OFFSET + ((caret % chars_per_line) as f64 * (font_size * CHAR_WIDTH_MULTIPLIER));
-    let top =
-        POPUP_HORIZONTAL_OFFSET + ((caret / chars_per_line) as f64 * line_height) + line_height;
+    let top = POPUP_HORIZONTAL_OFFSET + ((caret / chars_per_line) as f64 * line_height) + line_height;
     clamped_popup_position(left, top, client_width, client_height)
 }
 
@@ -147,7 +144,8 @@ fn parse_popup_marker_metrics(raw: &str) -> Option<PopupMarkerMetrics> {
 #[cfg(any(target_arch = "wasm32", test))]
 fn popup_position_from_marker_metrics(metrics: PopupMarkerMetrics) -> SuggestionPopup {
     let left = metrics.marker_left - metrics.mirror_left - metrics.scroll_left + POPUP_HORIZONTAL_OFFSET;
-    let top = metrics.marker_top - metrics.mirror_top - metrics.scroll_top + metrics.line_height + POPUP_VERTICAL_OFFSET;
+    let top =
+        metrics.marker_top - metrics.mirror_top - metrics.scroll_top + metrics.line_height + POPUP_VERTICAL_OFFSET;
     clamped_popup_position(left, top, metrics.client_width, metrics.client_height)
 }
 
@@ -251,7 +249,8 @@ fn prefix_chars(value: &str, char_count: usize) -> String {
 
 #[cfg(target_arch = "wasm32")]
 fn char_at_or_dot(value: &str, char_index: usize) -> String {
-    value.chars()
+    value
+        .chars()
         .nth(char_index)
         .map(|ch| ch.to_string())
         .unwrap_or_else(|| ".".to_owned())
@@ -282,10 +281,7 @@ fn build_measurement_mirror(
 }
 
 #[cfg(target_arch = "wasm32")]
-fn append_measurement_nodes(
-    mirror: &HtmlElement,
-    marker: &Element,
-) -> Option<web_sys::HtmlElement> {
+fn append_measurement_nodes(mirror: &HtmlElement, marker: &Element) -> Option<web_sys::HtmlElement> {
     mirror.append_child(marker).ok()?;
     let body = browser_document()?.body()?;
     body.append_child(mirror).ok()?;
