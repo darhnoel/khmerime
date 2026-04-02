@@ -1,0 +1,22 @@
+/target
+**/*.rs.bk
+*.wasm
+/examples/test.wat
+
+# Local tooling
+.venv/
+
+# Python caches
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# Dioxus/web build output
+dist/
+
+# Dioxus/Linux
+vendor/
+
+# Editor and OS noise
+.DS_Store
+Thumbs.db

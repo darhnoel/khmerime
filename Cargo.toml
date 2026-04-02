@@ -1,0 +1,24 @@
+[package]
+name = "roman_lookup"
+version = "0.1.0"
+edition = "2021"
+default-run = "roman_lookup"
+
+[features]
+default = []
+wfst-decoder = []
+
+[dependencies]
+
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+dioxus = { version = "0.7.4", default-features = false, features = ["desktop", "document", "signals", "hooks", "html", "macro", "asset", "launch"] }
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+console_error_panic_hook = "0.1.7"
+dioxus = { version = "0.7.4", default-features = false, features = ["web", "document", "signals", "hooks", "html", "macro", "asset", "launch"] }
+js-sys = "0.3.77"
+web-sys = { version = "0.3.77", features = ["Document", "HtmlTextAreaElement", "KeyboardEvent", "Location", "Storage", "Window"] }
+
+# [patch.crates-io]
+# muda = { path = "vendor/muda" }
+# tray-icon = { path = "vendor/tray-icon" }
