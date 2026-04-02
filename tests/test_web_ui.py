@@ -110,10 +110,18 @@ def test_web_ui_suggestions_and_decoder_toggle(web_server: str) -> None:
         shadow_button = page.locator("[data-testid='decoder-shadow']").last
         shadow_button.click()
         expect(shadow_button).to_have_class(re.compile(r".*active.*"))
-        expect(page.locator("[data-testid='shadow-panel']").last).to_be_visible(timeout=15_000)
+        expect(page.locator("[data-testid='shadow-panel']")).to_have_count(0)
+        editor.press("Control+A")
+        editor.type("khnhomtov")
+        expect(page.locator("[data-testid='suggestion-popup'] .suggestion button").first).to_contain_text("ខ្ញុំទៅ")
 
         legacy_button = page.locator("[data-testid='decoder-legacy']").last
         legacy_button.click()
         expect(legacy_button).to_have_class(re.compile(r".*active.*"))
+
+        rules_button = page.locator("[data-testid='toggle-rules']").last
+        rules_button.click()
+        expect(rules_button).to_have_class(re.compile(r".*active.*"))
+        expect(page.locator(".guide-panel")).to_be_visible(timeout=15_000)
 
         browser.close()

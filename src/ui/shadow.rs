@@ -23,6 +23,54 @@ pub(crate) fn ShadowPanel(debug: Option<ShadowObservation>) -> Element {
                         code { class: "debug-value", {debug.mismatch.as_str()} }
                     }
                     div { class: "debug-row",
+                        span { class: "debug-label", "Composer Chunks" }
+                        span { class: "debug-value", {
+                            if debug.composer_chunks.is_empty() {
+                                "-".to_owned()
+                            } else {
+                                debug.composer_chunks.join(" | ")
+                            }
+                        } }
+                    }
+                    div { class: "debug-row",
+                        span { class: "debug-label", "Hint Chunks" }
+                        span { class: "debug-value", {
+                            if debug.composer_hint_chunks.is_empty() {
+                                "-".to_owned()
+                            } else {
+                                debug.composer_hint_chunks.join(" | ")
+                            }
+                        } }
+                    }
+                    div { class: "debug-row",
+                        span { class: "debug-label", "Pending Tail" }
+                        code { class: "debug-value", {
+                            if debug.composer_pending_tail.is_empty() {
+                                "-".to_owned()
+                            } else {
+                                debug.composer_pending_tail.clone()
+                            }
+                        } }
+                    }
+                    div { class: "debug-row",
+                        span { class: "debug-label", "Composer State" }
+                        code { class: "debug-value", {format!(
+                            "segmented={} hint_used={}",
+                            debug.composer_fully_segmented,
+                            debug.wfst_used_hint_chunks
+                        )} }
+                    }
+                    div { class: "debug-row",
+                        span { class: "debug-label", "WFST Segments" }
+                        span { class: "debug-value", {
+                            if debug.wfst_top_segments.is_empty() {
+                                "-".to_owned()
+                            } else {
+                                debug.wfst_top_segments.join(" | ")
+                            }
+                        } }
+                    }
+                    div { class: "debug-row",
                         span { class: "debug-label", "Legacy Top" }
                         span { class: "debug-value", {debug.legacy_top.clone().unwrap_or_else(|| "-".to_owned())} }
                     }

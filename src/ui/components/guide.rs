@@ -22,14 +22,6 @@ const SPECIAL_WORDS: [(&str, &str); 5] = [
 #[component]
 pub(crate) fn GuidePanel(show_guide: Signal<bool>) -> Element {
     rsx! {
-        if !show_guide() {
-            button {
-                class: "guide-handle guide-handle-collapsed",
-                onclick: move |_| show_guide.set(true),
-                title: "Show typing rules",
-                ">"
-            }
-        }
         if show_guide() {
             aside { class: "guide guide-open",
                 button {

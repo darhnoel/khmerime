@@ -1,5 +1,9 @@
 use std::fmt::Write;
 
+use crate::composer::ComposerAnalysis;
+#[cfg(feature = "wfst-decoder")]
+use crate::composer::ComposerChunkKind;
+
 use super::{DecodeFailure, DecodeResult, DecoderMode};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -34,6 +38,12 @@ pub struct ShadowObservation {
     pub mode: DecoderMode,
     pub input: String,
     pub mismatch: ShadowMismatch,
+    pub composer_chunks: Vec<String>,
+    pub composer_hint_chunks: Vec<String>,
+    pub composer_pending_tail: String,
+    pub composer_fully_segmented: bool,
+    pub wfst_used_hint_chunks: bool,
+    pub wfst_top_segments: Vec<String>,
     pub legacy_latency_us: u64,
     pub wfst_latency_us: Option<u64>,
     pub legacy_failure: Option<String>,
@@ -48,15 +58,21 @@ pub struct ShadowObservation {
 
 impl ShadowObservation {
     pub fn tsv_header() -> &'static str {
-        "mode\tinput\tmismatch\tlegacy_latency_us\twfst_latency_us\tlegacy_failure\twfst_failure\tlegacy_top\twfst_top\tlegacy_top_in_wfst\twfst_top_in_legacy\tlegacy_top5\twfst_top5"
+        "mode\tinput\tmismatch\tcomposer_chunks\tcomposer_hint_chunks\tcomposer_pending_tail\tcomposer_fully_segmented\twfst_used_hint_chunks\twfst_top_segments\tlegacy_latency_us\twfst_latency_us\tlegacy_failure\twfst_failure\tlegacy_top\twfst_top\tlegacy_top_in_wfst\twfst_top_in_legacy\tlegacy_top5\twfst_top5"
     }
 
     pub fn to_tsv_row(&self) -> String {
         format!(
-            "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}",
+            "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}",
             sanitize_field(&format!("{:?}", self.mode)),
             sanitize_field(&self.input),
             self.mismatch.as_str(),
+            sanitize_field(&self.composer_chunks.join("|")),
+            sanitize_field(&self.composer_hint_chunks.join("|")),
+            sanitize_field(&self.composer_pending_tail),
+            if self.composer_fully_segmented { "1" } else { "0" },
+            if self.wfst_used_hint_chunks { "1" } else { "0" },
+            sanitize_field(&self.wfst_top_segments.join("|")),
             self.legacy_latency_us,
             self.wfst_latency_us
                 .map(|value| value.to_string())
@@ -141,6 +157,7 @@ impl<'a> ShadowReport<'a> {
 pub(crate) fn build_shadow_observation(
     mode: DecoderMode,
     input: &str,
+    composer: &ComposerAnalysis,
     legacy: &DecodeResult,
     wfst: Option<&DecodeResult>,
 ) -> ShadowObservation {
@@ -157,11 +174,46 @@ pub(crate) fn build_shadow_observation(
         .as_ref()
         .map(|top| legacy_top5.iter().any(|candidate| candidate == top))
         .unwrap_or(false);
+    let wfst_top_segments = wfst
+        .and_then(|result| result.candidates.first())
+        .map(|candidate| {
+            candidate
+                .segments
+                .iter()
+                .map(|segment| format!("{}=>{}", segment.input, segment.output))
+                .collect::<Vec<_>>()
+        })
+        .unwrap_or_default();
+    let composer_chunks = composer
+        .chunks
+        .iter()
+        .map(|chunk| chunk.normalized.clone())
+        .collect::<Vec<_>>();
+    #[cfg(feature = "wfst-decoder")]
+    let composer_hint_chunks = composer
+        .wfst_phrase_chunks()
+        .into_iter()
+        .filter(|chunk| chunk.kind == ComposerChunkKind::Hint)
+        .map(|chunk| chunk.normalized)
+        .collect::<Vec<_>>();
+    #[cfg(not(feature = "wfst-decoder"))]
+    let composer_hint_chunks = Vec::new();
+    let wfst_used_hint_chunks = !composer_hint_chunks.is_empty()
+        && wfst
+            .and_then(|result| result.candidates.first())
+            .map(|candidate| candidate.segments.len() > 1)
+            .unwrap_or(false);
 
     ShadowObservation {
         mode,
         input: input.to_owned(),
         mismatch,
+        composer_chunks,
+        composer_hint_chunks,
+        composer_pending_tail: composer.pending_tail.clone(),
+        composer_fully_segmented: composer.fully_segmented,
+        wfst_used_hint_chunks,
+        wfst_top_segments,
         legacy_latency_us: legacy.latency_us,
         wfst_latency_us: wfst.map(|result| result.latency_us),
         legacy_failure: legacy.failure.as_ref().map(format_failure),
@@ -256,6 +308,12 @@ mod tests {
 
     #[test]
     fn summary_counts_rows() {
+        let composer = ComposerAnalysis {
+            normalized: "jea".to_owned(),
+            chunks: Vec::new(),
+            pending_tail: String::new(),
+            fully_segmented: false,
+        };
         let legacy = DecodeResult::success(
             "legacy",
             vec![DecodeCandidate {
@@ -267,7 +325,7 @@ mod tests {
             5,
         );
         let wfst = DecodeResult::failed("wfst", DecodeFailure::Timeout, 11);
-        let observation = build_shadow_observation(DecoderMode::Shadow, "jea", &legacy, Some(&wfst));
+        let observation = build_shadow_observation(DecoderMode::Shadow, "jea", &composer, &legacy, Some(&wfst));
 
         let mut summary = ShadowSummary::default();
         summary.record(&observation);

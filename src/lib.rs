@@ -1,3 +1,4 @@
+mod composer;
 mod decoder;
 mod roman_lookup;
 

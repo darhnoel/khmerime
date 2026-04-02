@@ -61,14 +61,24 @@ pub(crate) async fn update_candidates(
         return;
     }
 
+    let history_snapshot = history();
     let legacy = engine(DecoderMode::Legacy);
-    let items = legacy.suggest(&token, &history());
+    let legacy_items = legacy.suggest(&token, &history_snapshot);
     if live_text() != value {
         return;
     }
-    if decoder_mode != DecoderMode::Shadow {
+    let items = if decoder_mode == DecoderMode::Shadow {
+        let observation = engine(DecoderMode::Shadow).shadow_observation(&token, &history_snapshot);
+        if live_text() != value {
+            return;
+        }
+        let visible = choose_visible_suggestions(&legacy_items, &observation);
+        shadow_debug.set(Some(observation));
+        visible
+    } else {
         shadow_debug.set(None);
-    }
+        legacy_items
+    };
     let preserve_selection = active_token() == token && !suggestions().is_empty();
     let popup_position = if items.is_empty() {
         None
@@ -97,15 +107,6 @@ pub(crate) async fn update_candidates(
         selected.set(items.len().saturating_sub(1));
     }
     suggestions.set(items);
-    if decoder_mode == DecoderMode::Shadow {
-        spawn(update_shadow_debug(
-            value,
-            live_text,
-            history,
-            shadow_debug,
-            active_token,
-        ));
-    }
 }
 
 fn default_popup_position() -> SuggestionPopup {
@@ -127,27 +128,12 @@ async fn candidate_composition_mark(start: usize, token: &str) -> Option<Composi
     editor_composition_mark(start, token).await
 }
 
-async fn update_shadow_debug(
-    value: String,
-    live_text: Signal<String>,
-    history: Signal<HashMap<String, usize>>,
-    mut shadow_debug: Signal<Option<ShadowObservation>>,
-    active_token: Signal<String>,
-) {
-    if live_text() != value {
-        return;
+fn choose_visible_suggestions(legacy_items: &[String], observation: &ShadowObservation) -> Vec<String> {
+    if !observation.wfst_top5.is_empty() {
+        observation.wfst_top5.clone()
+    } else {
+        legacy_items.to_vec()
     }
-    let token = active_token();
-    if token.trim().is_empty() {
-        shadow_debug.set(None);
-        return;
-    }
-    let shadow = engine(DecoderMode::Shadow);
-    let observation = shadow.shadow_observation(&token, &history());
-    if live_text() != value || active_token() != token {
-        return;
-    }
-    shadow_debug.set(Some(observation));
 }
 
 pub(crate) async fn commit_selection(
@@ -251,4 +237,54 @@ pub(crate) fn should_exit_number_pick(key: &str) -> bool {
 
 pub(crate) fn is_space_key(key: &str) -> bool {
     matches!(key, " " | "Space" | "Spacebar")
+}
+
+#[cfg(test)]
+mod tests {
+    use roman_lookup::{DecoderMode, ShadowMismatch, ShadowObservation};
+
+    use super::choose_visible_suggestions;
+
+    fn sample_observation() -> ShadowObservation {
+        ShadowObservation {
+            mode: DecoderMode::Shadow,
+            input: "khnhomtov".to_owned(),
+            mismatch: ShadowMismatch::OutputMismatch,
+            composer_chunks: vec!["khnhom".to_owned(), "t".to_owned(), "ov".to_owned()],
+            composer_hint_chunks: vec!["tov".to_owned()],
+            composer_pending_tail: String::new(),
+            composer_fully_segmented: true,
+            wfst_used_hint_chunks: true,
+            wfst_top_segments: vec!["khnhom=>ខ្ញុំ".to_owned(), "tov=>ទៅ".to_owned()],
+            legacy_latency_us: 10,
+            wfst_latency_us: Some(8),
+            legacy_failure: None,
+            wfst_failure: None,
+            legacy_top: Some("ខ្ញុំ ទៅ".to_owned()),
+            wfst_top: Some("ខ្ញុំទៅ".to_owned()),
+            legacy_top5: vec!["ខ្ញុំ ទៅ".to_owned()],
+            wfst_top5: vec!["ខ្ញុំទៅ".to_owned()],
+            legacy_top_in_wfst: false,
+            wfst_top_in_legacy: false,
+        }
+    }
+
+    #[test]
+    fn prefers_wfst_suggestions_when_available() {
+        let legacy = vec!["ខ្ញុំ ទៅ".to_owned()];
+        let observation = sample_observation();
+        assert_eq!(
+            choose_visible_suggestions(&legacy, &observation),
+            vec!["ខ្ញុំទៅ".to_owned()]
+        );
+    }
+
+    #[test]
+    fn falls_back_to_legacy_suggestions_when_wfst_has_no_candidates() {
+        let legacy = vec!["ខ្ញុំ ទៅ".to_owned()];
+        let mut observation = sample_observation();
+        observation.wfst_failure = Some("timeout".to_owned());
+        observation.wfst_top5.clear();
+        assert_eq!(choose_visible_suggestions(&legacy, &observation), legacy);
+    }
 }

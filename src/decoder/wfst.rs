@@ -1,6 +1,7 @@
 use std::cmp::Reverse;
 use std::collections::{HashMap, HashSet};
 
+use crate::composer::{ComposerChunk, ComposerChunkKind};
 use crate::roman_lookup::{normalize, similarity, Entry};
 
 use super::{
@@ -16,6 +17,8 @@ const SUBSTRING_WINDOW_LIMIT: usize = 16;
 const SUBSTRING_APPROX_WINDOW_LIMIT: usize = 4;
 const SEGMENT_LIMIT: usize = 6;
 const EARLY_EXIT_SCORE_BPS: u16 = 7_600;
+const PHRASE_CHUNK_LIMIT: usize = 3;
+const PHRASE_COMBINATION_LIMIT: usize = 10;
 
 #[derive(Clone)]
 struct WfstRecord {
@@ -38,6 +41,76 @@ pub(crate) struct WfstDecoder {
 }
 
 impl WfstDecoder {
+    fn exact_terminal_candidates(&self, normalized: &str) -> Vec<DecodeCandidate> {
+        let mut node_index = 0usize;
+        for ch in normalized.chars() {
+            let Some(&child) = self.nodes[node_index].children.get(&ch) else {
+                return Vec::new();
+            };
+            node_index = child;
+        }
+
+        let mut candidates = Vec::new();
+        let mut seen = HashSet::new();
+        for (rank, &record_index) in self.nodes[node_index].terminal_records.iter().enumerate() {
+            let record = &self.records[record_index];
+            if seen.insert(record.target.clone()) {
+                let rank_penalty = rank.min(250) as u16;
+                candidates.push(candidate_from_record(
+                    record,
+                    10_000u16.saturating_sub(rank_penalty),
+                    9_500u16.saturating_sub(rank_penalty),
+                ));
+            }
+        }
+        candidates
+    }
+
+    fn decode_single_normalized(&self, normalized: &str) -> Vec<DecodeCandidate> {
+        let mut candidates = self.exact_or_prefix_candidates(normalized);
+        if candidates.is_empty() {
+            candidates = self.approximate_candidates(normalized);
+        }
+        if candidates.is_empty() || normalized.chars().count() > SUBSTRING_MAX_LEN {
+            let substring_candidates = self.substring_candidates(normalized);
+            for candidate in substring_candidates {
+                upsert_candidate_list(&mut candidates, candidate);
+            }
+            candidates.sort_by_key(|candidate| {
+                Reverse((
+                    candidate.score_bps.unwrap_or_default(),
+                    candidate.confidence_bps.unwrap_or_default(),
+                    candidate.text.chars().count(),
+                ))
+            });
+        }
+        candidates
+    }
+
+    fn decode_composer_chunk(&self, chunk: &ComposerChunk) -> Vec<DecodeCandidate> {
+        let mut candidates = self.exact_terminal_candidates(&chunk.normalized);
+        if candidates.is_empty() {
+            candidates = self.decode_single_normalized(&chunk.normalized);
+        }
+
+        if chunk.kind == ComposerChunkKind::Hint {
+            for variant in hint_variants(&chunk.normalized) {
+                for candidate in self.decode_single_normalized(&variant) {
+                    upsert_candidate_list(&mut candidates, candidate);
+                }
+            }
+            candidates.sort_by_key(|candidate| {
+                (
+                    Reverse(candidate.score_bps.unwrap_or_default()),
+                    Reverse(candidate.confidence_bps.unwrap_or_default()),
+                    candidate.text.chars().count(),
+                )
+            });
+        }
+
+        candidates
+    }
+
     pub(crate) fn from_entries(entries: &[Entry]) -> Self {
         let mut decoder = Self {
             nodes: vec![TrieNode::default()],
@@ -136,10 +209,11 @@ impl WfstDecoder {
         }
 
         candidates.sort_by_key(|candidate| {
-            Reverse((
-                candidate.score_bps.unwrap_or_default(),
-                candidate.confidence_bps.unwrap_or_default(),
-            ))
+            (
+                Reverse(candidate.score_bps.unwrap_or_default()),
+                Reverse(candidate.confidence_bps.unwrap_or_default()),
+                candidate.text.chars().count(),
+            )
         });
         candidates
     }
@@ -253,13 +327,38 @@ impl WfstDecoder {
 
         let mut candidates = best.into_values().collect::<Vec<_>>();
         candidates.sort_by_key(|candidate| {
-            Reverse((
-                candidate.score_bps.unwrap_or_default(),
-                candidate.confidence_bps.unwrap_or_default(),
+            (
+                Reverse(candidate.score_bps.unwrap_or_default()),
+                Reverse(candidate.confidence_bps.unwrap_or_default()),
                 candidate.text.chars().count(),
-            ))
+            )
         });
         candidates
+    }
+
+    fn compose_chunk_candidates(&self, request: &DecodeRequest<'_>) -> Vec<DecodeCandidate> {
+        let phrase_chunks = request.composer.wfst_phrase_chunks();
+        if phrase_chunks.len() <= 1 {
+            return Vec::new();
+        }
+
+        let mut per_chunk = Vec::<Vec<DecodeCandidate>>::new();
+        for chunk in &phrase_chunks {
+            let candidates = self
+                .decode_composer_chunk(chunk)
+                .into_iter()
+                .take(PHRASE_CHUNK_LIMIT)
+                .collect::<Vec<_>>();
+            if candidates.is_empty() {
+                return Vec::new();
+            }
+            per_chunk.push(candidates);
+        }
+
+        let mut output = Vec::new();
+        let mut current = Vec::new();
+        expand_phrase_candidates(&per_chunk, 0, &mut current, &mut output);
+        output
     }
 }
 
@@ -270,28 +369,22 @@ impl Decoder for WfstDecoder {
 
     fn decode(&self, request: &DecodeRequest<'_>) -> DecodeResult {
         let started_at = start_decode_timer();
-        let normalized = normalize(request.input);
+        let normalized = &request.composer.normalized;
         if normalized.is_empty() {
             return DecodeResult::failed(self.name(), DecodeFailure::EmptyResult, elapsed_decode_us(started_at));
         }
 
-        let mut candidates = self.exact_or_prefix_candidates(&normalized);
-        if candidates.is_empty() {
-            candidates = self.approximate_candidates(&normalized);
+        let mut candidates = self.decode_single_normalized(normalized);
+        for candidate in self.compose_chunk_candidates(request) {
+            upsert_candidate_list(&mut candidates, candidate);
         }
-        if candidates.is_empty() || normalized.chars().count() > SUBSTRING_MAX_LEN {
-            let substring_candidates = self.substring_candidates(&normalized);
-            for candidate in substring_candidates {
-                upsert_candidate_list(&mut candidates, candidate);
-            }
-            candidates.sort_by_key(|candidate| {
-                Reverse((
-                    candidate.score_bps.unwrap_or_default(),
-                    candidate.confidence_bps.unwrap_or_default(),
-                    candidate.text.chars().count(),
-                ))
-            });
-        }
+        candidates.sort_by_key(|candidate| {
+            (
+                Reverse(candidate.score_bps.unwrap_or_default()),
+                Reverse(candidate.confidence_bps.unwrap_or_default()),
+                candidate.text.chars().count(),
+            )
+        });
 
         DecodeResult::success(self.name(), candidates, elapsed_decode_us(started_at))
     }
@@ -369,6 +462,66 @@ fn upsert_candidate_list(candidates: &mut Vec<DecodeCandidate>, candidate: Decod
     }
 }
 
+fn expand_phrase_candidates(
+    per_chunk: &[Vec<DecodeCandidate>],
+    index: usize,
+    current: &mut Vec<DecodeCandidate>,
+    output: &mut Vec<DecodeCandidate>,
+) {
+    if output.len() >= PHRASE_COMBINATION_LIMIT {
+        return;
+    }
+    if index == per_chunk.len() {
+        output.push(combine_phrase_candidates(current));
+        return;
+    }
+    for candidate in &per_chunk[index] {
+        current.push(candidate.clone());
+        expand_phrase_candidates(per_chunk, index + 1, current, output);
+        current.pop();
+        if output.len() >= PHRASE_COMBINATION_LIMIT {
+            return;
+        }
+    }
+}
+
+fn combine_phrase_candidates(parts: &[DecodeCandidate]) -> DecodeCandidate {
+    let text = parts
+        .iter()
+        .map(|candidate| candidate.text.as_str())
+        .collect::<String>();
+    let mut total_score = 0u32;
+    let mut total_confidence = 0u32;
+    let mut segments = Vec::new();
+    for part in parts {
+        total_score += u32::from(part.score_bps.unwrap_or(0));
+        total_confidence += u32::from(part.confidence_bps.unwrap_or(part.score_bps.unwrap_or(0)));
+        segments.extend(part.segments.clone());
+    }
+    let average_score = (total_score / parts.len().max(1) as u32) as u16;
+    let average_confidence = (total_confidence / parts.len().max(1) as u32) as u16;
+    let phrase_bonus = ((parts.len().saturating_sub(1) as u16) * 250).min(750);
+
+    DecodeCandidate {
+        text,
+        score_bps: Some(average_score.saturating_add(phrase_bonus)),
+        confidence_bps: Some(average_confidence.saturating_add(phrase_bonus / 2)),
+        segments,
+    }
+}
+
+fn hint_variants(normalized: &str) -> Vec<String> {
+    let mut chars = normalized.chars();
+    let Some(first) = chars.next() else {
+        return Vec::new();
+    };
+
+    let mut doubled = String::with_capacity(normalized.len() + first.len_utf8());
+    doubled.push(first);
+    doubled.push_str(normalized);
+    vec![doubled]
+}
+
 fn char_ngrams(input: &str, size: usize) -> Vec<String> {
     let chars = input.chars().collect::<Vec<_>>();
     if chars.is_empty() {
@@ -389,6 +542,7 @@ fn char_ngrams(input: &str, size: usize) -> Vec<String> {
 mod tests {
     use std::collections::HashMap;
 
+    use crate::composer::ComposerTable;
     use crate::roman_lookup::Transliterator;
 
     use super::*;
@@ -397,10 +551,13 @@ mod tests {
     fn returns_candidates_for_exact_entries() {
         let transliterator = Transliterator::from_default_data().unwrap();
         let decoder = WfstDecoder::from_entries(transliterator.entries());
+        let composer = ComposerTable::from_entries(transliterator.entries());
         let history = HashMap::new();
+        let analysis = composer.analyze("jea");
         let request = DecodeRequest {
             input: "jea",
             history: &history,
+            composer: &analysis,
         };
 
         let result = decoder.decode(&request);
@@ -414,13 +571,56 @@ mod tests {
     fn recovers_embedded_word_from_noisy_long_token() {
         let transliterator = Transliterator::from_default_data().unwrap();
         let decoder = WfstDecoder::from_entries(transliterator.entries());
+        let composer = ComposerTable::from_entries(transliterator.entries());
         let history = HashMap::new();
+        let analysis = composer.analyze("knhoddmtofvvsffalarien");
         let request = DecodeRequest {
             input: "knhoddmtofvvsffalarien",
             history: &history,
+            composer: &analysis,
         };
 
         let result = decoder.decode(&request);
         assert!(result.candidates.iter().any(|candidate| candidate.text == "សាលារៀន"));
+    }
+
+    #[test]
+    fn composes_exact_chunk_phrases() {
+        let transliterator = Transliterator::from_default_data().unwrap();
+        let decoder = WfstDecoder::from_entries(transliterator.entries());
+        let composer = ComposerTable::from_entries(transliterator.entries());
+        let history = HashMap::new();
+        let analysis = composer.analyze("khnhomttov");
+        let request = DecodeRequest {
+            input: "khnhomttov",
+            history: &history,
+            composer: &analysis,
+        };
+
+        let result = decoder.decode(&request);
+        assert_eq!(
+            result.candidates.first().map(|candidate| candidate.text.as_str()),
+            Some("ខ្ញុំទៅ")
+        );
+    }
+
+    #[test]
+    fn composes_hint_based_phrase_chunks() {
+        let transliterator = Transliterator::from_default_data().unwrap();
+        let decoder = WfstDecoder::from_entries(transliterator.entries());
+        let composer = ComposerTable::from_entries(transliterator.entries());
+        let history = HashMap::new();
+        let analysis = composer.analyze("khnhomtov");
+        let request = DecodeRequest {
+            input: "khnhomtov",
+            history: &history,
+            composer: &analysis,
+        };
+
+        let result = decoder.decode(&request);
+        assert_eq!(
+            result.candidates.first().map(|candidate| candidate.text.as_str()),
+            Some("ខ្ញុំទៅ")
+        );
     }
 }

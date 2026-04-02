@@ -107,6 +107,7 @@ fn App() -> Element {
                         text,
                         roman_enabled,
                         decoder_mode,
+                        show_guide,
                         font_size,
                         suggestions,
                         popup,

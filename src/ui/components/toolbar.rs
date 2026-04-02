@@ -12,6 +12,7 @@ pub(crate) fn AppToolbar(
     text: Signal<String>,
     roman_enabled: Signal<bool>,
     decoder_mode: Signal<DecoderMode>,
+    show_guide: Signal<bool>,
     font_size: Signal<usize>,
     suggestions: Signal<Vec<String>>,
     popup: Signal<Option<SuggestionPopup>>,
@@ -26,9 +27,6 @@ pub(crate) fn AppToolbar(
 ) -> Element {
     rsx! {
         div { class: "workspace-top",
-            div { class: "hero",
-                h1 { "Khmer IME" }
-            }
             div { class: "toolbar",
                 div { class: "font-tools",
                     span { class: "tool-label", "Font size" }
@@ -72,7 +70,7 @@ pub(crate) fn AppToolbar(
                                     spawn(update_candidates(text(), text, roman_enabled, decoder_mode(), suggestions, popup, composition, shadow_debug, active_token, number_pick_mode, selection_started, selected, history));
                                 }
                             },
-                            "Roman To Khmer"
+                            "RtoK"
                         }
                         button {
                             class: if !roman_enabled() { "mode-pill active" } else { "mode-pill" },
@@ -90,7 +88,7 @@ pub(crate) fn AppToolbar(
                                     selected.set(0);
                                 }
                             },
-                            "Raw Roman"
+                            "Raw"
                         }
                     }
                     div { class: "decoder-tools",
@@ -125,6 +123,16 @@ pub(crate) fn AppToolbar(
                                 },
                                 "Shadow"
                             }
+                        }
+                    }
+                    button {
+                        class: if show_guide() { "ghost active" } else { "ghost" },
+                        "data-testid": "toggle-rules",
+                        onclick: move |_| show_guide.set(!show_guide()),
+                        if show_guide() {
+                            "Hide Rules"
+                        } else {
+                            "Rules"
                         }
                     }
                     button {

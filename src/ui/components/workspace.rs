@@ -1,8 +1,6 @@
 use dioxus::prelude::*;
 use roman_lookup::{DecoderMode, ShadowObservation};
 
-use crate::ui::shadow::ShadowPanel;
-
 #[component]
 pub(crate) fn WorkspaceBody(
     roman_enabled: bool,
@@ -10,16 +8,10 @@ pub(crate) fn WorkspaceBody(
     shadow_debug: Option<ShadowObservation>,
     editor_card: Element,
 ) -> Element {
+    let _ = (roman_enabled, decoder_mode, shadow_debug);
     rsx! {
         div {
-            class: if roman_enabled && decoder_mode == DecoderMode::Shadow {
-                "workspace-body workspace-body-shadow"
-            } else {
-                "workspace-body"
-            },
-            if roman_enabled && decoder_mode == DecoderMode::Shadow {
-                ShadowPanel { debug: shadow_debug }
-            }
+            class: "workspace-body",
             {editor_card}
         }
     }

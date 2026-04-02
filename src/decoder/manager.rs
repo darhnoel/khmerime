@@ -1,5 +1,7 @@
 use std::collections::HashMap;
 
+use crate::composer::ComposerTable;
+
 #[cfg(feature = "wfst-decoder")]
 use super::DecodeFailure;
 #[cfg(feature = "wfst-decoder")]
@@ -10,6 +12,7 @@ use super::{
 };
 
 pub(crate) struct DecoderManager {
+    composer: ComposerTable,
     legacy: LegacyDecoder,
     #[cfg(feature = "wfst-decoder")]
     wfst: Option<WfstDecoder>,
@@ -18,20 +21,39 @@ pub(crate) struct DecoderManager {
 
 impl DecoderManager {
     #[cfg(feature = "wfst-decoder")]
-    pub(crate) fn new(legacy: LegacyDecoder, wfst: Option<WfstDecoder>, config: DecoderConfig) -> Self {
-        Self { legacy, wfst, config }
+    pub(crate) fn new(
+        composer: ComposerTable,
+        legacy: LegacyDecoder,
+        wfst: Option<WfstDecoder>,
+        config: DecoderConfig,
+    ) -> Self {
+        Self {
+            composer,
+            legacy,
+            wfst,
+            config,
+        }
     }
 
     #[cfg(not(feature = "wfst-decoder"))]
-    pub(crate) fn new(legacy: LegacyDecoder, config: DecoderConfig) -> Self {
-        Self { legacy, config }
+    pub(crate) fn new(composer: ComposerTable, legacy: LegacyDecoder, config: DecoderConfig) -> Self {
+        Self {
+            composer,
+            legacy,
+            config,
+        }
     }
 
     pub(crate) fn suggest(&self, input: &str, history: &HashMap<String, usize>) -> Vec<String> {
-        let request = DecodeRequest { input, history };
+        let composer = self.composer.analyze(input);
+        let request = DecodeRequest {
+            input,
+            history,
+            composer: &composer,
+        };
         let legacy = self.legacy.decode(&request);
         let wfst = self.decode_wfst(&request);
-        let observation = build_shadow_observation(self.config.mode, input, &legacy, wfst.as_ref());
+        let observation = build_shadow_observation(self.config.mode, input, &composer, &legacy, wfst.as_ref());
         if self.config.mode != DecoderMode::Legacy && self.should_sample_shadow(input) {
             self.log_shadow_report(&observation);
         }
@@ -46,10 +68,15 @@ impl DecoderManager {
     }
 
     pub(crate) fn shadow_observation(&self, input: &str, history: &HashMap<String, usize>) -> ShadowObservation {
-        let request = DecodeRequest { input, history };
+        let composer = self.composer.analyze(input);
+        let request = DecodeRequest {
+            input,
+            history,
+            composer: &composer,
+        };
         let legacy = self.legacy.decode(&request);
         let wfst = self.decode_wfst(&request);
-        build_shadow_observation(self.config.mode, input, &legacy, wfst.as_ref())
+        build_shadow_observation(self.config.mode, input, &composer, &legacy, wfst.as_ref())
     }
 
     #[cfg(feature = "wfst-decoder")]

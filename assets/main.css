@@ -99,8 +99,6 @@ body {
   gap: 18px;
   flex-wrap: wrap;
   min-height: 60px;
-  padding-top: 10px;
-  border-top: 1px solid var(--line);
 }
 
 .hero {
@@ -213,6 +211,12 @@ body {
 
 .ghost {
   background: transparent;
+}
+
+.ghost.active {
+  border-color: rgba(177, 77, 30, 0.32);
+  background: var(--accent-soft);
+  color: var(--accent-strong);
 }
 
 .card-head {

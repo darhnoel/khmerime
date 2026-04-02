@@ -1,5 +1,7 @@
 use std::collections::HashMap;
 
+use crate::composer::ComposerAnalysis;
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum DecoderMode {
     Legacy,
@@ -36,6 +38,7 @@ pub struct DecodeCandidate {
 pub struct DecodeRequest<'a> {
     pub input: &'a str,
     pub history: &'a HashMap<String, usize>,
+    pub(crate) composer: &'a ComposerAnalysis,
 }
 
 #[derive(Clone, Debug, PartialEq)]

@@ -5,6 +5,7 @@ use std::ops::Range;
 use std::path::Path;
 use std::sync::Arc;
 
+use crate::composer::ComposerTable;
 #[cfg(feature = "wfst-decoder")]
 use crate::decoder::WfstDecoder;
 use crate::decoder::{DecoderConfig, DecoderManager, LegacyDecoder, ShadowObservation};
@@ -106,6 +107,7 @@ pub type Result<T> = std::result::Result<T, LexiconError>;
 pub(crate) struct LegacyData {
     entries: Vec<Entry>,
     by_roman: HashMap<String, Vec<String>>,
+    by_normalized: HashMap<String, Vec<String>>,
     index: SearchIndex,
 }
 
@@ -140,14 +142,16 @@ impl Transliterator {
     pub fn from_tsv_str_with_config(source: &str, config: DecoderConfig) -> Result<Self> {
         let entries = parse_tsv(source)?;
         let legacy = Arc::new(LegacyData::from_entries(entries));
+        let composer = ComposerTable::from_entries(legacy.entries());
         #[cfg(feature = "wfst-decoder")]
         let decoder = DecoderManager::new(
+            composer,
             LegacyDecoder::new(Arc::clone(&legacy)),
             Some(WfstDecoder::from_entries(legacy.entries())),
             config,
         );
         #[cfg(not(feature = "wfst-decoder"))]
-        let decoder = DecoderManager::new(LegacyDecoder::new(Arc::clone(&legacy)), config);
+        let decoder = DecoderManager::new(composer, LegacyDecoder::new(Arc::clone(&legacy)), config);
         Ok(Self { legacy, decoder })
     }
 
@@ -230,9 +234,14 @@ impl Transliterator {
 impl LegacyData {
     fn from_entries(entries: Vec<Entry>) -> Self {
         let mut by_roman = HashMap::<String, Vec<String>>::new();
+        let mut by_normalized = HashMap::<String, Vec<String>>::new();
         for entry in &entries {
             by_roman
                 .entry(entry.roman.clone())
+                .or_insert_with(Vec::new)
+                .push(entry.target.clone());
+            by_normalized
+                .entry(normalize(&entry.roman))
                 .or_insert_with(Vec::new)
                 .push(entry.target.clone());
         }
@@ -240,6 +249,7 @@ impl LegacyData {
         Self {
             entries,
             by_roman,
+            by_normalized,
             index: SearchIndex::new(&roman_keys, true, 2, 3),
         }
     }
@@ -378,6 +388,10 @@ impl LegacyData {
         });
         suggestions.truncate(MAX_SUGGESTIONS);
         suggestions
+    }
+
+    pub(crate) fn exact_targets(&self, normalized: &str) -> Option<&[String]> {
+        self.by_normalized.get(normalized).map(Vec::as_slice)
     }
 }
 
@@ -730,6 +744,18 @@ mod tests {
                 text: "ជា".to_owned(),
                 caret: 2,
             }
+        );
+    }
+
+    #[test]
+    fn composes_exact_phrase_chunks_before_fuzzy_whole_token_matches() {
+        let transliterator = Transliterator::from_default_data().unwrap();
+        assert_eq!(
+            transliterator
+                .suggest("khnhomttov", &HashMap::new())
+                .first()
+                .map(String::as_str),
+            Some("ខ្ញុំ ទៅ")
         );
     }
 }
