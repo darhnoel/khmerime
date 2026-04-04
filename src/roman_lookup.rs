@@ -7,10 +7,13 @@ use std::sync::Arc;
 
 use crate::composer::ComposerTable;
 #[cfg(feature = "wfst-decoder")]
+use crate::decoder::DecoderMode;
+#[cfg(feature = "wfst-decoder")]
 use crate::decoder::WfstDecoder;
 use crate::decoder::{DecoderConfig, DecoderManager, LegacyDecoder, ShadowObservation};
 
-const DEFAULT_DATA: &str = include_str!("../data/roman_lookup_v3.tsv");
+const DEFAULT_COMPILED_DATA: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/roman_lookup.lexicon.bin"));
+const COMPILED_MAGIC: &[u8; 4] = b"RLX1";
 const MAX_SUGGESTIONS: usize = 10;
 const MAX_MATCHES: usize = 50;
 const SYMBOL_DIGITS: [(&str, &str); 10] = [
@@ -118,7 +121,7 @@ pub struct Transliterator {
 
 impl Transliterator {
     pub fn from_default_data() -> Result<Self> {
-        Self::from_tsv_str_with_config(DEFAULT_DATA, DecoderConfig::default())
+        Self::from_default_data_with_config(DecoderConfig::default())
     }
 
     pub fn from_tsv_path(path: impl AsRef<Path>) -> Result<Self> {
@@ -131,7 +134,8 @@ impl Transliterator {
     }
 
     pub fn from_default_data_with_config(config: DecoderConfig) -> Result<Self> {
-        Self::from_tsv_str_with_config(DEFAULT_DATA, config)
+        let entries = parse_compiled_lexicon(DEFAULT_COMPILED_DATA)?;
+        Self::from_entries_with_config(entries, config)
     }
 
     pub fn from_tsv_path_with_config(path: impl AsRef<Path>, config: DecoderConfig) -> Result<Self> {
@@ -141,13 +145,17 @@ impl Transliterator {
 
     pub fn from_tsv_str_with_config(source: &str, config: DecoderConfig) -> Result<Self> {
         let entries = parse_tsv(source)?;
+        Self::from_entries_with_config(entries, config)
+    }
+
+    fn from_entries_with_config(entries: Vec<Entry>, config: DecoderConfig) -> Result<Self> {
         let legacy = Arc::new(LegacyData::from_entries(entries));
         let composer = ComposerTable::from_entries(legacy.entries());
         #[cfg(feature = "wfst-decoder")]
         let decoder = DecoderManager::new(
             composer,
             LegacyDecoder::new(Arc::clone(&legacy)),
-            Some(WfstDecoder::from_entries(legacy.entries())),
+            (config.mode != DecoderMode::Legacy).then(|| WfstDecoder::from_entries(legacy.entries())),
             config,
         );
         #[cfg(not(feature = "wfst-decoder"))]
@@ -589,6 +597,45 @@ fn parse_tsv(source: &str) -> Result<Vec<Entry>> {
     Ok(entries)
 }
 
+fn parse_compiled_lexicon(source: &[u8]) -> Result<Vec<Entry>> {
+    if source.len() < 8 || &source[..4] != COMPILED_MAGIC {
+        return Err(LexiconError::Parse("invalid compiled lexicon header".to_owned()));
+    }
+
+    let entry_count = u32::from_le_bytes(source[4..8].try_into().expect("header slice has fixed width")) as usize;
+    let mut offset = 8usize;
+    let mut entries = Vec::with_capacity(entry_count);
+    while offset < source.len() {
+        let roman_end = find_nul(source, offset)
+            .ok_or_else(|| LexiconError::Parse("invalid compiled lexicon payload".to_owned()))?;
+        let target_start = roman_end + 1;
+        let target_end = find_nul(source, target_start)
+            .ok_or_else(|| LexiconError::Parse("invalid compiled lexicon payload".to_owned()))?;
+        let roman = std::str::from_utf8(&source[offset..roman_end])
+            .map_err(|_| LexiconError::Parse("compiled lexicon contains invalid UTF-8".to_owned()))?;
+        let target = std::str::from_utf8(&source[target_start..target_end])
+            .map_err(|_| LexiconError::Parse("compiled lexicon contains invalid UTF-8".to_owned()))?;
+        entries.push(Entry {
+            roman: roman.to_owned(),
+            target: target.to_owned(),
+        });
+        offset = target_end + 1;
+    }
+
+    if entries.len() != entry_count {
+        return Err(LexiconError::Parse("compiled lexicon entry count mismatch".to_owned()));
+    }
+
+    Ok(entries)
+}
+
+fn find_nul(source: &[u8], start: usize) -> Option<usize> {
+    source[start..]
+        .iter()
+        .position(|byte| *byte == 0)
+        .map(|relative| start + relative)
+}
+
 fn is_roman_letter(ch: char) -> bool {
     ch.is_ascii() && ch.is_ascii_alphabetic()
 }
@@ -664,11 +711,12 @@ pub(crate) fn similarity(left: &str, right: &str) -> f64 {
 #[cfg(test)]
 mod tests {
     use super::*;
+    const DEFAULT_DATA_TSV: &str = include_str!("../data/roman_lookup.tsv");
 
     #[test]
     fn loads_embedded_data() {
         let transliterator = Transliterator::from_default_data().unwrap();
-        let expected_entries = DEFAULT_DATA.lines().filter(|line| !line.is_empty()).count();
+        let expected_entries = DEFAULT_DATA_TSV.lines().filter(|line| !line.is_empty()).count();
         assert_eq!(transliterator.entries().len(), expected_entries);
         assert!(transliterator
             .entries()
@@ -681,6 +729,13 @@ mod tests {
     }
 
     #[test]
+    fn compiled_lexicon_matches_tsv_source() {
+        let compiled_entries = parse_compiled_lexicon(DEFAULT_COMPILED_DATA).unwrap();
+        let tsv_entries = parse_tsv(DEFAULT_DATA_TSV).unwrap();
+        assert_eq!(compiled_entries, tsv_entries);
+    }
+
+    #[test]
     fn reproduces_expected_suggestions() {
         let transliterator = Transliterator::from_default_data().unwrap();
         assert_eq!(
@@ -689,7 +744,7 @@ mod tests {
         );
         assert_eq!(
             transliterator.suggest("tver", &HashMap::new()),
-            vec!["តើ", "វេរ", "ថេរ", "ទេរ", "ធ្វើ", "ខ្វេរ", "ទ្វារ", "ហ្វឹក", "ថ្នេរ", "ទង្វើ"]
+            vec!["ទៅ", "តើ", "វេរ", "ថេរ", "ទេរ", "ធ្វើ", "ដំណើរ", "សរសើរ", "ខ្វេរ", "ទង្វើ"]
         );
     }
 
@@ -701,7 +756,7 @@ mod tests {
         history.insert("តែ".to_owned(), 1);
         assert_eq!(
             transliterator.suggest("te", &history),
-            vec!["ទេ", "តែ", "តើ", "តិះ", "តេត", "តេន", "តិច", "តេជ", "តិចៗ", "ទន្លេ"]
+            vec!["ទេ", "តែ", "តើ", "តិះ", "តេត", "តេន", "តិច", "ធ្វើ", "ទន្លេ", "ផ្ទេរ"]
         );
     }
 

@@ -452,6 +452,22 @@ pub(crate) async fn editor_popup_position(caret: usize) -> Option<SuggestionPopu
     ))
 }
 
+#[cfg(target_arch = "wasm32")]
+pub(crate) fn mark_app_ready() {
+    let Some(document) = browser_document() else {
+        return;
+    };
+    if let Some(body) = document.body() {
+        let _ = body.set_attribute("data-app-ready", "1");
+    }
+    if let Some(splash) = document.get_element_by_id("app-preboot-splash") {
+        let _ = splash.set_attribute("data-hidden", "true");
+    }
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+pub(crate) fn mark_app_ready() {}
+
 #[cfg(test)]
 mod tests {
     use super::*;

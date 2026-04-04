@@ -13,6 +13,7 @@ use crate::{CompositionMark, SuggestionPopup, EDITOR_ID, VISIBLE_SUGGESTIONS};
 
 #[component]
 pub(crate) fn EditorCard(
+    engine_ready: Signal<bool>,
     text: Signal<String>,
     roman_enabled: Signal<bool>,
     decoder_mode: Signal<DecoderMode>,
@@ -45,7 +46,7 @@ pub(crate) fn EditorCard(
                         let value = event.value();
                         save_editor_text(&value);
                         text.set(value.clone());
-                        spawn(update_candidates(value, text, roman_enabled, decoder_mode(), suggestions, popup, composition, shadow_debug, active_token, number_pick_mode, selection_started, selected, history));
+                        spawn(update_candidates(value, text, roman_enabled, decoder_mode(), engine_ready, suggestions, popup, composition, shadow_debug, active_token, number_pick_mode, selection_started, selected, history));
                     },
                     onkeydown: move |event| {
                         let key = event.key().to_string();
@@ -69,7 +70,7 @@ pub(crate) fn EditorCard(
                                 selection_started.set(false);
                                 selected.set(0);
                             } else {
-                                spawn(update_candidates(text(), text, roman_enabled, decoder_mode(), suggestions, popup, composition, shadow_debug, active_token, number_pick_mode, selection_started, selected, history));
+                                spawn(update_candidates(text(), text, roman_enabled, decoder_mode(), engine_ready, suggestions, popup, composition, shadow_debug, active_token, number_pick_mode, selection_started, selected, history));
                             }
                             return;
                         }
@@ -157,7 +158,7 @@ pub(crate) fn EditorCard(
                             return;
                         }
                         if roman_enabled() {
-                            spawn(update_candidates(text(), text, roman_enabled, decoder_mode(), suggestions, popup, composition, shadow_debug, active_token, number_pick_mode, selection_started, selected, history));
+                            spawn(update_candidates(text(), text, roman_enabled, decoder_mode(), engine_ready, suggestions, popup, composition, shadow_debug, active_token, number_pick_mode, selection_started, selected, history));
                         }
                     }
                 }

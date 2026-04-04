@@ -8,10 +8,10 @@ mod ui;
 
 use self::ui::components::{AppToolbar, EditorCard, GuidePanel, WorkspaceBody};
 use self::ui::editor::refresh_popup_position;
-use self::ui::platform::set_editor_caret;
+use self::ui::platform::{mark_app_ready, set_editor_caret};
 use self::ui::storage::{load_decoder_mode, load_editor_text, load_enabled, load_font_size, load_history};
 
-static STYLES: Asset = asset!("/assets/main.css");
+const APP_CSS: &str = include_str!("../assets/main.css");
 static LEGACY_TRANSLITERATOR: OnceLock<Transliterator> = OnceLock::new();
 static SHADOW_TRANSLITERATOR: OnceLock<Transliterator> = OnceLock::new();
 
@@ -60,6 +60,7 @@ pub(crate) fn engine(mode: DecoderMode) -> &'static Transliterator {
 
 #[component]
 fn App() -> Element {
+    let mut engine_ready = use_signal(|| LEGACY_TRANSLITERATOR.get().is_some());
     let text = use_signal(load_editor_text);
     let roman_enabled = use_signal(load_enabled);
     let decoder_mode = use_signal(load_decoder_mode);
@@ -84,8 +85,37 @@ fn App() -> Element {
     });
 
     use_effect(move || {
-        let _ = engine(DecoderMode::Legacy);
-        let _ = engine(decoder_mode());
+        spawn(async move {
+            let _ = engine(DecoderMode::Legacy);
+            engine_ready.set(true);
+        });
+    });
+
+    use_effect(move || {
+        if engine_ready() {
+            mark_app_ready();
+        }
+    });
+
+    use_effect(move || {
+        if engine_ready() && roman_enabled() {
+            spawn(ui::editor::update_candidates(
+                text(),
+                text,
+                roman_enabled,
+                decoder_mode(),
+                engine_ready,
+                suggestions,
+                popup,
+                composition,
+                shadow_debug,
+                active_token,
+                number_pick_mode,
+                selection_started,
+                selected,
+                history,
+            ));
+        }
     });
 
     use_effect(move || {
@@ -99,11 +129,12 @@ fn App() -> Element {
     });
 
     rsx! {
-        document::Stylesheet { href: STYLES }
+        document::Style { {APP_CSS} }
         div { class: "shell",
             div { class: if show_guide() { "board" } else { "board board-wide" },
                 section { class: "workspace",
                     AppToolbar {
+                        engine_ready,
                         text,
                         roman_enabled,
                         decoder_mode,
@@ -126,6 +157,7 @@ fn App() -> Element {
                         shadow_debug: shadow_debug(),
                         editor_card: rsx! {
                             EditorCard {
+                                engine_ready,
                                 text,
                                 roman_enabled,
                                 decoder_mode,

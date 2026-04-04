@@ -360,6 +360,6 @@ mod tests {
             hints.iter().map(|chunk| chunk.normalized.as_str()).collect::<Vec<_>>(),
             vec!["khnhom", "tov"]
         );
-        assert_eq!(hints.last().map(|chunk| chunk.kind), Some(ComposerChunkKind::Hint));
+        assert_eq!(hints.last().map(|chunk| chunk.kind), Some(ComposerChunkKind::Exact));
     }
 }

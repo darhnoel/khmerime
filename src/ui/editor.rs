@@ -20,6 +20,7 @@ pub(crate) async fn update_candidates(
     live_text: Signal<String>,
     roman_enabled: Signal<bool>,
     decoder_mode: DecoderMode,
+    engine_ready: Signal<bool>,
     mut suggestions: Signal<Vec<String>>,
     mut popup: Signal<Option<SuggestionPopup>>,
     mut composition: Signal<Option<CompositionMark>>,
@@ -55,6 +56,18 @@ pub(crate) async fn update_candidates(
         composition.set(None);
         shadow_debug.set(None);
         active_token.set(String::new());
+        number_pick_mode.set(false);
+        selection_started.set(false);
+        selected.set(0);
+        return;
+    }
+
+    if !engine_ready() {
+        suggestions.set(Vec::new());
+        popup.set(None);
+        composition.set(None);
+        shadow_debug.set(None);
+        active_token.set(token);
         number_pick_mode.set(false);
         selection_started.set(false);
         selected.set(0);

@@ -9,6 +9,7 @@ use crate::{CompositionMark, SuggestionPopup, MAX_FONT_SIZE, MIN_FONT_SIZE};
 
 #[component]
 pub(crate) fn AppToolbar(
+    engine_ready: Signal<bool>,
     text: Signal<String>,
     roman_enabled: Signal<bool>,
     decoder_mode: Signal<DecoderMode>,
@@ -38,7 +39,7 @@ pub(crate) fn AppToolbar(
                             font_size.set(next);
                             save_font_size(next, MIN_FONT_SIZE, MAX_FONT_SIZE);
                             if roman_enabled() {
-                                spawn(update_candidates(text(), text, roman_enabled, decoder_mode(), suggestions, popup, composition, shadow_debug, active_token, number_pick_mode, selection_started, selected, history));
+                                spawn(update_candidates(text(), text, roman_enabled, decoder_mode(), engine_ready, suggestions, popup, composition, shadow_debug, active_token, number_pick_mode, selection_started, selected, history));
                             }
                         },
                         "A-"
@@ -52,7 +53,7 @@ pub(crate) fn AppToolbar(
                             font_size.set(next);
                             save_font_size(next, MIN_FONT_SIZE, MAX_FONT_SIZE);
                             if roman_enabled() {
-                                spawn(update_candidates(text(), text, roman_enabled, decoder_mode(), suggestions, popup, composition, shadow_debug, active_token, number_pick_mode, selection_started, selected, history));
+                                spawn(update_candidates(text(), text, roman_enabled, decoder_mode(), engine_ready, suggestions, popup, composition, shadow_debug, active_token, number_pick_mode, selection_started, selected, history));
                             }
                         },
                         "A+"
@@ -67,7 +68,7 @@ pub(crate) fn AppToolbar(
                                 if !roman_enabled() {
                                     roman_enabled.set(true);
                                     save_enabled(true);
-                                    spawn(update_candidates(text(), text, roman_enabled, decoder_mode(), suggestions, popup, composition, shadow_debug, active_token, number_pick_mode, selection_started, selected, history));
+                                    spawn(update_candidates(text(), text, roman_enabled, decoder_mode(), engine_ready, suggestions, popup, composition, shadow_debug, active_token, number_pick_mode, selection_started, selected, history));
                                 }
                             },
                             "RtoK"
@@ -103,7 +104,7 @@ pub(crate) fn AppToolbar(
                                         save_decoder_mode(DecoderMode::Legacy);
                                         shadow_debug.set(None);
                                         if roman_enabled() {
-                                            spawn(update_candidates(text(), text, roman_enabled, DecoderMode::Legacy, suggestions, popup, composition, shadow_debug, active_token, number_pick_mode, selection_started, selected, history));
+                                            spawn(update_candidates(text(), text, roman_enabled, DecoderMode::Legacy, engine_ready, suggestions, popup, composition, shadow_debug, active_token, number_pick_mode, selection_started, selected, history));
                                         }
                                     }
                                 },
@@ -117,11 +118,19 @@ pub(crate) fn AppToolbar(
                                         decoder_mode.set(DecoderMode::Shadow);
                                         save_decoder_mode(DecoderMode::Shadow);
                                         if roman_enabled() {
-                                            spawn(update_candidates(text(), text, roman_enabled, DecoderMode::Shadow, suggestions, popup, composition, shadow_debug, active_token, number_pick_mode, selection_started, selected, history));
+                                            spawn(update_candidates(text(), text, roman_enabled, DecoderMode::Shadow, engine_ready, suggestions, popup, composition, shadow_debug, active_token, number_pick_mode, selection_started, selected, history));
                                         }
                                     }
                                 },
                                 "Shadow"
+                            }
+                        }
+                        if !engine_ready() {
+                            div {
+                                class: "engine-status loading",
+                                "data-testid": "engine-status",
+                                span { class: "engine-status-dot", aria_hidden: "true" }
+                                span { "Preparing lexicon..." }
                             }
                         }
                     }

@@ -12,8 +12,13 @@ from playwright.sync_api import expect, sync_playwright
 
 ROOT = Path(__file__).resolve().parents[1]
 HOST = "127.0.0.1"
-PORT = 4185
-BASE_URL = f"http://{HOST}:{PORT}"
+
+
+def _free_port(host: str) -> int:
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+        sock.bind((host, 0))
+        sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        return sock.getsockname()[1]
 
 
 def _port_open(host: str, port: int) -> bool:
@@ -36,29 +41,31 @@ def _wait_for_server(url: str, timeout_s: float = 90.0) -> None:
     raise RuntimeError(f"web server did not become ready: {last_error!r}")
 
 
+def _wait_for_shell_splash(url: str, timeout_s: float = 20.0) -> None:
+    deadline = time.time() + timeout_s
+    while time.time() < deadline:
+        try:
+            with urlopen(url, timeout=2.0) as response:
+                html = response.read().decode("utf-8", errors="replace")
+            if 'data-testid="preboot-splash"' in html:
+                return
+        except Exception:
+            pass
+        time.sleep(0.25)
+    raise RuntimeError("preboot splash was not injected into index.html")
+
+
 @pytest.fixture(scope="module")
 def web_server():
-    if _port_open(HOST, PORT):
-        raise RuntimeError(f"test port {PORT} already in use")
+    port = _free_port(HOST)
+    base_url = f"http://{HOST}:{port}"
 
     env = os.environ.copy()
     env["ADDR"] = HOST
-    env["PORT"] = str(PORT)
+    env["PORT"] = str(port)
+    env["DX_FEATURES"] = "wfst-decoder"
     process = subprocess.Popen(
-        [
-            "dx",
-            "serve",
-            "--platform",
-            "web",
-            "--addr",
-            HOST,
-            "--port",
-            str(PORT),
-            "--open",
-            "false",
-            "--features",
-            "wfst-decoder",
-        ],
+        ["bash", "scripts/serve_web_phone.sh"],
         cwd=ROOT,
         env=env,
         stdout=subprocess.PIPE,
@@ -67,8 +74,9 @@ def web_server():
     )
 
     try:
-        _wait_for_server(BASE_URL)
-        yield BASE_URL
+        _wait_for_server(base_url)
+        _wait_for_shell_splash(base_url)
+        yield base_url
     finally:
         process.terminate()
         try:
@@ -92,9 +100,12 @@ def test_web_ui_suggestions_and_decoder_toggle(web_server: str) -> None:
             window.sessionStorage.clear();
             """
         )
-        page.goto(web_server, wait_until="networkidle")
+        page.goto(web_server, wait_until="domcontentloaded")
+        expect(page.locator("[data-testid='preboot-splash']")).to_have_count(1)
+        page.wait_for_load_state("networkidle")
 
         editor = page.locator("[data-testid='editor-input']").last
+        expect(editor).to_be_visible(timeout=20_000)
         editor.click()
         editor.type("jea")
 
