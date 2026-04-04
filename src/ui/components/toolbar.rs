@@ -3,8 +3,8 @@ use std::collections::HashMap;
 use dioxus::prelude::*;
 use roman_lookup::{DecoderMode, ShadowObservation};
 
-use crate::ui::editor::update_candidates;
-use crate::ui::storage::{save_decoder_mode, save_editor_text, save_enabled, save_font_size};
+use crate::ui::editor::{update_candidates, SegmentedSession};
+use crate::ui::storage::{save_editor_text, save_enabled, save_font_size};
 use crate::{CompositionMark, SuggestionPopup, MAX_FONT_SIZE, MIN_FONT_SIZE};
 
 #[component]
@@ -19,6 +19,8 @@ pub(crate) fn AppToolbar(
     popup: Signal<Option<SuggestionPopup>>,
     composition: Signal<Option<CompositionMark>>,
     shadow_debug: Signal<Option<ShadowObservation>>,
+    segmented_session: Signal<Option<SegmentedSession>>,
+    segmented_refine_mode: Signal<bool>,
     active_token: Signal<String>,
     number_pick_mode: Signal<bool>,
     selection_started: Signal<bool>,
@@ -39,7 +41,7 @@ pub(crate) fn AppToolbar(
                             font_size.set(next);
                             save_font_size(next, MIN_FONT_SIZE, MAX_FONT_SIZE);
                             if roman_enabled() {
-                                spawn(update_candidates(text(), text, roman_enabled, decoder_mode(), engine_ready, suggestions, popup, composition, shadow_debug, active_token, number_pick_mode, selection_started, selected, history));
+                                spawn(update_candidates(text(), text, roman_enabled, decoder_mode(), engine_ready, suggestions, popup, composition, shadow_debug, segmented_session, segmented_refine_mode, active_token, number_pick_mode, selection_started, selected, history));
                             }
                         },
                         "A-"
@@ -53,85 +55,47 @@ pub(crate) fn AppToolbar(
                             font_size.set(next);
                             save_font_size(next, MIN_FONT_SIZE, MAX_FONT_SIZE);
                             if roman_enabled() {
-                                spawn(update_candidates(text(), text, roman_enabled, decoder_mode(), engine_ready, suggestions, popup, composition, shadow_debug, active_token, number_pick_mode, selection_started, selected, history));
+                                spawn(update_candidates(text(), text, roman_enabled, decoder_mode(), engine_ready, suggestions, popup, composition, shadow_debug, segmented_session, segmented_refine_mode, active_token, number_pick_mode, selection_started, selected, history));
                             }
                         },
                         "A+"
                     }
                 }
                 div { class: "mode-tools",
-                    div { class: "mode-switch",
-                        button {
-                            class: if roman_enabled() { "mode-pill active" } else { "mode-pill" },
-                            "data-testid": "mode-roman",
-                            onclick: move |_| {
-                                if !roman_enabled() {
-                                    roman_enabled.set(true);
-                                    save_enabled(true);
-                                    spawn(update_candidates(text(), text, roman_enabled, decoder_mode(), engine_ready, suggestions, popup, composition, shadow_debug, active_token, number_pick_mode, selection_started, selected, history));
-                                }
-                            },
-                            "RtoK"
-                        }
-                        button {
-                            class: if !roman_enabled() { "mode-pill active" } else { "mode-pill" },
-                            "data-testid": "mode-raw",
-                            onclick: move |_| {
-                                if roman_enabled() {
-                                    roman_enabled.set(false);
-                                    save_enabled(false);
-                                    suggestions.set(Vec::new());
-                                    popup.set(None);
-                                    composition.set(None);
-                                    shadow_debug.set(None);
-                                    number_pick_mode.set(false);
-                                    selection_started.set(false);
-                                    selected.set(0);
-                                }
-                            },
-                            "Raw"
+                    button {
+                        class: if roman_enabled() { "mode-pill active" } else { "mode-pill" },
+                        "data-testid": "toggle-live-edit",
+                        onclick: move |_| {
+                            let next = !roman_enabled();
+                            roman_enabled.set(next);
+                            save_enabled(next);
+                            if next {
+                                spawn(update_candidates(text(), text, roman_enabled, decoder_mode(), engine_ready, suggestions, popup, composition, shadow_debug, segmented_session, segmented_refine_mode, active_token, number_pick_mode, selection_started, selected, history));
+                            } else {
+                                suggestions.set(Vec::new());
+                                popup.set(None);
+                                composition.set(None);
+                                shadow_debug.set(None);
+                                segmented_session.set(None);
+                                segmented_refine_mode.set(false);
+                                active_token.set(String::new());
+                                number_pick_mode.set(false);
+                                selection_started.set(false);
+                                selected.set(0);
+                            }
+                        },
+                        if roman_enabled() {
+                            "Live Edit"
+                        } else {
+                            "Live Edit Off"
                         }
                     }
-                    div { class: "decoder-tools",
-                        span { class: "tool-label", "Decoder" }
-                        div { class: "mode-switch",
-                            button {
-                                class: if decoder_mode() == DecoderMode::Legacy { "mode-pill active" } else { "mode-pill" },
-                                "data-testid": "decoder-legacy",
-                                onclick: move |_| {
-                                    if decoder_mode() != DecoderMode::Legacy {
-                                        decoder_mode.set(DecoderMode::Legacy);
-                                        save_decoder_mode(DecoderMode::Legacy);
-                                        shadow_debug.set(None);
-                                        if roman_enabled() {
-                                            spawn(update_candidates(text(), text, roman_enabled, DecoderMode::Legacy, engine_ready, suggestions, popup, composition, shadow_debug, active_token, number_pick_mode, selection_started, selected, history));
-                                        }
-                                    }
-                                },
-                                "Legacy"
-                            }
-                            button {
-                                class: if decoder_mode() == DecoderMode::Shadow { "mode-pill active" } else { "mode-pill" },
-                                "data-testid": "decoder-shadow",
-                                onclick: move |_| {
-                                    if decoder_mode() != DecoderMode::Shadow {
-                                        decoder_mode.set(DecoderMode::Shadow);
-                                        save_decoder_mode(DecoderMode::Shadow);
-                                        if roman_enabled() {
-                                            spawn(update_candidates(text(), text, roman_enabled, DecoderMode::Shadow, engine_ready, suggestions, popup, composition, shadow_debug, active_token, number_pick_mode, selection_started, selected, history));
-                                        }
-                                    }
-                                },
-                                "Shadow"
-                            }
-                        }
-                        if !engine_ready() {
-                            div {
-                                class: "engine-status loading",
-                                "data-testid": "engine-status",
-                                span { class: "engine-status-dot", aria_hidden: "true" }
-                                span { "Preparing lexicon..." }
-                            }
+                    if !engine_ready() {
+                        div {
+                            class: "engine-status loading",
+                            "data-testid": "engine-status",
+                            span { class: "engine-status-dot", aria_hidden: "true" }
+                            span { "Preparing lexicon..." }
                         }
                     }
                     button {
@@ -154,6 +118,8 @@ pub(crate) fn AppToolbar(
                             popup.set(None);
                             composition.set(None);
                             shadow_debug.set(None);
+                            segmented_session.set(None);
+                            segmented_refine_mode.set(false);
                             active_token.set(String::new());
                             number_pick_mode.set(false);
                             selection_started.set(false);

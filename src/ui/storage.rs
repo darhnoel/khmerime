@@ -10,8 +10,6 @@ const STORAGE_TEXT: &str = "roman_lookup.text";
 #[cfg(target_arch = "wasm32")]
 const STORAGE_ENABLED: &str = "roman_lookup.enabled";
 #[cfg(target_arch = "wasm32")]
-const STORAGE_DECODER_MODE: &str = "roman_lookup.decoder_mode";
-#[cfg(target_arch = "wasm32")]
 const STORAGE_HISTORY: &str = "roman_lookup.history";
 #[cfg(target_arch = "wasm32")]
 const STORAGE_FONT_SIZE: &str = "roman_lookup.font_size";
@@ -67,30 +65,13 @@ pub(crate) fn save_enabled(value: bool) {
 #[cfg(not(target_arch = "wasm32"))]
 pub(crate) fn save_enabled(_: bool) {}
 
-#[cfg(target_arch = "wasm32")]
 pub(crate) fn load_decoder_mode() -> DecoderMode {
-    match storage_get_web(STORAGE_DECODER_MODE).as_deref() {
-        Some("shadow") => DecoderMode::Shadow,
-        _ => DecoderMode::Legacy,
+    if cfg!(feature = "wfst-decoder") {
+        DecoderMode::Shadow
+    } else {
+        DecoderMode::Legacy
     }
 }
-
-#[cfg(not(target_arch = "wasm32"))]
-pub(crate) fn load_decoder_mode() -> DecoderMode {
-    DecoderMode::Legacy
-}
-
-#[cfg(target_arch = "wasm32")]
-pub(crate) fn save_decoder_mode(mode: DecoderMode) {
-    let value = match mode {
-        DecoderMode::Shadow => "shadow",
-        _ => "legacy",
-    };
-    let _ = storage_set_web(STORAGE_DECODER_MODE, value);
-}
-
-#[cfg(not(target_arch = "wasm32"))]
-pub(crate) fn save_decoder_mode(_: DecoderMode) {}
 
 #[cfg(target_arch = "wasm32")]
 pub(crate) fn load_history() -> HashMap<String, usize> {

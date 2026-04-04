@@ -32,7 +32,6 @@ pub(crate) fn GuidePanel(show_guide: Signal<bool>) -> Element {
                 }
                 div { class: "guide-panel",
                     div { class: "guide-card intro",
-                        p { class: "eyebrow", "User guide" }
                         h2 { "Typing rules" }
                         p { "These are the patterns users should remember first. The goal is fast recall, not full linguistic detail." }
                     }

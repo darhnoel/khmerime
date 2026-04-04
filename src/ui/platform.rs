@@ -465,8 +465,21 @@ pub(crate) fn mark_app_ready() {
     }
 }
 
+#[cfg(target_arch = "wasm32")]
+pub(crate) fn hide_preboot_splash() {
+    let Some(document) = browser_document() else {
+        return;
+    };
+    if let Some(splash) = document.get_element_by_id("app-preboot-splash") {
+        let _ = splash.set_attribute("data-hidden", "true");
+    }
+}
+
 #[cfg(not(target_arch = "wasm32"))]
 pub(crate) fn mark_app_ready() {}
+
+#[cfg(not(target_arch = "wasm32"))]
+pub(crate) fn hide_preboot_splash() {}
 
 #[cfg(test)]
 mod tests {

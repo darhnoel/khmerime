@@ -86,7 +86,7 @@ def web_server():
             process.wait(timeout=5)
 
 
-def test_web_ui_suggestions_and_decoder_toggle(web_server: str) -> None:
+def test_web_ui_suggestions_and_live_edit_toggle(web_server: str) -> None:
     with sync_playwright() as playwright:
         browser = playwright.chromium.launch()
         page = browser.new_page()
@@ -106,6 +106,7 @@ def test_web_ui_suggestions_and_decoder_toggle(web_server: str) -> None:
 
         editor = page.locator("[data-testid='editor-input']").last
         expect(editor).to_be_visible(timeout=20_000)
+        expect(page.locator("[data-testid='engine-status']")).to_have_count(0, timeout=20_000)
         editor.click()
         editor.type("jea")
 
@@ -118,17 +119,23 @@ def test_web_ui_suggestions_and_decoder_toggle(web_server: str) -> None:
         expect(page.locator(".composition-mark, .composition-preview").last).to_be_visible(timeout=15_000)
         expect(page.locator("[data-testid='suggestion-popup'] .suggestion button").first).to_be_visible()
 
-        shadow_button = page.locator("[data-testid='decoder-shadow']").last
-        shadow_button.click()
-        expect(shadow_button).to_have_class(re.compile(r".*active.*"))
-        expect(page.locator("[data-testid='shadow-panel']")).to_have_count(0)
         editor.press("Control+A")
         editor.type("khnhomtov")
+        expect(page.locator("[data-testid='segment-preview']")).to_be_visible(timeout=15_000)
+        expect(page.locator(".segment-chip").nth(0)).to_contain_text("ខ្ញុំ")
+        expect(page.locator(".segment-chip").nth(1)).to_contain_text("ទៅ")
         expect(page.locator("[data-testid='suggestion-popup'] .suggestion button").first).to_contain_text("ខ្ញុំទៅ")
+        editor.press("ArrowRight")
+        expect(page.locator(".segment-chip.active").last).to_contain_text("ទៅ")
+        expect(page.locator("[data-testid='suggestion-popup'] .suggestion button").first).to_contain_text("ទៅ")
 
-        legacy_button = page.locator("[data-testid='decoder-legacy']").last
-        legacy_button.click()
-        expect(legacy_button).to_have_class(re.compile(r".*active.*"))
+        live_edit_button = page.locator("[data-testid='toggle-live-edit']").last
+        expect(live_edit_button).to_have_class(re.compile(r".*active.*"))
+        live_edit_button.click()
+        expect(live_edit_button).not_to_have_class(re.compile(r".*active.*"))
+        expect(page.locator("[data-testid='suggestion-popup']")).to_have_count(0)
+        live_edit_button.click()
+        expect(live_edit_button).to_have_class(re.compile(r".*active.*"))
 
         rules_button = page.locator("[data-testid='toggle-rules']").last
         rules_button.click()

@@ -7,6 +7,52 @@ use crate::ui::platform::{current_editor_caret, editor_composition_mark, editor_
 use crate::ui::storage::{save_editor_text, save_history};
 use crate::{engine, CompositionMark, SuggestionPopup, FALLBACK_POPUP_LEFT, FALLBACK_POPUP_TOP};
 
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct SegmentedChoice {
+    pub input: String,
+    pub candidates: Vec<String>,
+    pub selected: usize,
+}
+
+impl SegmentedChoice {
+    pub(crate) fn selected_text(&self) -> String {
+        self.candidates
+            .get(self.selected)
+            .cloned()
+            .or_else(|| self.candidates.first().cloned())
+            .unwrap_or_default()
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct SegmentedSession {
+    pub segments: Vec<SegmentedChoice>,
+    pub focused: usize,
+}
+
+impl SegmentedSession {
+    pub(crate) fn focused_candidates(&self) -> Vec<String> {
+        self.segments
+            .get(self.focused)
+            .map(|segment| segment.candidates.clone())
+            .unwrap_or_default()
+    }
+
+    pub(crate) fn focused_selected(&self) -> usize {
+        self.segments
+            .get(self.focused)
+            .map(|segment| segment.selected)
+            .unwrap_or(0)
+    }
+
+    pub(crate) fn composed_text(&self) -> String {
+        self.segments
+            .iter()
+            .map(SegmentedChoice::selected_text)
+            .collect::<String>()
+    }
+}
+
 fn slice_chars(input: &str, range: std::ops::Range<usize>) -> String {
     input
         .chars()
@@ -25,6 +71,8 @@ pub(crate) async fn update_candidates(
     mut popup: Signal<Option<SuggestionPopup>>,
     mut composition: Signal<Option<CompositionMark>>,
     mut shadow_debug: Signal<Option<ShadowObservation>>,
+    mut segmented_session: Signal<Option<SegmentedSession>>,
+    mut segmented_refine_mode: Signal<bool>,
     mut active_token: Signal<String>,
     mut number_pick_mode: Signal<bool>,
     mut selection_started: Signal<bool>,
@@ -36,6 +84,8 @@ pub(crate) async fn update_candidates(
         popup.set(None);
         composition.set(None);
         shadow_debug.set(None);
+        segmented_session.set(None);
+        segmented_refine_mode.set(false);
         active_token.set(String::new());
         number_pick_mode.set(false);
         selection_started.set(false);
@@ -55,6 +105,8 @@ pub(crate) async fn update_candidates(
         popup.set(None);
         composition.set(None);
         shadow_debug.set(None);
+        segmented_session.set(None);
+        segmented_refine_mode.set(false);
         active_token.set(String::new());
         number_pick_mode.set(false);
         selection_started.set(false);
@@ -67,6 +119,8 @@ pub(crate) async fn update_candidates(
         popup.set(None);
         composition.set(None);
         shadow_debug.set(None);
+        segmented_session.set(None);
+        segmented_refine_mode.set(false);
         active_token.set(token);
         number_pick_mode.set(false);
         selection_started.set(false);
@@ -85,11 +139,21 @@ pub(crate) async fn update_candidates(
         if live_text() != value {
             return;
         }
-        let visible = choose_visible_suggestions(&legacy_items, &observation);
+        let next_segmented = build_segmented_session(&observation, &history_snapshot);
+        let visible = choose_visible_suggestions(
+            &legacy_items,
+            &observation,
+            next_segmented.as_ref(),
+            segmented_refine_mode(),
+        );
         shadow_debug.set(Some(observation));
+        segmented_session.set(next_segmented);
+        segmented_refine_mode.set(false);
         visible
     } else {
         shadow_debug.set(None);
+        segmented_session.set(None);
+        segmented_refine_mode.set(false);
         legacy_items
     };
     let preserve_selection = active_token() == token && !suggestions().is_empty();
@@ -141,12 +205,194 @@ async fn candidate_composition_mark(start: usize, token: &str) -> Option<Composi
     editor_composition_mark(start, token).await
 }
 
-fn choose_visible_suggestions(legacy_items: &[String], observation: &ShadowObservation) -> Vec<String> {
+fn choose_visible_suggestions(
+    legacy_items: &[String],
+    observation: &ShadowObservation,
+    segmented_session: Option<&SegmentedSession>,
+    segmented_refine_mode: bool,
+) -> Vec<String> {
+    if segmented_refine_mode {
+        if let Some(session) = segmented_session {
+            return session.focused_candidates();
+        }
+    }
     if !observation.wfst_top5.is_empty() {
-        observation.wfst_top5.clone()
+        merge_suggestion_lists(&observation.wfst_top5, legacy_items, 10)
+    } else if let Some(session) = segmented_session {
+        session.focused_candidates()
     } else {
         legacy_items.to_vec()
     }
+}
+
+fn normalized_suggestion_key(item: &str) -> String {
+    item.chars().filter(|ch| !ch.is_whitespace()).collect()
+}
+
+fn merge_suggestion_lists(primary: &[String], fallback: &[String], limit: usize) -> Vec<String> {
+    let mut merged = Vec::new();
+    let mut seen = std::collections::HashSet::<String>::new();
+
+    for item in primary.iter().chain(fallback.iter()) {
+        let key = normalized_suggestion_key(item);
+        if seen.insert(key) {
+            merged.push(item.clone());
+            if merged.len() >= limit {
+                break;
+            }
+        }
+    }
+
+    merged
+}
+
+pub(crate) fn move_segment_focus(
+    delta: isize,
+    mut segmented_session: Signal<Option<SegmentedSession>>,
+    mut segmented_refine_mode: Signal<bool>,
+    mut suggestions: Signal<Vec<String>>,
+    mut selected: Signal<usize>,
+    mut selection_started: Signal<bool>,
+) -> bool {
+    let Some(mut session) = segmented_session() else {
+        return false;
+    };
+    if session.segments.len() <= 1 {
+        return false;
+    }
+    let len = session.segments.len() as isize;
+    let next = (session.focused as isize + delta).clamp(0, len - 1) as usize;
+    if next == session.focused {
+        if segmented_refine_mode() {
+            return false;
+        }
+        segmented_refine_mode.set(true);
+        suggestions.set(session.focused_candidates());
+        selected.set(session.focused_selected());
+        selection_started.set(true);
+        segmented_session.set(Some(session));
+        return true;
+    }
+    session.focused = next;
+    segmented_refine_mode.set(true);
+    suggestions.set(session.focused_candidates());
+    selected.set(session.focused_selected());
+    selection_started.set(true);
+    segmented_session.set(Some(session));
+    true
+}
+
+pub(crate) fn select_segment_candidate(
+    candidate_index: usize,
+    mut segmented_session: Signal<Option<SegmentedSession>>,
+    mut segmented_refine_mode: Signal<bool>,
+    mut suggestions: Signal<Vec<String>>,
+    mut selected: Signal<usize>,
+    mut selection_started: Signal<bool>,
+) -> bool {
+    let Some(mut session) = segmented_session() else {
+        return false;
+    };
+    let Some(segment) = session.segments.get_mut(session.focused) else {
+        return false;
+    };
+    if candidate_index >= segment.candidates.len() {
+        return false;
+    }
+    segment.selected = candidate_index;
+    segmented_refine_mode.set(true);
+    suggestions.set(segment.candidates.clone());
+    selected.set(candidate_index);
+    selection_started.set(true);
+    segmented_session.set(Some(session));
+    true
+}
+
+pub(crate) async fn commit_segmented_selection(
+    typed_space: bool,
+    mut text: Signal<String>,
+    mut segmented_session: Signal<Option<SegmentedSession>>,
+    mut segmented_refine_mode: Signal<bool>,
+    mut suggestions: Signal<Vec<String>>,
+    mut popup: Signal<Option<SuggestionPopup>>,
+    mut composition: Signal<Option<CompositionMark>>,
+    mut shadow_debug: Signal<Option<ShadowObservation>>,
+    mut active_token: Signal<String>,
+    mut selection_started: Signal<bool>,
+    mut selected: Signal<usize>,
+    mut pending_caret: Signal<Option<usize>>,
+    mut history: Signal<HashMap<String, usize>>,
+) {
+    let Some(session) = segmented_session() else {
+        return;
+    };
+    let choice = session.composed_text();
+    if choice.is_empty() {
+        return;
+    }
+    let current_text = text();
+    let caret = current_editor_caret()
+        .await
+        .unwrap_or_else(|| current_text.chars().count());
+    let applied = Transliterator::apply_suggestion(&current_text, caret, &choice, typed_space);
+
+    let mut next_history = history();
+    Transliterator::learn(&mut next_history, &choice);
+    save_history(&next_history);
+    history.set(next_history);
+
+    save_editor_text(&applied.text);
+    text.set(applied.text);
+    suggestions.set(Vec::new());
+    popup.set(None);
+    composition.set(None);
+    shadow_debug.set(None);
+    segmented_session.set(None);
+    segmented_refine_mode.set(false);
+    active_token.set(String::new());
+    selection_started.set(false);
+    selected.set(0);
+    pending_caret.set(Some(applied.caret));
+}
+
+fn build_segmented_session(
+    observation: &ShadowObservation,
+    history: &HashMap<String, usize>,
+) -> Option<SegmentedSession> {
+    let pairs = observation
+        .wfst_top_segments
+        .iter()
+        .filter_map(|segment| segment.split_once("=>"))
+        .map(|(input, output)| (input.to_owned(), output.to_owned()))
+        .collect::<Vec<_>>();
+
+    if pairs.len() < 2 {
+        return None;
+    }
+
+    let legacy = engine(DecoderMode::Legacy);
+    let segments = pairs
+        .into_iter()
+        .map(|(input, output)| {
+            let mut candidates = legacy.suggest(&input, history);
+            if let Some(position) = candidates.iter().position(|candidate| candidate == &output) {
+                if position != 0 {
+                    let preferred = candidates.remove(position);
+                    candidates.insert(0, preferred);
+                }
+            } else {
+                candidates.insert(0, output);
+            }
+            candidates.truncate(10);
+            SegmentedChoice {
+                input,
+                candidates,
+                selected: 0,
+            }
+        })
+        .collect::<Vec<_>>();
+
+    Some(SegmentedSession { segments, focused: 0 })
 }
 
 pub(crate) async fn commit_selection(
@@ -221,6 +467,32 @@ pub(crate) fn composition_preview_style(mark: &CompositionMark, font_size: usize
     )
 }
 
+pub(crate) fn segmented_composition_preview_style(mark: &CompositionMark, font_size: usize) -> String {
+    format!(
+        "left:{:.1}px; top:{:.1}px; min-width:{:.1}px; min-height:{:.1}px; font-size:{}px;",
+        mark.left, mark.top, mark.width, mark.height, font_size
+    )
+}
+
+pub(crate) fn segmented_preview_parts(session: &SegmentedSession) -> (String, String, String) {
+    let mut before = String::new();
+    let mut focused = String::new();
+    let mut after = String::new();
+
+    for (index, segment) in session.segments.iter().enumerate() {
+        let text = segment.selected_text();
+        if index < session.focused {
+            before.push_str(&text);
+        } else if index == session.focused {
+            focused = text;
+        } else {
+            after.push_str(&text);
+        }
+    }
+
+    (before, focused, after)
+}
+
 pub(crate) fn shortcut_index(key: &str) -> Option<usize> {
     match key {
         "1" => Some(0),
@@ -256,7 +528,7 @@ pub(crate) fn is_space_key(key: &str) -> bool {
 mod tests {
     use roman_lookup::{DecoderMode, ShadowMismatch, ShadowObservation};
 
-    use super::choose_visible_suggestions;
+    use super::{choose_visible_suggestions, SegmentedChoice, SegmentedSession};
 
     fn sample_observation() -> ShadowObservation {
         ShadowObservation {
@@ -283,12 +555,41 @@ mod tests {
     }
 
     #[test]
-    fn prefers_wfst_suggestions_when_available() {
+    fn uses_segment_candidates_in_refine_mode() {
         let legacy = vec!["ខ្ញុំ ទៅ".to_owned()];
         let observation = sample_observation();
         assert_eq!(
-            choose_visible_suggestions(&legacy, &observation),
-            vec!["ខ្ញុំទៅ".to_owned()]
+            choose_visible_suggestions(
+                &legacy,
+                &observation,
+                Some(&SegmentedSession {
+                    segments: vec![
+                        SegmentedChoice {
+                            input: "khnhom".to_owned(),
+                            candidates: vec!["ខ្ញុំ".to_owned()],
+                            selected: 0,
+                        },
+                        SegmentedChoice {
+                            input: "tov".to_owned(),
+                            candidates: vec!["ទៅ".to_owned()],
+                            selected: 0,
+                        },
+                    ],
+                    focused: 0,
+                }),
+                true,
+            ),
+            vec!["ខ្ញុំ".to_owned()]
+        );
+    }
+
+    #[test]
+    fn merges_wfst_and_legacy_suggestions_when_available() {
+        let legacy = vec!["ខ្ញុំ ទៅ".to_owned(), "ខ្ញមទៅ".to_owned()];
+        let observation = sample_observation();
+        assert_eq!(
+            choose_visible_suggestions(&legacy, &observation, None, false),
+            vec!["ខ្ញុំទៅ".to_owned(), "ខ្ញមទៅ".to_owned()]
         );
     }
 
@@ -298,6 +599,6 @@ mod tests {
         let mut observation = sample_observation();
         observation.wfst_failure = Some("timeout".to_owned());
         observation.wfst_top5.clear();
-        assert_eq!(choose_visible_suggestions(&legacy, &observation), legacy);
+        assert_eq!(choose_visible_suggestions(&legacy, &observation, None, false), legacy);
     }
 }

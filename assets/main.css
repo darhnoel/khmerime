@@ -343,6 +343,54 @@ body {
   position: relative;
 }
 
+.segment-preview {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 14px 2px 0;
+}
+
+.segment-chip {
+  appearance: none;
+  display: inline-grid;
+  gap: 2px;
+  align-items: start;
+  justify-items: start;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.9);
+  color: var(--ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background 120ms ease, border-color 120ms ease, transform 120ms ease;
+}
+
+.segment-chip:hover {
+  border-color: rgba(177, 77, 30, 0.28);
+  background: #fff8f0;
+}
+
+.segment-chip.active {
+  border-color: rgba(177, 77, 30, 0.32);
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+  transform: translateY(-1px);
+}
+
+.segment-chip-output {
+  font-size: 1rem;
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+.segment-chip-input {
+  color: var(--muted);
+  font-size: 0.78rem;
+  line-height: 1.2;
+}
+
 .editor {
   width: 100%;
   min-height: 480px;
@@ -356,6 +404,10 @@ body {
   font-weight: 500;
   line-height: 1.7;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8);
+}
+
+.editor-composing {
+  caret-color: transparent;
 }
 
 .editor:focus {
@@ -390,6 +442,13 @@ body {
   border: 0;
 }
 
+.composition-preview-segmented {
+  width: auto;
+  max-width: calc(100% - 24px);
+  overflow: visible;
+  white-space: nowrap;
+}
+
 .composition-preview-text {
   display: inline-block;
   color: var(--accent-strong);
@@ -401,11 +460,85 @@ body {
   text-shadow: 0 0 0 rgba(177, 77, 30, 0.01);
 }
 
+.composition-preview-rest {
+  display: inline-block;
+  color: var(--ink);
+  line-height: 1.35;
+}
+
+.composition-caret {
+  display: inline-block;
+  align-self: stretch;
+  width: 0;
+  margin-left: 1px;
+  border-right: 2px solid rgba(33, 24, 18, 0.92);
+  min-height: 1.2em;
+}
+
 .editor-note {
   margin: 14px 2px 0;
+  padding: 10px 12px;
+  border: 1px solid rgba(177, 77, 30, 0.14);
+  border-radius: 16px;
+  background:
+    linear-gradient(180deg, rgba(255, 249, 241, 0.96), rgba(255, 253, 249, 0.92));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.75);
+}
+
+.editor-note-title {
+  margin-bottom: 8px;
+  color: var(--accent-strong);
+  font-size: 0.76rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.editor-note-items {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 10px;
+}
+
+.editor-tip {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.82);
   color: var(--muted);
-  font-size: 0.92rem;
-  line-height: 1.45;
+  font-size: 0.84rem;
+  line-height: 1.35;
+}
+
+.editor-tip-text {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.editor-tip-sep {
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.keycap {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 1.8em;
+  padding: 0.12em 0.52em;
+  border: 1px solid rgba(177, 77, 30, 0.22);
+  border-bottom-color: rgba(177, 77, 30, 0.34);
+  border-radius: 9px;
+  background: linear-gradient(180deg, #fffefe, #f8ede1);
+  color: var(--accent-strong);
+  font-size: 0.76rem;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: 0.02em;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.9), inset 0 -1px 0 rgba(177, 77, 30, 0.06);
 }
 
 .debug-card {

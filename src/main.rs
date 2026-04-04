@@ -7,8 +7,8 @@ use roman_lookup::{DecoderConfig, DecoderMode, ShadowObservation, Transliterator
 mod ui;
 
 use self::ui::components::{AppToolbar, EditorCard, GuidePanel, WorkspaceBody};
-use self::ui::editor::refresh_popup_position;
-use self::ui::platform::{mark_app_ready, set_editor_caret};
+use self::ui::editor::{refresh_popup_position, SegmentedSession};
+use self::ui::platform::{hide_preboot_splash, mark_app_ready, set_editor_caret};
 use self::ui::storage::{load_decoder_mode, load_editor_text, load_enabled, load_font_size, load_history};
 
 const APP_CSS: &str = include_str!("../assets/main.css");
@@ -70,6 +70,8 @@ fn App() -> Element {
     let mut popup = use_signal(|| None::<SuggestionPopup>);
     let composition = use_signal(|| None::<CompositionMark>);
     let shadow_debug = use_signal(|| None::<ShadowObservation>);
+    let segmented_session = use_signal(|| None::<SegmentedSession>);
+    let segmented_refine_mode = use_signal(|| false);
     let active_token = use_signal(String::new);
     let mut number_pick_mode = use_signal(|| false);
     let mut selection_started = use_signal(|| false);
@@ -92,6 +94,10 @@ fn App() -> Element {
     });
 
     use_effect(move || {
+        hide_preboot_splash();
+    });
+
+    use_effect(move || {
         if engine_ready() {
             mark_app_ready();
         }
@@ -109,6 +115,8 @@ fn App() -> Element {
                 popup,
                 composition,
                 shadow_debug,
+                segmented_session,
+                segmented_refine_mode,
                 active_token,
                 number_pick_mode,
                 selection_started,
@@ -144,6 +152,8 @@ fn App() -> Element {
                         popup,
                         composition,
                         shadow_debug,
+                        segmented_session,
+                        segmented_refine_mode,
                         active_token,
                         number_pick_mode,
                         selection_started,
@@ -166,6 +176,8 @@ fn App() -> Element {
                                 popup,
                                 composition,
                                 shadow_debug,
+                                segmented_session,
+                                segmented_refine_mode,
                                 active_token,
                                 number_pick_mode,
                                 selection_started,
