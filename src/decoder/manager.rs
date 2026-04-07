@@ -2,25 +2,19 @@ use std::collections::HashMap;
 
 use crate::composer::ComposerTable;
 
-#[cfg(feature = "wfst-decoder")]
-use super::DecodeFailure;
-#[cfg(feature = "wfst-decoder")]
-use super::WfstDecoder;
 use super::{
-    build_shadow_observation, DecodeRequest, DecodeResult, Decoder, DecoderConfig, DecoderMode, LegacyDecoder,
-    ShadowObservation, ShadowReport,
+    build_shadow_observation, DecodeFailure, DecodeRequest, DecodeResult, Decoder, DecoderConfig, DecoderMode,
+    LegacyDecoder, ShadowObservation, ShadowReport, WfstDecoder,
 };
 
 pub(crate) struct DecoderManager {
     composer: ComposerTable,
     legacy: LegacyDecoder,
-    #[cfg(feature = "wfst-decoder")]
     wfst: Option<WfstDecoder>,
     config: DecoderConfig,
 }
 
 impl DecoderManager {
-    #[cfg(feature = "wfst-decoder")]
     pub(crate) fn new(
         composer: ComposerTable,
         legacy: LegacyDecoder,
@@ -31,15 +25,6 @@ impl DecoderManager {
             composer,
             legacy,
             wfst,
-            config,
-        }
-    }
-
-    #[cfg(not(feature = "wfst-decoder"))]
-    pub(crate) fn new(composer: ComposerTable, legacy: LegacyDecoder, config: DecoderConfig) -> Self {
-        Self {
-            composer,
-            legacy,
             config,
         }
     }
@@ -58,13 +43,9 @@ impl DecoderManager {
             self.log_shadow_report(&observation);
         }
 
-        let mut visible = legacy;
+        let mut visible = self.choose_visible_result(&legacy, wfst.as_ref());
         visible.candidates.truncate(self.config.max_candidates);
         visible.visible_strings()
-    }
-
-    pub(crate) fn active_decoder_name(&self) -> &'static str {
-        self.legacy.name()
     }
 
     pub(crate) fn shadow_observation(&self, input: &str, history: &HashMap<String, usize>) -> ShadowObservation {
@@ -79,16 +60,10 @@ impl DecoderManager {
         build_shadow_observation(self.config.mode, input, &composer, &legacy, wfst.as_ref())
     }
 
-    #[cfg(feature = "wfst-decoder")]
     fn decode_wfst(&self, request: &DecodeRequest<'_>) -> Option<DecodeResult> {
         self.wfst
             .as_ref()
             .map(|decoder| self.guard_wfst_result(decoder.decode(request)))
-    }
-
-    #[cfg(not(feature = "wfst-decoder"))]
-    fn decode_wfst(&self, _: &DecodeRequest<'_>) -> Option<DecodeResult> {
-        None
     }
 
     fn log_shadow_report(&self, observation: &ShadowObservation) {
@@ -108,7 +83,6 @@ impl DecoderManager {
         stable_sample_bucket(input) < u64::from(self.config.shadow_sample_bps)
     }
 
-    #[cfg(feature = "wfst-decoder")]
     fn guard_wfst_result(&self, mut result: DecodeResult) -> DecodeResult {
         if result.failure.is_some() {
             return result;
@@ -131,6 +105,49 @@ impl DecoderManager {
 
         result
     }
+
+    fn choose_visible_result(&self, legacy: &DecodeResult, wfst: Option<&DecodeResult>) -> DecodeResult {
+        match self.config.mode {
+            DecoderMode::Legacy | DecoderMode::Shadow => legacy.clone(),
+            DecoderMode::Wfst => wfst
+                .filter(|result| result.failure.is_none() && !result.candidates.is_empty())
+                .cloned()
+                .unwrap_or_else(|| legacy.clone()),
+            DecoderMode::Hybrid => merge_results(legacy, wfst, self.config.max_candidates),
+        }
+    }
+}
+
+fn merge_results(legacy: &DecodeResult, wfst: Option<&DecodeResult>, limit: usize) -> DecodeResult {
+    let mut merged = DecodeResult {
+        decoder: "hybrid",
+        candidates: Vec::new(),
+        failure: None,
+        latency_us: legacy.latency_us + wfst.map(|result| result.latency_us).unwrap_or(0),
+    };
+
+    for candidate in wfst
+        .filter(|result| result.failure.is_none())
+        .into_iter()
+        .flat_map(|result| result.candidates.iter())
+        .chain(legacy.candidates.iter())
+    {
+        if !merged.candidates.iter().any(|current| current.text == candidate.text) {
+            merged.candidates.push(candidate.clone());
+        }
+        if merged.candidates.len() >= limit {
+            break;
+        }
+    }
+
+    if merged.candidates.is_empty() {
+        merged.failure = Some(
+            wfst.and_then(|result| result.failure.clone())
+                .unwrap_or(DecodeFailure::EmptyResult),
+        );
+    }
+
+    merged
 }
 
 fn stable_sample_bucket(input: &str) -> u64 {

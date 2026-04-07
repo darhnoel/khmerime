@@ -19,6 +19,13 @@ dioxus = { version = "0.7.4", default-features = false, features = ["web", "docu
 js-sys = "0.3.77"
 web-sys = { version = "0.3.77", features = ["CssStyleDeclaration", "Document", "DomRect", "Element", "HtmlElement", "HtmlTextAreaElement", "KeyboardEvent", "Location", "Node", "Storage", "Window"] }
 
+[profile.release]
+opt-level = "z"
+lto = "fat"
+codegen-units = 1
+strip = true
+panic = "abort"
+
 # [patch.crates-io]
 # muda = { path = "vendor/muda" }
 # tray-icon = { path = "vendor/tray-icon" }

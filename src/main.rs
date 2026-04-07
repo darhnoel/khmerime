@@ -14,6 +14,8 @@ use self::ui::storage::{load_decoder_mode, load_editor_text, load_enabled, load_
 const APP_CSS: &str = include_str!("../assets/main.css");
 static LEGACY_TRANSLITERATOR: OnceLock<Transliterator> = OnceLock::new();
 static SHADOW_TRANSLITERATOR: OnceLock<Transliterator> = OnceLock::new();
+static WFST_TRANSLITERATOR: OnceLock<Transliterator> = OnceLock::new();
+static HYBRID_TRANSLITERATOR: OnceLock<Transliterator> = OnceLock::new();
 
 pub(crate) const EDITOR_ID: &str = "ime-editor";
 const DEFAULT_FONT_SIZE: usize = 24;
@@ -47,10 +49,22 @@ pub(crate) fn engine(mode: DecoderMode) -> &'static Transliterator {
     match mode {
         DecoderMode::Legacy => LEGACY_TRANSLITERATOR
             .get_or_init(|| Transliterator::from_default_data().expect("embedded lexicon must load")),
-        DecoderMode::Shadow | DecoderMode::Wfst | DecoderMode::Hybrid => SHADOW_TRANSLITERATOR.get_or_init(|| {
+        DecoderMode::Shadow => SHADOW_TRANSLITERATOR.get_or_init(|| {
+            Transliterator::from_default_data_with_config(DecoderConfig::shadow_interactive().with_shadow_log(false))
+                .expect("embedded lexicon must load")
+        }),
+        DecoderMode::Wfst => WFST_TRANSLITERATOR.get_or_init(|| {
             Transliterator::from_default_data_with_config(
                 DecoderConfig::default()
-                    .with_mode(DecoderMode::Shadow)
+                    .with_mode(DecoderMode::Wfst)
+                    .with_shadow_log(false),
+            )
+            .expect("embedded lexicon must load")
+        }),
+        DecoderMode::Hybrid => HYBRID_TRANSLITERATOR.get_or_init(|| {
+            Transliterator::from_default_data_with_config(
+                DecoderConfig::default()
+                    .with_mode(DecoderMode::Hybrid)
                     .with_shadow_log(false),
             )
             .expect("embedded lexicon must load")

@@ -6,11 +6,7 @@ use std::path::Path;
 use std::sync::Arc;
 
 use crate::composer::ComposerTable;
-#[cfg(feature = "wfst-decoder")]
-use crate::decoder::DecoderMode;
-#[cfg(feature = "wfst-decoder")]
-use crate::decoder::WfstDecoder;
-use crate::decoder::{DecoderConfig, DecoderManager, LegacyDecoder, ShadowObservation};
+use crate::decoder::{DecoderConfig, DecoderManager, DecoderMode, LegacyDecoder, ShadowObservation, WfstDecoder};
 
 const DEFAULT_COMPILED_DATA: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/roman_lookup.lexicon.bin"));
 const COMPILED_MAGIC: &[u8; 4] = b"RLX1";
@@ -107,11 +103,41 @@ impl From<std::io::Error> for LexiconError {
 
 pub type Result<T> = std::result::Result<T, LexiconError>;
 
+#[derive(Clone, Debug)]
+pub(crate) struct RankedLexiconEntry {
+    pub target: String,
+    pub canonical_roman: String,
+    pub normalized_key: String,
+    pub alias_keys: Vec<String>,
+    pub frequency: u32,
+    pub source_rank: usize,
+    pub pos_tag: Option<String>,
+}
+
+impl RankedLexiconEntry {
+    pub(crate) fn score_forms(&self) -> impl Iterator<Item = &str> {
+        std::iter::once(self.normalized_key.as_str())
+            .chain(self.alias_keys.iter().map(String::as_str))
+            .filter(|key| !key.starts_with("sk:"))
+    }
+}
+
+#[derive(Clone, Debug, Default)]
+pub(crate) struct RankedLexicon {
+    pub entries: Vec<RankedLexiconEntry>,
+    pub exact_index: HashMap<String, Vec<usize>>,
+    pub alias_index: HashMap<String, Vec<usize>>,
+    pub gram_index: HashMap<String, Vec<usize>>,
+    pub word_unigrams: HashMap<String, u32>,
+    pub word_bigrams: HashMap<(String, String), u32>,
+}
+
 pub(crate) struct LegacyData {
     entries: Vec<Entry>,
     by_roman: HashMap<String, Vec<String>>,
     by_normalized: HashMap<String, Vec<String>>,
     index: SearchIndex,
+    ranked: RankedLexicon,
 }
 
 pub struct Transliterator {
@@ -151,15 +177,12 @@ impl Transliterator {
     fn from_entries_with_config(entries: Vec<Entry>, config: DecoderConfig) -> Result<Self> {
         let legacy = Arc::new(LegacyData::from_entries(entries));
         let composer = ComposerTable::from_entries(legacy.entries());
-        #[cfg(feature = "wfst-decoder")]
         let decoder = DecoderManager::new(
             composer,
             LegacyDecoder::new(Arc::clone(&legacy)),
-            (config.mode != DecoderMode::Legacy).then(|| WfstDecoder::from_entries(legacy.entries())),
+            (config.mode != DecoderMode::Legacy).then(|| WfstDecoder::new(Arc::clone(&legacy), config.clone())),
             config,
         );
-        #[cfg(not(feature = "wfst-decoder"))]
-        let decoder = DecoderManager::new(composer, LegacyDecoder::new(Arc::clone(&legacy)), config);
         Ok(Self { legacy, decoder })
     }
 
@@ -172,7 +195,6 @@ impl Transliterator {
     }
 
     pub fn suggest(&self, input: &str, history: &HashMap<String, usize>) -> Vec<String> {
-        debug_assert_eq!(self.decoder.active_decoder_name(), "legacy");
         self.decoder.suggest(input, history)
     }
 
@@ -240,7 +262,7 @@ impl Transliterator {
 }
 
 impl LegacyData {
-    fn from_entries(entries: Vec<Entry>) -> Self {
+    pub(crate) fn from_entries(entries: Vec<Entry>) -> Self {
         let mut by_roman = HashMap::<String, Vec<String>>::new();
         let mut by_normalized = HashMap::<String, Vec<String>>::new();
         for entry in &entries {
@@ -254,16 +276,22 @@ impl LegacyData {
                 .push(entry.target.clone());
         }
         let roman_keys = entries.iter().map(|entry| entry.roman.clone()).collect::<Vec<_>>();
+        let ranked = RankedLexicon::from_entries(&entries);
         Self {
             entries,
             by_roman,
             by_normalized,
             index: SearchIndex::new(&roman_keys, true, 2, 3),
+            ranked,
         }
     }
 
     fn entries(&self) -> &[Entry] {
         &self.entries
+    }
+
+    pub(crate) fn ranked(&self) -> &RankedLexicon {
+        &self.ranked
     }
 
     fn starter_suggestions(&self, history: &HashMap<String, usize>) -> Vec<String> {
@@ -400,6 +428,68 @@ impl LegacyData {
 
     pub(crate) fn exact_targets(&self, normalized: &str) -> Option<&[String]> {
         self.by_normalized.get(normalized).map(Vec::as_slice)
+    }
+}
+
+impl RankedLexicon {
+    fn from_entries(entries: &[Entry]) -> Self {
+        let mut ranked = Self::default();
+        let mut target_frequency = HashMap::<String, u32>::new();
+        for entry in entries {
+            *target_frequency.entry(entry.target.clone()).or_default() += 1;
+            let words = entry.target.split_whitespace().collect::<Vec<_>>();
+            for word in &words {
+                *ranked.word_unigrams.entry((*word).to_owned()).or_default() += 1;
+            }
+            for pair in words.windows(2) {
+                *ranked
+                    .word_bigrams
+                    .entry((pair[0].to_owned(), pair[1].to_owned()))
+                    .or_default() += 1;
+            }
+        }
+
+        for (source_rank, entry) in entries.iter().enumerate() {
+            let normalized_key = normalize(&entry.roman);
+            if normalized_key.is_empty() {
+                continue;
+            }
+            let alias_keys = roman_search_variants(&entry.roman)
+                .into_iter()
+                .filter(|key| key != &normalized_key)
+                .collect::<Vec<_>>();
+            let ranked_entry = RankedLexiconEntry {
+                target: entry.target.clone(),
+                canonical_roman: entry.roman.clone(),
+                normalized_key: normalized_key.clone(),
+                alias_keys: alias_keys.clone(),
+                frequency: target_frequency.get(&entry.target).copied().unwrap_or(1),
+                source_rank,
+                pos_tag: None,
+            };
+            let entry_index = ranked.entries.len();
+            ranked.entries.push(ranked_entry);
+            ranked
+                .exact_index
+                .entry(normalized_key.clone())
+                .or_default()
+                .push(entry_index);
+
+            let mut seen_aliases = HashSet::new();
+            for key in alias_keys {
+                if seen_aliases.insert(key.clone()) {
+                    ranked.alias_index.entry(key.clone()).or_default().push(entry_index);
+                    for gram in char_ngrams(&key, 2) {
+                        ranked.gram_index.entry(gram).or_default().push(entry_index);
+                    }
+                }
+            }
+            for gram in char_ngrams(&normalized_key, 2) {
+                ranked.gram_index.entry(gram).or_default().push(entry_index);
+            }
+        }
+
+        ranked
     }
 }
 
@@ -660,6 +750,142 @@ pub(crate) fn normalize(input: &str) -> String {
         .collect()
 }
 
+pub(crate) fn roman_search_variants(input: &str) -> Vec<String> {
+    let base = normalize(input);
+    if base.is_empty() {
+        return Vec::new();
+    }
+
+    let mut variants = Vec::new();
+    let mut seen = HashSet::new();
+    push_variant(&mut variants, &mut seen, base.clone());
+
+    let collapsed = collapse_repeated_letters(&base);
+    push_variant(&mut variants, &mut seen, collapsed.clone());
+    push_variant(&mut variants, &mut seen, normalize_cluster_aliases(&base));
+    push_variant(&mut variants, &mut seen, normalize_cluster_aliases(&collapsed));
+    push_variant(&mut variants, &mut seen, normalize_vowel_aliases(&base));
+    push_variant(&mut variants, &mut seen, normalize_vowel_aliases(&collapsed));
+    push_variant(&mut variants, &mut seen, normalize_final_aliases(&base));
+    push_variant(&mut variants, &mut seen, normalize_final_aliases(&collapsed));
+
+    let final_cluster = normalize_cluster_aliases(&normalize_final_aliases(&collapsed));
+    push_variant(&mut variants, &mut seen, final_cluster.clone());
+
+    let skeleton = consonant_skeleton(&base);
+    if !skeleton.is_empty() {
+        push_variant(&mut variants, &mut seen, format!("sk:{skeleton}"));
+    }
+    let collapsed_skeleton = consonant_skeleton(&collapsed);
+    if !collapsed_skeleton.is_empty() {
+        push_variant(&mut variants, &mut seen, format!("sk:{collapsed_skeleton}"));
+    }
+
+    variants
+}
+
+fn push_variant(variants: &mut Vec<String>, seen: &mut HashSet<String>, variant: String) {
+    if !variant.is_empty() && seen.insert(variant.clone()) {
+        variants.push(variant);
+    }
+}
+
+fn collapse_repeated_letters(input: &str) -> String {
+    let mut output = String::with_capacity(input.len());
+    let mut previous = None::<char>;
+    for ch in input.chars() {
+        let allow_repeat = matches!(ch, 't' | 'n' | 'm' | 'a' | 'o');
+        if previous == Some(ch) && !allow_repeat {
+            continue;
+        }
+        output.push(ch);
+        previous = Some(ch);
+    }
+    output
+}
+
+fn normalize_cluster_aliases(input: &str) -> String {
+    let replacements = [
+        ("chh", "c"),
+        ("ddh", "d"),
+        ("tth", "t"),
+        ("kh", "k"),
+        ("gh", "g"),
+        ("ng", "n"),
+        ("nh", "n"),
+        ("th", "t"),
+        ("tt", "t"),
+        ("dd", "d"),
+        ("ph", "p"),
+        ("bh", "b"),
+        ("jh", "j"),
+        ("ch", "c"),
+    ];
+    apply_replacements(input, &replacements)
+}
+
+fn normalize_vowel_aliases(input: &str) -> String {
+    let replacements = [
+        ("aeu", "e"),
+        ("ae", "e"),
+        ("ea", "e"),
+        ("ei", "e"),
+        ("ie", "i"),
+        ("oe", "e"),
+        ("eu", "e"),
+        ("ou", "o"),
+        ("ov", "o"),
+        ("aw", "o"),
+        ("av", "ao"),
+    ];
+    apply_replacements(input, &replacements)
+}
+
+fn normalize_final_aliases(input: &str) -> String {
+    for suffix in ["aors", "aor", "aos", "aoh", "ors", "or", "os", "oh", "rs"] {
+        if let Some(stem) = input.strip_suffix(suffix) {
+            return format!("{stem}aoh");
+        }
+    }
+    input.to_owned()
+}
+
+fn consonant_skeleton(input: &str) -> String {
+    let mut output = String::new();
+    for ch in normalize_cluster_aliases(input).chars() {
+        if !matches!(ch, 'a' | 'e' | 'i' | 'o' | 'u' | 'y') {
+            if output.chars().last() != Some(ch) {
+                output.push(ch);
+            }
+        }
+    }
+    output
+}
+
+fn apply_replacements(input: &str, replacements: &[(&str, &str)]) -> String {
+    let mut output = input.to_owned();
+    for (from, to) in replacements {
+        output = output.replace(from, to);
+    }
+    output
+}
+
+pub(crate) fn char_ngrams(input: &str, size: usize) -> Vec<String> {
+    let chars = input.chars().collect::<Vec<_>>();
+    if chars.is_empty() {
+        return Vec::new();
+    }
+    if chars.len() <= size {
+        return vec![chars.iter().collect()];
+    }
+
+    let mut grams = Vec::with_capacity(chars.len().saturating_sub(size) + 1);
+    for start in 0..=chars.len().saturating_sub(size) {
+        grams.push(chars[start..start + size].iter().collect());
+    }
+    grams
+}
+
 fn ngram_counts(input: &str, size: usize) -> Vec<(String, usize)> {
     let mut padded = format!("-{}-", normalize(input));
     if padded.len() < size {
@@ -777,17 +1003,15 @@ mod tests {
     }
 
     #[test]
-    fn shadow_observation_is_unavailable_without_wfst_feature() {
+    fn shadow_observation_exposes_bounded_decoder_results() {
         let transliterator = Transliterator::from_default_data_with_config(
             DecoderConfig::default().with_mode(crate::decoder::DecoderMode::Shadow),
         )
         .unwrap();
 
         let observation = transliterator.shadow_observation("jea", &HashMap::new());
-        #[cfg(not(feature = "wfst-decoder"))]
-        assert_eq!(observation.mismatch, crate::decoder::ShadowMismatch::WfstUnavailable);
-        #[cfg(feature = "wfst-decoder")]
         assert_ne!(observation.mismatch, crate::decoder::ShadowMismatch::WfstUnavailable);
+        assert_eq!(observation.wfst_top.as_deref(), Some("ជា"));
     }
 
     #[test]
@@ -812,5 +1036,14 @@ mod tests {
                 .map(String::as_str),
             Some("ខ្ញុំ ទៅ")
         );
+    }
+
+    #[test]
+    fn search_variants_cover_repeated_letters_and_soft_finals() {
+        let repeated = roman_search_variants("knhhom");
+        assert!(repeated.iter().any(|variant| variant == "knhom"));
+
+        let finals = roman_search_variants("sronors");
+        assert!(finals.iter().any(|variant| variant == "sronaoh"));
     }
 }

@@ -66,11 +66,7 @@ pub(crate) fn save_enabled(value: bool) {
 pub(crate) fn save_enabled(_: bool) {}
 
 pub(crate) fn load_decoder_mode() -> DecoderMode {
-    if cfg!(feature = "wfst-decoder") {
-        DecoderMode::Shadow
-    } else {
-        DecoderMode::Legacy
-    }
+    DecoderMode::Shadow
 }
 
 #[cfg(target_arch = "wasm32")]

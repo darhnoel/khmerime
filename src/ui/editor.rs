@@ -134,7 +134,7 @@ pub(crate) async fn update_candidates(
     if live_text() != value {
         return;
     }
-    let items = if decoder_mode == DecoderMode::Shadow {
+    let items = if decoder_mode == DecoderMode::Shadow && token.chars().count() >= 3 {
         let observation = engine(DecoderMode::Shadow).shadow_observation(&token, &history_snapshot);
         if live_text() != value {
             return;
@@ -213,20 +213,51 @@ fn choose_visible_suggestions(
 ) -> Vec<String> {
     if segmented_refine_mode {
         if let Some(session) = segmented_session {
-            return session.focused_candidates();
+            return normalize_visible_suggestions(session.focused_candidates());
         }
     }
     if !observation.wfst_top5.is_empty() {
-        merge_suggestion_lists(&observation.wfst_top5, legacy_items, 10)
+        normalize_visible_suggestions(merge_suggestion_lists(&observation.wfst_top5, legacy_items, 10))
     } else if let Some(session) = segmented_session {
-        session.focused_candidates()
+        normalize_visible_suggestions(session.focused_candidates())
     } else {
-        legacy_items.to_vec()
+        normalize_visible_suggestions(legacy_items.to_vec())
     }
 }
 
 fn normalized_suggestion_key(item: &str) -> String {
     item.chars().filter(|ch| !ch.is_whitespace()).collect()
+}
+
+fn connect_khmer_display(item: &str) -> String {
+    let parts = item.split_whitespace().collect::<Vec<_>>();
+    if parts.len() <= 1 {
+        return item.to_owned();
+    }
+    if parts.iter().all(|part| part.chars().any(is_khmer_char)) {
+        parts.concat()
+    } else {
+        item.to_owned()
+    }
+}
+
+fn is_khmer_char(ch: char) -> bool {
+    ('\u{1780}'..='\u{17ff}').contains(&ch) || ('\u{19e0}'..='\u{19ff}').contains(&ch)
+}
+
+fn normalize_visible_suggestions(items: Vec<String>) -> Vec<String> {
+    let mut normalized = Vec::new();
+    let mut seen = std::collections::HashSet::<String>::new();
+
+    for item in items {
+        let display = connect_khmer_display(&item);
+        let key = normalized_suggestion_key(&display);
+        if seen.insert(key) {
+            normalized.push(display);
+        }
+    }
+
+    normalized
 }
 
 fn merge_suggestion_lists(primary: &[String], fallback: &[String], limit: usize) -> Vec<String> {
@@ -374,7 +405,8 @@ fn build_segmented_session(
     let segments = pairs
         .into_iter()
         .map(|(input, output)| {
-            let mut candidates = legacy.suggest(&input, history);
+            let mut candidates = normalize_visible_suggestions(legacy.suggest(&input, history));
+            let output = connect_khmer_display(&output);
             if let Some(position) = candidates.iter().position(|candidate| candidate == &output) {
                 if position != 0 {
                     let preferred = candidates.remove(position);
@@ -528,7 +560,7 @@ pub(crate) fn is_space_key(key: &str) -> bool {
 mod tests {
     use roman_lookup::{DecoderMode, ShadowMismatch, ShadowObservation};
 
-    use super::{choose_visible_suggestions, SegmentedChoice, SegmentedSession};
+    use super::{choose_visible_suggestions, connect_khmer_display, SegmentedChoice, SegmentedSession};
 
     fn sample_observation() -> ShadowObservation {
         ShadowObservation {
@@ -599,6 +631,15 @@ mod tests {
         let mut observation = sample_observation();
         observation.wfst_failure = Some("timeout".to_owned());
         observation.wfst_top5.clear();
-        assert_eq!(choose_visible_suggestions(&legacy, &observation, None, false), legacy);
+        assert_eq!(
+            choose_visible_suggestions(&legacy, &observation, None, false),
+            vec!["ខ្ញុំទៅ".to_owned()]
+        );
+    }
+
+    #[test]
+    fn connects_multiword_khmer_display_strings() {
+        assert_eq!(connect_khmer_display("ខ្ញុំ ទៅ"), "ខ្ញុំទៅ");
+        assert_eq!(connect_khmer_display("foo bar"), "foo bar");
     }
 }

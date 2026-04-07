@@ -3,7 +3,6 @@ mod legacy;
 mod manager;
 mod observer;
 mod types;
-#[cfg(feature = "wfst-decoder")]
 mod wfst;
 
 pub use self::config::DecoderConfig;
@@ -12,7 +11,6 @@ pub(crate) use self::manager::DecoderManager;
 pub(crate) use self::observer::{build_shadow_observation, ShadowReport};
 pub use self::observer::{ShadowMismatch, ShadowObservation, ShadowSummary};
 pub use self::types::{DecodeCandidate, DecodeFailure, DecodeRequest, DecodeResult, DecodeSegment, DecoderMode};
-#[cfg(feature = "wfst-decoder")]
 pub(crate) use self::wfst::WfstDecoder;
 
 pub(crate) trait Decoder: Send + Sync {

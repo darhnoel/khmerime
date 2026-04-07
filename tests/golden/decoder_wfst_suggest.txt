@@ -1,0 +1,64 @@
+# Locked golden snapshot for Transliterator::suggest in Wfst mode.
+# This file is verified by cargo test and must be updated explicitly.
+mode: wfst
+
+[[case]]
+name: exact_jea
+input: jea
+top_n: 1
+suggestions:
+1. ជា
+
+[[case]]
+name: exact_ttov
+input: ttov
+top_n: 2
+suggestions:
+1. ទៅ
+2. ទៅ៏
+
+[[case]]
+name: single_span_sronors
+input: sronors
+top_n: 7
+suggestions:
+1. ស្រន់អុះ
+2. ស្រីងរ
+3. សរសើរងរ
+4. ស្រីង៉ែង៉រ
+5. ស្រីខ្នុរសម្ល
+6. ស្រីនិរាស
+7. សរសើរង៉ែង៉រ
+
+[[case]]
+name: exact_phrase_khnhomttov
+input: khnhomttov
+top_n: 6
+suggestions:
+1. ខ្ញុំទៅ
+2. ខ្ញមទៅ
+3. ខ្ញុំទៅ៏
+4. ខ្ញមទៅ៏
+5. ក្នុងទទីមទទាម
+6. ក្នុងទទ្រែមទទ្រម
+
+[[case]]
+name: beam_phrase_saensronors
+input: saensronors
+top_n: 1
+suggestions:
+1. សែនស្រណោះ
+
+[[case]]
+name: beam_phrase_knhhomttovsalarien
+input: knhhomttovsalarien
+top_n: 1
+suggestions:
+1. ខ្ញុំទៅសាលារៀន
+
+[[case]]
+name: beam_phrase_khomtaekitmnakaeng
+input: khomtaekitmnakaeng
+top_n: 1
+suggestions:
+1. ខំតែគិតម្នាក់ឯង

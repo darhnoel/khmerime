@@ -9,7 +9,8 @@ Standalone Rust lookup engine with:
 - Core logic: [src/roman_lookup.rs](src/roman_lookup.rs)
 - Dioxus app: [src/main.rs](src/main.rs)
 - CLI: [src/bin/lookup_cli.rs](src/bin/lookup_cli.rs)
-- Default embedded data: `data/your_lexicon.tsv`
+- Architecture guide: [docs/architecture.md](docs/architecture.md)
+- Default embedded data: `data/roman_lookup.tsv`
 
 ## Usage
 

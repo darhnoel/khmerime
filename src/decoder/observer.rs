@@ -1,7 +1,6 @@
 use std::fmt::Write;
 
 use crate::composer::ComposerAnalysis;
-#[cfg(feature = "wfst-decoder")]
 use crate::composer::ComposerChunkKind;
 
 use super::{DecodeFailure, DecodeResult, DecoderMode};
@@ -189,15 +188,12 @@ pub(crate) fn build_shadow_observation(
         .iter()
         .map(|chunk| chunk.normalized.clone())
         .collect::<Vec<_>>();
-    #[cfg(feature = "wfst-decoder")]
     let composer_hint_chunks = composer
         .wfst_phrase_chunks()
         .into_iter()
         .filter(|chunk| chunk.kind == ComposerChunkKind::Hint)
         .map(|chunk| chunk.normalized)
         .collect::<Vec<_>>();
-    #[cfg(not(feature = "wfst-decoder"))]
-    let composer_hint_chunks = Vec::new();
     let wfst_used_hint_chunks = !composer_hint_chunks.is_empty()
         && wfst
             .and_then(|result| result.candidates.first())
@@ -311,6 +307,7 @@ mod tests {
         let composer = ComposerAnalysis {
             normalized: "jea".to_owned(),
             chunks: Vec::new(),
+            wfst_chunk_paths: Vec::new(),
             pending_tail: String::new(),
             fully_segmented: false,
         };

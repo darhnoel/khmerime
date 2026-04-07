@@ -13,6 +13,7 @@ const CHAR_WIDTH_DIVISOR: f64 = 0.62;
 #[cfg(any(not(target_arch = "wasm32"), test))]
 const CHAR_WIDTH_MULTIPLIER: f64 = 0.58;
 const POPUP_HORIZONTAL_OFFSET: f64 = 18.0;
+#[cfg(any(target_arch = "wasm32", test))]
 const POPUP_VERTICAL_OFFSET: f64 = 10.0;
 const POPUP_MIN_LEFT: f64 = 10.0;
 const POPUP_MIN_TOP: f64 = 10.0;
