@@ -9,7 +9,9 @@ use crate::composer::ComposerTable;
 use crate::decoder::{DecoderConfig, DecoderManager, DecoderMode, LegacyDecoder, ShadowObservation, WfstDecoder};
 
 const DEFAULT_COMPILED_DATA: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/roman_lookup.lexicon.bin"));
+const DEFAULT_COMPILED_KHPOS_STATS: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/khpos.stats.bin"));
 const COMPILED_MAGIC: &[u8; 4] = b"RLX1";
+const KHPOS_MAGIC: &[u8; 4] = b"KPS1";
 const MAX_SUGGESTIONS: usize = 10;
 const MAX_MATCHES: usize = 50;
 const SYMBOL_DIGITS: [(&str, &str); 10] = [
@@ -114,6 +116,34 @@ pub(crate) struct RankedLexiconEntry {
     pub pos_tag: Option<String>,
 }
 
+#[derive(Clone, Debug, Default)]
+pub(crate) struct CorpusStats {
+    #[allow(dead_code)]
+    pub word_unigrams: HashMap<String, u32>,
+    #[allow(dead_code)]
+    pub word_bigrams: HashMap<(String, String), u32>,
+    pub tag_unigrams: HashMap<String, u32>,
+    pub tag_bigrams: HashMap<(String, String), u32>,
+    pub dominant_word_tags: HashMap<String, DominantTag>,
+}
+
+#[derive(Clone, Debug)]
+pub(crate) struct DominantTag {
+    pub tag: String,
+    #[allow(dead_code)]
+    pub support: u32,
+}
+
+impl CorpusStats {
+    fn from_default_data() -> Result<Self> {
+        parse_compiled_khpos_stats(DEFAULT_COMPILED_KHPOS_STATS)
+    }
+
+    fn dominant_tag(&self, word: &str) -> Option<&str> {
+        self.dominant_word_tags.get(word).map(|entry| entry.tag.as_str())
+    }
+}
+
 impl RankedLexiconEntry {
     pub(crate) fn score_forms(&self) -> impl Iterator<Item = &str> {
         std::iter::once(self.normalized_key.as_str())
@@ -130,6 +160,8 @@ pub(crate) struct RankedLexicon {
     pub gram_index: HashMap<String, Vec<usize>>,
     pub word_unigrams: HashMap<String, u32>,
     pub word_bigrams: HashMap<(String, String), u32>,
+    pub tag_unigrams: HashMap<String, u32>,
+    pub tag_bigrams: HashMap<(String, String), u32>,
 }
 
 pub(crate) struct LegacyData {
@@ -263,6 +295,7 @@ impl Transliterator {
 
 impl LegacyData {
     pub(crate) fn from_entries(entries: Vec<Entry>) -> Self {
+        let corpus_stats = CorpusStats::from_default_data().expect("embedded khPOS stats must load");
         let mut by_roman = HashMap::<String, Vec<String>>::new();
         let mut by_normalized = HashMap::<String, Vec<String>>::new();
         for entry in &entries {
@@ -276,7 +309,7 @@ impl LegacyData {
                 .push(entry.target.clone());
         }
         let roman_keys = entries.iter().map(|entry| entry.roman.clone()).collect::<Vec<_>>();
-        let ranked = RankedLexicon::from_entries(&entries);
+        let ranked = RankedLexicon::from_entries(&entries, &corpus_stats);
         Self {
             entries,
             by_roman,
@@ -432,7 +465,7 @@ impl LegacyData {
 }
 
 impl RankedLexicon {
-    fn from_entries(entries: &[Entry]) -> Self {
+    fn from_entries(entries: &[Entry], corpus_stats: &CorpusStats) -> Self {
         let mut ranked = Self::default();
         let mut target_frequency = HashMap::<String, u32>::new();
         for entry in entries {
@@ -448,6 +481,9 @@ impl RankedLexicon {
                     .or_default() += 1;
             }
         }
+
+        ranked.tag_unigrams = corpus_stats.tag_unigrams.clone();
+        ranked.tag_bigrams = corpus_stats.tag_bigrams.clone();
 
         for (source_rank, entry) in entries.iter().enumerate() {
             let normalized_key = normalize(&entry.roman);
@@ -465,7 +501,9 @@ impl RankedLexicon {
                 alias_keys: alias_keys.clone(),
                 frequency: target_frequency.get(&entry.target).copied().unwrap_or(1),
                 source_rank,
-                pos_tag: None,
+                pos_tag: (entry.target.split_whitespace().count() == 1)
+                    .then(|| corpus_stats.dominant_tag(&entry.target).map(str::to_owned))
+                    .flatten(),
             };
             let entry_index = ranked.entries.len();
             ranked.entries.push(ranked_entry);
@@ -719,11 +757,93 @@ fn parse_compiled_lexicon(source: &[u8]) -> Result<Vec<Entry>> {
     Ok(entries)
 }
 
+fn parse_compiled_khpos_stats(source: &[u8]) -> Result<CorpusStats> {
+    if source.len() < 4 || &source[..4] != KHPOS_MAGIC {
+        return Err(LexiconError::Parse("invalid compiled khPOS stats header".to_owned()));
+    }
+
+    let mut offset = 4usize;
+    let word_unigrams = read_string_count_map(source, &mut offset)?;
+    let word_bigrams = read_pair_count_map(source, &mut offset)?;
+    let tag_unigrams = read_string_count_map(source, &mut offset)?;
+    let tag_bigrams = read_pair_count_map(source, &mut offset)?;
+    let dominant_word_tags = read_dominant_tags(source, &mut offset)?;
+    if offset != source.len() {
+        return Err(LexiconError::Parse(
+            "compiled khPOS stats has trailing bytes".to_owned(),
+        ));
+    }
+
+    Ok(CorpusStats {
+        word_unigrams,
+        word_bigrams,
+        tag_unigrams,
+        tag_bigrams,
+        dominant_word_tags,
+    })
+}
+
 fn find_nul(source: &[u8], start: usize) -> Option<usize> {
     source[start..]
         .iter()
         .position(|byte| *byte == 0)
         .map(|relative| start + relative)
+}
+
+fn read_string_count_map(source: &[u8], offset: &mut usize) -> Result<HashMap<String, u32>> {
+    let count = read_u32(source, offset)? as usize;
+    let mut output = HashMap::with_capacity(count);
+    for _ in 0..count {
+        let text = read_nul_terminated_str(source, offset)?;
+        let value = read_u32(source, offset)?;
+        output.insert(text, value);
+    }
+    Ok(output)
+}
+
+fn read_pair_count_map(source: &[u8], offset: &mut usize) -> Result<HashMap<(String, String), u32>> {
+    let count = read_u32(source, offset)? as usize;
+    let mut output = HashMap::with_capacity(count);
+    for _ in 0..count {
+        let left = read_nul_terminated_str(source, offset)?;
+        let right = read_nul_terminated_str(source, offset)?;
+        let value = read_u32(source, offset)?;
+        output.insert((left, right), value);
+    }
+    Ok(output)
+}
+
+fn read_dominant_tags(source: &[u8], offset: &mut usize) -> Result<HashMap<String, DominantTag>> {
+    let count = read_u32(source, offset)? as usize;
+    let mut output = HashMap::with_capacity(count);
+    for _ in 0..count {
+        let word = read_nul_terminated_str(source, offset)?;
+        let tag = read_nul_terminated_str(source, offset)?;
+        let support = read_u32(source, offset)?;
+        output.insert(word, DominantTag { tag, support });
+    }
+    Ok(output)
+}
+
+fn read_u32(source: &[u8], offset: &mut usize) -> Result<u32> {
+    if source.len().saturating_sub(*offset) < 4 {
+        return Err(LexiconError::Parse(
+            "compiled khPOS stats payload is truncated".to_owned(),
+        ));
+    }
+    let value = u32::from_le_bytes(source[*offset..*offset + 4].try_into().expect("slice length checked"));
+    *offset += 4;
+    Ok(value)
+}
+
+fn read_nul_terminated_str(source: &[u8], offset: &mut usize) -> Result<String> {
+    let end = find_nul(source, *offset)
+        .ok_or_else(|| LexiconError::Parse("compiled khPOS stats string is missing NUL terminator".to_owned()))?;
+    let value = std::str::from_utf8(&source[*offset..end])
+        .map_err(|_| LexiconError::Parse("compiled khPOS stats contains invalid UTF-8".to_owned()))?
+        .to_owned();
+    *offset = end + 1;
+    Ok(value)
 }
 
 fn is_roman_letter(ch: char) -> bool {
@@ -959,6 +1079,26 @@ mod tests {
         let compiled_entries = parse_compiled_lexicon(DEFAULT_COMPILED_DATA).unwrap();
         let tsv_entries = parse_tsv(DEFAULT_DATA_TSV).unwrap();
         assert_eq!(compiled_entries, tsv_entries);
+    }
+
+    #[test]
+    fn loads_embedded_khpos_stats() {
+        let stats = parse_compiled_khpos_stats(DEFAULT_COMPILED_KHPOS_STATS).unwrap();
+        assert!(stats.word_unigrams.get("ខ្ញុំ").copied().unwrap_or(0) > 0);
+        assert!(
+            stats
+                .word_bigrams
+                .get(&(String::from("ខ្ញុំ"), String::from("ទៅ")))
+                .copied()
+                .unwrap_or(0)
+                > 0
+        );
+        assert_eq!(stats.dominant_tag("ខ្ញុំ"), Some("PRO"));
+        assert!(stats
+            .dominant_word_tags
+            .get("ខ្ញុំ")
+            .map(|entry| entry.support > 0)
+            .unwrap_or(false));
     }
 
     #[test]

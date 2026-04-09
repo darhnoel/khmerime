@@ -14,16 +14,28 @@ Standalone Rust lookup engine with:
 
 ## Usage
 
+Preferred entrypoint:
+
+```
+$ make help
+```
+
+Operational guide:
+
+```
+docs/development.md
+```
+
 Run the web app:
 
 ```
-$ dx serve
+$ make web
 ```
 
 Run the web app on a fixed phone-accessible address:
 
 ```
-$ bash scripts/serve_web_phone.sh
+$ make web-phone
 ```
 
 Default address:
@@ -41,25 +53,37 @@ $ ADDR=0.0.0.0 PORT=8080 bash scripts/serve_web_phone.sh
 Run the desktop app:
 
 ```
-$ dx serve --platform desktop
+$ make desktop
 ```
 
 Run the CLI and print the number of entries:
 
 ```
-$ cargo run --bin lookup_cli -- stats
+$ make stats
 ```
 
 Run the CLI and print the top suggestions for a roman query:
 
 ```
-$ cargo run --bin lookup_cli -- suggest tver
+$ make suggest QUERY=tver
 ```
 
 Use a different lexicon file:
 
 ```
 $ cargo run --bin lookup_cli -- --data data/your_lexicon.tsv suggest tver
+```
+
+Run the full Rust test suite:
+
+```
+$ make test
+```
+
+Run the WFST golden snapshot test:
+
+```
+$ make test-golden
 ```
 
 ## Behavior
