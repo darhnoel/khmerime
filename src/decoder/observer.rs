@@ -3,7 +3,7 @@ use std::fmt::Write;
 use crate::composer::ComposerAnalysis;
 use crate::composer::ComposerChunkKind;
 
-use super::{DecodeFailure, DecodeResult, DecoderMode};
+use super::{DecodeFailure, DecodeResult, DecodeSegment, DecoderMode};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ShadowMismatch {
@@ -42,6 +42,7 @@ pub struct ShadowObservation {
     pub composer_pending_tail: String,
     pub composer_fully_segmented: bool,
     pub wfst_used_hint_chunks: bool,
+    pub wfst_top_segment_details: Vec<DecodeSegment>,
     pub wfst_top_segments: Vec<String>,
     pub legacy_latency_us: u64,
     pub wfst_latency_us: Option<u64>,
@@ -183,6 +184,10 @@ pub(crate) fn build_shadow_observation(
                 .collect::<Vec<_>>()
         })
         .unwrap_or_default();
+    let wfst_top_segment_details = wfst
+        .and_then(|result| result.candidates.first())
+        .map(|candidate| candidate.segments.clone())
+        .unwrap_or_default();
     let composer_chunks = composer
         .chunks
         .iter()
@@ -209,6 +214,7 @@ pub(crate) fn build_shadow_observation(
         composer_pending_tail: composer.pending_tail.clone(),
         composer_fully_segmented: composer.fully_segmented,
         wfst_used_hint_chunks,
+        wfst_top_segment_details,
         wfst_top_segments,
         legacy_latency_us: legacy.latency_us,
         wfst_latency_us: wfst.map(|result| result.latency_us),

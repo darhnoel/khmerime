@@ -18,17 +18,17 @@ suggestions:
 2. ទៅ៏
 
 [[case]]
-name: single_span_sronors
-input: sronors
+name: single_span_sronos
+input: sronos
 top_n: 7
 suggestions:
-1. ស្រន់អុះ
-2. ស្រីងរ
-3. សរសើរងរ
-4. ស្រីង៉ែង៉រ
-5. ស្រីខ្នុរសម្ល
-6. ស្រីនិរាស
-7. សរសើរង៉ែង៉រ
+1. ស្រណោះ
+2. ស្រីនេះ
+3. ស្រីនោះ
+4. ស្រីងរ
+5. សារនេះ
+6. សារនោះ
+7. ស្រីងងូស
 
 [[case]]
 name: exact_phrase_khnhomttov
@@ -62,3 +62,4 @@ input: khomtaekitmnakaeng
 top_n: 1
 suggestions:
 1. ខំតែគិតម្នាក់ឯង
+

@@ -8,6 +8,7 @@ const KHPOS_TRAIN_PATH: &str = "data/khPOS/corpus-draft-ver-1.0/data/after-repla
 const KHPOS_TAG_PATH: &str = "data/khPOS/corpus-draft-ver-1.0/data/after-replace/train.all.tag";
 const MAGIC: &[u8; 4] = b"RLX1";
 const KHPOS_MAGIC: &[u8; 4] = b"KPS1";
+const MAX_JOINED_SURFACE_TOKENS: usize = 4;
 
 fn main() {
     println!("cargo:rerun-if-changed={DEFAULT_TSV_PATH}");
@@ -73,6 +74,7 @@ fn compile_khpos_stats(train_source: &str, tag_source: &str) -> Result<Vec<u8>, 
 
     let mut word_unigrams = HashMap::<String, u32>::new();
     let mut word_bigrams = HashMap::<(String, String), u32>::new();
+    let mut surface_unigrams = HashMap::<String, u32>::new();
     let mut tag_unigrams = HashMap::<String, u32>::new();
     let mut tag_bigrams = HashMap::<(String, String), u32>::new();
     let mut word_tag_counts = HashMap::<String, HashMap<String, u32>>::new();
@@ -126,6 +128,13 @@ fn compile_khpos_stats(train_source: &str, tag_source: &str) -> Result<Vec<u8>, 
         for pair in words.windows(2) {
             *word_bigrams.entry((pair[0].clone(), pair[1].clone())).or_default() += 1;
         }
+        for start in 0..words.len() {
+            let mut joined = String::new();
+            for token in words.iter().skip(start).take(MAX_JOINED_SURFACE_TOKENS) {
+                joined.push_str(token);
+                *surface_unigrams.entry(joined.clone()).or_default() += 1;
+            }
+        }
         for pair in tags.windows(2) {
             *tag_bigrams.entry((pair[0].to_owned(), pair[1].to_owned())).or_default() += 1;
         }
@@ -146,6 +155,7 @@ fn compile_khpos_stats(train_source: &str, tag_source: &str) -> Result<Vec<u8>, 
     output.extend_from_slice(KHPOS_MAGIC);
     write_string_count_map(&mut output, &word_unigrams)?;
     write_pair_count_map(&mut output, &word_bigrams)?;
+    write_string_count_map(&mut output, &surface_unigrams)?;
     write_string_count_map(&mut output, &tag_unigrams)?;
     write_pair_count_map(&mut output, &tag_bigrams)?;
     write_dominant_tags(&mut output, &dominant_tags)?;

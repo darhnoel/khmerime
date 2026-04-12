@@ -57,7 +57,7 @@ impl DecoderConfig {
             chunk_score_weight: 1,
             segmentation_score_weight: 1,
             lm_score_weight: 0,
-            pos_score_weight: 0,
+            pos_score_weight: 1,
             history_score_weight: 1,
             interactive_mode: true,
         }
@@ -81,7 +81,7 @@ impl Default for DecoderConfig {
             chunk_score_weight: 1,
             segmentation_score_weight: 1,
             lm_score_weight: 1,
-            pos_score_weight: 0,
+            pos_score_weight: 1,
             history_score_weight: 1,
             interactive_mode: false,
         }

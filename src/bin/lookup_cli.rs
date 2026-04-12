@@ -222,6 +222,11 @@ mod tests {
             composer_pending_tail: String::new(),
             composer_fully_segmented: true,
             wfst_used_hint_chunks: false,
+            wfst_top_segment_details: vec![roman_lookup::DecodeSegment {
+                input: "jea".to_owned(),
+                output: "ជា".to_owned(),
+                weight_bps: 9_800,
+            }],
             wfst_top_segments: vec!["jea=>ជា".to_owned()],
             legacy_latency_us: 10,
             wfst_latency_us: Some(8),

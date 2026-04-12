@@ -204,13 +204,17 @@ impl ComposerTable {
         }
 
         if let Some(chunks) = self.full_segmentation(&normalized) {
-            let primary = chunks.clone();
-            return ComposerAnalysis {
+            let provisional = ComposerAnalysis {
                 normalized,
                 chunks,
-                wfst_chunk_paths: vec![primary],
+                wfst_chunk_paths: Vec::new(),
                 pending_tail: String::new(),
                 fully_segmented: true,
+            };
+            let wfst_chunk_paths = self.wfst_chunk_paths(&provisional);
+            return ComposerAnalysis {
+                wfst_chunk_paths,
+                ..provisional
             };
         }
 
@@ -386,9 +390,9 @@ impl ComposerTable {
     fn wfst_chunk_paths(&self, analysis: &ComposerAnalysis) -> Vec<Vec<ComposerChunk>> {
         let mut paths = Vec::<Vec<ComposerChunk>>::new();
         let primary = analysis.primary_wfst_phrase_chunks();
-        let primary_has_weak = primary
-            .iter()
-            .any(|chunk| chunk.end.saturating_sub(chunk.start) < 3 || chunk.kind == ComposerChunkKind::Hint);
+        if !primary.is_empty() {
+            paths.push(primary.clone());
+        }
 
         for alternate in self.suffix_anchored_paths(analysis) {
             if !alternate.is_empty() && !paths.contains(&alternate) {
@@ -396,9 +400,7 @@ impl ComposerTable {
             }
         }
 
-        if !primary.is_empty() && (!primary_has_weak || !paths.contains(&primary)) {
-            paths.push(primary);
-        }
+        paths.sort_by(|left, right| compare_wfst_chunk_paths(left, right));
 
         paths
     }
@@ -542,6 +544,28 @@ impl ComposerTable {
     }
 }
 
+fn compare_wfst_chunk_paths(left: &[ComposerChunk], right: &[ComposerChunk]) -> std::cmp::Ordering {
+    wfst_chunk_path_priority(left)
+        .cmp(&wfst_chunk_path_priority(right))
+        .then_with(|| right.len().cmp(&left.len()))
+}
+
+fn wfst_chunk_path_priority(path: &[ComposerChunk]) -> (usize, usize, usize) {
+    let weak_chunks = path
+        .iter()
+        .filter(|chunk| chunk.end.saturating_sub(chunk.start) < 3)
+        .count();
+    let hint_chunks = path
+        .iter()
+        .filter(|chunk| chunk.kind == ComposerChunkKind::Hint)
+        .count();
+    let total_len = path
+        .iter()
+        .map(|chunk| chunk.end.saturating_sub(chunk.start))
+        .sum::<usize>();
+    (weak_chunks, hint_chunks, usize::MAX - total_len)
+}
+
 #[cfg(test)]
 mod tests {
     use crate::roman_lookup::Transliterator;
@@ -591,5 +615,83 @@ mod tests {
             vec!["khnhom", "tov"]
         );
         assert_eq!(hints.last().map(|chunk| chunk.kind), Some(ComposerChunkKind::Exact));
+    }
+
+    #[test]
+    fn exposes_wfst_phrase_hints_for_weak_full_segmentation() {
+        let transliterator = Transliterator::from_default_data().unwrap();
+        let table = ComposerTable::from_entries(transliterator.entries());
+        let analysis = table.analyze("knhhomttovsalarien");
+        let hints = analysis.wfst_phrase_chunks();
+
+        assert!(analysis.fully_segmented);
+        assert_eq!(
+            analysis
+                .chunks
+                .iter()
+                .map(|chunk| chunk.normalized.as_str())
+                .collect::<Vec<_>>(),
+            vec!["k", "nhhom", "ttov", "salarien"]
+        );
+        assert_eq!(
+            hints.iter().map(|chunk| chunk.normalized.as_str()).collect::<Vec<_>>(),
+            vec!["knhhom", "ttov", "salarien"]
+        );
+        assert_eq!(hints.first().map(|chunk| chunk.kind), Some(ComposerChunkKind::Hint));
+    }
+
+    #[test]
+    fn preserves_last_strong_chunk_before_weak_tail_hint() {
+        let transliterator = Transliterator::from_default_data().unwrap();
+        let table = ComposerTable::from_entries(transliterator.entries());
+        let analysis = table.analyze("khomtaekitmnakaeng");
+        let hints = analysis.wfst_phrase_chunks();
+
+        assert!(analysis.fully_segmented);
+        assert_eq!(
+            analysis
+                .chunks
+                .iter()
+                .map(|chunk| chunk.normalized.as_str())
+                .collect::<Vec<_>>(),
+            vec!["khom", "tae", "kit", "m", "na", "kaeng"]
+        );
+        assert_eq!(
+            hints.iter().map(|chunk| chunk.normalized.as_str()).collect::<Vec<_>>(),
+            vec!["khom", "tae", "kit", "mnak", "eng"]
+        );
+        assert_eq!(
+            hints.iter().map(|chunk| chunk.kind).collect::<Vec<_>>(),
+            vec![
+                ComposerChunkKind::Exact,
+                ComposerChunkKind::Exact,
+                ComposerChunkKind::Exact,
+                ComposerChunkKind::Exact,
+                ComposerChunkKind::Exact,
+            ]
+        );
+    }
+
+    #[test]
+    fn merges_last_strong_chunk_when_weak_tail_is_not_a_good_exact_suffix() {
+        let transliterator = Transliterator::from_default_data().unwrap();
+        let table = ComposerTable::from_entries(transliterator.entries());
+        let analysis = table.analyze("saensronors");
+        let hints = analysis.wfst_phrase_chunks();
+
+        assert!(analysis.fully_segmented);
+        assert_eq!(
+            analysis
+                .chunks
+                .iter()
+                .map(|chunk| chunk.normalized.as_str())
+                .collect::<Vec<_>>(),
+            vec!["saen", "sron", "or", "s"]
+        );
+        assert_eq!(
+            hints.iter().map(|chunk| chunk.normalized.as_str()).collect::<Vec<_>>(),
+            vec!["saen", "sronors"]
+        );
+        assert_eq!(hints.last().map(|chunk| chunk.kind), Some(ComposerChunkKind::Hint));
     }
 }

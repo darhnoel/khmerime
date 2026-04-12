@@ -113,7 +113,8 @@ pub(crate) struct RankedLexiconEntry {
     pub alias_keys: Vec<String>,
     pub frequency: u32,
     pub source_rank: usize,
-    pub pos_tag: Option<String>,
+    pub first_tag: Option<String>,
+    pub last_tag: Option<String>,
 }
 
 #[derive(Clone, Debug, Default)]
@@ -122,6 +123,7 @@ pub(crate) struct CorpusStats {
     pub word_unigrams: HashMap<String, u32>,
     #[allow(dead_code)]
     pub word_bigrams: HashMap<(String, String), u32>,
+    pub surface_unigrams: HashMap<String, u32>,
     pub tag_unigrams: HashMap<String, u32>,
     pub tag_bigrams: HashMap<(String, String), u32>,
     pub dominant_word_tags: HashMap<String, DominantTag>,
@@ -160,6 +162,9 @@ pub(crate) struct RankedLexicon {
     pub gram_index: HashMap<String, Vec<usize>>,
     pub word_unigrams: HashMap<String, u32>,
     pub word_bigrams: HashMap<(String, String), u32>,
+    pub corpus_word_unigrams: HashMap<String, u32>,
+    pub corpus_word_bigrams: HashMap<(String, String), u32>,
+    pub corpus_surface_unigrams: HashMap<String, u32>,
     pub tag_unigrams: HashMap<String, u32>,
     pub tag_bigrams: HashMap<(String, String), u32>,
 }
@@ -168,6 +173,7 @@ pub(crate) struct LegacyData {
     entries: Vec<Entry>,
     by_roman: HashMap<String, Vec<String>>,
     by_normalized: HashMap<String, Vec<String>>,
+    by_target: HashMap<String, Vec<String>>,
     index: SearchIndex,
     ranked: RankedLexicon,
 }
@@ -234,6 +240,10 @@ impl Transliterator {
         self.decoder.shadow_observation(input, history)
     }
 
+    pub fn best_prefix_consumption(&self, input: &str, target: &str) -> Option<String> {
+        self.legacy.best_prefix_consumption(input, target)
+    }
+
     pub fn learn(history: &mut HashMap<String, usize>, suggestion: &str) {
         let count = history.entry(suggestion.to_owned()).or_insert(0);
         *count += 1;
@@ -298,6 +308,7 @@ impl LegacyData {
         let corpus_stats = CorpusStats::from_default_data().expect("embedded khPOS stats must load");
         let mut by_roman = HashMap::<String, Vec<String>>::new();
         let mut by_normalized = HashMap::<String, Vec<String>>::new();
+        let mut by_target = HashMap::<String, Vec<String>>::new();
         for entry in &entries {
             by_roman
                 .entry(entry.roman.clone())
@@ -307,6 +318,10 @@ impl LegacyData {
                 .entry(normalize(&entry.roman))
                 .or_insert_with(Vec::new)
                 .push(entry.target.clone());
+            by_target
+                .entry(entry.target.clone())
+                .or_insert_with(Vec::new)
+                .push(normalize(&entry.roman));
         }
         let roman_keys = entries.iter().map(|entry| entry.roman.clone()).collect::<Vec<_>>();
         let ranked = RankedLexicon::from_entries(&entries, &corpus_stats);
@@ -314,6 +329,7 @@ impl LegacyData {
             entries,
             by_roman,
             by_normalized,
+            by_target,
             index: SearchIndex::new(&roman_keys, true, 2, 3),
             ranked,
         }
@@ -346,6 +362,24 @@ impl LegacyData {
         });
         suggestions.truncate(MAX_SUGGESTIONS);
         suggestions
+    }
+
+    fn best_prefix_consumption(&self, input: &str, target: &str) -> Option<String> {
+        let normalized_input = normalize(input);
+        if normalized_input.is_empty() {
+            return None;
+        }
+
+        let mut matches = self
+            .by_target
+            .get(target)?
+            .iter()
+            .filter(|roman| !roman.is_empty() && normalized_input.starts_with(roman.as_str()))
+            .cloned()
+            .collect::<Vec<_>>();
+        matches.sort_by(|left, right| right.len().cmp(&left.len()).then_with(|| left.cmp(right)));
+        matches.dedup();
+        matches.into_iter().next()
     }
 
     pub(crate) fn suggest(&self, input: &str, history: &HashMap<String, usize>) -> Vec<String> {
@@ -482,6 +516,9 @@ impl RankedLexicon {
             }
         }
 
+        ranked.corpus_word_unigrams = corpus_stats.word_unigrams.clone();
+        ranked.corpus_word_bigrams = corpus_stats.word_bigrams.clone();
+        ranked.corpus_surface_unigrams = corpus_stats.surface_unigrams.clone();
         ranked.tag_unigrams = corpus_stats.tag_unigrams.clone();
         ranked.tag_bigrams = corpus_stats.tag_bigrams.clone();
 
@@ -494,6 +531,7 @@ impl RankedLexicon {
                 .into_iter()
                 .filter(|key| key != &normalized_key)
                 .collect::<Vec<_>>();
+            let (first_tag, last_tag) = boundary_tags_for_target(&entry.target, corpus_stats);
             let ranked_entry = RankedLexiconEntry {
                 target: entry.target.clone(),
                 canonical_roman: entry.roman.clone(),
@@ -501,9 +539,8 @@ impl RankedLexicon {
                 alias_keys: alias_keys.clone(),
                 frequency: target_frequency.get(&entry.target).copied().unwrap_or(1),
                 source_rank,
-                pos_tag: (entry.target.split_whitespace().count() == 1)
-                    .then(|| corpus_stats.dominant_tag(&entry.target).map(str::to_owned))
-                    .flatten(),
+                first_tag,
+                last_tag,
             };
             let entry_index = ranked.entries.len();
             ranked.entries.push(ranked_entry);
@@ -529,6 +566,18 @@ impl RankedLexicon {
 
         ranked
     }
+}
+
+fn boundary_tags_for_target(target: &str, corpus_stats: &CorpusStats) -> (Option<String>, Option<String>) {
+    let mut words = target.split_whitespace();
+    let Some(first_word) = words.next() else {
+        return (None, None);
+    };
+    let last_word = words.last().unwrap_or(first_word);
+    (
+        corpus_stats.dominant_tag(first_word).map(str::to_owned),
+        corpus_stats.dominant_tag(last_word).map(str::to_owned),
+    )
 }
 
 fn push_candidate(
@@ -765,6 +814,7 @@ fn parse_compiled_khpos_stats(source: &[u8]) -> Result<CorpusStats> {
     let mut offset = 4usize;
     let word_unigrams = read_string_count_map(source, &mut offset)?;
     let word_bigrams = read_pair_count_map(source, &mut offset)?;
+    let surface_unigrams = read_string_count_map(source, &mut offset)?;
     let tag_unigrams = read_string_count_map(source, &mut offset)?;
     let tag_bigrams = read_pair_count_map(source, &mut offset)?;
     let dominant_word_tags = read_dominant_tags(source, &mut offset)?;
@@ -777,6 +827,7 @@ fn parse_compiled_khpos_stats(source: &[u8]) -> Result<CorpusStats> {
     Ok(CorpusStats {
         word_unigrams,
         word_bigrams,
+        surface_unigrams,
         tag_unigrams,
         tag_bigrams,
         dominant_word_tags,
@@ -953,6 +1004,7 @@ fn normalize_vowel_aliases(input: &str) -> String {
         ("ie", "i"),
         ("oe", "e"),
         ("eu", "e"),
+        ("ue", "e"),
         ("ou", "o"),
         ("ov", "o"),
         ("aw", "o"),
@@ -1085,6 +1137,8 @@ mod tests {
     fn loads_embedded_khpos_stats() {
         let stats = parse_compiled_khpos_stats(DEFAULT_COMPILED_KHPOS_STATS).unwrap();
         assert!(stats.word_unigrams.get("ខ្ញុំ").copied().unwrap_or(0) > 0);
+        assert!(stats.surface_unigrams.get("ខ្ញុំ").copied().unwrap_or(0) > 0);
+        assert!(stats.surface_unigrams.get("ខ្ញុំទៅ").copied().unwrap_or(0) > 0);
         assert!(
             stats
                 .word_bigrams
@@ -1099,6 +1153,32 @@ mod tests {
             .get("ខ្ញុំ")
             .map(|entry| entry.support > 0)
             .unwrap_or(false));
+    }
+
+    #[test]
+    fn ranked_lexicon_assigns_boundary_tags_for_phrase_entries() {
+        let stats = parse_compiled_khpos_stats(DEFAULT_COMPILED_KHPOS_STATS).unwrap();
+        let ranked = RankedLexicon::from_entries(
+            &[
+                Entry {
+                    roman: "khnhom".to_owned(),
+                    target: "ខ្ញុំ".to_owned(),
+                },
+                Entry {
+                    roman: "khnhomttov".to_owned(),
+                    target: "ខ្ញុំ ទៅ".to_owned(),
+                },
+            ],
+            &stats,
+        );
+
+        let single = ranked.entries.iter().find(|entry| entry.target == "ខ្ញុំ").unwrap();
+        assert_eq!(single.first_tag.as_deref(), stats.dominant_tag("ខ្ញុំ"));
+        assert_eq!(single.last_tag.as_deref(), stats.dominant_tag("ខ្ញុំ"));
+
+        let phrase = ranked.entries.iter().find(|entry| entry.target == "ខ្ញុំ ទៅ").unwrap();
+        assert_eq!(phrase.first_tag.as_deref(), stats.dominant_tag("ខ្ញុំ"));
+        assert_eq!(phrase.last_tag.as_deref(), stats.dominant_tag("ទៅ"));
     }
 
     #[test]
@@ -1139,6 +1219,15 @@ mod tests {
         assert_eq!(
             shadow.suggest("jea", &HashMap::new()),
             legacy.suggest("jea", &HashMap::new())
+        );
+    }
+
+    #[test]
+    fn best_prefix_consumption_prefers_longest_matching_target_roman() {
+        let transliterator = Transliterator::from_default_data().unwrap();
+        assert_eq!(
+            transliterator.best_prefix_consumption("cheamnouslaor", "ជា").as_deref(),
+            Some("chea")
         );
     }
 
@@ -1185,5 +1274,13 @@ mod tests {
 
         let finals = roman_search_variants("sronors");
         assert!(finals.iter().any(|variant| variant == "sronaoh"));
+    }
+
+    #[test]
+    fn search_variants_cover_ue_eu_aliases() {
+        let eu = roman_search_variants("heub");
+        let ue = roman_search_variants("hueb");
+        assert!(eu.iter().any(|variant| variant == "heb"));
+        assert!(ue.iter().any(|variant| variant == "heb"));
     }
 }

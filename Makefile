@@ -1,4 +1,4 @@
-.PHONY: help web web-phone desktop stats suggest suggest-wfst suggest-shadow shadow-eval fmt test test-golden test-ui paper-current paper-current-clean
+.PHONY: help web web-phone desktop stats suggest suggest-wfst suggest-shadow shadow-eval visualize-lexicon visualize-lexicon-streamlit fmt test test-golden test-ui paper-current paper-current-clean
 
 DX ?= dx
 CLI := cargo run --bin lookup_cli --
@@ -21,6 +21,8 @@ help:
 	"  make suggest-wfst QUERY=tver     Print WFST-mode suggestions" \
 	"  make suggest-shadow QUERY=tver   Print shadow-mode suggestions" \
 	"  make shadow-eval QUERIES=path/to/queries.txt [MODE=shadow|wfst|hybrid] [OUTPUT=report.txt]" \
+	"  make visualize-lexicon           Generate lightweight lexicon relationship views under dist/" \
+	"  make visualize-lexicon-streamlit Launch the optional Streamlit explorer for the generated views" \
 	"  make fmt                         Run cargo fmt" \
 	"  make test                        Run cargo test" \
 	"  make test-golden                 Run the WFST golden snapshot test" \
@@ -61,6 +63,12 @@ shadow-eval:
 	else \
 		$(CLI) --decoder-mode "$(MODE)" shadow-eval "$(QUERIES)"; \
 	fi
+
+visualize-lexicon:
+	python3 scripts/visualize_roman_lookup.py
+
+visualize-lexicon-streamlit:
+	python3 -m streamlit run scripts/visualize_roman_lookup_streamlit.py
 
 fmt:
 	cargo fmt --all

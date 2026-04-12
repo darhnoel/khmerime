@@ -26,8 +26,8 @@ const WFST_CASES: &[GoldenCase] = &[
         top_n: 2,
     },
     GoldenCase {
-        name: "single_span_sronors",
-        input: "sronors",
+        name: "single_span_sronos",
+        input: "sronos",
         top_n: 7,
     },
     GoldenCase {

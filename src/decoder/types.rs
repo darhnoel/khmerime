@@ -19,7 +19,7 @@ pub enum DecodeFailure {
     Unavailable,
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct DecodeSegment {
     pub input: String,
     pub output: String,

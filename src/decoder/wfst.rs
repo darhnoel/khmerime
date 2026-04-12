@@ -28,7 +28,9 @@ struct SpanCandidate {
     input: String,
     output: String,
     recovered_roman: String,
-    pos_tag: Option<String>,
+    source_rank: usize,
+    first_tag: Option<String>,
+    last_tag: Option<String>,
     score: i32,
     score_bps: u16,
     edit_similarity: f64,
@@ -49,7 +51,7 @@ struct BeamItem {
     spans: Vec<SpanCandidate>,
     recovered_romans: Vec<String>,
     words: Vec<String>,
-    pos_tags: Vec<Option<String>>,
+    last_tags: Vec<Option<String>>,
     scores: ScoreBreakdown,
 }
 
@@ -88,11 +90,16 @@ impl WfstDecoder {
         if chars.is_empty() {
             return Vec::new();
         }
+        let exact_full_span = self.decode_exact_full_span(request, &chars, started_at);
 
         if self.config.interactive_mode && self.has_anchor_chunks(request) {
             let anchored = self.decode_with_anchors(request, &chars, started_at);
             if !anchored.is_empty() {
-                return anchored;
+                let mut finals = anchored;
+                finals.extend(exact_full_span);
+                finals.sort_by(|left, right| compare_beam_items(left, right, &self.config));
+                finals.truncate(self.config.max_candidates.max(self.config.beam_width));
+                return finals;
             }
         }
 
@@ -130,10 +137,36 @@ impl WfstDecoder {
                 item
             })
             .collect::<Vec<_>>();
+        finals.extend(exact_full_span);
         finals.extend(self.decode_with_anchors(request, &chars, started_at));
         finals.sort_by(|left, right| compare_beam_items(left, right, &self.config));
         finals.truncate(self.config.max_candidates.max(self.config.beam_width));
         finals
+    }
+
+    fn decode_exact_full_span(
+        &self,
+        request: &DecodeRequest<'_>,
+        chars: &[char],
+        started_at: super::DecodeTimer,
+    ) -> Vec<BeamItem> {
+        if self.over_budget(started_at) {
+            return Vec::new();
+        }
+        let span = chars.iter().collect::<String>();
+        if !self.data.ranked().exact_index.contains_key(span.as_str()) {
+            return Vec::new();
+        }
+
+        self.rerank_span_candidates(0, chars.len(), &span)
+            .into_iter()
+            .map(|candidate| {
+                let mut beam = self.extend_beam(BeamItem::default(), &candidate, request);
+                beam.scores.segmentation += 30_000;
+                beam.scores.history += final_history_score(request.history, &beam.final_text());
+                beam
+            })
+            .collect()
     }
 
     fn decode_with_anchors(
@@ -272,13 +305,7 @@ impl WfstDecoder {
             }
 
             let mut candidates = best_by_signature.into_values().collect::<Vec<_>>();
-            candidates.sort_by_key(|candidate| {
-                Reverse((
-                    candidate.score,
-                    candidate.end.saturating_sub(candidate.start),
-                    candidate.output.len(),
-                ))
-            });
+            candidates.sort_by(|left, right| compare_span_candidates(left, right));
             candidates.truncate(SEGMENT_LIMIT_PER_START.min(self.config.beam_retrieval_shortlist.max(1)));
             per_start[start] = candidates;
         }
@@ -310,7 +337,7 @@ impl WfstDecoder {
             let entry = &self.data.ranked().entries[entry_index];
             if let Some(candidate) = self.score_span_candidate(start, end, span, entry, &search_keys, &signals) {
                 match best_by_output.get(candidate.output.as_str()) {
-                    Some(current) if current.score >= candidate.score => {}
+                    Some(current) if !compare_span_candidates(current, &candidate).is_gt() => {}
                     _ => {
                         best_by_output.insert(candidate.output.clone(), candidate);
                     }
@@ -319,7 +346,7 @@ impl WfstDecoder {
         }
 
         let mut ranked = best_by_output.into_values().collect::<Vec<_>>();
-        ranked.sort_by_key(|candidate| Reverse((candidate.score, candidate.end - candidate.start)));
+        ranked.sort_by(|left, right| compare_span_candidates(left, right));
         ranked.truncate(self.config.beam_candidates_per_span);
         ranked
     }
@@ -381,20 +408,14 @@ impl WfstDecoder {
 
         if self.config.interactive_mode && !exact_signals.is_empty() {
             let mut ranked = exact_signals.into_iter().collect::<Vec<_>>();
-            ranked.sort_by_key(|(entry_index, signal)| {
-                let frequency = lexicon.entries[*entry_index].frequency;
-                Reverse((signal.raw_exact_hit, signal.exact_hit, frequency))
-            });
+            ranked.sort_by(|left, right| compare_retrieval_hits(left, right, lexicon));
             ranked.truncate(self.config.beam_retrieval_shortlist.max(1));
             return ranked;
         }
 
         if self.config.interactive_mode && raw_key.chars().count() >= 4 && !alias_only.is_empty() {
             let mut ranked = alias_only.into_iter().collect::<Vec<_>>();
-            ranked.sort_by_key(|(entry_index, signal)| {
-                let frequency = lexicon.entries[*entry_index].frequency;
-                Reverse((signal.alias_hit, frequency))
-            });
+            ranked.sort_by(|left, right| compare_retrieval_hits(left, right, lexicon));
             ranked.truncate(self.config.beam_retrieval_shortlist.max(1));
             return ranked;
         }
@@ -447,10 +468,7 @@ impl WfstDecoder {
         }
 
         let mut ranked = signals.into_iter().collect::<Vec<_>>();
-        ranked.sort_by_key(|(entry_index, signal)| {
-            let frequency = lexicon.entries[*entry_index].frequency;
-            Reverse((signal.exact_hit, signal.alias_hit, signal.gram_hits, frequency))
-        });
+        ranked.sort_by(|left, right| compare_retrieval_hits(left, right, lexicon));
         ranked.truncate(self.config.beam_retrieval_shortlist);
         ranked
     }
@@ -507,7 +525,9 @@ impl WfstDecoder {
             input: span.to_owned(),
             output: entry.target.clone(),
             recovered_roman: entry.canonical_roman.clone(),
-            pos_tag: entry.pos_tag.clone(),
+            source_rank: entry.source_rank,
+            first_tag: entry.first_tag.clone(),
+            last_tag: entry.last_tag.clone(),
             score,
             score_bps: score_to_bps(score),
             edit_similarity: best_edit,
@@ -521,13 +541,14 @@ impl WfstDecoder {
         beam.scores.segmentation += composer_alignment_delta(request.composer, candidate.start, candidate.end);
         beam.scores.lm += lm_delta(self.data.ranked(), beam.words.last(), &candidate.output);
         beam.scores.pos += pos_delta(
-            beam.pos_tags.last().and_then(|tag| tag.as_deref()),
-            candidate.pos_tag.as_deref(),
+            self.data.ranked(),
+            beam.last_tags.last().and_then(|tag| tag.as_deref()),
+            candidate.first_tag.as_deref(),
         );
         beam.scores.history += incremental_history_score(request.history, &candidate.output);
         beam.recovered_romans.push(candidate.recovered_roman.clone());
         beam.words.push(candidate.output.clone());
-        beam.pos_tags.push(candidate.pos_tag.clone());
+        beam.last_tags.push(candidate.last_tag.clone());
         beam.spans.push(candidate.clone());
         beam
     }
@@ -568,7 +589,10 @@ impl WfstDecoder {
                 .iter()
                 .any(|chunk| chunk.kind == crate::composer::ComposerChunkKind::Explicit);
             let all_strong = ranges.iter().all(|(start, end)| end.saturating_sub(*start) >= 4);
-            if !explicit && ranges.len() > 2 && !all_strong {
+            let all_exact = chunks
+                .iter()
+                .all(|chunk| chunk.kind == crate::composer::ComposerChunkKind::Exact);
+            if !explicit && ranges.len() > 2 && !all_strong && !all_exact {
                 return None;
             }
 
@@ -695,6 +719,46 @@ fn compare_beam_items(left: &BeamItem, right: &BeamItem, config: &DecoderConfig)
                 .sum::<usize>()
                 .cmp(&left.words.iter().map(|word| word.chars().count()).sum::<usize>())
         })
+        .then_with(|| left.final_text().cmp(&right.final_text()))
+        .then_with(|| left.recovered_romans.cmp(&right.recovered_romans))
+}
+
+fn compare_span_candidates(left: &SpanCandidate, right: &SpanCandidate) -> std::cmp::Ordering {
+    right
+        .score
+        .cmp(&left.score)
+        .then_with(|| {
+            right
+                .end
+                .saturating_sub(right.start)
+                .cmp(&left.end.saturating_sub(left.start))
+        })
+        .then_with(|| right.edit_similarity.total_cmp(&left.edit_similarity))
+        .then_with(|| left.source_rank.cmp(&right.source_rank))
+        .then_with(|| left.recovered_roman.cmp(&right.recovered_roman))
+        .then_with(|| left.output.cmp(&right.output))
+}
+
+fn compare_retrieval_hits(
+    left: &(usize, RetrievalSignals),
+    right: &(usize, RetrievalSignals),
+    lexicon: &RankedLexicon,
+) -> std::cmp::Ordering {
+    let left_entry = &lexicon.entries[left.0];
+    let right_entry = &lexicon.entries[right.0];
+    let left_signal = &left.1;
+    let right_signal = &right.1;
+
+    right_signal
+        .raw_exact_hit
+        .cmp(&left_signal.raw_exact_hit)
+        .then_with(|| right_signal.exact_hit.cmp(&left_signal.exact_hit))
+        .then_with(|| right_signal.alias_hit.cmp(&left_signal.alias_hit))
+        .then_with(|| right_signal.gram_hits.cmp(&left_signal.gram_hits))
+        .then_with(|| right_entry.frequency.cmp(&left_entry.frequency))
+        .then_with(|| left_entry.source_rank.cmp(&right_entry.source_rank))
+        .then_with(|| left_entry.canonical_roman.cmp(&right_entry.canonical_roman))
+        .then_with(|| left_entry.target.cmp(&right_entry.target))
 }
 
 fn frequency_prior(frequency: u32) -> i32 {
@@ -727,17 +791,68 @@ fn segmentation_delta(span_len: usize, edit_similarity: f64) -> i32 {
 }
 
 fn lm_delta(lexicon: &RankedLexicon, previous: Option<&String>, word: &str) -> i32 {
-    let unigram = lexicon.word_unigrams.get(word).copied().unwrap_or(0);
-    let unigram_score = (((unigram + 1) as f64).ln() * 260.0).round() as i32;
+    let corpus_surface = lexicon.corpus_surface_unigrams.get(word).copied().unwrap_or(0);
+    let corpus_word = lexicon.corpus_word_unigrams.get(word).copied().unwrap_or(0);
+    let lexicon_unigram = lexicon.word_unigrams.get(word).copied().unwrap_or(0);
+    let unigram_score = if corpus_surface > 0 {
+        (((corpus_surface + 1) as f64).ln() * 260.0).round() as i32
+    } else if corpus_word > 0 {
+        (((corpus_word + 1) as f64).ln() * 240.0).round() as i32
+    } else {
+        (((lexicon_unigram + 1) as f64).ln() * 180.0).round() as i32
+    };
     let bigram_score = previous
-        .and_then(|prev| lexicon.word_bigrams.get(&(prev.clone(), word.to_owned())).copied())
-        .map(|count| (((count + 1) as f64).ln() * 320.0).round() as i32)
-        .unwrap_or_else(|| if previous.is_some() { -90 } else { 0 });
+        .map(|prev| {
+            let corpus_bigram = lexicon
+                .corpus_word_bigrams
+                .get(&(prev.clone(), word.to_owned()))
+                .copied()
+                .unwrap_or(0);
+            if corpus_bigram > 0 {
+                return (((corpus_bigram + 1) as f64).ln() * 320.0).round() as i32;
+            }
+
+            let lexicon_bigram = lexicon
+                .word_bigrams
+                .get(&(prev.clone(), word.to_owned()))
+                .copied()
+                .unwrap_or(0);
+            if lexicon_bigram > 0 {
+                return (((lexicon_bigram + 1) as f64).ln() * 260.0).round() as i32;
+            }
+
+            if lexicon.corpus_surface_unigrams.contains_key(prev) && lexicon.corpus_surface_unigrams.contains_key(word)
+            {
+                -40
+            } else {
+                -90
+            }
+        })
+        .unwrap_or(0);
     unigram_score + bigram_score
 }
 
-fn pos_delta(_previous: Option<&str>, _current: Option<&str>) -> i32 {
-    0
+fn pos_delta(lexicon: &RankedLexicon, previous: Option<&str>, current: Option<&str>) -> i32 {
+    let (Some(previous), Some(current)) = (previous, current) else {
+        return 0;
+    };
+
+    let transition = lexicon
+        .tag_bigrams
+        .get(&(previous.to_owned(), current.to_owned()))
+        .copied()
+        .unwrap_or(0);
+    if transition > 0 {
+        return (((transition + 1) as f64).ln() * 28.0).round() as i32;
+    }
+
+    let previous_seen = lexicon.tag_unigrams.contains_key(previous);
+    let current_seen = lexicon.tag_unigrams.contains_key(current);
+    if previous_seen && current_seen {
+        -18
+    } else {
+        0
+    }
 }
 
 fn composer_alignment_delta(composer: &crate::composer::ComposerAnalysis, start: usize, end: usize) -> i32 {
@@ -934,9 +1049,9 @@ mod tests {
     use std::collections::HashMap;
     use std::sync::Arc;
 
-    use super::WfstDecoder;
+    use super::{lm_delta, pos_delta, WfstDecoder};
     use crate::decoder::{DecoderConfig, DecoderMode};
-    use crate::roman_lookup::{LegacyData, Transliterator};
+    use crate::roman_lookup::{LegacyData, RankedLexicon, Transliterator};
 
     #[test]
     fn returns_candidates_for_exact_entries() {
@@ -1009,5 +1124,44 @@ mod tests {
             candidates.first().map(|candidate| candidate.output.as_str()),
             Some("ស្រណោះ")
         );
+    }
+
+    #[test]
+    fn prefers_exact_single_span_match_for_sronos() {
+        let transliterator =
+            Transliterator::from_default_data_with_config(DecoderConfig::default().with_mode(DecoderMode::Wfst))
+                .unwrap();
+
+        assert_eq!(
+            transliterator
+                .suggest("sronos", &HashMap::new())
+                .first()
+                .map(String::as_str),
+            Some("ស្រណោះ")
+        );
+    }
+
+    #[test]
+    fn lm_delta_prefers_corpus_surface_counts_for_joined_outputs() {
+        let mut lexicon = RankedLexicon::default();
+        lexicon.corpus_surface_unigrams.insert(String::from("ខ្ញុំទៅ"), 3);
+        lexicon.word_unigrams.insert(String::from("ខ្ញុំទៅ"), 1);
+
+        assert!(lm_delta(&lexicon, None, "ខ្ញុំទៅ") > 0);
+    }
+
+    #[test]
+    fn pos_delta_prefers_seen_tag_transitions() {
+        let mut lexicon = RankedLexicon::default();
+        lexicon.tag_unigrams.insert(String::from("PRO"), 10);
+        lexicon.tag_unigrams.insert(String::from("VB"), 12);
+        lexicon.tag_unigrams.insert(String::from("JJ"), 4);
+        lexicon
+            .tag_bigrams
+            .insert((String::from("PRO"), String::from("VB")), 25);
+
+        assert!(pos_delta(&lexicon, Some("PRO"), Some("VB")) > 0);
+        assert!(pos_delta(&lexicon, Some("PRO"), Some("JJ")) < 0);
+        assert_eq!(pos_delta(&lexicon, None, Some("VB")), 0);
     }
 }

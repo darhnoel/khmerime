@@ -10,6 +10,8 @@ use crate::{engine, CompositionMark, SuggestionPopup, FALLBACK_POPUP_LEFT, FALLB
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) struct SegmentedChoice {
     pub input: String,
+    pub start: usize,
+    pub end: usize,
     pub candidates: Vec<String>,
     pub selected: usize,
 }
@@ -26,6 +28,7 @@ impl SegmentedChoice {
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) struct SegmentedSession {
+    pub raw_input: String,
     pub segments: Vec<SegmentedChoice>,
     pub focused: usize,
 }
@@ -59,6 +62,10 @@ fn slice_chars(input: &str, range: std::ops::Range<usize>) -> String {
         .skip(range.start)
         .take(range.end.saturating_sub(range.start))
         .collect()
+}
+
+fn char_len(input: &str) -> usize {
+    input.chars().count()
 }
 
 pub(crate) async fn update_candidates(
@@ -139,7 +146,7 @@ pub(crate) async fn update_candidates(
         if live_text() != value {
             return;
         }
-        let next_segmented = build_segmented_session(&observation, &history_snapshot);
+        let next_segmented = build_segmented_session(&observation, &token, &history_snapshot);
         let visible = choose_visible_suggestions(
             &legacy_items,
             &observation,
@@ -320,19 +327,36 @@ pub(crate) fn select_segment_candidate(
     mut suggestions: Signal<Vec<String>>,
     mut selected: Signal<usize>,
     mut selection_started: Signal<bool>,
+    history: Signal<HashMap<String, usize>>,
 ) -> bool {
     let Some(mut session) = segmented_session() else {
         return false;
     };
-    let Some(segment) = session.segments.get_mut(session.focused) else {
+    let focused = session.focused;
+    let Some(segment) = session.segments.get(focused) else {
         return false;
     };
     if candidate_index >= segment.candidates.len() {
         return false;
     }
-    segment.selected = candidate_index;
+    session.segments[focused].selected = candidate_index;
+    if let Some(reflowed) = reflow_segmented_session_from_selection(&session, &history()) {
+        let focused_candidates = reflowed.focused_candidates();
+        let focused_selected = reflowed.focused_selected();
+        segmented_refine_mode.set(true);
+        suggestions.set(focused_candidates);
+        selected.set(focused_selected);
+        selection_started.set(true);
+        segmented_session.set(Some(reflowed));
+        return true;
+    }
+    let focused_candidates = session
+        .segments
+        .get(focused)
+        .map(|segment| segment.candidates.clone())
+        .unwrap_or_default();
     segmented_refine_mode.set(true);
-    suggestions.set(segment.candidates.clone());
+    suggestions.set(focused_candidates);
     selected.set(candidate_index);
     selection_started.set(true);
     segmented_session.set(Some(session));
@@ -388,20 +412,39 @@ pub(crate) async fn commit_segmented_selection(
 
 fn build_segmented_session(
     observation: &ShadowObservation,
+    raw_input: &str,
     history: &HashMap<String, usize>,
 ) -> Option<SegmentedSession> {
-    let pairs = observation
-        .wfst_top_segments
-        .iter()
-        .filter_map(|segment| segment.split_once("=>"))
-        .map(|(input, output)| (input.to_owned(), output.to_owned()))
-        .collect::<Vec<_>>();
+    let pairs = if !observation.wfst_top_segment_details.is_empty() {
+        observation
+            .wfst_top_segment_details
+            .iter()
+            .map(|segment| (segment.input.clone(), segment.output.clone()))
+            .collect::<Vec<_>>()
+    } else {
+        observation
+            .wfst_top_segments
+            .iter()
+            .filter_map(|segment| segment.split_once("=>"))
+            .map(|(input, output)| (input.to_owned(), output.to_owned()))
+            .collect::<Vec<_>>()
+    };
 
+    build_segmented_session_from_pairs(raw_input, pairs, history, 0)
+}
+
+fn build_segmented_session_from_pairs(
+    raw_input: &str,
+    pairs: Vec<(String, String)>,
+    history: &HashMap<String, usize>,
+    base_offset: usize,
+) -> Option<SegmentedSession> {
     if pairs.len() < 2 {
         return None;
     }
 
     let legacy = engine(DecoderMode::Legacy);
+    let mut cursor = base_offset;
     let segments = pairs
         .into_iter()
         .map(|(input, output)| {
@@ -416,15 +459,130 @@ fn build_segmented_session(
                 candidates.insert(0, output);
             }
             candidates.truncate(10);
+            let start = cursor;
+            let end = start + char_len(&input);
+            cursor = end;
             SegmentedChoice {
                 input,
+                start,
+                end,
                 candidates,
                 selected: 0,
             }
         })
         .collect::<Vec<_>>();
 
-    Some(SegmentedSession { segments, focused: 0 })
+    Some(SegmentedSession {
+        raw_input: raw_input.to_owned(),
+        segments,
+        focused: 0,
+    })
+}
+
+fn build_locked_segment(
+    input: String,
+    output: String,
+    start: usize,
+    history: &HashMap<String, usize>,
+) -> SegmentedChoice {
+    let legacy = engine(DecoderMode::Legacy);
+    let mut candidates = normalize_visible_suggestions(legacy.suggest(&input, history));
+    let output = connect_khmer_display(&output);
+    if let Some(position) = candidates.iter().position(|candidate| candidate == &output) {
+        if position != 0 {
+            let preferred = candidates.remove(position);
+            candidates.insert(0, preferred);
+        }
+    } else {
+        candidates.insert(0, output);
+    }
+    candidates.truncate(10);
+
+    SegmentedChoice {
+        end: start + char_len(&input),
+        input,
+        start,
+        candidates,
+        selected: 0,
+    }
+}
+
+fn build_tail_segment(input: String, start: usize, history: &HashMap<String, usize>) -> SegmentedChoice {
+    let legacy = engine(DecoderMode::Legacy);
+    let mut candidates = normalize_visible_suggestions(legacy.suggest(&input, history));
+    if candidates.is_empty() {
+        candidates.push(input.clone());
+    }
+    candidates.truncate(10);
+
+    SegmentedChoice {
+        end: start + char_len(&input),
+        input,
+        start,
+        candidates,
+        selected: 0,
+    }
+}
+
+fn reflow_segmented_session_from_selection(
+    session: &SegmentedSession,
+    history: &HashMap<String, usize>,
+) -> Option<SegmentedSession> {
+    let focused = session.focused;
+    let segment = session.segments.get(focused)?;
+    let chosen = segment.selected_text();
+    let tail = slice_chars(&session.raw_input, segment.start..char_len(&session.raw_input));
+    let consumed = engine(DecoderMode::Legacy).best_prefix_consumption(&tail, &chosen)?;
+    let consumed_len = char_len(&consumed);
+    if consumed_len == 0 || consumed_len == segment.end.saturating_sub(segment.start) {
+        return None;
+    }
+
+    let mut segments = session.segments[..focused].to_vec();
+    segments.push(build_locked_segment(consumed.clone(), chosen, segment.start, history));
+
+    let tail_start = segment.start + consumed_len;
+    let total_len = char_len(&session.raw_input);
+    if tail_start < total_len {
+        let remaining_tail = slice_chars(&session.raw_input, tail_start..total_len);
+        let observation = engine(DecoderMode::Shadow).shadow_observation(&remaining_tail, history);
+        if let Some(mut tail_session) = build_segmented_session_from_pairs(
+            &session.raw_input,
+            {
+                if !observation.wfst_top_segment_details.is_empty() {
+                    observation
+                        .wfst_top_segment_details
+                        .iter()
+                        .map(|segment| (segment.input.clone(), segment.output.clone()))
+                        .collect::<Vec<_>>()
+                } else {
+                    observation
+                        .wfst_top_segments
+                        .iter()
+                        .filter_map(|segment| segment.split_once("=>"))
+                        .map(|(input, output)| (input.to_owned(), output.to_owned()))
+                        .collect::<Vec<_>>()
+                }
+            },
+            history,
+            tail_start,
+        ) {
+            segments.append(&mut tail_session.segments);
+        } else {
+            segments.push(build_tail_segment(remaining_tail, tail_start, history));
+        }
+    }
+
+    let focused = if focused + 1 < segments.len() {
+        focused + 1
+    } else {
+        focused.min(segments.len().saturating_sub(1))
+    };
+    Some(SegmentedSession {
+        raw_input: session.raw_input.clone(),
+        segments,
+        focused,
+    })
 }
 
 pub(crate) async fn commit_selection(
@@ -558,9 +716,12 @@ pub(crate) fn is_space_key(key: &str) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use roman_lookup::{DecoderMode, ShadowMismatch, ShadowObservation};
+    use roman_lookup::{DecodeSegment, DecoderMode, ShadowMismatch, ShadowObservation};
 
-    use super::{choose_visible_suggestions, connect_khmer_display, SegmentedChoice, SegmentedSession};
+    use super::{
+        build_segmented_session, char_len, choose_visible_suggestions, connect_khmer_display,
+        reflow_segmented_session_from_selection, slice_chars, SegmentedChoice, SegmentedSession,
+    };
 
     fn sample_observation() -> ShadowObservation {
         ShadowObservation {
@@ -572,6 +733,18 @@ mod tests {
             composer_pending_tail: String::new(),
             composer_fully_segmented: true,
             wfst_used_hint_chunks: true,
+            wfst_top_segment_details: vec![
+                DecodeSegment {
+                    input: "khnhom".to_owned(),
+                    output: "ខ្ញុំ".to_owned(),
+                    weight_bps: 9_500,
+                },
+                DecodeSegment {
+                    input: "tov".to_owned(),
+                    output: "ទៅ".to_owned(),
+                    weight_bps: 9_100,
+                },
+            ],
             wfst_top_segments: vec!["khnhom=>ខ្ញុំ".to_owned(), "tov=>ទៅ".to_owned()],
             legacy_latency_us: 10,
             wfst_latency_us: Some(8),
@@ -595,14 +768,19 @@ mod tests {
                 &legacy,
                 &observation,
                 Some(&SegmentedSession {
+                    raw_input: "khnhomtov".to_owned(),
                     segments: vec![
                         SegmentedChoice {
                             input: "khnhom".to_owned(),
+                            start: 0,
+                            end: 6,
                             candidates: vec!["ខ្ញុំ".to_owned()],
                             selected: 0,
                         },
                         SegmentedChoice {
                             input: "tov".to_owned(),
+                            start: 6,
+                            end: 9,
                             candidates: vec!["ទៅ".to_owned()],
                             selected: 0,
                         },
@@ -616,12 +794,72 @@ mod tests {
     }
 
     #[test]
+    fn builds_segmented_session_from_structured_wfst_segments() {
+        let observation = sample_observation();
+        let session = build_segmented_session(&observation, "khnhomtov", &std::collections::HashMap::new()).unwrap();
+
+        assert_eq!(session.segments.len(), 2);
+        assert_eq!(session.segments[0].input, "khnhom");
+        assert_eq!(session.segments[0].start, 0);
+        assert_eq!(session.segments[0].end, 6);
+        assert_eq!(session.segments[0].selected_text(), "ខ្ញុំ");
+        assert_eq!(session.segments[1].input, "tov");
+        assert_eq!(session.segments[1].start, 6);
+        assert_eq!(session.segments[1].end, 9);
+        assert_eq!(session.segments[1].selected_text(), "ទៅ");
+    }
+
+    #[test]
     fn merges_wfst_and_legacy_suggestions_when_available() {
         let legacy = vec!["ខ្ញុំ ទៅ".to_owned(), "ខ្ញមទៅ".to_owned()];
         let observation = sample_observation();
         assert_eq!(
             choose_visible_suggestions(&legacy, &observation, None, false),
             vec!["ខ្ញុំទៅ".to_owned(), "ខ្ញមទៅ".to_owned()]
+        );
+    }
+
+    #[test]
+    fn reflows_suffix_when_selected_candidate_consumes_shorter_prefix() {
+        let session = SegmentedSession {
+            raw_input: "cheamnouslaor".to_owned(),
+            segments: vec![
+                SegmentedChoice {
+                    input: "cheam".to_owned(),
+                    start: 0,
+                    end: 5,
+                    candidates: vec!["ជា".to_owned()],
+                    selected: 0,
+                },
+                SegmentedChoice {
+                    input: "ous".to_owned(),
+                    start: 5,
+                    end: 8,
+                    candidates: vec!["អូស".to_owned()],
+                    selected: 0,
+                },
+                SegmentedChoice {
+                    input: "laor".to_owned(),
+                    start: 8,
+                    end: 12,
+                    candidates: vec!["ល្អ".to_owned()],
+                    selected: 0,
+                },
+            ],
+            focused: 0,
+        };
+
+        let reflowed = reflow_segmented_session_from_selection(&session, &std::collections::HashMap::new()).unwrap();
+
+        assert_eq!(reflowed.segments[0].input, "chea");
+        assert_eq!(reflowed.segments[0].selected_text(), "ជា");
+        assert_eq!(reflowed.segments[1].start, 4);
+        assert_eq!(
+            slice_chars(
+                &reflowed.raw_input,
+                reflowed.segments[1].start..char_len(&reflowed.raw_input)
+            ),
+            "mnouslaor"
         );
     }
 

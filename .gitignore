@@ -20,3 +20,6 @@ vendor/
 # Editor and OS noise
 .DS_Store
 Thumbs.db
+
+# Local notes
+notes/*.local.md

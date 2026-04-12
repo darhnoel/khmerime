@@ -123,7 +123,7 @@ pub(crate) fn EditorCard(
                                 let len = suggestions().len();
                                 let next = (selected() + 1) % len;
                                 if segmented_refine_mode() && segmented_session().is_some() {
-                                    select_segment_candidate(next, segmented_session, segmented_refine_mode, suggestions, selected, selection_started);
+                                    select_segment_candidate(next, segmented_session, segmented_refine_mode, suggestions, selected, selection_started, history);
                                 } else {
                                     selected.set(next);
                                     selection_started.set(true);
@@ -135,7 +135,7 @@ pub(crate) fn EditorCard(
                                 let len = suggestions().len();
                                 if segmented_refine_mode() && segmented_session().is_some() {
                                     let next = if !selection_started() { 0 } else { (selected() + 1) % len };
-                                    select_segment_candidate(next, segmented_session, segmented_refine_mode, suggestions, selected, selection_started);
+                                    select_segment_candidate(next, segmented_session, segmented_refine_mode, suggestions, selected, selection_started, history);
                                 } else {
                                     if !selection_started() {
                                         selected.set(0);
@@ -155,7 +155,7 @@ pub(crate) fn EditorCard(
                                     } else {
                                         (selected() + len - 1) % len
                                     };
-                                    select_segment_candidate(next, segmented_session, segmented_refine_mode, suggestions, selected, selection_started);
+                                    select_segment_candidate(next, segmented_session, segmented_refine_mode, suggestions, selected, selection_started, history);
                                 } else {
                                     if !selection_started() {
                                         selected.set(len.saturating_sub(1));
@@ -177,7 +177,7 @@ pub(crate) fn EditorCard(
                             key if is_space_key(key) && !suggestions().is_empty() && !selection_started() => {
                                 event.prevent_default();
                                 if segmented_refine_mode() && segmented_session().is_some() {
-                                    select_segment_candidate(0, segmented_session, segmented_refine_mode, suggestions, selected, selection_started);
+                                    select_segment_candidate(0, segmented_session, segmented_refine_mode, suggestions, selected, selection_started, history);
                                 } else {
                                     selected.set(0);
                                     selection_started.set(true);
@@ -189,7 +189,7 @@ pub(crate) fn EditorCard(
                                 let len = suggestions().len();
                                 let next = (selected() + 1) % len;
                                 if segmented_refine_mode() && segmented_session().is_some() {
-                                    select_segment_candidate(next, segmented_session, segmented_refine_mode, suggestions, selected, selection_started);
+                                    select_segment_candidate(next, segmented_session, segmented_refine_mode, suggestions, selected, selection_started, history);
                                 } else {
                                     selected.set(next);
                                     selection_started.set(true);
@@ -211,7 +211,7 @@ pub(crate) fn EditorCard(
                                     if index < suggestions().len() {
                                         event.prevent_default();
                                         if segmented_refine_mode() && segmented_session().is_some() {
-                                            select_segment_candidate(index, segmented_session, segmented_refine_mode, suggestions, selected, selection_started);
+                                            select_segment_candidate(index, segmented_session, segmented_refine_mode, suggestions, selected, selection_started, history);
                                         } else {
                                             selected.set(index);
                                             selection_started.set(true);
@@ -283,7 +283,7 @@ pub(crate) fn EditorCard(
                                     button {
                                         onclick: move |_| {
                                             if segmented_refine_mode() && segmented_session().is_some() {
-                                                select_segment_candidate(index, segmented_session, segmented_refine_mode, suggestions, selected, selection_started);
+                                                select_segment_candidate(index, segmented_session, segmented_refine_mode, suggestions, selected, selection_started, history);
                                                 number_pick_mode.set(true);
                                             } else {
                                                 selected.set(index);
