@@ -1,33 +1,11 @@
-use std::collections::HashMap;
-
 use dioxus::prelude::*;
-use roman_lookup::{DecoderMode, ShadowObservation};
 
-use crate::ui::editor::{update_candidates, SegmentedSession};
+use crate::ui::editor::{update_candidates, EditorSignals};
 use crate::ui::storage::{save_editor_text, save_enabled, save_font_size};
-use crate::{CompositionMark, SuggestionPopup, MAX_FONT_SIZE, MIN_FONT_SIZE};
+use crate::{MAX_FONT_SIZE, MIN_FONT_SIZE};
 
 #[component]
-pub(crate) fn AppToolbar(
-    engine_ready: Signal<bool>,
-    text: Signal<String>,
-    roman_enabled: Signal<bool>,
-    decoder_mode: Signal<DecoderMode>,
-    show_guide: Signal<bool>,
-    font_size: Signal<usize>,
-    suggestions: Signal<Vec<String>>,
-    popup: Signal<Option<SuggestionPopup>>,
-    composition: Signal<Option<CompositionMark>>,
-    shadow_debug: Signal<Option<ShadowObservation>>,
-    segmented_session: Signal<Option<SegmentedSession>>,
-    segmented_refine_mode: Signal<bool>,
-    active_token: Signal<String>,
-    number_pick_mode: Signal<bool>,
-    selection_started: Signal<bool>,
-    selected: Signal<usize>,
-    pending_caret: Signal<Option<usize>>,
-    history: Signal<HashMap<String, usize>>,
-) -> Element {
+pub(crate) fn AppToolbar(state: EditorSignals, show_guide: Signal<bool>, font_size: Signal<usize>) -> Element {
     rsx! {
         div { class: "workspace-top",
             div { class: "toolbar",
@@ -40,8 +18,8 @@ pub(crate) fn AppToolbar(
                             let next = font_size().saturating_sub(2).max(MIN_FONT_SIZE);
                             font_size.set(next);
                             save_font_size(next, MIN_FONT_SIZE, MAX_FONT_SIZE);
-                            if roman_enabled() {
-                                spawn(update_candidates(text(), text, roman_enabled, decoder_mode(), engine_ready, suggestions, popup, composition, shadow_debug, segmented_session, segmented_refine_mode, active_token, number_pick_mode, selection_started, selected, history));
+                            if state.roman_enabled() {
+                                spawn(update_candidates(state.text(), state));
                             }
                         },
                         "A-"
@@ -54,8 +32,8 @@ pub(crate) fn AppToolbar(
                             let next = (font_size() + 2).min(MAX_FONT_SIZE);
                             font_size.set(next);
                             save_font_size(next, MIN_FONT_SIZE, MAX_FONT_SIZE);
-                            if roman_enabled() {
-                                spawn(update_candidates(text(), text, roman_enabled, decoder_mode(), engine_ready, suggestions, popup, composition, shadow_debug, segmented_session, segmented_refine_mode, active_token, number_pick_mode, selection_started, selected, history));
+                            if state.roman_enabled() {
+                                spawn(update_candidates(state.text(), state));
                             }
                         },
                         "A+"
@@ -63,34 +41,25 @@ pub(crate) fn AppToolbar(
                 }
                 div { class: "mode-tools",
                     button {
-                        class: if roman_enabled() { "mode-pill active" } else { "mode-pill" },
+                        class: if state.roman_enabled() { "mode-pill active" } else { "mode-pill" },
                         "data-testid": "toggle-live-edit",
                         onclick: move |_| {
-                            let next = !roman_enabled();
-                            roman_enabled.set(next);
+                            let next = !state.roman_enabled();
+                            state.roman_enabled.set(next);
                             save_enabled(next);
                             if next {
-                                spawn(update_candidates(text(), text, roman_enabled, decoder_mode(), engine_ready, suggestions, popup, composition, shadow_debug, segmented_session, segmented_refine_mode, active_token, number_pick_mode, selection_started, selected, history));
+                                spawn(update_candidates(state.text(), state));
                             } else {
-                                suggestions.set(Vec::new());
-                                popup.set(None);
-                                composition.set(None);
-                                shadow_debug.set(None);
-                                segmented_session.set(None);
-                                segmented_refine_mode.set(false);
-                                active_token.set(String::new());
-                                number_pick_mode.set(false);
-                                selection_started.set(false);
-                                selected.set(0);
+                                state.clear_candidate_state_and_picker();
                             }
                         },
-                        if roman_enabled() {
+                        if state.roman_enabled() {
                             "Live Edit"
                         } else {
                             "Live Edit Off"
                         }
                     }
-                    if !engine_ready() {
+                    if !state.engine_ready() {
                         div {
                             class: "engine-status loading",
                             "data-testid": "engine-status",
@@ -112,19 +81,10 @@ pub(crate) fn AppToolbar(
                         class: "ghost",
                         "data-testid": "clear-editor",
                         onclick: move |_| {
-                            text.set(String::new());
+                            state.text.set(String::new());
                             save_editor_text("");
-                            suggestions.set(Vec::new());
-                            popup.set(None);
-                            composition.set(None);
-                            shadow_debug.set(None);
-                            segmented_session.set(None);
-                            segmented_refine_mode.set(false);
-                            active_token.set(String::new());
-                            number_pick_mode.set(false);
-                            selection_started.set(false);
-                            selected.set(0);
-                            pending_caret.set(Some(0));
+                            state.clear_candidate_state_and_picker();
+                            state.pending_caret.set(Some(0));
                         },
                         "Clear"
                     }

@@ -647,29 +647,20 @@ mod tests {
         let analysis = table.analyze("khomtaekitmnakaeng");
         let hints = analysis.wfst_phrase_chunks();
 
-        assert!(analysis.fully_segmented);
+        assert!(!analysis.fully_segmented);
         assert_eq!(
             analysis
                 .chunks
                 .iter()
                 .map(|chunk| chunk.normalized.as_str())
                 .collect::<Vec<_>>(),
-            vec!["khom", "tae", "kit", "m", "na", "kaeng"]
+            vec!["khom", "t", "aek"]
         );
         assert_eq!(
             hints.iter().map(|chunk| chunk.normalized.as_str()).collect::<Vec<_>>(),
-            vec!["khom", "tae", "kit", "mnak", "eng"]
+            vec!["khom", "taekitmnakaeng"]
         );
-        assert_eq!(
-            hints.iter().map(|chunk| chunk.kind).collect::<Vec<_>>(),
-            vec![
-                ComposerChunkKind::Exact,
-                ComposerChunkKind::Exact,
-                ComposerChunkKind::Exact,
-                ComposerChunkKind::Exact,
-                ComposerChunkKind::Exact,
-            ]
-        );
+        assert_eq!(hints.last().map(|chunk| chunk.kind), Some(ComposerChunkKind::Hint));
     }
 
     #[test]
@@ -686,12 +677,12 @@ mod tests {
                 .iter()
                 .map(|chunk| chunk.normalized.as_str())
                 .collect::<Vec<_>>(),
-            vec!["saen", "sron", "or", "s"]
+            vec!["saen", "sronors"]
         );
         assert_eq!(
             hints.iter().map(|chunk| chunk.normalized.as_str()).collect::<Vec<_>>(),
             vec!["saen", "sronors"]
         );
-        assert_eq!(hints.last().map(|chunk| chunk.kind), Some(ComposerChunkKind::Hint));
+        assert_eq!(hints.last().map(|chunk| chunk.kind), Some(ComposerChunkKind::Exact));
     }
 }

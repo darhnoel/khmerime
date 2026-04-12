@@ -980,6 +980,8 @@ fn normalize_cluster_aliases(input: &str) -> String {
         ("chh", "c"),
         ("ddh", "d"),
         ("tth", "t"),
+        ("kiet", "git"),
+        ("kit", "git"),
         ("kh", "k"),
         ("gh", "g"),
         ("ng", "n"),
@@ -1282,5 +1284,11 @@ mod tests {
         let ue = roman_search_variants("hueb");
         assert!(eu.iter().any(|variant| variant == "heb"));
         assert!(ue.iter().any(|variant| variant == "heb"));
+    }
+
+    #[test]
+    fn search_variants_cover_kit_git_aliases() {
+        let variants = roman_search_variants("kit");
+        assert!(variants.iter().any(|variant| variant == "git"));
     }
 }

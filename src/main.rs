@@ -7,7 +7,7 @@ use roman_lookup::{DecoderConfig, DecoderMode, ShadowObservation, Transliterator
 mod ui;
 
 use self::ui::components::{AppToolbar, EditorCard, GuidePanel, WorkspaceBody};
-use self::ui::editor::{refresh_popup_position, SegmentedSession};
+use self::ui::editor::{refresh_popup_position, EditorSignals, SegmentedSession};
 use self::ui::platform::{hide_preboot_splash, mark_app_ready, set_editor_caret};
 use self::ui::storage::{load_decoder_mode, load_editor_text, load_enabled, load_font_size, load_history};
 
@@ -92,6 +92,24 @@ fn App() -> Element {
     let selected = use_signal(|| 0usize);
     let mut pending_caret = use_signal(|| None::<usize>);
     let history = use_signal(load_history);
+    let editor_state = EditorSignals {
+        text,
+        roman_enabled,
+        decoder_mode,
+        engine_ready,
+        suggestions,
+        popup,
+        composition,
+        shadow_debug,
+        segmented_session,
+        segmented_refine_mode,
+        active_token,
+        number_pick_mode,
+        selection_started,
+        selected,
+        pending_caret,
+        history,
+    };
 
     use_effect(move || {
         if let Some(caret) = pending_caret() {
@@ -118,25 +136,8 @@ fn App() -> Element {
     });
 
     use_effect(move || {
-        if engine_ready() && roman_enabled() {
-            spawn(ui::editor::update_candidates(
-                text(),
-                text,
-                roman_enabled,
-                decoder_mode(),
-                engine_ready,
-                suggestions,
-                popup,
-                composition,
-                shadow_debug,
-                segmented_session,
-                segmented_refine_mode,
-                active_token,
-                number_pick_mode,
-                selection_started,
-                selected,
-                history,
-            ));
+        if editor_state.engine_ready() && editor_state.roman_enabled() {
+            spawn(ui::editor::update_candidates(editor_state.text(), editor_state));
         }
     });
 
@@ -156,48 +157,18 @@ fn App() -> Element {
             div { class: if show_guide() { "board" } else { "board board-wide" },
                 section { class: "workspace",
                     AppToolbar {
-                        engine_ready,
-                        text,
-                        roman_enabled,
-                        decoder_mode,
+                        state: editor_state,
                         show_guide,
                         font_size,
-                        suggestions,
-                        popup,
-                        composition,
-                        shadow_debug,
-                        segmented_session,
-                        segmented_refine_mode,
-                        active_token,
-                        number_pick_mode,
-                        selection_started,
-                        selected,
-                        pending_caret,
-                        history,
                     }
                     WorkspaceBody {
-                        roman_enabled: roman_enabled(),
-                        decoder_mode: decoder_mode(),
-                        shadow_debug: shadow_debug(),
+                        roman_enabled: editor_state.roman_enabled(),
+                        decoder_mode: editor_state.decoder_mode(),
+                        shadow_debug: editor_state.shadow_debug(),
                         editor_card: rsx! {
                             EditorCard {
-                                engine_ready,
-                                text,
-                                roman_enabled,
-                                decoder_mode,
+                                state: editor_state,
                                 font_size,
-                                suggestions,
-                                popup,
-                                composition,
-                                shadow_debug,
-                                segmented_session,
-                                segmented_refine_mode,
-                                active_token,
-                                number_pick_mode,
-                                selection_started,
-                                selected,
-                                pending_caret,
-                                history,
                             }
                         },
                     }
