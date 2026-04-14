@@ -977,6 +977,12 @@ pub(crate) fn roman_search_variants(input: &str) -> Vec<String> {
     push_variant(&mut variants, &mut seen, normalize_vowel_aliases(&collapsed));
     push_variant(&mut variants, &mut seen, normalize_final_aliases(&base));
     push_variant(&mut variants, &mut seen, normalize_final_aliases(&collapsed));
+    for variant in collision_variants(&base) {
+        push_variant(&mut variants, &mut seen, variant);
+    }
+    for variant in collision_variants(&collapsed) {
+        push_variant(&mut variants, &mut seen, variant);
+    }
 
     let final_cluster = normalize_cluster_aliases(&normalize_final_aliases(&collapsed));
     push_variant(&mut variants, &mut seen, final_cluster.clone());
@@ -1060,6 +1066,50 @@ fn normalize_final_aliases(input: &str) -> String {
         }
     }
     input.to_owned()
+}
+
+fn collision_variants(input: &str) -> Vec<String> {
+    let mut variants = Vec::new();
+    let mut seen = HashSet::new();
+    let pairs = [
+        ("ch", "j"),
+        ("j", "ch"),
+        ("bb", "p"),
+        ("p", "bb"),
+        ("tt", "t"),
+        ("t", "tt"),
+        ("ue", "eu"),
+        ("eu", "ue"),
+    ];
+
+    for (from, to) in pairs {
+        for variant in replace_once_variants(input, from, to) {
+            if variant != input && seen.insert(variant.clone()) {
+                variants.push(variant);
+            }
+        }
+    }
+
+    variants
+}
+
+fn replace_once_variants(input: &str, from: &str, to: &str) -> Vec<String> {
+    if from.is_empty() || !input.contains(from) {
+        return Vec::new();
+    }
+    let mut variants = Vec::new();
+    let mut search_from = 0usize;
+    while let Some(found) = input[search_from..].find(from) {
+        let start = search_from + found;
+        let end = start + from.len();
+        let mut candidate = String::with_capacity(input.len() + to.len().saturating_sub(from.len()));
+        candidate.push_str(&input[..start]);
+        candidate.push_str(to);
+        candidate.push_str(&input[end..]);
+        variants.push(candidate);
+        search_from = start + 1;
+    }
+    variants
 }
 
 fn consonant_skeleton(input: &str) -> String {
@@ -1371,6 +1421,48 @@ mod tests {
         let ue = roman_search_variants("hueb");
         assert!(eu.iter().any(|variant| variant == "heb"));
         assert!(ue.iter().any(|variant| variant == "heb"));
+    }
+
+    #[test]
+    fn search_variants_cover_common_rule_collisions() {
+        let j = roman_search_variants("jea");
+        let ch = roman_search_variants("chea");
+        assert!(j.iter().any(|variant| variant == "chea"));
+        assert!(ch.iter().any(|variant| variant == "jea"));
+
+        let p = roman_search_variants("pa");
+        let bb = roman_search_variants("bba");
+        assert!(p.iter().any(|variant| variant == "bba"));
+        assert!(bb.iter().any(|variant| variant == "pa"));
+
+        let t = roman_search_variants("ta");
+        let tt = roman_search_variants("tta");
+        assert!(t.iter().any(|variant| variant == "tta"));
+        assert!(tt.iter().any(|variant| variant == "ta"));
+    }
+
+    #[test]
+    fn suggest_recovers_targets_from_common_collision_typos() {
+        let fixture = "chea\tជា\nbbong\tបង\nttae\tតែ\nhueb\tហួប\n";
+        let transliterator = Transliterator::from_tsv_str(fixture).unwrap();
+        let history = HashMap::new();
+
+        assert_eq!(
+            transliterator.suggest("jea", &history).first().map(String::as_str),
+            Some("ជា")
+        );
+        assert_eq!(
+            transliterator.suggest("pong", &history).first().map(String::as_str),
+            Some("បង")
+        );
+        assert_eq!(
+            transliterator.suggest("tae", &history).first().map(String::as_str),
+            Some("តែ")
+        );
+        assert_eq!(
+            transliterator.suggest("heub", &history).first().map(String::as_str),
+            Some("ហួប")
+        );
     }
 
     #[test]

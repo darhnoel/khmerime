@@ -102,6 +102,9 @@ pub(crate) fn EditorCard(state: EditorSignals, font_size: Signal<usize>) -> Elem
                                 state.number_pick_mode.set(false);
                             }
                             "ArrowDown" if !state.suggestions().is_empty() => {
+                                if event.is_auto_repeating() {
+                                    return;
+                                }
                                 event.prevent_default();
                                 let len = state.suggestions().len();
                                 if state.segmented_refine_mode() && state.segmented_session().is_some() {
@@ -118,6 +121,9 @@ pub(crate) fn EditorCard(state: EditorSignals, font_size: Signal<usize>) -> Elem
                                 state.number_pick_mode.set(false);
                             }
                             "ArrowUp" if !state.suggestions().is_empty() => {
+                                if event.is_auto_repeating() {
+                                    return;
+                                }
                                 event.prevent_default();
                                 let len = state.suggestions().len();
                                 if state.segmented_refine_mode() && state.segmented_session().is_some() {
