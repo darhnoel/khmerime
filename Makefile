@@ -1,4 +1,4 @@
-.PHONY: help web web-phone desktop stats suggest suggest-wfst suggest-shadow shadow-eval visualize-lexicon visualize-lexicon-streamlit fmt test test-golden test-ui paper-current paper-current-clean
+.PHONY: help web web-release web-phone desktop stats suggest suggest-wfst suggest-shadow shadow-eval visualize-lexicon visualize-lexicon-streamlit fmt test test-golden test-ui paper-current paper-current-clean
 
 DX ?= dx
 CLI := cargo run --bin lookup_cli --
@@ -14,6 +14,7 @@ help:
 	"khmerime developer commands" \
 	"" \
 	"  make web                         Run the Dioxus web app" \
+	"  make web-release                 Build deployable web artifacts under dist/web-release" \
 	"  make web-phone                   Run the web app on a phone-accessible host" \
 	"  make desktop                     Run the desktop app" \
 	"  make stats                       Print lexicon entry count" \
@@ -34,6 +35,9 @@ help:
 
 web:
 	$(DX) serve
+
+web-release:
+	bash scripts/build_web_release.sh
 
 web-phone:
 	bash scripts/serve_web_phone.sh

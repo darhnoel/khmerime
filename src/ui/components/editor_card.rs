@@ -99,7 +99,7 @@ pub(crate) fn EditorCard(state: EditorSignals, font_size: Signal<usize>) -> Elem
                                     state.selected.set(next);
                                     state.selection_started.set(true);
                                 }
-                                state.number_pick_mode.set(true);
+                                state.number_pick_mode.set(false);
                             }
                             "ArrowDown" if !state.suggestions().is_empty() => {
                                 event.prevent_default();
@@ -115,7 +115,7 @@ pub(crate) fn EditorCard(state: EditorSignals, font_size: Signal<usize>) -> Elem
                                     }
                                     state.selection_started.set(true);
                                 }
-                                state.number_pick_mode.set(true);
+                                state.number_pick_mode.set(false);
                             }
                             "ArrowUp" if !state.suggestions().is_empty() => {
                                 event.prevent_default();
@@ -135,7 +135,7 @@ pub(crate) fn EditorCard(state: EditorSignals, font_size: Signal<usize>) -> Elem
                                     }
                                     state.selection_started.set(true);
                                 }
-                                state.number_pick_mode.set(true);
+                                state.number_pick_mode.set(false);
                             }
                             key if is_space_key(key) && modifiers.contains(Modifiers::SHIFT) && !state.suggestions().is_empty() => {
                                 event.prevent_default();
@@ -205,7 +205,7 @@ pub(crate) fn EditorCard(state: EditorSignals, font_size: Signal<usize>) -> Elem
                                     class: if state.segmented_refine_mode() && index == session.focused { "segment-chip active" } else { "segment-chip" },
                                     onclick: move |_| {
                                         if move_segment_focus(index as isize - session.focused as isize, state) {
-                                            state.number_pick_mode.set(true);
+                                            state.number_pick_mode.set(false);
                                         }
                                     },
                                     span { class: "segment-chip-output", "{segment.selected_text()}" }
@@ -255,7 +255,7 @@ pub(crate) fn EditorCard(state: EditorSignals, font_size: Signal<usize>) -> Elem
                                         onclick: move |_| {
                                             if state.segmented_refine_mode() && state.segmented_session().is_some() {
                                                 select_segment_candidate(index, state);
-                                                state.number_pick_mode.set(true);
+                                                state.number_pick_mode.set(false);
                                             } else {
                                                 state.selected.set(index);
                                                 state.selection_started.set(true);

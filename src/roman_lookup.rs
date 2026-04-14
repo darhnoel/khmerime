@@ -14,18 +14,45 @@ const COMPILED_MAGIC: &[u8; 4] = b"RLX1";
 const KHPOS_MAGIC: &[u8; 4] = b"KPS1";
 const MAX_SUGGESTIONS: usize = 10;
 const MAX_MATCHES: usize = 50;
-const SYMBOL_DIGITS: [(&str, &str); 10] = [
-    ("!", "១"),
-    ("\"", "២"),
-    ("#", "៣"),
-    ("$", "៤"),
-    ("%", "៥"),
-    ("^", "៦"),
-    ("&", "៧"),
-    ("*", "៨"),
-    ("(", "៩"),
-    (")", "០"),
+const KEYCAP_SUGGESTIONS: [(&str, &str); 21] = [
+    ("1", "១"),
+    ("!", "!"),
+    ("2", "២"),
+    ("\"", "ៗ"),
+    ("3", "៣"),
+    ("#", "\""),
+    ("4", "៤"),
+    ("$", "៛"),
+    ("5", "៥"),
+    ("%", "%"),
+    ("6", "៦"),
+    ("&", "៍"),
+    ("7", "៧"),
+    ("'", "័"),
+    ("8", "៨"),
+    ("(", "៏"),
+    ("9", "៩"),
+    (")", "("),
+    ("0", "០"),
+    ("~", ")"),
+    ("=", "៌"),
 ];
+
+fn khmer_digit(ch: char) -> Option<char> {
+    match ch {
+        '0' => Some('០'),
+        '1' => Some('១'),
+        '2' => Some('២'),
+        '3' => Some('៣'),
+        '4' => Some('៤'),
+        '5' => Some('៥'),
+        '6' => Some('៦'),
+        '7' => Some('៧'),
+        '8' => Some('៨'),
+        '9' => Some('៩'),
+        _ => None,
+    }
+}
 const PRIORITY_SEEDS: [(&str, &str); 39] = [
     ("k", "ក"),
     ("kh", "ខ"),
@@ -252,35 +279,36 @@ impl Transliterator {
     pub fn token_bounds(text: &str, caret: usize, typed_space: bool) -> Range<usize> {
         let chars = text.chars().collect::<Vec<_>>();
         let end = caret.min(chars.len());
+        if end == 0 {
+            return 0..0;
+        }
         let mut scan = end.saturating_sub(1);
 
         if end > 0 && typed_space {
             scan = scan.saturating_sub(1);
         }
+        if scan >= chars.len() {
+            return end..end;
+        }
+        if is_period(chars[scan]) {
+            return scan..end;
+        }
+
+        let is_token_char = if is_roman_letter(chars[scan]) {
+            is_roman_letter as fn(char) -> bool
+        } else if is_keycap_token_char(chars[scan]) {
+            is_keycap_token_char as fn(char) -> bool
+        } else {
+            return end..end;
+        };
 
         let mut start = scan;
-        let mut found_boundary = false;
-
-        while end > 0 && start < chars.len() {
-            let ch = chars[start];
-            if is_period(ch) {
-                found_boundary = true;
-                break;
-            }
-            if !is_roman_letter(ch) {
-                start += 1;
-                found_boundary = true;
-                break;
-            }
-            if start == 0 {
-                found_boundary = true;
+        while start > 0 {
+            let previous = chars[start - 1];
+            if !is_token_char(previous) {
                 break;
             }
             start -= 1;
-        }
-
-        if !found_boundary {
-            start = 0;
         }
 
         start..end
@@ -387,8 +415,14 @@ impl LegacyData {
         if query == "." {
             return vec!["។".to_owned(), "៕".to_owned()];
         }
-        if let Some((_, digit)) = SYMBOL_DIGITS.iter().find(|(symbol, _)| *symbol == query) {
-            return vec![(*digit).to_owned()];
+        if query.chars().all(|ch| ch.is_ascii_digit()) && !query.is_empty() {
+            let mapped = query.chars().filter_map(khmer_digit).collect::<String>();
+            if !mapped.is_empty() {
+                return vec![mapped];
+            }
+        }
+        if let Some((_, mapped)) = KEYCAP_SUGGESTIONS.iter().find(|(key, _)| *key == query) {
+            return vec![(*mapped).to_owned()];
         }
         let normalized = normalize(query);
         if normalized.is_empty() {
@@ -901,6 +935,10 @@ fn is_roman_letter(ch: char) -> bool {
     ch.is_ascii() && ch.is_ascii_alphabetic()
 }
 
+fn is_keycap_token_char(ch: char) -> bool {
+    ch.is_ascii_digit() || matches!(ch, '!' | '"' | '#' | '$' | '%' | '&' | '\'' | '(' | ')' | '~' | '=')
+}
+
 fn is_period(ch: char) -> bool {
     ch == '.'
 }
@@ -1222,6 +1260,55 @@ mod tests {
             shadow.suggest("jea", &HashMap::new()),
             legacy.suggest("jea", &HashMap::new())
         );
+    }
+
+    #[test]
+    fn supports_top_row_keycap_suggestions() {
+        let transliterator = Transliterator::from_default_data().unwrap();
+        let history = HashMap::new();
+        let expectations = [
+            ("1", "១"),
+            ("!", "!"),
+            ("2", "២"),
+            ("\"", "ៗ"),
+            ("3", "៣"),
+            ("#", "\""),
+            ("4", "៤"),
+            ("$", "៛"),
+            ("5", "៥"),
+            ("%", "%"),
+            ("6", "៦"),
+            ("&", "៍"),
+            ("7", "៧"),
+            ("'", "័"),
+            ("8", "៨"),
+            ("(", "៏"),
+            ("9", "៩"),
+            (")", "("),
+            ("0", "០"),
+            ("~", ")"),
+            ("=", "៌"),
+        ];
+
+        for (input, expected) in expectations {
+            assert_eq!(transliterator.suggest(input, &history), vec![expected.to_owned()]);
+        }
+    }
+
+    #[test]
+    fn maps_multi_digit_queries_to_khmer_digits() {
+        let transliterator = Transliterator::from_default_data().unwrap();
+        let history = HashMap::new();
+        assert_eq!(transliterator.suggest("21212", &history), vec!["២១២១២".to_owned()]);
+        assert_eq!(transliterator.suggest("09876", &history), vec!["០៩៨៧៦".to_owned()]);
+    }
+
+    #[test]
+    fn token_bounds_supports_keycap_sequences() {
+        assert_eq!(Transliterator::token_bounds("21212", 5, false), 0..5);
+        assert_eq!(Transliterator::token_bounds("bong 21212", 10, false), 5..10);
+        assert_eq!(Transliterator::token_bounds("bong!", 5, false), 4..5);
+        assert_eq!(Transliterator::token_bounds("bong 2", 6, false), 5..6);
     }
 
     #[test]
