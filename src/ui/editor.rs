@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use dioxus::prelude::*;
 use roman_lookup::{DecoderMode, ShadowObservation, Transliterator};
@@ -46,6 +46,7 @@ pub(crate) struct EditorSignals {
     pub segmented_session: Signal<Option<SegmentedSession>>,
     pub segmented_refine_mode: Signal<bool>,
     pub active_token: Signal<String>,
+    pub recommended_indices: Signal<Vec<usize>>,
     pub number_pick_mode: Signal<bool>,
     pub selection_started: Signal<bool>,
     pub selected: Signal<usize>,
@@ -102,6 +103,10 @@ impl EditorSignals {
         (self.number_pick_mode)()
     }
 
+    pub(crate) fn recommended_indices(self) -> Vec<usize> {
+        (self.recommended_indices)()
+    }
+
     pub(crate) fn selection_started(self) -> bool {
         (self.selection_started)()
     }
@@ -122,6 +127,7 @@ impl EditorSignals {
         self.segmented_session.set(None);
         self.segmented_refine_mode.set(false);
         self.active_token.set(String::new());
+        self.recommended_indices.set(Vec::new());
         self.selection_started.set(false);
         self.selected.set(0);
     }
@@ -220,6 +226,16 @@ pub(crate) async fn update_candidates(value: String, mut state: EditorSignals) {
         state.segmented_refine_mode.set(false);
         legacy_items
     };
+    let exact_keys = legacy
+        .exact_match_targets(&token)
+        .into_iter()
+        .map(|item| normalized_suggestion_key(&item))
+        .collect::<HashSet<_>>();
+    let recommended_indices = items
+        .iter()
+        .enumerate()
+        .filter_map(|(index, item)| exact_keys.contains(&normalized_suggestion_key(item)).then_some(index))
+        .collect::<Vec<_>>();
     let preserve_selection = state.active_token() == token && !state.suggestions().is_empty();
     let popup_position = if items.is_empty() {
         None
@@ -236,6 +252,7 @@ pub(crate) async fn update_candidates(value: String, mut state: EditorSignals) {
     state.popup.set(popup_position);
     state.composition.set(composition_mark);
     state.active_token.set(token.clone());
+    state.recommended_indices.set(recommended_indices);
     if !preserve_selection {
         state.number_pick_mode.set(false);
         state.selection_started.set(false);

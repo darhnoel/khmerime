@@ -118,6 +118,13 @@ def test_web_ui_suggestions_and_live_edit_toggle(web_server: str) -> None:
         expect(popup).to_be_visible(timeout=15_000)
         expect(page.locator(".composition-mark, .composition-preview").last).to_be_visible(timeout=15_000)
         expect(page.locator("[data-testid='suggestion-popup'] .suggestion button").first).to_be_visible()
+        first_suggestion_text = page.locator("[data-testid='suggestion-popup'] .suggestion .suggestion-word").first
+        expected_first = first_suggestion_text.inner_text()
+        editor.press("ArrowDown")
+        active_suggestion_text = page.locator(
+            "[data-testid='suggestion-popup'] .suggestion.active .suggestion-word"
+        ).first
+        expect(active_suggestion_text).to_have_text(expected_first)
 
         editor.press("Control+A")
         editor.type("khnhomtov")

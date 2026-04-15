@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::sync::OnceLock;
 
 use dioxus::document;
@@ -8,7 +9,7 @@ mod ui;
 
 use self::ui::components::{AppToolbar, EditorCard, GuidePanel, WorkspaceBody};
 use self::ui::editor::{refresh_popup_position, EditorSignals, SegmentedSession};
-use self::ui::platform::{hide_preboot_splash, mark_app_ready, set_editor_caret};
+use self::ui::platform::{mark_app_ready, set_editor_caret};
 use self::ui::storage::{load_decoder_mode, load_editor_text, load_enabled, load_font_size, load_history};
 
 const APP_CSS: &str = include_str!("../assets/main.css");
@@ -72,6 +73,15 @@ pub(crate) fn engine(mode: DecoderMode) -> &'static Transliterator {
     }
 }
 
+fn warm_engine(mode: DecoderMode) {
+    let transliterator = engine(mode);
+    let history = HashMap::new();
+    let _ = transliterator.suggest("a", &history);
+    if mode == DecoderMode::Shadow {
+        let _ = transliterator.shadow_observation("khn", &history);
+    }
+}
+
 #[component]
 fn App() -> Element {
     let mut engine_ready = use_signal(|| LEGACY_TRANSLITERATOR.get().is_some());
@@ -87,6 +97,7 @@ fn App() -> Element {
     let segmented_session = use_signal(|| None::<SegmentedSession>);
     let segmented_refine_mode = use_signal(|| false);
     let active_token = use_signal(String::new);
+    let recommended_indices = use_signal(Vec::<usize>::new);
     let mut number_pick_mode = use_signal(|| false);
     let mut selection_started = use_signal(|| false);
     let selected = use_signal(|| 0usize);
@@ -104,6 +115,7 @@ fn App() -> Element {
         segmented_session,
         segmented_refine_mode,
         active_token,
+        recommended_indices,
         number_pick_mode,
         selection_started,
         selected,
@@ -120,13 +132,9 @@ fn App() -> Element {
 
     use_effect(move || {
         spawn(async move {
-            let _ = engine(DecoderMode::Legacy);
+            warm_engine(DecoderMode::Legacy);
             engine_ready.set(true);
         });
-    });
-
-    use_effect(move || {
-        hide_preboot_splash();
     });
 
     use_effect(move || {

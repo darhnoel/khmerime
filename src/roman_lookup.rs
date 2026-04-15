@@ -12,8 +12,8 @@ const DEFAULT_COMPILED_DATA: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/r
 const DEFAULT_COMPILED_KHPOS_STATS: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/khpos.stats.bin"));
 const COMPILED_MAGIC: &[u8; 4] = b"RLX1";
 const KHPOS_MAGIC: &[u8; 4] = b"KPS1";
-const MAX_SUGGESTIONS: usize = 10;
-const MAX_MATCHES: usize = 50;
+const MAX_SUGGESTIONS: usize = 15;
+const MAX_MATCHES: usize = 12;
 const KEYCAP_SUGGESTIONS: [(&str, &str); 21] = [
     ("1", "១"),
     ("!", "!"),
@@ -201,6 +201,8 @@ pub(crate) struct LegacyData {
     by_roman: HashMap<String, Vec<String>>,
     by_normalized: HashMap<String, Vec<String>>,
     by_target: HashMap<String, Vec<String>>,
+    roman_normalized: HashMap<String, String>,
+    roman_prefix_index: HashMap<String, Vec<String>>,
     index: SearchIndex,
     ranked: RankedLexicon,
 }
@@ -261,6 +263,17 @@ impl Transliterator {
 
     pub fn suggest(&self, input: &str, history: &HashMap<String, usize>) -> Vec<String> {
         self.decoder.suggest(input, history)
+    }
+
+    pub fn exact_match_targets(&self, input: &str) -> Vec<String> {
+        let query = input.strip_suffix(' ').unwrap_or(input);
+        let normalized = normalize(query);
+        if normalized.is_empty() {
+            return Vec::new();
+        }
+        self.legacy
+            .exact_targets(&normalized)
+            .map_or_else(Vec::new, |targets| targets.to_vec())
     }
 
     pub fn shadow_observation(&self, input: &str, history: &HashMap<String, usize>) -> ShadowObservation {
@@ -351,6 +364,24 @@ impl LegacyData {
                 .or_insert_with(Vec::new)
                 .push(normalize(&entry.roman));
         }
+        let mut sorted_romans = by_roman.keys().cloned().collect::<Vec<_>>();
+        sorted_romans.sort_by(|left, right| left.len().cmp(&right.len()).then_with(|| left.cmp(right)));
+        let mut roman_normalized = HashMap::<String, String>::new();
+        let mut roman_prefix_index = HashMap::<String, Vec<String>>::new();
+        for roman in &sorted_romans {
+            let normalized = normalize(roman);
+            roman_normalized.insert(roman.clone(), normalized.clone());
+            for prefix_len in 1..=3 {
+                let prefix = normalized.chars().take(prefix_len).collect::<String>();
+                if prefix.chars().count() != prefix_len {
+                    break;
+                }
+                roman_prefix_index
+                    .entry(prefix)
+                    .or_insert_with(Vec::new)
+                    .push(roman.clone());
+            }
+        }
         let roman_keys = entries.iter().map(|entry| entry.roman.clone()).collect::<Vec<_>>();
         let ranked = RankedLexicon::from_entries(&entries, &corpus_stats);
         Self {
@@ -358,6 +389,8 @@ impl LegacyData {
             by_roman,
             by_normalized,
             by_target,
+            roman_normalized,
+            roman_prefix_index,
             index: SearchIndex::new(&roman_keys, true, 2, 3),
             ranked,
         }
@@ -442,13 +475,21 @@ impl LegacyData {
         }
 
         if normalized.chars().count() <= 1 || romans.is_empty() {
-            let mut prefix_matches = self
-                .by_roman
-                .keys()
-                .filter(|roman| normalize(roman).starts_with(&normalized))
+            let prefix_seed = normalized.chars().take(3).collect::<String>();
+            let seed_pool = self
+                .roman_prefix_index
+                .get(&prefix_seed)
                 .cloned()
+                .unwrap_or_else(|| self.by_roman.keys().cloned().collect::<Vec<_>>());
+            let prefix_matches = seed_pool
+                .into_iter()
+                .filter(|roman| {
+                    self.roman_normalized
+                        .get(roman)
+                        .map(|value| value.starts_with(&normalized))
+                        .unwrap_or(false)
+                })
                 .collect::<Vec<_>>();
-            prefix_matches.sort_by(|left, right| left.len().cmp(&right.len()).then_with(|| left.cmp(right)));
 
             for roman in prefix_matches {
                 if seen_romans.insert(roman.clone()) {
@@ -484,8 +525,11 @@ impl LegacyData {
         }
 
         for roman in romans {
-            let roman_normalized = normalize(&roman);
-            let exact_match = roman_normalized == normalized;
+            let exact_match = self
+                .roman_normalized
+                .get(&roman)
+                .map(|value| value == &normalized)
+                .unwrap_or(false);
             let roman_len = roman.chars().count();
             if let Some(values) = self.by_roman.get(&roman) {
                 for target in values {
@@ -932,7 +976,7 @@ fn read_nul_terminated_str(source: &[u8], offset: &mut usize) -> Result<String> 
 }
 
 fn is_roman_letter(ch: char) -> bool {
-    ch.is_ascii() && ch.is_ascii_alphabetic()
+    ch.is_ascii() && (ch.is_ascii_alphabetic() || ch == '_')
 }
 
 fn is_keycap_token_char(ch: char) -> bool {
@@ -949,6 +993,7 @@ pub(crate) fn normalize(input: &str) -> String {
         .flat_map(char::to_lowercase)
         .filter(|ch| {
             ch.is_ascii_alphanumeric()
+                || *ch == '_'
                 || *ch == ','
                 || *ch == ' '
                 || ('\u{00C0}'..='\u{00FF}').contains(ch)
@@ -1354,11 +1399,42 @@ mod tests {
     }
 
     #[test]
+    fn normalize_preserves_underscore_for_disambiguation() {
+        assert_eq!(normalize("b_eh"), "b_eh");
+        assert_eq!(normalize("B_EH"), "b_eh");
+    }
+
+    #[test]
     fn token_bounds_supports_keycap_sequences() {
         assert_eq!(Transliterator::token_bounds("21212", 5, false), 0..5);
         assert_eq!(Transliterator::token_bounds("bong 21212", 10, false), 5..10);
         assert_eq!(Transliterator::token_bounds("bong!", 5, false), 4..5);
         assert_eq!(Transliterator::token_bounds("bong 2", 6, false), 5..6);
+    }
+
+    #[test]
+    fn token_bounds_treats_underscore_as_part_of_roman_token() {
+        assert_eq!(Transliterator::token_bounds("b_eh", 4, false), 0..4);
+        assert_eq!(Transliterator::token_bounds("foo b_eh", 8, false), 4..8);
+    }
+
+    #[test]
+    fn suggest_distinguishes_entries_with_underscore() {
+        let fixture = "beh\tបេះ\nb_eh\tប៊ិះ\n";
+        let transliterator = Transliterator::from_tsv_str(fixture).unwrap();
+        let history = HashMap::new();
+        assert_eq!(
+            transliterator.suggest("b_eh", &history).first().map(String::as_str),
+            Some("ប៊ិះ")
+        );
+    }
+
+    #[test]
+    fn exact_match_targets_only_return_exact_roman_mappings() {
+        let fixture = "barko\tបាកូ\nbark\tប៉ប្រោក\n";
+        let transliterator = Transliterator::from_tsv_str(fixture).unwrap();
+        assert_eq!(transliterator.exact_match_targets("barko"), vec!["បាកូ".to_owned()]);
+        assert_eq!(transliterator.exact_match_targets("BARK"), vec!["ប៉ប្រោក".to_owned()]);
     }
 
     #[test]

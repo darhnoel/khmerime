@@ -35,6 +35,11 @@ fn render_segmented_composition_preview(
 #[component]
 pub(crate) fn EditorCard(state: EditorSignals, font_size: Signal<usize>) -> Element {
     let text_value = state.text();
+    let suggestions = state.suggestions();
+    let suggestion_total = suggestions.len();
+    let page_start = visible_page_start(state.selected(), suggestion_total);
+    let page_end = (page_start + VISIBLE_SUGGESTIONS).min(suggestion_total);
+    let recommended_indices = state.recommended_indices();
     rsx! {
         div { class: "editor-card",
             div { class: "editor-wrap",
@@ -52,6 +57,11 @@ pub(crate) fn EditorCard(state: EditorSignals, font_size: Signal<usize>) -> Elem
                         let value = event.value();
                         save_editor_text(&value);
                         state.text.set(value.clone());
+                        // Start fresh after text changes so the next ArrowDown selects the first
+                        // candidate for the current token instead of continuing stale selection.
+                        state.number_pick_mode.set(false);
+                        state.selection_started.set(false);
+                        state.selected.set(0);
                         spawn(update_candidates(value, state));
                     },
                     onkeydown: move |event| {
@@ -89,9 +99,9 @@ pub(crate) fn EditorCard(state: EditorSignals, font_size: Signal<usize>) -> Elem
                                     event.prevent_default();
                                 }
                             }
-                            "Tab" if !state.suggestions().is_empty() => {
+                            "Tab" if !suggestions.is_empty() => {
                                 event.prevent_default();
-                                let len = state.suggestions().len();
+                                let len = suggestions.len();
                                 let next = (state.selected() + 1) % len;
                                 if state.segmented_refine_mode() && state.segmented_session().is_some() {
                                     select_segment_candidate(next, state);
@@ -101,12 +111,12 @@ pub(crate) fn EditorCard(state: EditorSignals, font_size: Signal<usize>) -> Elem
                                 }
                                 state.number_pick_mode.set(false);
                             }
-                            "ArrowDown" if !state.suggestions().is_empty() => {
+                            "ArrowDown" if !suggestions.is_empty() => {
                                 if event.is_auto_repeating() {
                                     return;
                                 }
                                 event.prevent_default();
-                                let len = state.suggestions().len();
+                                let len = suggestions.len();
                                 if state.segmented_refine_mode() && state.segmented_session().is_some() {
                                     let next = if !state.selection_started() { 0 } else { (state.selected() + 1) % len };
                                     select_segment_candidate(next, state);
@@ -120,12 +130,12 @@ pub(crate) fn EditorCard(state: EditorSignals, font_size: Signal<usize>) -> Elem
                                 }
                                 state.number_pick_mode.set(false);
                             }
-                            "ArrowUp" if !state.suggestions().is_empty() => {
+                            "ArrowUp" if !suggestions.is_empty() => {
                                 if event.is_auto_repeating() {
                                     return;
                                 }
                                 event.prevent_default();
-                                let len = state.suggestions().len();
+                                let len = suggestions.len();
                                 if state.segmented_refine_mode() && state.segmented_session().is_some() {
                                     let next = if !state.selection_started() {
                                         len.saturating_sub(1)
@@ -143,7 +153,7 @@ pub(crate) fn EditorCard(state: EditorSignals, font_size: Signal<usize>) -> Elem
                                 }
                                 state.number_pick_mode.set(false);
                             }
-                            key if is_space_key(key) && modifiers.contains(Modifiers::SHIFT) && !state.suggestions().is_empty() => {
+                            key if is_space_key(key) && modifiers.contains(Modifiers::SHIFT) && !suggestions.is_empty() => {
                                 event.prevent_default();
                                 if state.segmented_refine_mode() && state.segmented_session().is_some() {
                                     spawn(commit_segmented_selection(false, state));
@@ -151,7 +161,7 @@ pub(crate) fn EditorCard(state: EditorSignals, font_size: Signal<usize>) -> Elem
                                     spawn(commit_selection(false, state));
                                 }
                             }
-                            key if is_space_key(key) && !state.suggestions().is_empty() && !state.selection_started() => {
+                            key if is_space_key(key) && !suggestions.is_empty() && !state.selection_started() => {
                                 event.prevent_default();
                                 if state.segmented_refine_mode() && state.segmented_session().is_some() {
                                     select_segment_candidate(0, state);
@@ -161,9 +171,9 @@ pub(crate) fn EditorCard(state: EditorSignals, font_size: Signal<usize>) -> Elem
                                 }
                                 state.number_pick_mode.set(true);
                             }
-                            key if is_space_key(key) && !state.suggestions().is_empty() => {
+                            key if is_space_key(key) && !suggestions.is_empty() => {
                                 event.prevent_default();
-                                let len = state.suggestions().len();
+                                let len = suggestions.len();
                                 let next = (state.selected() + 1) % len;
                                 if state.segmented_refine_mode() && state.segmented_session().is_some() {
                                     select_segment_candidate(next, state);
@@ -173,7 +183,7 @@ pub(crate) fn EditorCard(state: EditorSignals, font_size: Signal<usize>) -> Elem
                                 }
                                 state.number_pick_mode.set(true);
                             }
-                            "Enter" if !state.suggestions().is_empty() => {
+                            "Enter" if !suggestions.is_empty() => {
                                 event.prevent_default();
                                 if state.segmented_refine_mode() && state.segmented_session().is_some() {
                                     spawn(commit_segmented_selection(false, state));
@@ -181,11 +191,11 @@ pub(crate) fn EditorCard(state: EditorSignals, font_size: Signal<usize>) -> Elem
                                     spawn(commit_selection(false, state));
                                 }
                             }
-                            key if state.number_pick_mode() && !state.suggestions().is_empty() => {
+                            key if state.number_pick_mode() && !suggestions.is_empty() => {
                                 if let Some(offset) = shortcut_index(key) {
-                                    let page_start = visible_page_start(state.selected(), state.suggestions().len());
+                                    let page_start = visible_page_start(state.selected(), suggestions.len());
                                     let index = page_start + offset;
-                                    if index < state.suggestions().len() {
+                                    if index < suggestions.len() {
                                         event.prevent_default();
                                         if state.segmented_refine_mode() && state.segmented_session().is_some() {
                                             select_segment_candidate(index, state);
@@ -227,7 +237,7 @@ pub(crate) fn EditorCard(state: EditorSignals, font_size: Signal<usize>) -> Elem
                             {render_segmented_composition_preview(&session, &mark, font_size())}
                         }
                     } else if state.selection_started() {
-                        if let Some(preview) = state.suggestions().get(state.selected()).cloned() {
+                        if let Some(preview) = suggestions.get(state.selected()).cloned() {
                             div {
                                 class: "composition-preview",
                                 style: composition_preview_style(&mark, font_size()),
@@ -242,17 +252,19 @@ pub(crate) fn EditorCard(state: EditorSignals, font_size: Signal<usize>) -> Elem
                         }
                     }
                 }
-                if !state.suggestions().is_empty() {
+                if !suggestions.is_empty() {
                     div {
                         class: "suggestion-popup",
                         "data-testid": "suggestion-popup",
                         style: popup_style(state.popup()),
-                        div { class: "suggestion-popup-head", "Suggestions" }
+                        div { class: "suggestion-popup-head",
+                            span { "Suggestions" }
+                            span { class: "suggestion-page", "{page_start + 1}-{page_end}/{suggestion_total}" }
+                        }
                         ul { class: "suggestion-list",
-                            for (index, item) in state.suggestions()
-                                .iter()
+                            for (index, item) in suggestions.iter()
                                 .enumerate()
-                                .skip(visible_page_start(state.selected(), state.suggestions().len()))
+                                .skip(page_start)
                                 .take(VISIBLE_SUGGESTIONS) {
                                 li {
                                     key: "{index}-{item}",
@@ -270,6 +282,9 @@ pub(crate) fn EditorCard(state: EditorSignals, font_size: Signal<usize>) -> Elem
                                         },
                                         span { class: "suggestion-rank", "{shortcut_label(index)}" }
                                         span { class: "suggestion-word", "{item}" }
+                                        if recommended_indices.contains(&index) {
+                                            span { class: "suggestion-recommended", "គួរប្រើ" }
+                                        }
                                     }
                                 }
                             }

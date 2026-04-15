@@ -13,11 +13,9 @@ const CHAR_WIDTH_DIVISOR: f64 = 0.62;
 #[cfg(any(not(target_arch = "wasm32"), test))]
 const CHAR_WIDTH_MULTIPLIER: f64 = 0.58;
 const POPUP_HORIZONTAL_OFFSET: f64 = 18.0;
-#[cfg(any(target_arch = "wasm32", test))]
 const POPUP_VERTICAL_OFFSET: f64 = 10.0;
-const POPUP_MIN_LEFT: f64 = 10.0;
-const POPUP_MIN_TOP: f64 = 10.0;
-const POPUP_WIDTH: f64 = 250.0;
+const POPUP_SAFE_MARGIN: f64 = 8.0;
+const POPUP_WIDTH: f64 = 280.0;
 const POPUP_HEIGHT: f64 = 220.0;
 #[cfg(any(not(target_arch = "wasm32"), test))]
 const COMPOSITION_MIN_WIDTH: f64 = 12.0;
@@ -50,6 +48,15 @@ fn clamp(value: f64, min: f64, max: f64) -> f64 {
     value.max(min).min(max)
 }
 
+fn preferred_popup_top(caret_top: f64, line_height: f64, client_height: f64) -> f64 {
+    let below = caret_top + line_height + POPUP_VERTICAL_OFFSET;
+    let below_fits = below + POPUP_HEIGHT <= client_height - POPUP_SAFE_MARGIN;
+    if below_fits {
+        return below;
+    }
+    caret_top - POPUP_VERTICAL_OFFSET - POPUP_HEIGHT
+}
+
 #[cfg(any(not(target_arch = "wasm32"), test))]
 fn estimated_chars_per_line(client_width: f64, font_size: f64) -> usize {
     let slot_width = (font_size * CHAR_WIDTH_DIVISOR).max(1.0);
@@ -57,9 +64,11 @@ fn estimated_chars_per_line(client_width: f64, font_size: f64) -> usize {
 }
 
 fn clamped_popup_position(left: f64, top: f64, client_width: f64, client_height: f64) -> SuggestionPopup {
+    let max_left = (client_width - POPUP_WIDTH - POPUP_SAFE_MARGIN).max(POPUP_SAFE_MARGIN);
+    let max_top = (client_height - POPUP_HEIGHT - POPUP_SAFE_MARGIN).max(POPUP_SAFE_MARGIN);
     SuggestionPopup {
-        left: clamp(left, POPUP_MIN_LEFT, client_width - POPUP_WIDTH),
-        top: clamp(top, POPUP_MIN_TOP, client_height - POPUP_HEIGHT),
+        left: clamp(left, POPUP_SAFE_MARGIN, max_left),
+        top: clamp(top, POPUP_SAFE_MARGIN, max_top),
     }
 }
 
@@ -73,7 +82,8 @@ fn estimated_popup_position(
 ) -> SuggestionPopup {
     let chars_per_line = estimated_chars_per_line(client_width, font_size);
     let left = POPUP_HORIZONTAL_OFFSET + ((caret % chars_per_line) as f64 * (font_size * CHAR_WIDTH_MULTIPLIER));
-    let top = POPUP_HORIZONTAL_OFFSET + ((caret / chars_per_line) as f64 * line_height) + line_height;
+    let caret_top = POPUP_HORIZONTAL_OFFSET + ((caret / chars_per_line) as f64 * line_height);
+    let top = preferred_popup_top(caret_top, line_height, client_height);
     clamped_popup_position(left, top, client_width, client_height)
 }
 
@@ -145,8 +155,8 @@ fn parse_popup_marker_metrics(raw: &str) -> Option<PopupMarkerMetrics> {
 #[cfg(any(target_arch = "wasm32", test))]
 fn popup_position_from_marker_metrics(metrics: PopupMarkerMetrics) -> SuggestionPopup {
     let left = metrics.marker_left - metrics.mirror_left - metrics.scroll_left + POPUP_HORIZONTAL_OFFSET;
-    let top =
-        metrics.marker_top - metrics.mirror_top - metrics.scroll_top + metrics.line_height + POPUP_VERTICAL_OFFSET;
+    let caret_top = metrics.marker_top - metrics.mirror_top - metrics.scroll_top;
+    let top = preferred_popup_top(caret_top, metrics.line_height, metrics.client_height);
     clamped_popup_position(left, top, metrics.client_width, metrics.client_height)
 }
 
@@ -466,21 +476,8 @@ pub(crate) fn mark_app_ready() {
     }
 }
 
-#[cfg(target_arch = "wasm32")]
-pub(crate) fn hide_preboot_splash() {
-    let Some(document) = browser_document() else {
-        return;
-    };
-    if let Some(splash) = document.get_element_by_id("app-preboot-splash") {
-        let _ = splash.set_attribute("data-hidden", "true");
-    }
-}
-
 #[cfg(not(target_arch = "wasm32"))]
 pub(crate) fn mark_app_ready() {}
-
-#[cfg(not(target_arch = "wasm32"))]
-pub(crate) fn hide_preboot_splash() {}
 
 #[cfg(test)]
 mod tests {
@@ -489,10 +486,10 @@ mod tests {
     #[test]
     fn estimates_popup_position_in_rust() {
         let popup = estimated_popup_position(12, 640.0, 480.0, 24.0, 36.0);
-        assert!(popup.left >= POPUP_MIN_LEFT);
-        assert!(popup.top >= POPUP_MIN_TOP);
-        assert!(popup.left <= 640.0 - POPUP_WIDTH);
-        assert!(popup.top <= 480.0 - POPUP_HEIGHT);
+        assert!(popup.left >= POPUP_SAFE_MARGIN);
+        assert!(popup.top >= POPUP_SAFE_MARGIN);
+        assert!(popup.left <= 640.0 - POPUP_WIDTH - POPUP_SAFE_MARGIN);
+        assert!(popup.top <= 480.0 - POPUP_HEIGHT - POPUP_SAFE_MARGIN);
     }
 
     #[test]
@@ -508,8 +505,25 @@ mod tests {
             client_width: 640.0,
             client_height: 480.0,
         });
-        assert_eq!(popup.left, 390.0);
-        assert_eq!(popup.top, 260.0);
+        assert_eq!(popup.left, 352.0);
+        assert_eq!(popup.top, 252.0);
+    }
+
+    #[test]
+    fn prefers_popup_above_caret_when_bottom_space_is_tight() {
+        let popup = popup_position_from_marker_metrics(PopupMarkerMetrics {
+            marker_left: 160.0,
+            marker_top: 350.0,
+            mirror_left: 100.0,
+            mirror_top: 100.0,
+            scroll_left: 0.0,
+            scroll_top: 0.0,
+            line_height: 36.0,
+            client_width: 380.0,
+            client_height: 320.0,
+        });
+        // caret_top = 250, above = 20, below would overflow the viewport.
+        assert_eq!(popup.top, 20.0);
     }
 
     #[test]
