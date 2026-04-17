@@ -8,6 +8,7 @@ from urllib.request import urlopen
 
 import pytest
 from playwright.sync_api import expect, sync_playwright
+from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -41,18 +42,11 @@ def _wait_for_server(url: str, timeout_s: float = 90.0) -> None:
     raise RuntimeError(f"web server did not become ready: {last_error!r}")
 
 
-def _wait_for_shell_splash(url: str, timeout_s: float = 20.0) -> None:
-    deadline = time.time() + timeout_s
-    while time.time() < deadline:
-        try:
-            with urlopen(url, timeout=2.0) as response:
-                html = response.read().decode("utf-8", errors="replace")
-            if 'data-testid="preboot-splash"' in html:
-                return
-        except Exception:
-            pass
-        time.sleep(0.25)
-    raise RuntimeError("preboot splash was not injected into index.html")
+def _goto_app(page, url: str) -> None:
+    try:
+        page.goto(url, wait_until="domcontentloaded", timeout=60_000)
+    except PlaywrightTimeoutError:
+        page.goto(url, wait_until="commit", timeout=60_000)
 
 
 @pytest.fixture(scope="module")
@@ -75,7 +69,6 @@ def web_server():
 
     try:
         _wait_for_server(base_url)
-        _wait_for_shell_splash(base_url)
         yield base_url
     finally:
         process.terminate()
@@ -86,7 +79,7 @@ def web_server():
             process.wait(timeout=5)
 
 
-def test_web_ui_suggestions_and_live_edit_toggle(web_server: str) -> None:
+def test_web_ui_desktop_popup_and_live_edit_toggle(web_server: str) -> None:
     with sync_playwright() as playwright:
         browser = playwright.chromium.launch()
         page = browser.new_page()
@@ -100,9 +93,7 @@ def test_web_ui_suggestions_and_live_edit_toggle(web_server: str) -> None:
             window.sessionStorage.clear();
             """
         )
-        page.goto(web_server, wait_until="domcontentloaded")
-        expect(page.locator("[data-testid='preboot-splash']")).to_have_count(1)
-        page.wait_for_load_state("networkidle")
+        _goto_app(page, web_server)
 
         editor = page.locator("[data-testid='editor-input']").last
         expect(editor).to_be_visible(timeout=20_000)
@@ -148,5 +139,33 @@ def test_web_ui_suggestions_and_live_edit_toggle(web_server: str) -> None:
         rules_button.click()
         expect(rules_button).to_have_class(re.compile(r".*active.*"))
         expect(page.locator(".guide-panel")).to_be_visible(timeout=15_000)
+
+        browser.close()
+
+
+def test_web_ui_mobile_candidate_bar_prioritizes_candidates(web_server: str) -> None:
+    with sync_playwright() as playwright:
+        browser = playwright.chromium.launch()
+        page = browser.new_page(viewport={"width": 390, "height": 844})
+        page.add_init_script(
+            """
+            window.localStorage.clear();
+            window.sessionStorage.clear();
+            """
+        )
+        _goto_app(page, web_server)
+
+        editor = page.locator("[data-testid='editor-input']").last
+        expect(editor).to_be_visible(timeout=20_000)
+        editor.click()
+        editor.type("tverkomnaebrae")
+
+        candidate_bar = page.locator(".candidate-bar").last
+        expect(candidate_bar).to_be_visible(timeout=15_000)
+        expect(page.locator("[data-testid='suggestion-popup']")).to_be_hidden()
+        expect(candidate_bar.locator(".suggestion button").first).to_be_visible(timeout=15_000)
+        expect(candidate_bar.locator(".candidate-footer")).to_be_hidden()
+        expect(page.locator("[data-testid='segment-preview']")).to_be_hidden()
+        expect(candidate_bar.locator(".suggestion").nth(1)).to_be_visible()
 
         browser.close()

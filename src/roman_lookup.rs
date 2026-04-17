@@ -1,19 +1,23 @@
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::fmt;
+#[cfg(not(all(target_arch = "wasm32", feature = "fetch-data")))]
 use std::fs;
 use std::ops::Range;
+#[cfg(not(all(target_arch = "wasm32", feature = "fetch-data")))]
 use std::path::Path;
 use std::sync::Arc;
 
 use crate::composer::ComposerTable;
 use crate::decoder::{DecoderConfig, DecoderManager, DecoderMode, LegacyDecoder, ShadowObservation, WfstDecoder};
 
+#[cfg(not(all(target_arch = "wasm32", feature = "fetch-data")))]
 const DEFAULT_COMPILED_DATA: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/roman_lookup.lexicon.bin"));
+#[cfg(not(all(target_arch = "wasm32", feature = "fetch-data")))]
 const DEFAULT_COMPILED_KHPOS_STATS: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/khpos.stats.bin"));
 const COMPILED_MAGIC: &[u8; 4] = b"RLX1";
 const KHPOS_MAGIC: &[u8; 4] = b"KPS1";
 const MAX_SUGGESTIONS: usize = 15;
-const MAX_MATCHES: usize = 12;
+const MAX_MATCHES: usize = 20;
 const KEYCAP_SUGGESTIONS: [(&str, &str); 21] = [
     ("1", "១"),
     ("!", "!"),
@@ -164,6 +168,7 @@ pub(crate) struct DominantTag {
 }
 
 impl CorpusStats {
+    #[cfg(not(all(target_arch = "wasm32", feature = "fetch-data")))]
     fn from_default_data() -> Result<Self> {
         parse_compiled_khpos_stats(DEFAULT_COMPILED_KHPOS_STATS)
     }
@@ -213,36 +218,60 @@ pub struct Transliterator {
 }
 
 impl Transliterator {
+    #[cfg(not(all(target_arch = "wasm32", feature = "fetch-data")))]
     pub fn from_default_data() -> Result<Self> {
         Self::from_default_data_with_config(DecoderConfig::default())
     }
 
+    #[cfg(not(all(target_arch = "wasm32", feature = "fetch-data")))]
     pub fn from_tsv_path(path: impl AsRef<Path>) -> Result<Self> {
         let source = fs::read_to_string(path)?;
         Self::from_tsv_str_with_config(&source, DecoderConfig::default())
     }
 
+    #[cfg(not(all(target_arch = "wasm32", feature = "fetch-data")))]
     pub fn from_tsv_str(source: &str) -> Result<Self> {
         Self::from_tsv_str_with_config(source, DecoderConfig::default())
     }
 
+    #[cfg(not(all(target_arch = "wasm32", feature = "fetch-data")))]
     pub fn from_default_data_with_config(config: DecoderConfig) -> Result<Self> {
         let entries = parse_compiled_lexicon(DEFAULT_COMPILED_DATA)?;
         Self::from_entries_with_config(entries, config)
     }
 
+    #[cfg(not(all(target_arch = "wasm32", feature = "fetch-data")))]
     pub fn from_tsv_path_with_config(path: impl AsRef<Path>, config: DecoderConfig) -> Result<Self> {
         let source = fs::read_to_string(path)?;
         Self::from_tsv_str_with_config(&source, config)
     }
 
+    #[cfg(not(all(target_arch = "wasm32", feature = "fetch-data")))]
     pub fn from_tsv_str_with_config(source: &str, config: DecoderConfig) -> Result<Self> {
         let entries = parse_tsv(source)?;
         Self::from_entries_with_config(entries, config)
     }
 
+    #[cfg(not(all(target_arch = "wasm32", feature = "fetch-data")))]
     fn from_entries_with_config(entries: Vec<Entry>, config: DecoderConfig) -> Result<Self> {
         let legacy = Arc::new(LegacyData::from_entries(entries));
+        let composer = ComposerTable::from_entries(legacy.entries());
+        let decoder = DecoderManager::new(
+            composer,
+            LegacyDecoder::new(Arc::clone(&legacy)),
+            (config.mode != DecoderMode::Legacy).then(|| WfstDecoder::new(Arc::clone(&legacy), config.clone())),
+            config,
+        );
+        Ok(Self { legacy, decoder })
+    }
+
+    /// Build a `Transliterator` from externally-provided compiled binary blobs.
+    /// On `wasm32` with the `fetch-data` feature these blobs are fetched at runtime
+    /// instead of being baked into the binary via `include_bytes!`.
+    pub fn from_compiled_bytes(lexicon: &[u8], khpos: &[u8], config: DecoderConfig) -> Result<Self> {
+        let entries = parse_compiled_lexicon(lexicon)?;
+        let corpus_stats = parse_compiled_khpos_stats(khpos)?;
+        let legacy = Arc::new(LegacyData::from_entries_with_corpus(entries, corpus_stats));
         let composer = ComposerTable::from_entries(legacy.entries());
         let decoder = DecoderManager::new(
             composer,
@@ -274,6 +303,10 @@ impl Transliterator {
         self.legacy
             .exact_targets(&normalized)
             .map_or_else(Vec::new, |targets| targets.to_vec())
+    }
+
+    pub fn exact_match_roman_variants(&self, input: &str, target: &str) -> Vec<String> {
+        self.legacy.exact_match_roman_variants(input, target)
     }
 
     pub fn shadow_observation(&self, input: &str, history: &HashMap<String, usize>) -> ShadowObservation {
@@ -345,8 +378,13 @@ impl Transliterator {
 }
 
 impl LegacyData {
+    #[cfg(not(all(target_arch = "wasm32", feature = "fetch-data")))]
     pub(crate) fn from_entries(entries: Vec<Entry>) -> Self {
         let corpus_stats = CorpusStats::from_default_data().expect("embedded khPOS stats must load");
+        Self::from_entries_with_corpus(entries, corpus_stats)
+    }
+
+    pub(crate) fn from_entries_with_corpus(entries: Vec<Entry>, corpus_stats: CorpusStats) -> Self {
         let mut by_roman = HashMap::<String, Vec<String>>::new();
         let mut by_normalized = HashMap::<String, Vec<String>>::new();
         let mut by_target = HashMap::<String, Vec<String>>::new();
@@ -441,6 +479,34 @@ impl LegacyData {
         matches.sort_by(|left, right| right.len().cmp(&left.len()).then_with(|| left.cmp(right)));
         matches.dedup();
         matches.into_iter().next()
+    }
+
+    fn exact_match_roman_variants(&self, input: &str, target: &str) -> Vec<String> {
+        let query = input.strip_suffix(' ').unwrap_or(input);
+        let normalized_query = normalize(query);
+        if normalized_query.is_empty() {
+            return Vec::new();
+        }
+
+        let Some(romans) = self.by_target.get(target) else {
+            return Vec::new();
+        };
+
+        let mut variants = romans
+            .iter()
+            .filter(|roman| !roman.is_empty())
+            .cloned()
+            .collect::<Vec<_>>();
+        variants.sort_by(|left, right| {
+            let left_is_query = left == &normalized_query;
+            let right_is_query = right == &normalized_query;
+            right_is_query
+                .cmp(&left_is_query)
+                .then_with(|| left.len().cmp(&right.len()))
+                .then_with(|| left.cmp(right))
+        });
+        variants.dedup();
+        variants
     }
 
     pub(crate) fn suggest(&self, input: &str, history: &HashMap<String, usize>) -> Vec<String> {
@@ -832,6 +898,7 @@ impl SearchIndex {
     }
 }
 
+#[cfg(not(all(target_arch = "wasm32", feature = "fetch-data")))]
 fn parse_tsv(source: &str) -> Result<Vec<Entry>> {
     let mut entries = Vec::new();
     for (line_no, line) in source.lines().enumerate() {
@@ -1321,7 +1388,7 @@ mod tests {
         let transliterator = Transliterator::from_default_data().unwrap();
         assert_eq!(
             transliterator.suggest("jea", &HashMap::new()),
-            vec!["ជា", "ជះ", "ជាត", "ជាម", "ជាយ", "ជាល", "ជាវ", "ជាតិ", "ជាត់", "ជម្រាប"]
+            vec!["ជា", "ជះ", "ជាត", "ជាម", "ឈាម", "ជាយ", "ជាល", "ជាវ", "ជាស", "ជាង"]
         );
         assert_eq!(
             transliterator.suggest("tver", &HashMap::new()),
@@ -1337,7 +1404,7 @@ mod tests {
         history.insert("តែ".to_owned(), 1);
         assert_eq!(
             transliterator.suggest("te", &history),
-            vec!["ទេ", "តែ", "តើ", "តិះ", "តេត", "តេន", "តិច", "ធ្វើ", "ទន្លេ", "ផ្ទេរ"]
+            vec!["ទេ", "តែ", "តើ", "តិះ", "តេត", "តេន", "តិច", "តេជ", "តែង", "ទៀត"]
         );
     }
 
@@ -1435,6 +1502,16 @@ mod tests {
         let transliterator = Transliterator::from_tsv_str(fixture).unwrap();
         assert_eq!(transliterator.exact_match_targets("barko"), vec!["បាកូ".to_owned()]);
         assert_eq!(transliterator.exact_match_targets("BARK"), vec!["ប៉ប្រោក".to_owned()]);
+    }
+
+    #[test]
+    fn exact_match_roman_variants_for_target_include_aliases() {
+        let fixture = "jea\tជា\nchea\tជា\njear\tជារ\n";
+        let transliterator = Transliterator::from_tsv_str(fixture).unwrap();
+        assert_eq!(
+            transliterator.exact_match_roman_variants("jea", "ជា"),
+            vec!["jea".to_owned(), "chea".to_owned()]
+        );
     }
 
     #[test]

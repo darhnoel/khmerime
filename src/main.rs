@@ -18,6 +18,11 @@ static SHADOW_TRANSLITERATOR: OnceLock<Transliterator> = OnceLock::new();
 static WFST_TRANSLITERATOR: OnceLock<Transliterator> = OnceLock::new();
 static HYBRID_TRANSLITERATOR: OnceLock<Transliterator> = OnceLock::new();
 
+#[cfg(all(target_arch = "wasm32", feature = "fetch-data"))]
+static LEXICON_DATA: OnceLock<Vec<u8>> = OnceLock::new();
+#[cfg(all(target_arch = "wasm32", feature = "fetch-data"))]
+static KHPOS_DATA: OnceLock<Vec<u8>> = OnceLock::new();
+
 pub(crate) const EDITOR_ID: &str = "ime-editor";
 const DEFAULT_FONT_SIZE: usize = 24;
 pub(crate) const MIN_FONT_SIZE: usize = 18;
@@ -47,30 +52,93 @@ fn main() {
 }
 
 pub(crate) fn engine(mode: DecoderMode) -> &'static Transliterator {
+    #[cfg(all(target_arch = "wasm32", feature = "fetch-data"))]
+    macro_rules! make_transliterator {
+        ($config:expr) => {{
+            let lexicon = LEXICON_DATA
+                .get()
+                .expect("lexicon data must be fetched before engine init");
+            let khpos = KHPOS_DATA.get().expect("khpos data must be fetched before engine init");
+            Transliterator::from_compiled_bytes(lexicon, khpos, $config).expect("transliterator init failed")
+        }};
+    }
+    #[cfg(not(all(target_arch = "wasm32", feature = "fetch-data")))]
+    macro_rules! make_transliterator {
+        ($config:expr) => {{
+            Transliterator::from_default_data_with_config($config).expect("embedded lexicon must load")
+        }};
+    }
     match mode {
-        DecoderMode::Legacy => LEGACY_TRANSLITERATOR
-            .get_or_init(|| Transliterator::from_default_data().expect("embedded lexicon must load")),
-        DecoderMode::Shadow => SHADOW_TRANSLITERATOR.get_or_init(|| {
-            Transliterator::from_default_data_with_config(DecoderConfig::shadow_interactive().with_shadow_log(false))
-                .expect("embedded lexicon must load")
-        }),
+        DecoderMode::Legacy => LEGACY_TRANSLITERATOR.get_or_init(|| make_transliterator!(DecoderConfig::default())),
+        DecoderMode::Shadow => SHADOW_TRANSLITERATOR
+            .get_or_init(|| make_transliterator!(DecoderConfig::shadow_interactive().with_shadow_log(false))),
         DecoderMode::Wfst => WFST_TRANSLITERATOR.get_or_init(|| {
-            Transliterator::from_default_data_with_config(
-                DecoderConfig::default()
-                    .with_mode(DecoderMode::Wfst)
-                    .with_shadow_log(false),
-            )
-            .expect("embedded lexicon must load")
+            make_transliterator!(DecoderConfig::default()
+                .with_mode(DecoderMode::Wfst)
+                .with_shadow_log(false))
         }),
         DecoderMode::Hybrid => HYBRID_TRANSLITERATOR.get_or_init(|| {
-            Transliterator::from_default_data_with_config(
-                DecoderConfig::default()
-                    .with_mode(DecoderMode::Hybrid)
-                    .with_shadow_log(false),
-            )
-            .expect("embedded lexicon must load")
+            make_transliterator!(DecoderConfig::default()
+                .with_mode(DecoderMode::Hybrid)
+                .with_shadow_log(false))
         }),
     }
+}
+
+#[cfg(all(target_arch = "wasm32", feature = "fetch-data"))]
+async fn fetch_binaries_parallel() -> Result<(Vec<u8>, Vec<u8>), String> {
+    use js_sys::wasm_bindgen::JsCast;
+    use wasm_bindgen_futures::JsFuture;
+    use web_sys::Response;
+
+    let lexicon_url = "./assets/data/roman_lookup.lexicon.bin";
+    let khpos_url = "./assets/data/khpos.stats.bin";
+
+    let window = web_sys::window().ok_or_else(|| "no window".to_owned())?;
+    // Start both requests first so network transfer happens in parallel.
+    let lexicon_promise = window.fetch_with_str(lexicon_url);
+    let khpos_promise = window.fetch_with_str(khpos_url);
+
+    let lexicon_resp = JsFuture::from(lexicon_promise)
+        .await
+        .map_err(|e| format!("fetch {lexicon_url} network error: {e:?}"))?;
+    let khpos_resp = JsFuture::from(khpos_promise)
+        .await
+        .map_err(|e| format!("fetch {khpos_url} network error: {e:?}"))?;
+
+    let lexicon_resp: Response = lexicon_resp
+        .dyn_into()
+        .map_err(|_| format!("fetch {lexicon_url}: response cast failed"))?;
+    let khpos_resp: Response = khpos_resp
+        .dyn_into()
+        .map_err(|_| format!("fetch {khpos_url}: response cast failed"))?;
+
+    if !lexicon_resp.ok() {
+        return Err(format!("fetch {lexicon_url}: HTTP {}", lexicon_resp.status()));
+    }
+    if !khpos_resp.ok() {
+        return Err(format!("fetch {khpos_url}: HTTP {}", khpos_resp.status()));
+    }
+
+    let lexicon_buf = JsFuture::from(
+        lexicon_resp
+            .array_buffer()
+            .map_err(|_| format!("fetch {lexicon_url}: array_buffer() failed"))?,
+    )
+    .await
+    .map_err(|e| format!("fetch {lexicon_url}: array_buffer await failed: {e:?}"))?;
+    let khpos_buf = JsFuture::from(
+        khpos_resp
+            .array_buffer()
+            .map_err(|_| format!("fetch {khpos_url}: array_buffer() failed"))?,
+    )
+    .await
+    .map_err(|e| format!("fetch {khpos_url}: array_buffer await failed: {e:?}"))?;
+
+    Ok((
+        js_sys::Uint8Array::new(&lexicon_buf).to_vec(),
+        js_sys::Uint8Array::new(&khpos_buf).to_vec(),
+    ))
 }
 
 fn warm_engine(mode: DecoderMode) {
@@ -85,6 +153,7 @@ fn warm_engine(mode: DecoderMode) {
 #[component]
 fn App() -> Element {
     let mut engine_ready = use_signal(|| LEGACY_TRANSLITERATOR.get().is_some());
+    let mut engine_progress = use_signal(|| if LEGACY_TRANSLITERATOR.get().is_some() { 100 } else { 0 });
     let text = use_signal(load_editor_text);
     let roman_enabled = use_signal(load_enabled);
     let decoder_mode = use_signal(load_decoder_mode);
@@ -98,6 +167,7 @@ fn App() -> Element {
     let segmented_refine_mode = use_signal(|| false);
     let active_token = use_signal(String::new);
     let recommended_indices = use_signal(Vec::<usize>::new);
+    let roman_variant_hints = use_signal(HashMap::<usize, Vec<String>>::new);
     let mut number_pick_mode = use_signal(|| false);
     let mut selection_started = use_signal(|| false);
     let selected = use_signal(|| 0usize);
@@ -108,6 +178,7 @@ fn App() -> Element {
         roman_enabled,
         decoder_mode,
         engine_ready,
+        engine_progress,
         suggestions,
         popup,
         composition,
@@ -116,6 +187,7 @@ fn App() -> Element {
         segmented_refine_mode,
         active_token,
         recommended_indices,
+        roman_variant_hints,
         number_pick_mode,
         selection_started,
         selected,
@@ -132,7 +204,32 @@ fn App() -> Element {
 
     use_effect(move || {
         spawn(async move {
+            if engine_ready() {
+                engine_progress.set(100);
+                return;
+            }
+
+            engine_progress.set(10);
+            #[cfg(all(target_arch = "wasm32", feature = "fetch-data"))]
+            {
+                engine_progress.set(35);
+                match fetch_binaries_parallel().await {
+                    Ok((lexicon, khpos)) => {
+                        let _ = LEXICON_DATA.set(lexicon);
+                        let _ = KHPOS_DATA.set(khpos);
+                        engine_progress.set(70);
+                    }
+                    Err(e) => {
+                        web_sys::console::error_1(&e.into());
+                        engine_progress.set(100);
+                        engine_ready.set(true); // unblock UI even on data load failure
+                        return;
+                    }
+                }
+            }
+            engine_progress.set(85);
             warm_engine(DecoderMode::Legacy);
+            engine_progress.set(100);
             engine_ready.set(true);
         });
     });

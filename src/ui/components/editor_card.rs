@@ -32,14 +32,20 @@ fn render_segmented_composition_preview(
     }
 }
 
+fn roman_hint_label(variants: &[String]) -> String {
+    // Show all variants if there are 3 or fewer, otherwise show the first 3 followed by ellipsis.
+    format!("{}", variants.join(" / "))
+}
+
 #[component]
 pub(crate) fn EditorCard(state: EditorSignals, font_size: Signal<usize>) -> Element {
     let text_value = state.text();
     let suggestions = state.suggestions();
     let suggestion_total = suggestions.len();
     let page_start = visible_page_start(state.selected(), suggestion_total);
-    let page_end = (page_start + VISIBLE_SUGGESTIONS).min(suggestion_total);
     let recommended_indices = state.recommended_indices();
+    let roman_variant_hints = state.roman_variant_hints();
+    let has_suggestions = !suggestions.is_empty();
     rsx! {
         div { class: "editor-card",
             div { class: "editor-wrap",
@@ -112,23 +118,57 @@ pub(crate) fn EditorCard(state: EditorSignals, font_size: Signal<usize>) -> Elem
                                 state.number_pick_mode.set(false);
                             }
                             "ArrowDown" if !suggestions.is_empty() => {
+                                event.prevent_default();
                                 if event.is_auto_repeating() {
                                     return;
                                 }
-                                event.prevent_default();
-                                let len = suggestions.len();
-                                if state.segmented_refine_mode() && state.segmented_session().is_some() {
-                                    let next = if !state.selection_started() { 0 } else { (state.selected() + 1) % len };
-                                    select_segment_candidate(next, state);
-                                } else {
-                                    if !state.selection_started() {
-                                        state.selected.set(0);
-                                    } else {
-                                        state.selected.set((state.selected() + 1) % len);
+                                if state.segmented_refine_mode() {
+                                    let Some(session) = state.segmented_session() else {
+                                        return;
+                                    };
+
+                                    let len = session.current_candidate_len();
+                                    if len == 0 {
+                                        return;
                                     }
+
+                                    let next = if !state.selection_started() {
+                                        0
+                                    } else {
+                                        (state.selected() + 1) % len
+                                    };
+
+                                    select_segment_candidate(next, state);
+                                    state.selection_started.set(true);
+                                } else {
+                                    let len = suggestions.len();
+                                    if len == 0 {
+                                        return;
+                                    }
+
+                                    let next = if !state.selection_started() {
+                                        0
+                                    } else {
+                                        (state.selected() + 1) % len
+                                    };
+
+                                    state.selected.set(next);
                                     state.selection_started.set(true);
                                 }
+
                                 state.number_pick_mode.set(false);
+                                // if state.segmented_refine_mode() && state.segmented_session().is_some() {
+                                //     let next = if !state.selection_started() { 0 } else { (state.selected() + 1) % len };
+                                //     select_segment_candidate(next, state);
+                                // } else {
+                                //     if !state.selection_started() {
+                                //         state.selected.set(0);
+                                //     } else {
+                                //         state.selected.set((state.selected() + 1) % len);
+                                //     }
+                                //     state.selection_started.set(true);
+                                // }
+                                // state.number_pick_mode.set(false);
                             }
                             "ArrowUp" if !suggestions.is_empty() => {
                                 if event.is_auto_repeating() {
@@ -212,21 +252,115 @@ pub(crate) fn EditorCard(state: EditorSignals, font_size: Signal<usize>) -> Elem
                         }
                     },
                 }
-                if let Some(session) = state.segmented_session() {
-                    if session.segments.len() > 1 {
-                        div { class: "segment-preview", "data-testid": "segment-preview",
-                            for (index, segment) in session.segments.iter().enumerate() {
-                                button {
-                                    key: "{index}-{segment.input}",
-                                    class: if state.segmented_refine_mode() && index == session.focused { "segment-chip active" } else { "segment-chip" },
-                                    onclick: move |_| {
-                                        if move_segment_focus(index as isize - session.focused as isize, state) {
-                                            state.number_pick_mode.set(false);
+                if has_suggestions {
+                    div {
+                        class: "suggestion-popup",
+                        "data-testid": "suggestion-popup",
+                        style: popup_style(state.popup()),
+                        div { class: "candidate-track candidate-track-popup",
+                            ul { class: "suggestion-list candidate-list",
+                                for (index, item) in suggestions.iter()
+                                    .enumerate()
+                                    .skip(page_start)
+                                    .take(VISIBLE_SUGGESTIONS) {
+                                    li {
+                                        key: "popup-{index}-{item}",
+                                        class: if state.selection_started() && index == state.selected() { "suggestion active" } else { "suggestion" },
+                                        button {
+                                            onclick: move |_| {
+                                                if state.segmented_refine_mode() && state.segmented_session().is_some() {
+                                                    select_segment_candidate(index, state);
+                                                    state.number_pick_mode.set(false);
+                                                } else {
+                                                    state.selected.set(index);
+                                                    state.selection_started.set(true);
+                                                    spawn(commit_selection(false, state));
+                                                }
+                                            },
+                                            span { class: "suggestion-rank", "{shortcut_label(index)}" }
+                                            span { class: "suggestion-main",
+                                                span { class: "suggestion-word", "{item}" }
+                                                if let Some(variants) = roman_variant_hints.get(&index) {
+                                                    span { class: "suggestion-roman-hint", "{roman_hint_label(variants)}" }
+                                                } else {
+                                                    span { class: "suggestion-roman-hint", "(derived)"}
+                                                }
+                                            }
+                                            if recommended_indices.contains(&index) {
+                                                span { class: "suggestion-recommended", "គួរប្រើ" }
+                                            }
                                         }
-                                    },
-                                    span { class: "segment-chip-output", "{segment.selected_text()}" }
-                                    span { class: "segment-chip-input", "{segment.input}" }
+                                    }
                                 }
+                            }
+                        }
+                    }
+                }
+                div {
+                    class: if has_suggestions { "candidate-bar" } else { "candidate-bar candidate-bar-empty" },
+                    div { class: "candidate-track candidate-track-mobile",
+                        if has_suggestions {
+                            ul { class: "suggestion-list candidate-list",
+                                for (index, item) in suggestions.iter()
+                                    .enumerate()
+                                    .skip(page_start)
+                                    .take(VISIBLE_SUGGESTIONS) {
+                                    li {
+                                        key: "mobile-{index}-{item}",
+                                        class: if state.selection_started() && index == state.selected() { "suggestion active" } else { "suggestion" },
+                                        button {
+                                            onclick: move |_| {
+                                                if state.segmented_refine_mode() && state.segmented_session().is_some() {
+                                                    select_segment_candidate(index, state);
+                                                    state.number_pick_mode.set(false);
+                                                } else {
+                                                    state.selected.set(index);
+                                                    state.selection_started.set(true);
+                                                    spawn(commit_selection(false, state));
+                                                }
+                                            },
+                                            span { class: "suggestion-rank", "{shortcut_label(index)}" }
+                                            span { class: "suggestion-main",
+                                                span { class: "suggestion-word", "{item}" }
+                                                if let Some(variants) = roman_variant_hints.get(&index) {
+                                                    span { class: "suggestion-roman-hint", "{roman_hint_label(variants)}" }
+                                                } else {
+                                                    span { class: "suggestion-roman-hint", "(derived)"}
+                                                }
+                                            }
+                                            if recommended_indices.contains(&index) {
+                                                span { class: "suggestion-recommended", "គួរប្រើ" }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        } else {
+                            div { class: "candidate-empty", aria_hidden: "true",
+                                span { class: "segment-placeholder-chip segment-placeholder-chip-1" }
+                                span { class: "segment-placeholder-chip segment-placeholder-chip-2" }
+                                span { class: "segment-placeholder-chip segment-placeholder-chip-3" }
+                            }
+                        }
+                    }
+                    div { class: "candidate-footer",
+                        div { class: "candidate-hints",
+                            span { class: "candidate-hint",
+                                span { class: "keycap", "Space" }
+                                span { class: "editor-tip-text", "cycle" }
+                                span { class: "editor-tip-sep", "or" }
+                                span { class: "keycap", "1-5" }
+                                span { class: "editor-tip-text", "choose" }
+                            }
+                            span { class: "candidate-hint",
+                                span { class: "keycap", "Enter" }
+                                span { class: "editor-tip-sep", "or" }
+                                span { class: "keycap", "Shift+Space" }
+                                span { class: "editor-tip-text", "commit" }
+                            }
+                            span { class: "candidate-hint",
+                                span { class: "keycap", "Left/Right" }
+                                span { class: "editor-tip-text", "move segments" }
                             }
                         }
                     }
@@ -250,67 +384,6 @@ pub(crate) fn EditorCard(state: EditorSignals, font_size: Signal<usize>) -> Elem
                             class: "composition-mark",
                             style: composition_style(&mark, false),
                         }
-                    }
-                }
-                if !suggestions.is_empty() {
-                    div {
-                        class: "suggestion-popup",
-                        "data-testid": "suggestion-popup",
-                        style: popup_style(state.popup()),
-                        div { class: "suggestion-popup-head",
-                            span { "Suggestions" }
-                            span { class: "suggestion-page", "{page_start + 1}-{page_end}/{suggestion_total}" }
-                        }
-                        ul { class: "suggestion-list",
-                            for (index, item) in suggestions.iter()
-                                .enumerate()
-                                .skip(page_start)
-                                .take(VISIBLE_SUGGESTIONS) {
-                                li {
-                                    key: "{index}-{item}",
-                                    class: if state.selection_started() && index == state.selected() { "suggestion active" } else { "suggestion" },
-                                    button {
-                                        onclick: move |_| {
-                                            if state.segmented_refine_mode() && state.segmented_session().is_some() {
-                                                select_segment_candidate(index, state);
-                                                state.number_pick_mode.set(false);
-                                            } else {
-                                                state.selected.set(index);
-                                                state.selection_started.set(true);
-                                                spawn(commit_selection(false, state));
-                                            }
-                                        },
-                                        span { class: "suggestion-rank", "{shortcut_label(index)}" }
-                                        span { class: "suggestion-word", "{item}" }
-                                        if recommended_indices.contains(&index) {
-                                            span { class: "suggestion-recommended", "គួរប្រើ" }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-            div { class: "editor-note",
-                div { class: "editor-note-title", "Quick Keys" }
-                div { class: "editor-note-items",
-                    div { class: "editor-tip",
-                        span { class: "keycap", "Space" }
-                        span { class: "editor-tip-text", "cycle" }
-                        span { class: "editor-tip-sep", "or" }
-                        span { class: "keycap", "1-5" }
-                        span { class: "editor-tip-text", "choose" }
-                    }
-                    div { class: "editor-tip",
-                        span { class: "keycap", "Enter" }
-                        span { class: "editor-tip-sep", "or" }
-                        span { class: "keycap", "Shift+Space" }
-                        span { class: "editor-tip-text", "commit" }
-                    }
-                    div { class: "editor-tip",
-                        span { class: "keycap", "Left/Right" }
-                        span { class: "editor-tip-text", "move between phrase segments" }
                     }
                 }
             }

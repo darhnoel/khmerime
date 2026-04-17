@@ -39,6 +39,7 @@ pub(crate) struct EditorSignals {
     pub roman_enabled: Signal<bool>,
     pub decoder_mode: Signal<DecoderMode>,
     pub engine_ready: Signal<bool>,
+    pub engine_progress: Signal<u8>,
     pub suggestions: Signal<Vec<String>>,
     pub popup: Signal<Option<SuggestionPopup>>,
     pub composition: Signal<Option<CompositionMark>>,
@@ -47,6 +48,7 @@ pub(crate) struct EditorSignals {
     pub segmented_refine_mode: Signal<bool>,
     pub active_token: Signal<String>,
     pub recommended_indices: Signal<Vec<usize>>,
+    pub roman_variant_hints: Signal<HashMap<usize, Vec<String>>>,
     pub number_pick_mode: Signal<bool>,
     pub selection_started: Signal<bool>,
     pub selected: Signal<usize>,
@@ -107,6 +109,10 @@ impl EditorSignals {
         (self.recommended_indices)()
     }
 
+    pub(crate) fn roman_variant_hints(self) -> HashMap<usize, Vec<String>> {
+        (self.roman_variant_hints)()
+    }
+
     pub(crate) fn selection_started(self) -> bool {
         (self.selection_started)()
     }
@@ -128,6 +134,7 @@ impl EditorSignals {
         self.segmented_refine_mode.set(false);
         self.active_token.set(String::new());
         self.recommended_indices.set(Vec::new());
+        self.roman_variant_hints.set(HashMap::new());
         self.selection_started.set(false);
         self.selected.set(0);
     }
@@ -144,6 +151,13 @@ impl SegmentedSession {
             .get(self.focused)
             .map(|segment| segment.candidates.clone())
             .unwrap_or_default()
+    }
+
+    pub(crate) fn current_candidate_len(&self) -> usize {
+        self.segments
+            .get(self.focused)
+            .map(|segment| segment.candidates.len())
+            .unwrap_or(0)
     }
 
     pub(crate) fn focused_selected(&self) -> usize {
@@ -204,38 +218,12 @@ pub(crate) async fn update_candidates(value: String, mut state: EditorSignals) {
     if live_text() != value {
         return;
     }
-    let items = if state.decoder_mode() == DecoderMode::Shadow && token.chars().count() >= 3 {
-        let observation = engine(DecoderMode::Shadow).shadow_observation(&token, &history_snapshot);
-        if live_text() != value {
-            return;
-        }
-        let next_segmented = build_segmented_session(&observation, &token, &history_snapshot);
-        let visible = choose_visible_suggestions(
-            &legacy_items,
-            &observation,
-            next_segmented.as_ref(),
-            state.segmented_refine_mode(),
-        );
-        state.shadow_debug.set(Some(observation));
-        state.segmented_session.set(next_segmented);
-        state.segmented_refine_mode.set(false);
-        visible
-    } else {
-        state.shadow_debug.set(None);
-        state.segmented_session.set(None);
-        state.segmented_refine_mode.set(false);
-        legacy_items
-    };
-    let exact_keys = legacy
-        .exact_match_targets(&token)
-        .into_iter()
-        .map(|item| normalized_suggestion_key(&item))
-        .collect::<HashSet<_>>();
-    let recommended_indices = items
-        .iter()
-        .enumerate()
-        .filter_map(|(index, item)| exact_keys.contains(&normalized_suggestion_key(item)).then_some(index))
-        .collect::<Vec<_>>();
+    let shadow_requested = state.decoder_mode() == DecoderMode::Shadow && token.chars().count() >= 3;
+    state.shadow_debug.set(None);
+    state.segmented_session.set(None);
+    state.segmented_refine_mode.set(false);
+    let items = legacy_items.clone();
+    let (recommended_indices, roman_variant_hints) = recommended_indices_and_roman_hints(legacy, &token, &items);
     let preserve_selection = state.active_token() == token && !state.suggestions().is_empty();
     let popup_position = if items.is_empty() {
         None
@@ -253,6 +241,7 @@ pub(crate) async fn update_candidates(value: String, mut state: EditorSignals) {
     state.composition.set(composition_mark);
     state.active_token.set(token.clone());
     state.recommended_indices.set(recommended_indices);
+    state.roman_variant_hints.set(roman_variant_hints);
     if !preserve_selection {
         state.number_pick_mode.set(false);
         state.selection_started.set(false);
@@ -264,7 +253,81 @@ pub(crate) async fn update_candidates(value: String, mut state: EditorSignals) {
     } else if state.selected() >= items.len() {
         state.selected.set(items.len().saturating_sub(1));
     }
-    state.suggestions.set(items);
+    state.suggestions.set(items.clone());
+
+    #[cfg(all(target_arch = "wasm32", feature = "fetch-data"))]
+    if shadow_requested {
+        let mut state_shadow = state;
+        let value_shadow = value.clone();
+        let token_shadow = token.clone();
+        let legacy_items_shadow = legacy_items.clone();
+        spawn(async move {
+            // Debounce heavy shadow decode so typing stays responsive.
+            gloo_timers::future::TimeoutFuture::new(120).await;
+            if state_shadow.text() != value_shadow {
+                return;
+            }
+            let history_shadow = state_shadow.history();
+            let observation = engine(DecoderMode::Shadow).shadow_observation(&token_shadow, &history_shadow);
+            if state_shadow.text() != value_shadow {
+                return;
+            }
+            let next_segmented = build_segmented_session(&observation, &token_shadow, &history_shadow);
+            let visible = choose_visible_suggestions(
+                &legacy_items_shadow,
+                &observation,
+                next_segmented.as_ref(),
+                state_shadow.segmented_refine_mode(),
+            );
+            let (recommended_indices, roman_variant_hints) =
+                recommended_indices_and_roman_hints(engine(DecoderMode::Legacy), &token_shadow, &visible);
+
+            state_shadow.shadow_debug.set(Some(observation));
+            state_shadow.segmented_session.set(next_segmented);
+            state_shadow.segmented_refine_mode.set(false);
+            state_shadow.recommended_indices.set(recommended_indices);
+            state_shadow.roman_variant_hints.set(roman_variant_hints);
+            if visible.is_empty() {
+                state_shadow.number_pick_mode.set(false);
+                state_shadow.selection_started.set(false);
+                state_shadow.selected.set(0);
+            } else if state_shadow.selected() >= visible.len() {
+                state_shadow.selected.set(visible.len().saturating_sub(1));
+            }
+            state_shadow.suggestions.set(visible);
+        });
+    }
+
+    #[cfg(not(all(target_arch = "wasm32", feature = "fetch-data")))]
+    if shadow_requested {
+        let observation = engine(DecoderMode::Shadow).shadow_observation(&token, &history_snapshot);
+        if live_text() != value {
+            return;
+        }
+        let next_segmented = build_segmented_session(&observation, &token, &history_snapshot);
+        let visible = choose_visible_suggestions(
+            &legacy_items,
+            &observation,
+            next_segmented.as_ref(),
+            state.segmented_refine_mode(),
+        );
+        let (recommended_indices, roman_variant_hints) =
+            recommended_indices_and_roman_hints(engine(DecoderMode::Legacy), &token, &visible);
+
+        state.shadow_debug.set(Some(observation));
+        state.segmented_session.set(next_segmented);
+        state.segmented_refine_mode.set(false);
+        state.recommended_indices.set(recommended_indices);
+        state.roman_variant_hints.set(roman_variant_hints);
+        if visible.is_empty() {
+            state.number_pick_mode.set(false);
+            state.selection_started.set(false);
+            state.selected.set(0);
+        } else if state.selected() >= visible.len() {
+            state.selected.set(visible.len().saturating_sub(1));
+        }
+        state.suggestions.set(visible);
+    }
 }
 
 fn default_popup_position() -> SuggestionPopup {
@@ -306,7 +369,34 @@ fn choose_visible_suggestions(
     }
 }
 
-fn normalized_suggestion_key(item: &str) -> String {
+fn recommended_indices_and_roman_hints(
+    legacy: &Transliterator,
+    token: &str,
+    items: &[String],
+) -> (Vec<usize>, HashMap<usize, Vec<String>>) {
+    let exact_keys = legacy
+        .exact_match_targets(token)
+        .into_iter()
+        .map(|item| normalized_suggestion_key(&item))
+        .collect::<HashSet<_>>();
+
+    let mut indices = Vec::new();
+    let mut hints = HashMap::<usize, Vec<String>>::new();
+    for (index, item) in items.iter().enumerate() {
+        if exact_keys.contains(&normalized_suggestion_key(item)) {
+            indices.push(index);
+        }
+        let mut variants = legacy.exact_match_roman_variants(token, item);
+        variants.truncate(3);
+        if !variants.is_empty() {
+            hints.insert(index, variants);
+        }
+    }
+
+    (indices, hints)
+}
+
+pub(crate) fn normalized_suggestion_key(item: &str) -> String {
     item.chars().filter(|ch| !ch.is_whitespace()).collect()
 }
 
@@ -373,6 +463,8 @@ pub(crate) fn move_segment_focus(delta: isize, mut state: EditorSignals) -> bool
         }
         state.segmented_refine_mode.set(true);
         state.suggestions.set(session.focused_candidates());
+        state.recommended_indices.set(Vec::new());
+        state.roman_variant_hints.set(HashMap::new());
         state.selected.set(session.focused_selected());
         state.selection_started.set(true);
         state.segmented_session.set(Some(session));
@@ -381,6 +473,8 @@ pub(crate) fn move_segment_focus(delta: isize, mut state: EditorSignals) -> bool
     session.focused = next;
     state.segmented_refine_mode.set(true);
     state.suggestions.set(session.focused_candidates());
+    state.recommended_indices.set(Vec::new());
+    state.roman_variant_hints.set(HashMap::new());
     state.selected.set(session.focused_selected());
     state.selection_started.set(true);
     state.segmented_session.set(Some(session));
@@ -404,6 +498,8 @@ pub(crate) fn select_segment_candidate(candidate_index: usize, mut state: Editor
         let focused_selected = reflowed.focused_selected();
         state.segmented_refine_mode.set(true);
         state.suggestions.set(focused_candidates);
+        state.recommended_indices.set(Vec::new());
+        state.roman_variant_hints.set(HashMap::new());
         state.selected.set(focused_selected);
         state.selection_started.set(true);
         state.segmented_session.set(Some(reflowed));
@@ -416,6 +512,8 @@ pub(crate) fn select_segment_candidate(candidate_index: usize, mut state: Editor
         .unwrap_or_default();
     state.segmented_refine_mode.set(true);
     state.suggestions.set(focused_candidates);
+    state.recommended_indices.set(Vec::new());
+    state.roman_variant_hints.set(HashMap::new());
     state.selected.set(candidate_index);
     state.selection_started.set(true);
     state.segmented_session.set(Some(session));
@@ -577,11 +675,7 @@ fn reflow_segmented_session_from_selection(
         }
     }
 
-    let focused = if focused + 1 < segments.len() {
-        focused + 1
-    } else {
-        focused.min(segments.len().saturating_sub(1))
-    };
+    let focused = focused.min(segments.len().saturating_sub(1));
     Some(SegmentedSession {
         raw_input: session.raw_input.clone(),
         segments,
@@ -704,11 +798,12 @@ pub(crate) fn is_space_key(key: &str) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use roman_lookup::{DecodeSegment, DecoderMode, ShadowMismatch, ShadowObservation};
+    use roman_lookup::{DecodeSegment, DecoderMode, ShadowMismatch, ShadowObservation, Transliterator};
 
     use super::{
         build_segmented_session, char_len, choose_visible_suggestions, connect_khmer_display,
-        reflow_segmented_session_from_selection, slice_chars, SegmentedChoice, SegmentedSession,
+        recommended_indices_and_roman_hints, reflow_segmented_session_from_selection, slice_chars, SegmentedChoice,
+        SegmentedSession,
     };
 
     fn sample_observation() -> ShadowObservation {
@@ -849,6 +944,7 @@ mod tests {
             ),
             "mnouslaor"
         );
+        assert_eq!(reflowed.focused, 0);
     }
 
     #[test]
@@ -867,5 +963,15 @@ mod tests {
     fn connects_multiword_khmer_display_strings() {
         assert_eq!(connect_khmer_display("ខ្ញុំ ទៅ"), "ខ្ញុំទៅ");
         assert_eq!(connect_khmer_display("foo bar"), "foo bar");
+    }
+
+    #[test]
+    fn builds_recommended_indices_with_roman_hints() {
+        let fixture = "jea\tជា\nchea\tជា\njeat\tជាត\n";
+        let transliterator = Transliterator::from_tsv_str(fixture).unwrap();
+        let items = vec!["ជា".to_owned(), "ជាត".to_owned()];
+        let (indices, hints) = recommended_indices_and_roman_hints(&transliterator, "jea", &items);
+        assert_eq!(indices, vec![0]);
+        assert_eq!(hints.get(&0).cloned(), Some(vec!["jea".to_owned(), "chea".to_owned()]));
     }
 }

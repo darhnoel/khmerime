@@ -24,9 +24,22 @@ fn main() {
 
     let out_dir = PathBuf::from(env::var("OUT_DIR").expect("OUT_DIR must be set"));
     let output_path = out_dir.join("roman_lookup.lexicon.bin");
-    fs::write(output_path, compiled).expect("compiled lexicon must be written");
+    fs::write(&output_path, compiled).expect("compiled lexicon must be written");
     let khpos_output_path = out_dir.join("khpos.stats.bin");
-    fs::write(khpos_output_path, compiled_khpos).expect("compiled khPOS stats must be written");
+    fs::write(&khpos_output_path, compiled_khpos).expect("compiled khPOS stats must be written");
+
+    // When building for wasm32 with the fetch-data feature, copy the compiled
+    // binary blobs into assets/data/ so Dioxus serves them as static files.
+    let target_arch = env::var("CARGO_CFG_TARGET_ARCH").unwrap_or_default();
+    let fetch_data = env::var("CARGO_FEATURE_FETCH_DATA").is_ok();
+    if target_arch == "wasm32" && fetch_data {
+        let manifest_dir = env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR must be set");
+        let assets_data = PathBuf::from(manifest_dir).join("assets/data");
+        fs::create_dir_all(&assets_data).expect("assets/data dir must be creatable");
+        fs::copy(&output_path, assets_data.join("roman_lookup.lexicon.bin"))
+            .expect("lexicon bin must copy to assets/data");
+        fs::copy(&khpos_output_path, assets_data.join("khpos.stats.bin")).expect("khpos bin must copy to assets/data");
+    }
 }
 
 fn compile_lexicon(source: &str) -> Result<Vec<u8>, String> {

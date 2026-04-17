@@ -1,7 +1,7 @@
 .PHONY: help web web-release web-phone desktop stats suggest suggest-wfst suggest-shadow shadow-eval visualize-lexicon visualize-lexicon-streamlit fmt test test-golden test-ui paper-current paper-current-clean
 
 DX ?= dx
-CLI := cargo run --bin lookup_cli --
+CLI := cargo run --bin lookup_cli --features cli --
 QUERY ?= tver
 MODE ?= shadow
 QUERIES ?=

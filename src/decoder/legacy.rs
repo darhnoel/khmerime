@@ -79,7 +79,7 @@ impl LegacyDecoder {
             .into_iter()
             .take(PHRASE_COMBINATION_LIMIT)
             .map(|parts| {
-                let text = parts.join(" ");
+                let text = parts.concat();
                 let segments = request
                     .composer
                     .chunks

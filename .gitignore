@@ -14,6 +14,9 @@ __pycache__/
 # Dioxus/web build output
 dist/
 
+# Generated binary data assets (copied here by build.rs for wasm32+fetch-data builds)
+assets/data/
+
 # Dioxus/Linux
 vendor/
 

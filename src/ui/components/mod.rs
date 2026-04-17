@@ -1,5 +1,6 @@
 pub(crate) mod editor_card;
 pub(crate) mod guide;
+pub(crate) mod segment_preview;
 pub(crate) mod toolbar;
 pub(crate) mod workspace;
 
