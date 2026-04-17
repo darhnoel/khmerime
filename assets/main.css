@@ -165,6 +165,66 @@ body {
   gap: 8px;
 }
 
+.dictionary-panel {
+  display: grid;
+  gap: 8px;
+  border: 1px solid rgba(177, 77, 30, 0.2);
+  border-radius: 14px;
+  background: rgba(255, 250, 242, 0.8);
+  padding: 10px;
+}
+
+.dictionary-panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.dictionary-panel-title {
+  font-size: 0.78rem;
+  font-weight: 800;
+  color: var(--accent-strong);
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.dictionary-panel-empty {
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.dictionary-list {
+  display: grid;
+  gap: 6px;
+  max-height: 220px;
+  overflow-y: auto;
+  padding-right: 2px;
+}
+
+.dictionary-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 6px 8px;
+  border: 1px solid rgba(93, 68, 40, 0.12);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.82);
+}
+
+.dictionary-map {
+  font-size: 0.82rem;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+
+.dictionary-remove {
+  padding: 6px 10px;
+  font-size: 0.78rem;
+}
+
 .editor-card,
 .guide-card {
   padding: 18px;
@@ -408,12 +468,13 @@ body {
 .toolbar-segment-slot {
   flex: 1;
   min-width: 0;
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: visible;
 }
 
 .segment-scroll-wrapper {
   overflow-x: auto;
-  overflow-y: hidden;
+  overflow-y: visible;
   scroll-behavior: smooth;
   -webkit-overflow-scrolling: touch;
   min-height: 56px;
@@ -464,7 +525,7 @@ body {
   gap: 2px;
   align-items: start;
   justify-items: start;
-  padding: 10px 12px;
+  padding: 6px 12px;
   border: 1px solid var(--line);
   border-radius: 16px;
   background: var(--surface-elevated);

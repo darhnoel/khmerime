@@ -5,12 +5,20 @@ use crate::ui::storage::{save_enabled, save_font_size};
 use crate::{MAX_FONT_SIZE, MIN_FONT_SIZE};
 
 use crate::ui::editor::{
-    dismiss_manual_save_request, save_manual_save_request, switch_input_mode, update_candidates, EditorSignals,
-    InputMode,
+    dismiss_manual_save_request, remove_user_dictionary_mapping, save_manual_save_request, switch_input_mode,
+    update_candidates, EditorSignals, InputMode,
 };
 
 #[component]
 pub(crate) fn AppToolbar(state: EditorSignals, show_guide: Signal<bool>, font_size: Signal<usize>) -> Element {
+    let mut show_saved_dictionary = use_signal(|| false);
+    let mut saved_entries = state
+        .user_dictionary()
+        .into_iter()
+        .flat_map(|(roman, values)| values.into_iter().map(move |khmer| (roman.clone(), khmer)))
+        .collect::<Vec<_>>();
+    saved_entries.sort_by(|left, right| left.0.cmp(&right.0).then_with(|| left.1.cmp(&right.1)));
+
     rsx! {
         div { class: "workspace-top",
             div { class: "toolbar",
@@ -96,6 +104,12 @@ pub(crate) fn AppToolbar(state: EditorSignals, show_guide: Signal<bool>, font_si
                             "Rules"
                         }
                     }
+                    button {
+                        class: if show_saved_dictionary() { "ghost active" } else { "ghost" },
+                        "data-testid": "toggle-saved-mappings",
+                        onclick: move |_| show_saved_dictionary.set(!show_saved_dictionary()),
+                        "Saved ({saved_entries.len()})"
+                    }
                 }
             }
             if let Some(request) = state.manual_save_request() {
@@ -118,6 +132,38 @@ pub(crate) fn AppToolbar(state: EditorSignals, show_guide: Signal<bool>, font_si
                             "data-testid": "manual-save-dismiss",
                             onclick: move |_| dismiss_manual_save_request(state),
                             "Dismiss"
+                        }
+                    }
+                }
+            }
+            if show_saved_dictionary() {
+                div { class: "dictionary-panel",
+                    div { class: "dictionary-panel-head",
+                        span { class: "dictionary-panel-title", "Saved manual mappings" }
+                        if saved_entries.is_empty() {
+                            span { class: "dictionary-panel-empty", "No saved mappings yet." }
+                        }
+                    }
+                    if !saved_entries.is_empty() {
+                        div { class: "dictionary-list",
+                            for (roman, khmer) in saved_entries.iter() {
+                                div {
+                                    key: "saved-{roman}-{khmer}",
+                                    class: "dictionary-row",
+                                    span { class: "dictionary-map", "{roman} → {khmer}" }
+                                    button {
+                                        class: "ghost dictionary-remove",
+                                        onclick: {
+                                            let roman = roman.clone();
+                                            let khmer = khmer.clone();
+                                            move |_| {
+                                                let _ = remove_user_dictionary_mapping(&roman, &khmer, state);
+                                            }
+                                        },
+                                        "Remove"
+                                    }
+                                }
+                            }
                         }
                     }
                 }

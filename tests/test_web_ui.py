@@ -169,3 +169,79 @@ def test_web_ui_mobile_candidate_bar_prioritizes_candidates(web_server: str) -> 
         expect(candidate_bar.locator(".suggestion").nth(1)).to_be_visible()
 
         browser.close()
+
+
+def test_web_ui_manual_selection_lock_blocks_printable_typing(web_server: str) -> None:
+    with sync_playwright() as playwright:
+        browser = playwright.chromium.launch()
+        page = browser.new_page()
+        page.add_init_script(
+            """
+            window.localStorage.clear();
+            window.sessionStorage.clear();
+            """
+        )
+        _goto_app(page, web_server)
+
+        editor = page.locator("[data-testid='editor-input']").last
+        expect(editor).to_be_visible(timeout=20_000)
+        page.locator("[data-testid='mode-manual']").last.click()
+
+        editor.click()
+        editor.type("imsorida")
+        expect(page.locator("[data-testid='suggestion-popup']").last).to_be_visible(timeout=15_000)
+
+        editor.press("Space")
+        editor.press("x")
+        expect(editor).to_have_value("imsorida")
+
+        browser.close()
+
+
+def test_web_ui_manual_skip_undo_and_inline_preview_sync(web_server: str) -> None:
+    with sync_playwright() as playwright:
+        browser = playwright.chromium.launch()
+        page = browser.new_page()
+        page.add_init_script(
+            """
+            window.localStorage.clear();
+            window.sessionStorage.clear();
+            """
+        )
+        _goto_app(page, web_server)
+
+        editor = page.locator("[data-testid='editor-input']").last
+        expect(editor).to_be_visible(timeout=20_000)
+        page.locator("[data-testid='mode-manual']").last.click()
+
+        editor.click()
+        editor.type("imsorida")
+        expect(page.locator("[data-testid='suggestion-popup']").last).to_be_visible(timeout=15_000)
+
+        editor.press("Space")
+        editor.press("Enter")
+
+        manual_preview = page.locator("[data-testid='manual-preview']")
+        expect(manual_preview).to_be_visible(timeout=15_000)
+
+        built_text_node = manual_preview.locator(".segment-chip.active .segment-chip-output").last
+        expect(built_text_node).to_be_visible(timeout=15_000)
+        built_text = built_text_node.inner_text().strip()
+        assert built_text, "manual built text should not be empty after selecting a candidate"
+
+        inline_preview_text = page.locator(".composition-preview .composition-preview-text").last
+        expect(inline_preview_text).to_have_text(built_text)
+
+        remaining_node = manual_preview.locator(".segment-chip .segment-chip-output").last
+        remaining_before = remaining_node.inner_text().strip()
+        editor.press("s")
+        remaining_after_skip = remaining_node.inner_text().strip()
+        assert remaining_after_skip != remaining_before
+        assert len(remaining_after_skip) < len(remaining_before)
+        expect(editor).to_have_value("imsorida")
+
+        editor.press("u")
+        expect(remaining_node).to_have_text(remaining_before)
+        expect(editor).to_have_value("imsorida")
+
+        browser.close()

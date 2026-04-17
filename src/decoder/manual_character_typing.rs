@@ -10,6 +10,7 @@ const CHARACTER_RELATION_CSV: &str = include_str!(concat!(
 pub enum ManualComposeKind {
     BaseConsonant,
     Vowel,
+    Subscript,
 }
 
 impl ManualComposeKind {
@@ -17,13 +18,7 @@ impl ManualComposeKind {
         match self {
             ManualComposeKind::BaseConsonant => "base consonant",
             ManualComposeKind::Vowel => "vowel",
-        }
-    }
-
-    fn fallback(self) -> Self {
-        match self {
-            ManualComposeKind::BaseConsonant => ManualComposeKind::Vowel,
-            ManualComposeKind::Vowel => ManualComposeKind::BaseConsonant,
+            ManualComposeKind::Subscript => "subscript",
         }
     }
 }
@@ -58,19 +53,97 @@ pub fn suggest_manual_character_candidates(
     }
 
     let expanded_limit = limit.max(32);
-    let fallback_kind = expected_kind.fallback();
-    let expected_starter = starter_candidates_for_seed(&normalized, expected_kind);
-    let expected_ranked = collect_candidates_for_kind(&normalized, expected_kind, expanded_limit);
-    let fallback_starter = starter_candidates_for_seed(&normalized, fallback_kind);
-    let fallback_ranked = collect_candidates_for_kind(&normalized, fallback_kind, expanded_limit);
     let mut merged = Vec::new();
 
-    // Prefer expected-kind starters/ranked first so fallback lists cannot starve them.
-    append_deduped_candidates(&mut merged, expected_starter, expanded_limit);
-    append_deduped_candidates(&mut merged, expected_ranked, expanded_limit);
-    append_deduped_candidates(&mut merged, fallback_starter, expanded_limit);
-    append_deduped_candidates(&mut merged, fallback_ranked, expanded_limit);
+    for kind in candidate_kind_order(expected_kind) {
+        let starter = starter_candidates_for_seed(&normalized, kind);
+        let ranked = collect_candidates_for_kind(&normalized, kind, expanded_limit);
+        // Keep kind-local starter hints ahead of ranked matches.
+        append_deduped_candidates(&mut merged, starter, expanded_limit);
+        append_deduped_candidates(&mut merged, ranked, expanded_limit);
+    }
+    rerank_manual_candidates(&normalized, expected_kind, &mut merged);
     merged
+}
+
+fn candidate_kind_order(expected_kind: ManualComposeKind) -> [ManualComposeKind; 3] {
+    match expected_kind {
+        ManualComposeKind::BaseConsonant => [
+            ManualComposeKind::BaseConsonant,
+            ManualComposeKind::Vowel,
+            ManualComposeKind::Subscript,
+        ],
+        ManualComposeKind::Vowel => [
+            ManualComposeKind::Vowel,
+            ManualComposeKind::Subscript,
+            ManualComposeKind::BaseConsonant,
+        ],
+        ManualComposeKind::Subscript => [
+            ManualComposeKind::Subscript,
+            ManualComposeKind::Vowel,
+            ManualComposeKind::BaseConsonant,
+        ],
+    }
+}
+
+fn rerank_manual_candidates(
+    seed: &str,
+    expected_kind: ManualComposeKind,
+    candidates: &mut Vec<ManualComposeCandidate>,
+) {
+    let kind_rank = |kind: ManualComposeKind| -> i32 {
+        if kind == expected_kind {
+            0
+        } else {
+            match (expected_kind, kind) {
+                (ManualComposeKind::BaseConsonant, ManualComposeKind::Vowel)
+                | (ManualComposeKind::Vowel, ManualComposeKind::Subscript)
+                | (ManualComposeKind::Subscript, ManualComposeKind::Vowel) => 1,
+                _ => 2,
+            }
+        }
+    };
+
+    candidates.sort_by(|left, right| {
+        let left_rank = kind_rank(left.kind);
+        let right_rank = kind_rank(right.kind);
+        let left_score = left.score + rerank_context_bonus(seed, left);
+        let right_score = right.score + rerank_context_bonus(seed, right);
+
+        left_rank
+            .cmp(&right_rank)
+            .then_with(|| right_score.cmp(&left_score))
+            .then_with(|| right.roman_span.len().cmp(&left.roman_span.len()))
+            .then_with(|| left.insert_text.cmp(&right.insert_text))
+    });
+}
+
+fn rerank_context_bonus(seed: &str, candidate: &ManualComposeCandidate) -> i32 {
+    let mut bonus = 0;
+
+    if candidate.roman_span.is_empty() {
+        // Generic starter hints should not outrank concrete roman matches.
+        bonus -= 24;
+    }
+
+    if candidate.kind == ManualComposeKind::BaseConsonant
+        && starts_with_roman_vowel(seed)
+        && candidate.insert_text == "អ"
+    {
+        bonus += 80;
+    }
+
+    if candidate.kind == ManualComposeKind::Vowel
+        && candidate.insert_text == "័"
+        && seed
+            .chars()
+            .next()
+            .is_some_and(|ch| matches!(ch, 'n' | 's' | 'm' | 'l' | 'g' | 'p' | 'h' | 't' | 'v' | 'b' | 'c'))
+    {
+        bonus += 120;
+    }
+
+    bonus
 }
 
 fn collect_candidates_for_kind(
@@ -143,7 +216,7 @@ fn parse_character_relation_entries() -> Vec<CharacterRelationEntry> {
             continue;
         };
         let text = raw_text.trim();
-        if text.is_empty() || text.contains('\u{17D2}') {
+        if text.is_empty() {
             continue;
         }
 
@@ -211,6 +284,9 @@ fn relation_tokens_to_patterns(tokens: &[String]) -> Vec<String> {
 fn classify_text_kind(text: &str) -> Option<ManualComposeKind> {
     let chars = text.chars().collect::<Vec<_>>();
     let first = *chars.first()?;
+    if is_subscript_text(&chars) {
+        return Some(ManualComposeKind::Subscript);
+    }
     if is_base_consonant(first) {
         return Some(ManualComposeKind::BaseConsonant);
     }
@@ -222,6 +298,10 @@ fn classify_text_kind(text: &str) -> Option<ManualComposeKind> {
 
 fn is_base_consonant(ch: char) -> bool {
     ('\u{1780}'..='\u{17A2}').contains(&ch)
+}
+
+fn is_subscript_text(chars: &[char]) -> bool {
+    chars.first() == Some(&'\u{17D2}') && chars.get(1).is_some_and(|ch| is_base_consonant(*ch))
 }
 
 fn is_vowel(ch: char) -> bool {
