@@ -1,6 +1,6 @@
 use dioxus::prelude::*;
 
-use crate::ui::editor::{move_segment_focus, normalized_suggestion_key, EditorSignals};
+use crate::ui::editor::{move_segment_focus, normalized_suggestion_key, EditorSignals, InputMode};
 use roman_lookup::DecoderMode;
 
 fn segment_is_exact_recommended(segment_input: &str, selected_text: &str) -> bool {
@@ -18,7 +18,26 @@ fn segment_is_exact_recommended(segment_input: &str, selected_text: &str) -> boo
 pub(crate) fn SegmentPreview(state: EditorSignals) -> Element {
     rsx! {
         div { class: "segment-scroll-wrapper",
-            if let Some(session) = state.segmented_session() {
+            if state.input_mode() == InputMode::ManualCharacterTyping {
+                if let Some(manual) = state.manual_typing_state() {
+                    div { class: "segment-preview manual-preview", "data-testid": "manual-preview",
+                        if !manual.composed_text.is_empty() {
+                            div { class: "segment-chip active manual-chip",
+                                span { class: "segment-chip-head",
+                                    span { class: "segment-chip-output", "{manual.composed_text}" }
+                                }
+                                span { class: "segment-chip-input", "built" }
+                            }
+                        }
+                        div { class: "segment-chip manual-chip",
+                            span { class: "segment-chip-head",
+                                span { class: "segment-chip-output", "{manual.remaining_roman()}" }
+                            }
+                            span { class: "segment-chip-input", "next {manual.expected_kind.label()}" }
+                        }
+                    }
+                }
+            } else if let Some(session) = state.segmented_session() {
                 div { class: "segment-preview", "data-testid": "segment-preview",
                     for (index, segment) in session.segments.iter().enumerate() {
                         button {

@@ -8,9 +8,13 @@ use roman_lookup::{DecoderConfig, DecoderMode, ShadowObservation, Transliterator
 mod ui;
 
 use self::ui::components::{AppToolbar, EditorCard, GuidePanel, WorkspaceBody};
-use self::ui::editor::{refresh_popup_position, EditorSignals, SegmentedSession};
+use self::ui::editor::{
+    refresh_popup_position, EditorSignals, InputMode, ManualSaveRequest, ManualTypingState, SegmentedSession,
+};
 use self::ui::platform::{mark_app_ready, set_editor_caret};
-use self::ui::storage::{load_decoder_mode, load_editor_text, load_enabled, load_font_size, load_history};
+use self::ui::storage::{
+    load_decoder_mode, load_editor_text, load_enabled, load_font_size, load_history, load_user_dictionary,
+};
 
 const APP_CSS: &str = include_str!("../assets/main.css");
 static LEGACY_TRANSLITERATOR: OnceLock<Transliterator> = OnceLock::new();
@@ -156,6 +160,7 @@ fn App() -> Element {
     let mut engine_progress = use_signal(|| if LEGACY_TRANSLITERATOR.get().is_some() { 100 } else { 0 });
     let text = use_signal(load_editor_text);
     let roman_enabled = use_signal(load_enabled);
+    let input_mode = use_signal(|| InputMode::NormalWordSuggestion);
     let decoder_mode = use_signal(load_decoder_mode);
     let font_size = use_signal(|| load_font_size(MIN_FONT_SIZE, MAX_FONT_SIZE, DEFAULT_FONT_SIZE));
     let show_guide = use_signal(|| false);
@@ -173,9 +178,13 @@ fn App() -> Element {
     let selected = use_signal(|| 0usize);
     let mut pending_caret = use_signal(|| None::<usize>);
     let history = use_signal(load_history);
+    let manual_typing_state = use_signal(|| None::<ManualTypingState>);
+    let manual_save_request = use_signal(|| None::<ManualSaveRequest>);
+    let user_dictionary = use_signal(load_user_dictionary);
     let editor_state = EditorSignals {
         text,
         roman_enabled,
+        input_mode,
         decoder_mode,
         engine_ready,
         engine_progress,
@@ -193,6 +202,9 @@ fn App() -> Element {
         selected,
         pending_caret,
         history,
+        manual_typing_state,
+        manual_save_request,
+        user_dictionary,
     };
 
     use_effect(move || {
@@ -241,7 +253,9 @@ fn App() -> Element {
     });
 
     use_effect(move || {
-        if editor_state.engine_ready() && editor_state.roman_enabled() {
+        if editor_state.roman_enabled()
+            && (editor_state.engine_ready() || editor_state.input_mode() == InputMode::ManualCharacterTyping)
+        {
             spawn(ui::editor::update_candidates(editor_state.text(), editor_state));
         }
     });

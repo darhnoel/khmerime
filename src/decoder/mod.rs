@@ -1,6 +1,7 @@
 mod config;
 mod legacy;
 mod manager;
+mod manual_character_typing;
 mod observer;
 mod types;
 mod wfst;
@@ -8,6 +9,9 @@ mod wfst;
 pub use self::config::DecoderConfig;
 pub(crate) use self::legacy::LegacyDecoder;
 pub(crate) use self::manager::DecoderManager;
+pub use self::manual_character_typing::{
+    suggest_manual_character_candidates, ManualComposeCandidate, ManualComposeKind,
+};
 pub(crate) use self::observer::{build_shadow_observation, ShadowReport};
 pub use self::observer::{ShadowMismatch, ShadowObservation, ShadowSummary};
 pub use self::types::{DecodeCandidate, DecodeFailure, DecodeRequest, DecodeResult, DecodeSegment, DecoderMode};

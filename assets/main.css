@@ -127,6 +127,44 @@ body {
   gap: 10px;
 }
 
+.manual-save-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+  border: 1px solid rgba(177, 77, 30, 0.22);
+  border-radius: 14px;
+  background: rgba(255, 247, 237, 0.85);
+  padding: 8px 10px;
+}
+
+.manual-save-text {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+.manual-save-label {
+  font-size: 0.72rem;
+  font-weight: 800;
+  color: var(--accent-strong);
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.manual-save-map {
+  font-size: 0.82rem;
+  color: var(--ink);
+}
+
+.manual-save-actions {
+  display: inline-flex;
+  gap: 8px;
+}
+
 .editor-card,
 .guide-card {
   padding: 18px;
@@ -149,7 +187,7 @@ body {
   justify-content: space-between;
   gap: 18px;
   flex-wrap: wrap;
-  min-height: 60px;
+  min-height: 65px;
 }
 
 .hero {
@@ -410,6 +448,10 @@ body {
   padding: 0 6px;
 }
 
+.manual-preview {
+  justify-content: center;
+}
+
 .segment-preview-skeleton {
   height: 32px;
   justify-content: center;
@@ -665,6 +707,7 @@ body {
 .candidate-footer {
   position: relative;
   display: flex;
+  flex-direction: column;
   width: fit-content;
   max-width: 100%;
   margin: 0 auto;
@@ -672,6 +715,38 @@ body {
   justify-content: center;
   gap: 8px;
   padding-top: 0;
+}
+
+.manual-kind-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.manual-kind-tab {
+  appearance: none;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface-strong);
+  color: var(--muted);
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 700;
+  padding: 4px 8px;
+  cursor: pointer;
+}
+
+.manual-kind-tab.active {
+  border-color: rgba(177, 77, 30, 0.32);
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+}
+
+.manual-kind-tab:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
 }
 
 .candidate-page {

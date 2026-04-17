@@ -4,7 +4,10 @@ use crate::ui::components::segment_preview::SegmentPreview;
 use crate::ui::storage::{save_enabled, save_font_size};
 use crate::{MAX_FONT_SIZE, MIN_FONT_SIZE};
 
-use crate::ui::editor::{update_candidates, EditorSignals};
+use crate::ui::editor::{
+    dismiss_manual_save_request, save_manual_save_request, switch_input_mode, update_candidates, EditorSignals,
+    InputMode,
+};
 
 #[component]
 pub(crate) fn AppToolbar(state: EditorSignals, show_guide: Signal<bool>, font_size: Signal<usize>) -> Element {
@@ -72,6 +75,18 @@ pub(crate) fn AppToolbar(state: EditorSignals, show_guide: Signal<bool>, font_si
                         }
                     }
                     button {
+                        class: if state.input_mode() == InputMode::NormalWordSuggestion { "mode-pill active" } else { "mode-pill" },
+                        "data-testid": "mode-word",
+                        onclick: move |_| switch_input_mode(InputMode::NormalWordSuggestion, state),
+                        {InputMode::NormalWordSuggestion.label()}
+                    }
+                    button {
+                        class: if state.input_mode() == InputMode::ManualCharacterTyping { "mode-pill active" } else { "mode-pill" },
+                        "data-testid": "mode-manual",
+                        onclick: move |_| switch_input_mode(InputMode::ManualCharacterTyping, state),
+                        {InputMode::ManualCharacterTyping.label()}
+                    }
+                    button {
                         class: if show_guide() { "ghost active" } else { "ghost" },
                         "data-testid": "toggle-rules",
                         onclick: move |_| show_guide.set(!show_guide()),
@@ -79,6 +94,30 @@ pub(crate) fn AppToolbar(state: EditorSignals, show_guide: Signal<bool>, font_si
                             "Hide Rules"
                         } else {
                             "Rules"
+                        }
+                    }
+                }
+            }
+            if let Some(request) = state.manual_save_request() {
+                div { class: "manual-save-banner",
+                    div { class: "manual-save-text",
+                        span { class: "manual-save-label", "Manual compose" }
+                        span { class: "manual-save-map", "{request.roman} → {request.khmer}" }
+                    }
+                    div { class: "manual-save-actions",
+                        button {
+                            class: "mode-pill active",
+                            "data-testid": "manual-save",
+                            onclick: move |_| {
+                                let _ = save_manual_save_request(state);
+                            },
+                            "Save Mapping"
+                        }
+                        button {
+                            class: "ghost",
+                            "data-testid": "manual-save-dismiss",
+                            onclick: move |_| dismiss_manual_save_request(state),
+                            "Dismiss"
                         }
                     }
                 }

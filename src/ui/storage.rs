@@ -12,6 +12,8 @@ const STORAGE_ENABLED: &str = "roman_lookup.enabled";
 #[cfg(target_arch = "wasm32")]
 const STORAGE_HISTORY: &str = "roman_lookup.history";
 #[cfg(target_arch = "wasm32")]
+const STORAGE_USER_DICTIONARY: &str = "roman_lookup.user_dictionary";
+#[cfg(target_arch = "wasm32")]
 const STORAGE_FONT_SIZE: &str = "roman_lookup.font_size";
 
 #[cfg(target_arch = "wasm32")]
@@ -100,6 +102,55 @@ pub(crate) fn save_history(history: &HashMap<String, usize>) {
 
 #[cfg(not(target_arch = "wasm32"))]
 pub(crate) fn save_history(_: &HashMap<String, usize>) {}
+
+#[cfg(target_arch = "wasm32")]
+pub(crate) fn load_user_dictionary() -> HashMap<String, Vec<String>> {
+    storage_get_web(STORAGE_USER_DICTIONARY)
+        .map(|raw| {
+            let mut dictionary = HashMap::<String, Vec<String>>::new();
+            for line in raw.lines() {
+                let Some((roman, khmer)) = line.split_once('\t') else {
+                    continue;
+                };
+                let roman = roman.trim();
+                let khmer = khmer.trim();
+                if roman.is_empty() || khmer.is_empty() {
+                    continue;
+                }
+                dictionary.entry(roman.to_owned()).or_default().push(khmer.to_owned());
+            }
+            for values in dictionary.values_mut() {
+                values.sort();
+                values.dedup();
+            }
+            dictionary
+        })
+        .unwrap_or_default()
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+pub(crate) fn load_user_dictionary() -> HashMap<String, Vec<String>> {
+    HashMap::new()
+}
+
+#[cfg(target_arch = "wasm32")]
+pub(crate) fn save_user_dictionary(dictionary: &HashMap<String, Vec<String>>) {
+    let mut rows = Vec::new();
+    let mut keys = dictionary.keys().cloned().collect::<Vec<_>>();
+    keys.sort();
+    for key in keys {
+        let mut values = dictionary.get(&key).cloned().unwrap_or_default();
+        values.sort();
+        values.dedup();
+        for value in values {
+            rows.push(format!("{key}\t{value}"));
+        }
+    }
+    let _ = storage_set_web(STORAGE_USER_DICTIONARY, &rows.join("\n"));
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+pub(crate) fn save_user_dictionary(_: &HashMap<String, Vec<String>>) {}
 
 #[cfg(target_arch = "wasm32")]
 pub(crate) fn load_font_size(min_font_size: usize, max_font_size: usize, default_font_size: usize) -> usize {

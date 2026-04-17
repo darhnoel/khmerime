@@ -1,11 +1,12 @@
 use dioxus::html::Modifiers;
 use dioxus::prelude::*;
+use roman_lookup::ManualComposeKind;
 
 use crate::ui::editor::{
-    commit_segmented_selection, commit_selection, composition_preview_style, composition_style, is_space_key,
+    click_candidate, commit_active_selection, composition_preview_style, composition_style, is_space_key,
     move_segment_focus, popup_style, segmented_composition_preview_style, segmented_preview_parts,
-    select_segment_candidate, shortcut_index, shortcut_label, should_exit_number_pick, update_candidates,
-    visible_page_start, EditorSignals, SegmentedSession,
+    select_segment_candidate, set_manual_kind_filter, shortcut_index, shortcut_label, should_exit_number_pick,
+    skip_manual_roman_char, update_candidates, visible_page_start, EditorSignals, InputMode, SegmentedSession,
 };
 use crate::ui::storage::{save_editor_text, save_enabled};
 use crate::{CompositionMark, EDITOR_ID, VISIBLE_SUGGESTIONS};
@@ -46,6 +47,31 @@ pub(crate) fn EditorCard(state: EditorSignals, font_size: Signal<usize>) -> Elem
     let recommended_indices = state.recommended_indices();
     let roman_variant_hints = state.roman_variant_hints();
     let has_suggestions = !suggestions.is_empty();
+    let manual_state = if state.input_mode() == InputMode::ManualCharacterTyping {
+        state.manual_typing_state()
+    } else {
+        None
+    };
+    let manual_consonant_count = manual_state
+        .as_ref()
+        .map(|manual| {
+            manual
+                .candidates
+                .iter()
+                .filter(|candidate| candidate.kind == ManualComposeKind::BaseConsonant)
+                .count()
+        })
+        .unwrap_or(0);
+    let manual_vowel_count = manual_state
+        .as_ref()
+        .map(|manual| {
+            manual
+                .candidates
+                .iter()
+                .filter(|candidate| candidate.kind == ManualComposeKind::Vowel)
+                .count()
+        })
+        .unwrap_or(0);
     rsx! {
         div { class: "editor-card",
             div { class: "editor-wrap",
@@ -63,6 +89,7 @@ pub(crate) fn EditorCard(state: EditorSignals, font_size: Signal<usize>) -> Elem
                         let value = event.value();
                         save_editor_text(&value);
                         state.text.set(value.clone());
+                        state.manual_save_request.set(None);
                         // Start fresh after text changes so the next ArrowDown selects the first
                         // candidate for the current token instead of continuing stale selection.
                         state.number_pick_mode.set(false);
@@ -104,6 +131,27 @@ pub(crate) fn EditorCard(state: EditorSignals, font_size: Signal<usize>) -> Elem
                                 if move_segment_focus(1, state) {
                                     event.prevent_default();
                                 }
+                            }
+                            "Tab" if state.input_mode() == InputMode::ManualCharacterTyping => {
+                                event.prevent_default();
+                                let Some(manual) = state.manual_typing_state() else {
+                                    return;
+                                };
+                                let target = if manual.kind_filter == ManualComposeKind::BaseConsonant {
+                                    ManualComposeKind::Vowel
+                                } else {
+                                    ManualComposeKind::BaseConsonant
+                                };
+                                let _ = set_manual_kind_filter(target, state);
+                                state.number_pick_mode.set(false);
+                            }
+                            key
+                                if state.input_mode() == InputMode::ManualCharacterTyping
+                                    && key.eq_ignore_ascii_case("s")
+                                    && modifiers.is_empty() =>
+                            {
+                                event.prevent_default();
+                                let _ = skip_manual_roman_char(state);
                             }
                             "Tab" if !suggestions.is_empty() => {
                                 event.prevent_default();
@@ -195,11 +243,7 @@ pub(crate) fn EditorCard(state: EditorSignals, font_size: Signal<usize>) -> Elem
                             }
                             key if is_space_key(key) && modifiers.contains(Modifiers::SHIFT) && !suggestions.is_empty() => {
                                 event.prevent_default();
-                                if state.segmented_refine_mode() && state.segmented_session().is_some() {
-                                    spawn(commit_segmented_selection(false, state));
-                                } else {
-                                    spawn(commit_selection(false, state));
-                                }
+                                spawn(commit_active_selection(false, state));
                             }
                             key if is_space_key(key) && !suggestions.is_empty() && !state.selection_started() => {
                                 event.prevent_default();
@@ -225,11 +269,11 @@ pub(crate) fn EditorCard(state: EditorSignals, font_size: Signal<usize>) -> Elem
                             }
                             "Enter" if !suggestions.is_empty() => {
                                 event.prevent_default();
-                                if state.segmented_refine_mode() && state.segmented_session().is_some() {
-                                    spawn(commit_segmented_selection(false, state));
-                                } else {
-                                    spawn(commit_selection(false, state));
-                                }
+                                spawn(commit_active_selection(false, state));
+                            }
+                            "Enter" if state.input_mode() == InputMode::ManualCharacterTyping => {
+                                event.prevent_default();
+                                spawn(commit_active_selection(false, state));
                             }
                             key if state.number_pick_mode() && !suggestions.is_empty() => {
                                 if let Some(offset) = shortcut_index(key) {
@@ -268,14 +312,7 @@ pub(crate) fn EditorCard(state: EditorSignals, font_size: Signal<usize>) -> Elem
                                         class: if state.selection_started() && index == state.selected() { "suggestion active" } else { "suggestion" },
                                         button {
                                             onclick: move |_| {
-                                                if state.segmented_refine_mode() && state.segmented_session().is_some() {
-                                                    select_segment_candidate(index, state);
-                                                    state.number_pick_mode.set(false);
-                                                } else {
-                                                    state.selected.set(index);
-                                                    state.selection_started.set(true);
-                                                    spawn(commit_selection(false, state));
-                                                }
+                                                spawn(click_candidate(index, state));
                                             },
                                             span { class: "suggestion-rank", "{shortcut_label(index)}" }
                                             span { class: "suggestion-main",
@@ -310,14 +347,7 @@ pub(crate) fn EditorCard(state: EditorSignals, font_size: Signal<usize>) -> Elem
                                         class: if state.selection_started() && index == state.selected() { "suggestion active" } else { "suggestion" },
                                         button {
                                             onclick: move |_| {
-                                                if state.segmented_refine_mode() && state.segmented_session().is_some() {
-                                                    select_segment_candidate(index, state);
-                                                    state.number_pick_mode.set(false);
-                                                } else {
-                                                    state.selected.set(index);
-                                                    state.selection_started.set(true);
-                                                    spawn(commit_selection(false, state));
-                                                }
+                                                spawn(click_candidate(index, state));
                                             },
                                             span { class: "suggestion-rank", "{shortcut_label(index)}" }
                                             span { class: "suggestion-main",
@@ -344,6 +374,42 @@ pub(crate) fn EditorCard(state: EditorSignals, font_size: Signal<usize>) -> Elem
                         }
                     }
                     div { class: "candidate-footer",
+                        if let Some(manual) = &manual_state {
+                            div { class: "manual-kind-switch",
+                                button {
+                                    class: if manual.kind_filter == ManualComposeKind::BaseConsonant {
+                                        "manual-kind-tab active"
+                                    } else {
+                                        "manual-kind-tab"
+                                    },
+                                    disabled: manual_consonant_count == 0,
+                                    onclick: move |_| {
+                                        let _ = set_manual_kind_filter(ManualComposeKind::BaseConsonant, state);
+                                    },
+                                    "Consonant ({manual_consonant_count})"
+                                }
+                                button {
+                                    class: if manual.kind_filter == ManualComposeKind::Vowel {
+                                        "manual-kind-tab active"
+                                    } else {
+                                        "manual-kind-tab"
+                                    },
+                                    disabled: manual_vowel_count == 0,
+                                    onclick: move |_| {
+                                        let _ = set_manual_kind_filter(ManualComposeKind::Vowel, state);
+                                    },
+                                    "Vowel ({manual_vowel_count})"
+                                }
+                                button {
+                                    class: "manual-kind-tab",
+                                    disabled: manual.remaining_roman().is_empty(),
+                                    onclick: move |_| {
+                                        let _ = skip_manual_roman_char(state);
+                                    },
+                                    "Skip (S)"
+                                }
+                            }
+                        }
                         div { class: "candidate-hints",
                             span { class: "candidate-hint",
                                 span { class: "keycap", "Space" }
@@ -356,11 +422,29 @@ pub(crate) fn EditorCard(state: EditorSignals, font_size: Signal<usize>) -> Elem
                                 span { class: "keycap", "Enter" }
                                 span { class: "editor-tip-sep", "or" }
                                 span { class: "keycap", "Shift+Space" }
-                                span { class: "editor-tip-text", "commit" }
+                                span { class: "editor-tip-text",
+                                    if state.input_mode() == InputMode::ManualCharacterTyping {
+                                        "pick/finalize"
+                                    } else {
+                                        "commit"
+                                    }
+                                }
                             }
-                            span { class: "candidate-hint",
-                                span { class: "keycap", "Left/Right" }
-                                span { class: "editor-tip-text", "move segments" }
+                            if state.input_mode() == InputMode::ManualCharacterTyping {
+                                span { class: "candidate-hint",
+                                    span { class: "keycap", "Tab" }
+                                    span { class: "editor-tip-text", "switch kind" }
+                                }
+                                span { class: "candidate-hint",
+                                    span { class: "keycap", "S" }
+                                    span { class: "editor-tip-text", "skip 1 roman char" }
+                                }
+                            }
+                            if state.input_mode() != InputMode::ManualCharacterTyping {
+                                span { class: "candidate-hint",
+                                    span { class: "keycap", "Left/Right" }
+                                    span { class: "editor-tip-text", "move segments" }
+                                }
                             }
                         }
                     }
