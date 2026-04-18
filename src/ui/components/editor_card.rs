@@ -111,6 +111,19 @@ pub(crate) fn EditorCard(state: EditorSignals, font_size: Signal<usize>) -> Elem
                     autocorrect: "off",
                     oninput: move |event| {
                         let value = event.value();
+                        let current_text = state.text();
+                        let live_suggestions = state.suggestions();
+                        let manual_cycle_mode_active = state.input_mode() == InputMode::ManualCharacterTyping
+                            && state.manual_typing_state().is_some()
+                            && !live_suggestions.is_empty()
+                            && (state.number_pick_mode() || state.selection_started());
+                        if manual_cycle_mode_active && value != current_text {
+                            // Guard manual cycle/edit mode from accidental printable text mutation.
+                            save_editor_text(&current_text);
+                            state.text.set(current_text);
+                            return;
+                        }
+
                         save_editor_text(&value);
                         state.text.set(value.clone());
                         state.manual_save_request.set(None);
@@ -145,10 +158,14 @@ pub(crate) fn EditorCard(state: EditorSignals, font_size: Signal<usize>) -> Elem
                             return;
                         }
 
-                        let manual_edit_shortcut_active = state.input_mode() == InputMode::ManualCharacterTyping
-                            && !suggestions.is_empty()
+                        let live_suggestions = state.suggestions();
+                        let has_live_suggestions = !live_suggestions.is_empty();
+                        let live_suggestion_len = live_suggestions.len();
+                        let manual_cycle_mode_active = state.input_mode() == InputMode::ManualCharacterTyping
+                            && state.manual_typing_state().is_some()
+                            && has_live_suggestions
                             && (state.number_pick_mode() || state.selection_started());
-                        let selection_lock_active = !suggestions.is_empty() && state.number_pick_mode();
+                        let selection_lock_active = has_live_suggestions && state.number_pick_mode();
 
                         match key.as_str() {
                             "ArrowLeft" if state.segmented_session().is_some() => {
@@ -185,7 +202,7 @@ pub(crate) fn EditorCard(state: EditorSignals, font_size: Signal<usize>) -> Elem
                                 state.number_pick_mode.set(false);
                             }
                             key
-                                if manual_edit_shortcut_active
+                                if manual_cycle_mode_active
                                     && key.eq_ignore_ascii_case("s")
                                     && !modifiers.contains(Modifiers::CONTROL)
                                     && !modifiers.contains(Modifiers::ALT)
@@ -198,7 +215,7 @@ pub(crate) fn EditorCard(state: EditorSignals, font_size: Signal<usize>) -> Elem
                                 }
                             }
                             key
-                                if manual_edit_shortcut_active
+                                if manual_cycle_mode_active
                                     && key.eq_ignore_ascii_case("u")
                                     && !modifiers.contains(Modifiers::CONTROL)
                                     && !modifiers.contains(Modifiers::ALT)
@@ -210,9 +227,9 @@ pub(crate) fn EditorCard(state: EditorSignals, font_size: Signal<usize>) -> Elem
                                     state.selection_started.set(true);
                                 }
                             }
-                            "Tab" if !suggestions.is_empty() => {
+                            "Tab" if has_live_suggestions => {
                                 event.prevent_default();
-                                let len = suggestions.len();
+                                let len = live_suggestion_len;
                                 let next = (state.selected() + 1) % len;
                                 if state.segmented_refine_mode() && state.segmented_session().is_some() {
                                     select_segment_candidate(next, state);
@@ -222,7 +239,7 @@ pub(crate) fn EditorCard(state: EditorSignals, font_size: Signal<usize>) -> Elem
                                 }
                                 state.number_pick_mode.set(false);
                             }
-                            "ArrowDown" if !suggestions.is_empty() => {
+                            "ArrowDown" if has_live_suggestions => {
                                 event.prevent_default();
                                 if event.is_auto_repeating() {
                                     return;
@@ -246,7 +263,7 @@ pub(crate) fn EditorCard(state: EditorSignals, font_size: Signal<usize>) -> Elem
                                     select_segment_candidate(next, state);
                                     state.selection_started.set(true);
                                 } else {
-                                    let len = suggestions.len();
+                                    let len = live_suggestion_len;
                                     if len == 0 {
                                         return;
                                     }
@@ -275,12 +292,12 @@ pub(crate) fn EditorCard(state: EditorSignals, font_size: Signal<usize>) -> Elem
                                 // }
                                 // state.number_pick_mode.set(false);
                             }
-                            "ArrowUp" if !suggestions.is_empty() => {
+                            "ArrowUp" if has_live_suggestions => {
                                 if event.is_auto_repeating() {
                                     return;
                                 }
                                 event.prevent_default();
-                                let len = suggestions.len();
+                                let len = live_suggestion_len;
                                 if state.segmented_refine_mode() && state.segmented_session().is_some() {
                                     let next = if !state.selection_started() {
                                         len.saturating_sub(1)
@@ -298,11 +315,11 @@ pub(crate) fn EditorCard(state: EditorSignals, font_size: Signal<usize>) -> Elem
                                 }
                                 state.number_pick_mode.set(false);
                             }
-                            key if is_space_key(key) && modifiers.contains(Modifiers::SHIFT) && !suggestions.is_empty() => {
+                            key if is_space_key(key) && modifiers.contains(Modifiers::SHIFT) && has_live_suggestions => {
                                 event.prevent_default();
                                 spawn(commit_active_selection(false, state));
                             }
-                            key if is_space_key(key) && !suggestions.is_empty() && !state.selection_started() => {
+                            key if is_space_key(key) && has_live_suggestions && !state.selection_started() => {
                                 event.prevent_default();
                                 if state.segmented_refine_mode() && state.segmented_session().is_some() {
                                     select_segment_candidate(0, state);
@@ -312,9 +329,9 @@ pub(crate) fn EditorCard(state: EditorSignals, font_size: Signal<usize>) -> Elem
                                 }
                                 state.number_pick_mode.set(true);
                             }
-                            key if is_space_key(key) && !suggestions.is_empty() => {
+                            key if is_space_key(key) && has_live_suggestions => {
                                 event.prevent_default();
-                                let len = suggestions.len();
+                                let len = live_suggestion_len;
                                 let next = (state.selected() + 1) % len;
                                 if state.segmented_refine_mode() && state.segmented_session().is_some() {
                                     select_segment_candidate(next, state);
@@ -324,7 +341,7 @@ pub(crate) fn EditorCard(state: EditorSignals, font_size: Signal<usize>) -> Elem
                                 }
                                 state.number_pick_mode.set(true);
                             }
-                            "Enter" if !suggestions.is_empty() => {
+                            "Enter" if has_live_suggestions => {
                                 event.prevent_default();
                                 spawn(commit_active_selection(false, state));
                             }
@@ -332,11 +349,11 @@ pub(crate) fn EditorCard(state: EditorSignals, font_size: Signal<usize>) -> Elem
                                 event.prevent_default();
                                 spawn(commit_active_selection(false, state));
                             }
-                            key if selection_lock_active && !suggestions.is_empty() => {
+                            key if selection_lock_active && has_live_suggestions => {
                                 if let Some(offset) = shortcut_index(key) {
-                                    let page_start = visible_page_start(state.selected(), suggestions.len());
+                                    let page_start = visible_page_start(state.selected(), live_suggestion_len);
                                     let index = page_start + offset;
-                                    if index < suggestions.len() {
+                                    if index < live_suggestion_len {
                                         event.prevent_default();
                                         if state.segmented_refine_mode() && state.segmented_session().is_some() {
                                             select_segment_candidate(index, state);
@@ -522,11 +539,11 @@ pub(crate) fn EditorCard(state: EditorSignals, font_size: Signal<usize>) -> Elem
                                 }
                                 span { class: "candidate-hint",
                                     span { class: "keycap", "S" }
-                                    span { class: "editor-tip-text", "skip 1 roman char (manual cycle mode)" }
+                                    span { class: "editor-tip-text", "skip 1 roman char after Space (manual cycle/edit mode)" }
                                 }
                                 span { class: "candidate-hint",
                                     span { class: "keycap", "U" }
-                                    span { class: "editor-tip-text", "undo step (manual cycle mode)" }
+                                    span { class: "editor-tip-text", "undo step after Space (manual cycle/edit mode)" }
                                 }
                             }
                             if state.input_mode() != InputMode::ManualCharacterTyping {

@@ -49,6 +49,37 @@ def _goto_app(page, url: str) -> None:
         page.goto(url, wait_until="commit", timeout=60_000)
 
 
+def _manual_candidate_index(page, text: str) -> int:
+    popup = page.locator("[data-testid='suggestion-popup']").last
+    expect(popup).to_be_visible(timeout=15_000)
+    expect(popup.locator(".suggestion button").first).to_be_visible(timeout=15_000)
+
+    words = popup.locator(".suggestion .suggestion-word")
+    count = words.count()
+    for index in range(count):
+        if words.nth(index).inner_text().strip() == text:
+            return index
+    raise AssertionError(f"manual candidate not found: {text!r}")
+
+
+def _click_manual_candidate(page, text: str) -> None:
+    popup = page.locator("[data-testid='suggestion-popup']").last
+    index = _manual_candidate_index(page, text)
+    popup.locator(".suggestion button").nth(index).click()
+
+
+def _manual_active_candidate_word(page) -> str:
+    popup = page.locator("[data-testid='suggestion-popup']").last
+    expect(popup).to_be_visible(timeout=15_000)
+    return popup.locator(".suggestion.active .suggestion-word").last.inner_text().strip()
+
+
+def _manual_active_candidate_hint(page) -> str:
+    popup = page.locator("[data-testid='suggestion-popup']").last
+    expect(popup).to_be_visible(timeout=15_000)
+    return popup.locator(".suggestion.active .suggestion-roman-hint").last.inner_text().strip()
+
+
 @pytest.fixture(scope="module")
 def web_server():
     port = _free_port(HOST)
@@ -219,18 +250,9 @@ def test_web_ui_manual_skip_undo_and_inline_preview_sync(web_server: str) -> Non
         expect(page.locator("[data-testid='suggestion-popup']").last).to_be_visible(timeout=15_000)
 
         editor.press("Space")
-        editor.press("Enter")
 
         manual_preview = page.locator("[data-testid='manual-preview']")
         expect(manual_preview).to_be_visible(timeout=15_000)
-
-        built_text_node = manual_preview.locator(".segment-chip.active .segment-chip-output").last
-        expect(built_text_node).to_be_visible(timeout=15_000)
-        built_text = built_text_node.inner_text().strip()
-        assert built_text, "manual built text should not be empty after selecting a candidate"
-
-        inline_preview_text = page.locator(".composition-preview .composition-preview-text").last
-        expect(inline_preview_text).to_have_text(built_text)
 
         remaining_node = manual_preview.locator(".segment-chip .segment-chip-output").last
         remaining_before = remaining_node.inner_text().strip()
@@ -243,5 +265,94 @@ def test_web_ui_manual_skip_undo_and_inline_preview_sync(web_server: str) -> Non
         editor.press("u")
         expect(remaining_node).to_have_text(remaining_before)
         expect(editor).to_have_value("imsorida")
+
+        editor.press("Enter")
+
+        built_text_node = manual_preview.locator(".segment-chip.active .segment-chip-output").last
+        expect(built_text_node).to_be_visible(timeout=15_000)
+        built_text = built_text_node.inner_text().strip()
+        assert built_text, "manual built text should not be empty after selecting a candidate"
+
+        inline_preview_text = page.locator(".composition-preview .composition-preview-text").last
+        expect(inline_preview_text).to_have_text(built_text)
+
+        browser.close()
+
+
+def test_web_ui_manual_sambath_shows_context_subscript_fallback(web_server: str) -> None:
+    with sync_playwright() as playwright:
+        browser = playwright.chromium.launch()
+        page = browser.new_page()
+        page.add_init_script(
+            """
+            window.localStorage.clear();
+            window.sessionStorage.clear();
+            """
+        )
+        _goto_app(page, web_server)
+
+        editor = page.locator("[data-testid='editor-input']").last
+        expect(editor).to_be_visible(timeout=20_000)
+        page.locator("[data-testid='mode-manual']").last.click()
+
+        editor.click()
+        editor.type("sambath")
+        expect(page.locator("[data-testid='suggestion-popup']").last).to_be_visible(timeout=15_000)
+
+        editor.press("Space")
+        for _ in range(5):
+            editor.press("s")
+        _click_manual_candidate(page, "ត")
+
+        max_cycles = 64
+        for _ in range(max_cycles):
+            if _manual_active_candidate_word(page) == "្ត":
+                break
+            editor.press("Space")
+        else:
+            raise AssertionError("manual context fallback candidate '្ត' did not appear while cycling")
+
+        hint = _manual_active_candidate_hint(page)
+        assert "subscript" in hint
+        assert "context repeat" in hint
+        assert "no-consume" in hint
+
+        browser.close()
+
+
+def test_web_ui_manual_sambath2_space_s_skips_without_text_mutation(web_server: str) -> None:
+    with sync_playwright() as playwright:
+        browser = playwright.chromium.launch()
+        page = browser.new_page()
+        page.add_init_script(
+            """
+            window.localStorage.clear();
+            window.sessionStorage.clear();
+            """
+        )
+        _goto_app(page, web_server)
+
+        editor = page.locator("[data-testid='editor-input']").last
+        expect(editor).to_be_visible(timeout=20_000)
+        page.locator("[data-testid='mode-manual']").last.click()
+
+        editor.click()
+        editor.type("sambath")
+        expect(page.locator("[data-testid='suggestion-popup']").last).to_be_visible(timeout=15_000)
+
+        editor.press("Space")
+        manual_preview = page.locator("[data-testid='manual-preview']")
+        expect(manual_preview).to_be_visible(timeout=15_000)
+        remaining_node = manual_preview.locator(".segment-chip .segment-chip-output").last
+        remaining_before = remaining_node.inner_text().strip()
+
+        editor.press("s")
+
+        expect(editor).to_have_value("sambath")
+        remaining_after = remaining_node.inner_text().strip()
+        assert remaining_after != remaining_before
+        assert len(remaining_after) < len(remaining_before)
+        expect(page.locator("[data-testid='suggestion-popup']").last).to_be_visible(timeout=15_000)
+        expect(manual_preview).to_be_visible(timeout=15_000)
 
         browser.close()

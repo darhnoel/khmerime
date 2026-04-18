@@ -53,6 +53,9 @@ pub(crate) struct ManualTypingState {
     pub composed_text: String,
     pub expected_kind: ManualComposeKind,
     pub kind_filter: ManualComposeKind,
+    pub last_selected_base_consonant: Option<String>,
+    pub context_fallback_key: Option<String>,
+    pub context_fallback_insert_text: Option<String>,
     pub active_span: Option<std::ops::Range<usize>>,
     pub candidates: Vec<ManualComposeCandidate>,
     pub checkpoints: Vec<ManualTypingCheckpoint>,
@@ -66,6 +69,9 @@ impl ManualTypingState {
             composed_text: String::new(),
             expected_kind: ManualComposeKind::BaseConsonant,
             kind_filter: ManualComposeKind::BaseConsonant,
+            last_selected_base_consonant: None,
+            context_fallback_key: None,
+            context_fallback_insert_text: None,
             active_span: None,
             candidates: Vec::new(),
             checkpoints: Vec::new(),
@@ -88,6 +94,7 @@ impl ManualTypingState {
             composed_text: self.composed_text.clone(),
             expected_kind: self.expected_kind,
             kind_filter: self.kind_filter,
+            last_selected_base_consonant: self.last_selected_base_consonant.clone(),
         }
     }
 
@@ -96,6 +103,7 @@ impl ManualTypingState {
         self.composed_text = checkpoint.composed_text;
         self.expected_kind = checkpoint.expected_kind;
         self.kind_filter = checkpoint.kind_filter;
+        self.last_selected_base_consonant = checkpoint.last_selected_base_consonant;
     }
 }
 
@@ -111,6 +119,7 @@ pub(crate) struct ManualTypingCheckpoint {
     pub(crate) composed_text: String,
     pub(crate) expected_kind: ManualComposeKind,
     pub(crate) kind_filter: ManualComposeKind,
+    pub(crate) last_selected_base_consonant: Option<String>,
 }
 
 #[derive(Clone, Copy, PartialEq)]
