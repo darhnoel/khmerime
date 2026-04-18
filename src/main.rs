@@ -11,7 +11,7 @@ use self::ui::components::{AppToolbar, EditorCard, GuidePanel, WorkspaceBody};
 use self::ui::editor::{
     refresh_popup_position, EditorSignals, InputMode, ManualSaveRequest, ManualTypingState, SegmentedSession,
 };
-use self::ui::platform::{mark_app_ready, set_editor_caret};
+use self::ui::platform::{mark_app_ready, mark_app_shell_ready, refresh_mobile_layout_density, set_editor_caret};
 use self::ui::storage::{
     load_decoder_mode, load_editor_text, load_enabled, load_font_size, load_history, load_user_dictionary,
 };
@@ -215,6 +215,11 @@ fn App() -> Element {
     });
 
     use_effect(move || {
+        mark_app_shell_ready();
+        refresh_mobile_layout_density();
+    });
+
+    use_effect(move || {
         spawn(async move {
             if engine_ready() {
                 engine_progress.set(100);
@@ -249,7 +254,16 @@ fn App() -> Element {
     use_effect(move || {
         if engine_ready() {
             mark_app_ready();
+            refresh_mobile_layout_density();
         }
+    });
+
+    use_effect(move || {
+        let _ = suggestions().len();
+        let _ = input_mode();
+        let _ = font_size();
+        let _ = segmented_refine_mode();
+        refresh_mobile_layout_density();
     });
 
     use_effect(move || {

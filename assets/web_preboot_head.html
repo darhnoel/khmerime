@@ -1,4 +1,10 @@
 <style>
+    @media (max-width: 900px) {
+        body:not([data-app-shell-ready="1"]) #main {
+            visibility: hidden;
+        }
+    }
+
     #app-preboot-splash {
         position: fixed;
         inset: 0;
@@ -40,6 +46,7 @@
         color: #695d51;
         font-size: 0.96rem;
         line-height: 1.5;
+        min-height: var(--pretext-splash-subtitle-min-height, 0px);
     }
 
     .app-preboot-spinner {
@@ -76,17 +83,249 @@
 </style>
 <script>
     (() => {
+        let splashHidden = false;
+        const MOBILE_EDITING_ATTR = "data-mobile-editing";
+
+        function isEditableTextTarget(target) {
+            if (!target || !target.tagName) return false;
+            const tag = target.tagName.toUpperCase();
+            return (
+                tag === "TEXTAREA" ||
+                (tag === "INPUT" && /^(text|search|url|tel|email|password)$/i.test(target.type || "text")) ||
+                !!target.isContentEditable
+            );
+        }
+
+        function setMobileKeyboardOffset(value) {
+            const root = document.documentElement;
+            if (!root) return;
+            const px = Number.isFinite(value) && value > 0 ? Math.round(value) : 0;
+            root.style.setProperty("--mobile-keyboard-offset", `${px}px`);
+            if (px > 0) {
+                root.setAttribute(MOBILE_EDITING_ATTR, "1");
+            } else if (!isEditableTextTarget(document.activeElement)) {
+                root.removeAttribute(MOBILE_EDITING_ATTR);
+            }
+        }
+
+        function setPretextLayoutVars(candidateFooterHeight, segmentHeight, subtitleHeight) {
+            const root = document.documentElement;
+            if (!root) return;
+            const footerPx = Number.isFinite(candidateFooterHeight) ? Math.max(30, Math.round(candidateFooterHeight)) : 34;
+            const segmentPx = Number.isFinite(segmentHeight) ? Math.max(28, Math.round(segmentHeight)) : 34;
+            const subtitlePx = Number.isFinite(subtitleHeight) ? Math.max(0, Math.round(subtitleHeight)) : 0;
+            root.style.setProperty("--mobile-candidate-footer-min-height", `${footerPx}px`);
+            root.style.setProperty("--mobile-segment-min-height", `${segmentPx}px`);
+            root.style.setProperty("--pretext-splash-subtitle-min-height", `${subtitlePx}px`);
+        }
+
+        function setMobileDensityAttr(attr, enabled) {
+            const root = document.documentElement;
+            if (!root) return;
+            if (enabled) {
+                root.setAttribute(attr, "1");
+            } else {
+                root.removeAttribute(attr);
+            }
+        }
+
+        function mobilePretextWidth() {
+            return Math.max(220, Math.min(window.innerWidth - 24, 440));
+        }
+
+        async function loadPretextModule() {
+            // We try primary and fallback ESM CDNs. Failures are non-fatal.
+            const urls = [
+                "./assets/vendor/pretext.mjs",
+                "https://esm.sh/@chenglou/pretext@latest?bundle",
+                "https://cdn.jsdelivr.net/npm/@chenglou/pretext/+esm",
+            ];
+            for (const url of urls) {
+                try {
+                    const mod = await import(url);
+                    if (mod && typeof mod.prepare === "function" && typeof mod.layout === "function") {
+                        return mod;
+                    }
+                } catch (_) {
+                    // try next source
+                }
+            }
+            return null;
+        }
+
+        async function initPretextSizing() {
+            const isLikelyMobile = window.matchMedia && window.matchMedia("(max-width: 900px)").matches;
+            if (!isLikelyMobile) return;
+
+            const pretext = await loadPretextModule();
+            if (!pretext) {
+                setPretextLayoutVars(34, 34, 0);
+                window.__pretextSizingStatus = { loaded: false };
+                return;
+            }
+
+            const candidatePrepared = pretext.prepare(
+                "↑↓ select Space cycle 1-5 choose Enter commit",
+                '700 11px "Noto Sans Khmer", "IBM Plex Sans", sans-serif'
+            );
+            const mobileHintsPrepared = pretext.prepareWithSegments(
+                "↑↓ select Space cycle 1-5 choose Enter commit",
+                '700 11px "Noto Sans Khmer", "IBM Plex Sans", sans-serif'
+            );
+            const toolbarPrepared = pretext.prepareWithSegments(
+                "Live Edit Word Manual Rules Saved (999)",
+                '700 14px "Noto Sans Khmer", "IBM Plex Sans", sans-serif'
+            );
+            const segmentPrepared = pretext.prepare(
+                "ជាមួយ កម្ពុជា",
+                '700 16px "Noto Sans Khmer", "IBM Plex Sans", sans-serif'
+            );
+            const segmentPreviewPrepared = pretext.prepareWithSegments(
+                "ជាមួយ កម្ពុជា",
+                '700 16px "Noto Sans Khmer", "IBM Plex Sans", sans-serif'
+            );
+            const subtitleNode = document.querySelector(".app-preboot-subtitle");
+            const subtitleText = subtitleNode ? subtitleNode.textContent || "" : "Preparing the local decoder and lexicon...";
+            const subtitlePrepared = pretext.prepare(
+                subtitleText,
+                '500 15px "Noto Sans Khmer", "IBM Plex Sans", sans-serif'
+            );
+
+            let rafPending = false;
+            const updateSizing = () => {
+                const width = mobilePretextWidth();
+                const toolbarNode = document.querySelector(".mode-tools");
+                const hintsNode = document.querySelector(".mobile-candidate-hints");
+                const segmentNode = document.querySelector(".segment-scroll-wrapper");
+                const toolbarWidth = Math.max(180, Math.min(width, toolbarNode && toolbarNode.clientWidth ? toolbarNode.clientWidth : width));
+                const hintsWidth = Math.max(180, Math.min(width, hintsNode && hintsNode.clientWidth ? hintsNode.clientWidth : width));
+                const segmentWidth = Math.max(180, Math.min(width, segmentNode && segmentNode.clientWidth ? segmentNode.clientWidth : width));
+                const subtitleContainer = document.querySelector(".app-preboot-content");
+                const subtitleWidth = Math.max(
+                    200,
+                    Math.min(width, subtitleContainer && subtitleContainer.clientWidth ? subtitleContainer.clientWidth : width)
+                );
+                const candidateLayout = pretext.layout(candidatePrepared, width, 14);
+                const segmentLayout = pretext.layout(segmentPrepared, width, 20);
+                const subtitleLayout = pretext.layout(subtitlePrepared, subtitleWidth, 22);
+                const hintStats = pretext.measureLineStats(mobileHintsPrepared, hintsWidth);
+                const toolbarStats = pretext.measureLineStats(toolbarPrepared, toolbarWidth);
+                const segmentStats = pretext.measureLineStats(segmentPreviewPrepared, segmentWidth);
+                setPretextLayoutVars(candidateLayout.height + 12, segmentLayout.height + 12, subtitleLayout.height);
+                if (toolbarNode || hintsNode || segmentNode) {
+                    setMobileDensityAttr("data-mobile-hints-compact", hintStats.lineCount > 1);
+                    setMobileDensityAttr("data-mobile-toolbar-compact", toolbarStats.lineCount > 1);
+                    setMobileDensityAttr("data-mobile-segment-compact", segmentStats.lineCount > 1);
+                } else {
+                    setMobileDensityAttr("data-mobile-hints-compact", false);
+                    setMobileDensityAttr("data-mobile-toolbar-compact", false);
+                    setMobileDensityAttr("data-mobile-segment-compact", false);
+                }
+            };
+            const scheduleSizing = () => {
+                if (rafPending) return;
+                rafPending = true;
+                window.requestAnimationFrame(() => {
+                    rafPending = false;
+                    updateSizing();
+                });
+            };
+
+            updateSizing();
+            window.addEventListener("resize", scheduleSizing, { passive: true });
+            if (document.fonts && document.fonts.ready) {
+                document.fonts.ready.then(scheduleSizing).catch(() => {});
+            }
+            window.__pretextSizingStatus = { loaded: true };
+            window.__recomputePretextSizing = scheduleSizing;
+        }
+
+        function computeMobileKeyboardInset() {
+            const vv = window.visualViewport;
+            if (!vv) return 0;
+            const active = document.activeElement;
+            const isTextInput = isEditableTextTarget(active);
+            if (!isTextInput) return 0;
+
+            const rawInset = Math.max(0, window.innerHeight - (vv.height + vv.offsetTop));
+            // Ignore browser chrome/address-bar deltas; dock only for real keyboard lift.
+            return rawInset >= 120 ? rawInset : 0;
+        }
+
+        function updateMobileKeyboardInset() {
+            setMobileKeyboardOffset(computeMobileKeyboardInset());
+        }
+
+        function wireMobileKeyboardInsetObserver() {
+            const isLikelyMobile = window.matchMedia && window.matchMedia("(max-width: 900px)").matches;
+            if (!isLikelyMobile) {
+                setMobileKeyboardOffset(0);
+                return;
+            }
+            const vv = window.visualViewport;
+            let rafPending = false;
+            const scheduleInsetUpdate = () => {
+                if (rafPending) return;
+                rafPending = true;
+                window.requestAnimationFrame(() => {
+                    rafPending = false;
+                    updateMobileKeyboardInset();
+                });
+            };
+            if (vv) {
+                vv.addEventListener("resize", scheduleInsetUpdate, { passive: true });
+                vv.addEventListener("scroll", scheduleInsetUpdate, { passive: true });
+            }
+            window.addEventListener(
+                "focusin",
+                (event) => {
+                    if (isEditableTextTarget(event.target)) {
+                        document.documentElement.setAttribute(MOBILE_EDITING_ATTR, "1");
+                    }
+                    window.setTimeout(scheduleInsetUpdate, 40);
+                },
+                { passive: true }
+            );
+            window.addEventListener(
+                "focusout",
+                () => {
+                    window.setTimeout(() => {
+                        if (!isEditableTextTarget(document.activeElement)) {
+                            document.documentElement.removeAttribute(MOBILE_EDITING_ATTR);
+                        }
+                        scheduleInsetUpdate();
+                    }, 40);
+                },
+                { passive: true }
+            );
+            window.addEventListener(
+                "orientationchange",
+                () => window.setTimeout(scheduleInsetUpdate, 120),
+                { passive: true }
+            );
+            scheduleInsetUpdate();
+        }
+
         function hideSplash() {
+            if (splashHidden) return;
             const splash = document.getElementById("app-preboot-splash");
             if (!splash) return;
+            splashHidden = true;
             splash.setAttribute("data-hidden", "true");
             window.setTimeout(() => splash.remove(), 220);
         }
 
         function shouldHideSplash() {
-            const bodyReady = document.body && document.body.getAttribute("data-app-ready") === "1";
+            const shellReady = document.body && document.body.getAttribute("data-app-shell-ready") === "1";
+            if (shellReady) {
+                return true;
+            }
             const main = document.getElementById("main");
-            return bodyReady || (main && main.childElementCount > 0);
+            if (main && main.childElementCount > 0 && document.body) {
+                document.body.setAttribute("data-app-shell-ready", "1");
+                return true;
+            }
+            return false;
         }
 
         function checkSplash() {
@@ -98,6 +337,11 @@
         }
 
         window.__hideAppPrebootSplash = hideSplash;
+        // Deterministic test hook for mobile keyboard-aware docking assertions.
+        window.__setMobileKeyboardOffsetForTest = setMobileKeyboardOffset;
+        window.__updateMobileKeyboardInset = updateMobileKeyboardInset;
+        wireMobileKeyboardInsetObserver();
+        initPretextSizing();
         document.addEventListener("readystatechange", checkSplash);
         window.addEventListener("load", checkSplash);
         const interval = window.setInterval(() => {

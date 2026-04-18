@@ -353,6 +353,63 @@ pub(crate) fn set_editor_caret(caret: usize) {
 }
 
 #[cfg(target_arch = "wasm32")]
+async fn editor_char_count() -> Option<usize> {
+    Some(editor_textarea()?.value().chars().count())
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+async fn editor_char_count() -> Option<usize> {
+    let script = format!(
+        r#"
+            const el = document.getElementById({editor_id:?});
+            return el && typeof el.value === "string" ? el.value.length : 0;
+        "#,
+        editor_id = EDITOR_ID,
+    );
+    document::eval(&script).join::<usize>().await.ok()
+}
+
+pub(crate) async fn move_editor_caret(delta: isize) -> bool {
+    let Some(current) = current_editor_caret().await else {
+        return false;
+    };
+    let max_caret = editor_char_count().await.unwrap_or(usize::MAX);
+    let magnitude = delta.unsigned_abs();
+    let next = if delta < 0 {
+        current.saturating_sub(magnitude)
+    } else {
+        current.saturating_add(magnitude)
+    }
+    .min(max_caret);
+    set_editor_caret(next);
+    true
+}
+
+#[cfg(target_arch = "wasm32")]
+pub(crate) fn refresh_mobile_layout_density() {
+    let _ = js_sys::eval(
+        r#"
+            if (typeof window !== "undefined" && typeof window.__recomputePretextSizing === "function") {
+                window.__recomputePretextSizing();
+                window.setTimeout(() => {
+                    if (typeof window.__recomputePretextSizing === "function") {
+                        window.__recomputePretextSizing();
+                    }
+                }, 80);
+                window.setTimeout(() => {
+                    if (typeof window.__recomputePretextSizing === "function") {
+                        window.__recomputePretextSizing();
+                    }
+                }, 220);
+            }
+        "#,
+    );
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+pub(crate) fn refresh_mobile_layout_density() {}
+
+#[cfg(target_arch = "wasm32")]
 pub(crate) async fn editor_composition_mark(start: usize, token: &str) -> Option<CompositionMark> {
     let document = browser_document()?;
     let editor = editor_textarea()?;
@@ -464,11 +521,25 @@ pub(crate) async fn editor_popup_position(caret: usize) -> Option<SuggestionPopu
 }
 
 #[cfg(target_arch = "wasm32")]
+pub(crate) fn mark_app_shell_ready() {
+    let Some(document) = browser_document() else {
+        return;
+    };
+    if let Some(body) = document.body() {
+        let _ = body.set_attribute("data-app-shell-ready", "1");
+    }
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+pub(crate) fn mark_app_shell_ready() {}
+
+#[cfg(target_arch = "wasm32")]
 pub(crate) fn mark_app_ready() {
     let Some(document) = browser_document() else {
         return;
     };
     if let Some(body) = document.body() {
+        let _ = body.set_attribute("data-app-shell-ready", "1");
         let _ = body.set_attribute("data-app-ready", "1");
     }
     if let Some(splash) = document.get_element_by_id("app-preboot-splash") {

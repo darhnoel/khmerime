@@ -9,6 +9,7 @@ use crate::ui::editor::{
     skip_manual_roman_char, undo_manual_step, update_candidates, visible_page_start, EditorSignals, InputMode,
     SegmentedSession,
 };
+use crate::ui::platform::move_editor_caret;
 use crate::ui::storage::{save_editor_text, save_enabled};
 use crate::{CompositionMark, EDITOR_ID, VISIBLE_SUGGESTIONS};
 
@@ -37,6 +38,44 @@ fn render_segmented_composition_preview(
 fn roman_hint_label(variants: &[String]) -> String {
     // Show all variants if there are 3 or fewer, otherwise show the first 3 followed by ellipsis.
     format!("{}", variants.join(" / "))
+}
+
+fn cycle_live_candidate(delta: isize, mut state: EditorSignals) -> bool {
+    let len = if state.segmented_refine_mode() && state.segmented_session().is_some() {
+        state
+            .segmented_session()
+            .map(|session| session.current_candidate_len())
+            .unwrap_or(0)
+    } else {
+        state.suggestions().len()
+    };
+    if len == 0 {
+        return false;
+    }
+
+    let next = if !state.selection_started() {
+        if delta < 0 {
+            len.saturating_sub(1)
+        } else {
+            0
+        }
+    } else if delta < 0 {
+        (state.selected() + len - 1) % len
+    } else {
+        (state.selected() + 1) % len
+    };
+
+    let changed = if state.segmented_refine_mode() && state.segmented_session().is_some() {
+        select_segment_candidate(next, state)
+    } else {
+        state.selected.set(next);
+        state.selection_started.set(true);
+        true
+    };
+    if changed {
+        state.number_pick_mode.set(false);
+    }
+    changed
 }
 
 #[component]
@@ -177,6 +216,20 @@ pub(crate) fn EditorCard(state: EditorSignals, font_size: Signal<usize>) -> Elem
                                 if move_segment_focus(1, state) {
                                     event.prevent_default();
                                 }
+                            }
+                            "ArrowLeft"
+                                if has_live_suggestions
+                                    && (state.selection_started() || state.number_pick_mode()) =>
+                            {
+                                event.prevent_default();
+                                let _ = cycle_live_candidate(-1, state);
+                            }
+                            "ArrowRight"
+                                if has_live_suggestions
+                                    && (state.selection_started() || state.number_pick_mode()) =>
+                            {
+                                event.prevent_default();
+                                let _ = cycle_live_candidate(1, state);
                             }
                             "Tab" if state.input_mode() == InputMode::ManualCharacterTyping => {
                                 event.prevent_default();
@@ -512,7 +565,7 @@ pub(crate) fn EditorCard(state: EditorSignals, font_size: Signal<usize>) -> Elem
                                 }
                             }
                         }
-                        div { class: "candidate-hints",
+                        div { class: "candidate-hints desktop-candidate-hints",
                             span { class: "candidate-hint",
                                 span { class: "keycap", "Space" }
                                 span { class: "editor-tip-text", "cycle" }
@@ -551,6 +604,62 @@ pub(crate) fn EditorCard(state: EditorSignals, font_size: Signal<usize>) -> Elem
                                     span { class: "keycap", "Left/Right" }
                                     span { class: "editor-tip-text", "move segments" }
                                 }
+                            }
+                        }
+                        div { class: "mobile-candidate-footer",
+                            div { class: "mobile-caret-controls",
+                                button {
+                                    class: "mobile-caret-btn",
+                                    "data-testid": "mobile-caret-left",
+                                    aria_label: "Move caret left",
+                                    onclick: move |_| {
+                                        spawn(async move {
+                                            let _ = move_editor_caret(-1).await;
+                                        });
+                                    },
+                                    "←"
+                                }
+                                button {
+                                    class: "mobile-caret-btn",
+                                    "data-testid": "mobile-caret-right",
+                                    aria_label: "Move caret right",
+                                    onclick: move |_| {
+                                        spawn(async move {
+                                            let _ = move_editor_caret(1).await;
+                                        });
+                                    },
+                                    "→"
+                                }
+                                button {
+                                    class: "mobile-caret-btn",
+                                    "data-testid": "mobile-select-up",
+                                    aria_label: "Select previous suggestion",
+                                    disabled: !has_suggestions,
+                                    onclick: move |_| {
+                                        let _ = cycle_live_candidate(-1, state);
+                                    },
+                                    "↑"
+                                }
+                                button {
+                                    class: "mobile-caret-btn",
+                                    "data-testid": "mobile-select-down",
+                                    aria_label: "Select next suggestion",
+                                    disabled: !has_suggestions,
+                                    onclick: move |_| {
+                                        let _ = cycle_live_candidate(1, state);
+                                    },
+                                    "↓"
+                                }
+                            }
+                            div { class: "mobile-candidate-hints",
+                                span { class: "keycap", "↑↓" }
+                                span { class: "editor-tip-text", "select" }
+                                span { class: "keycap", "Space" }
+                                span { class: "editor-tip-text", "cycle" }
+                                span { class: "keycap", "1-5" }
+                                span { class: "editor-tip-text", "choose" }
+                                span { class: "keycap", "Enter" }
+                                span { class: "editor-tip-text", "commit" }
                             }
                         }
                     }
