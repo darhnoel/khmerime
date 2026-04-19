@@ -153,6 +153,22 @@ fn compile_khpos_stats(train_source: &str, tag_source: &str) -> Result<Vec<u8>, 
         }
     }
 
+    let surface_min_count = env::var("KHPOS_SURFACE_MIN_COUNT")
+        .ok()
+        .and_then(|value| value.parse::<u32>().ok())
+        .unwrap_or(1);
+    if surface_min_count > 1 {
+        surface_unigrams.retain(|_, count| *count >= surface_min_count);
+    }
+
+    if let Some(limit) = env::var("KHPOS_SURFACE_TOP_N")
+        .ok()
+        .and_then(|value| value.parse::<usize>().ok())
+        .filter(|limit| *limit > 0)
+    {
+        trim_map_to_top_n(&mut surface_unigrams, limit);
+    }
+
     let mut dominant_tags = word_tag_counts
         .into_iter()
         .map(|(word, tags)| {
@@ -173,6 +189,23 @@ fn compile_khpos_stats(train_source: &str, tag_source: &str) -> Result<Vec<u8>, 
     write_pair_count_map(&mut output, &tag_bigrams)?;
     write_dominant_tags(&mut output, &dominant_tags)?;
     Ok(output)
+}
+
+fn trim_map_to_top_n(map: &mut HashMap<String, u32>, limit: usize) {
+    if map.len() <= limit {
+        return;
+    }
+    let mut ranked = map
+        .iter()
+        .map(|(token, count)| (token.clone(), *count))
+        .collect::<Vec<_>>();
+    ranked.sort_by(|left, right| right.1.cmp(&left.1).then_with(|| left.0.cmp(&right.0)));
+    let keep = ranked
+        .into_iter()
+        .take(limit)
+        .map(|(token, _)| token)
+        .collect::<std::collections::HashSet<_>>();
+    map.retain(|token, _| keep.contains(token));
 }
 
 fn write_string_count_map(output: &mut Vec<u8>, map: &HashMap<String, u32>) -> Result<(), String> {

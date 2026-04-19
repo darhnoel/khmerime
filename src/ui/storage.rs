@@ -68,6 +68,8 @@ pub(crate) fn save_enabled(value: bool) {
 pub(crate) fn save_enabled(_: bool) {}
 
 pub(crate) fn load_decoder_mode() -> DecoderMode {
+    // Keep shadow as the configured mode; startup still uses legacy behavior until
+    // full engine readiness gates are satisfied in candidate_pipeline.
     DecoderMode::Shadow
 }
 

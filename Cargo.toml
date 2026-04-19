@@ -21,7 +21,7 @@ dioxus = { version = "0.7.4", default-features = false, features = ["web", "docu
 gloo-timers = { version = "0.3", features = ["futures"] }
 js-sys = "0.3.77"
 wasm-bindgen-futures = "0.4"
-web-sys = { version = "0.3.77", features = ["console", "CssStyleDeclaration", "Document", "DomRect", "Element", "HtmlElement", "HtmlTextAreaElement", "KeyboardEvent", "Location", "Node", "Response", "Storage", "Window"] }
+web-sys = { version = "0.3.77", features = ["console", "CssStyleDeclaration", "Document", "DomRect", "Element", "Headers", "HtmlElement", "HtmlTextAreaElement", "KeyboardEvent", "Location", "Node", "Performance", "Response", "Storage", "Window"] }
 
 [[bin]]
 name = "lookup_cli"

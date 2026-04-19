@@ -1,5 +1,6 @@
 mod composer;
 mod decoder;
+mod khmer;
 mod roman_lookup;
 
 pub use crate::decoder::{
@@ -7,4 +8,5 @@ pub use crate::decoder::{
     DecoderConfig, DecoderMode, ManualComposeCandidate, ManualComposeKind, ShadowMismatch, ShadowObservation,
     ShadowSummary,
 };
+pub use crate::khmer::khnormal;
 pub use crate::roman_lookup::{AppliedSuggestion, Entry, LexiconError, Result, Transliterator};

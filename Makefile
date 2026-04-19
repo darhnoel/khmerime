@@ -15,6 +15,7 @@ help:
 	"" \
 	"  make web                         Run the Dioxus web app" \
 	"  make web-release                 Build deployable web artifacts under dist/web-release" \
+	"                                   Optional: WEB_BASE_PATH=khmerime-beta (or KHMERIME_BASE_PATH=/khmerime-beta)" \
 	"  make web-phone                   Run the web app on a phone-accessible host" \
 	"  make desktop                     Run the desktop app" \
 	"  make stats                       Print lexicon entry count" \

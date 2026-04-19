@@ -2,7 +2,7 @@ use dioxus::prelude::*;
 
 use crate::ui::components::segment_preview::SegmentPreview;
 use crate::ui::storage::{save_enabled, save_font_size};
-use crate::{MAX_FONT_SIZE, MIN_FONT_SIZE};
+use crate::{EngineReadiness, MAX_FONT_SIZE, MIN_FONT_SIZE};
 
 use crate::ui::editor::{
     dismiss_manual_save_request, remove_user_dictionary_mapping, save_manual_save_request, switch_input_mode,
@@ -54,13 +54,29 @@ pub(crate) fn AppToolbar(state: EditorSignals, show_guide: Signal<bool>, font_si
                     SegmentPreview { state }
                 }
                 div { class: "mode-tools",
-                    if !state.engine_ready() {
+                    if state.engine_readiness() == EngineReadiness::Booting {
                         div {
                             class: "engine-status loading",
                             "data-testid": "engine-status",
                             role: "status",
                             aria_label: "Preparing resources",
                             span { class: "engine-status-spinner", aria_hidden: "true" }
+                        }
+                    } else if state.engine_readiness() == EngineReadiness::LegacyReady {
+                        div {
+                            class: "engine-status partial",
+                            "data-testid": "engine-status",
+                            role: "status",
+                            aria_label: "Core engine ready, ranking still warming up",
+                            "Core Ready"
+                        }
+                    } else if state.engine_readiness() == EngineReadiness::Failed {
+                        div {
+                            class: "engine-status loading",
+                            "data-testid": "engine-status",
+                            role: "status",
+                            aria_label: "Engine fallback mode",
+                            "Fallback"
                         }
                     }
                     button {

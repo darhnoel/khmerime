@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use dioxus::prelude::*;
 use roman_lookup::{DecoderMode, ManualComposeCandidate, ManualComposeKind, ShadowObservation};
 
-use crate::{CompositionMark, SuggestionPopup};
+use crate::{CompositionMark, EngineReadiness, SuggestionPopup};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) struct SegmentedChoice {
@@ -128,6 +128,7 @@ pub(crate) struct EditorSignals {
     pub roman_enabled: Signal<bool>,
     pub input_mode: Signal<InputMode>,
     pub decoder_mode: Signal<DecoderMode>,
+    pub engine_readiness: Signal<EngineReadiness>,
     pub engine_ready: Signal<bool>,
     pub engine_progress: Signal<u8>,
     pub suggestions: Signal<Vec<String>>,
@@ -164,6 +165,14 @@ impl EditorSignals {
 
     pub(crate) fn decoder_mode(self) -> DecoderMode {
         (self.decoder_mode)()
+    }
+
+    pub(crate) fn engine_readiness(self) -> EngineReadiness {
+        (self.engine_readiness)()
+    }
+
+    pub(crate) fn engine_full_ready(self) -> bool {
+        self.engine_readiness() == EngineReadiness::FullReady
     }
 
     pub(crate) fn engine_ready(self) -> bool {

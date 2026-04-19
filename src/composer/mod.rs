@@ -163,10 +163,14 @@ pub(crate) struct ComposerTable {
 }
 
 impl ComposerTable {
-    pub(crate) fn from_entries(entries: &[Entry]) -> Self {
-        let mut table = Self {
+    pub(crate) fn empty() -> Self {
+        Self {
             nodes: vec![ComposerNode::default()],
-        };
+        }
+    }
+
+    pub(crate) fn from_entries(entries: &[Entry]) -> Self {
+        let mut table = Self::empty();
 
         for entry in entries {
             let normalized = normalize(&entry.roman);

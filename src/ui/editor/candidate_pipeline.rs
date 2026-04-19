@@ -77,7 +77,8 @@ pub(crate) async fn update_candidates(value: String, mut state: EditorSignals) {
     if live_text() != value {
         return;
     }
-    let shadow_requested = state.decoder_mode() == DecoderMode::Shadow && token.chars().count() >= 3;
+    let shadow_requested =
+        state.engine_full_ready() && state.decoder_mode() == DecoderMode::Shadow && token.chars().count() >= 3;
     state.shadow_debug.set(None);
     state.segmented_session.set(None);
     state.segmented_refine_mode.set(false);

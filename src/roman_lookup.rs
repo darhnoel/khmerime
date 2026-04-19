@@ -99,6 +99,32 @@ const PRIORITY_SEEDS: [(&str, &str); 39] = [
     ("ngg", "ង៉"),
 ];
 
+#[cfg(target_arch = "wasm32")]
+fn startup_trace_now_ms() -> f64 {
+    web_sys::window()
+        .and_then(|window| window.performance())
+        .map(|performance| performance.now())
+        .unwrap_or(0.0)
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn startup_trace_now_ms() -> f64 {
+    use std::sync::OnceLock;
+    use std::time::Instant;
+
+    static STARTED_AT: OnceLock<Instant> = OnceLock::new();
+    let started_at = STARTED_AT.get_or_init(Instant::now);
+    started_at.elapsed().as_secs_f64() * 1000.0
+}
+
+fn startup_trace_log(stage: &str) {
+    let message = format!("[startup] {stage} t_ms={:.2}", startup_trace_now_ms());
+    #[cfg(target_arch = "wasm32")]
+    web_sys::console::log_1(&message.clone().into());
+    #[cfg(not(target_arch = "wasm32"))]
+    eprintln!("{message}");
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Entry {
     pub roman: String,
@@ -217,6 +243,15 @@ pub struct Transliterator {
     decoder: DecoderManager,
 }
 
+struct LegacyLookupMaps {
+    by_roman: HashMap<String, Vec<String>>,
+    by_normalized: HashMap<String, Vec<String>>,
+    by_target: HashMap<String, Vec<String>>,
+    roman_normalized: HashMap<String, String>,
+    roman_prefix_index: HashMap<String, Vec<String>>,
+    roman_keys: Vec<String>,
+}
+
 impl Transliterator {
     #[cfg(not(all(target_arch = "wasm32", feature = "fetch-data")))]
     pub fn from_default_data() -> Result<Self> {
@@ -269,6 +304,7 @@ impl Transliterator {
     /// On `wasm32` with the `fetch-data` feature these blobs are fetched at runtime
     /// instead of being baked into the binary via `include_bytes!`.
     pub fn from_compiled_bytes(lexicon: &[u8], khpos: &[u8], config: DecoderConfig) -> Result<Self> {
+        startup_trace_log("Transliterator::from_compiled_bytes.start");
         let entries = parse_compiled_lexicon(lexicon)?;
         let corpus_stats = parse_compiled_khpos_stats(khpos)?;
         let legacy = Arc::new(LegacyData::from_entries_with_corpus(entries, corpus_stats));
@@ -279,7 +315,34 @@ impl Transliterator {
             (config.mode != DecoderMode::Legacy).then(|| WfstDecoder::new(Arc::clone(&legacy), config.clone())),
             config,
         );
+        startup_trace_log("Transliterator::from_compiled_bytes.end");
         Ok(Self { legacy, decoder })
+    }
+
+    /// Build a minimal phase-A transliterator from compiled lexicon bytes.
+    /// This path intentionally skips heavy fuzzy/ranking/composer structures so web startup can
+    /// unlock basic suggestions faster on constrained devices (notably iOS Safari).
+    pub fn from_phase_a_bytes(lexicon: &[u8], config: DecoderConfig) -> Result<Self> {
+        startup_trace_log("Transliterator::from_phase_a_bytes.start");
+        let entries = parse_compiled_lexicon(lexicon)?;
+        let legacy = Arc::new(LegacyData::from_entries_phase_a(entries));
+        // Phase A keeps legacy lexical suggestions available but defers expensive
+        // composer trie construction to full engine promotion.
+        let composer = ComposerTable::empty();
+        let decoder = DecoderManager::new(
+            composer,
+            LegacyDecoder::new(Arc::clone(&legacy)),
+            (config.mode != DecoderMode::Legacy).then(|| WfstDecoder::new(Arc::clone(&legacy), config.clone())),
+            config,
+        );
+        startup_trace_log("Transliterator::from_phase_a_bytes.end");
+        Ok(Self { legacy, decoder })
+    }
+
+    /// Build a `Transliterator` from compiled lexicon bytes without khPOS corpus stats.
+    /// This is used for fast phase-A startup where legacy suggestions are enough to unlock typing.
+    pub fn from_compiled_lexicon_bytes(lexicon: &[u8], config: DecoderConfig) -> Result<Self> {
+        Self::from_phase_a_bytes(lexicon, config)
     }
 
     pub fn entries(&self) -> &[Entry] {
@@ -384,11 +447,42 @@ impl LegacyData {
         Self::from_entries_with_corpus(entries, corpus_stats)
     }
 
+    pub(crate) fn from_entries_phase_a(entries: Vec<Entry>) -> Self {
+        let maps = Self::build_lookup_maps(&entries);
+        Self {
+            entries,
+            by_roman: maps.by_roman,
+            by_normalized: maps.by_normalized,
+            by_target: maps.by_target,
+            roman_normalized: maps.roman_normalized,
+            roman_prefix_index: maps.roman_prefix_index,
+            // Phase A avoids building the heavyweight fuzzy gram index.
+            index: SearchIndex::new(&[], true, 2, 3),
+            // Phase A avoids khPOS-derived ranking structures.
+            ranked: RankedLexicon::default(),
+        }
+    }
+
     pub(crate) fn from_entries_with_corpus(entries: Vec<Entry>, corpus_stats: CorpusStats) -> Self {
+        let maps = Self::build_lookup_maps(&entries);
+        let ranked = RankedLexicon::from_entries(&entries, &corpus_stats);
+        Self {
+            entries,
+            by_roman: maps.by_roman,
+            by_normalized: maps.by_normalized,
+            by_target: maps.by_target,
+            roman_normalized: maps.roman_normalized,
+            roman_prefix_index: maps.roman_prefix_index,
+            index: SearchIndex::new(&maps.roman_keys, true, 2, 3),
+            ranked,
+        }
+    }
+
+    fn build_lookup_maps(entries: &[Entry]) -> LegacyLookupMaps {
         let mut by_roman = HashMap::<String, Vec<String>>::new();
         let mut by_normalized = HashMap::<String, Vec<String>>::new();
         let mut by_target = HashMap::<String, Vec<String>>::new();
-        for entry in &entries {
+        for entry in entries {
             by_roman
                 .entry(entry.roman.clone())
                 .or_insert_with(Vec::new)
@@ -420,17 +514,13 @@ impl LegacyData {
                     .push(roman.clone());
             }
         }
-        let roman_keys = entries.iter().map(|entry| entry.roman.clone()).collect::<Vec<_>>();
-        let ranked = RankedLexicon::from_entries(&entries, &corpus_stats);
-        Self {
-            entries,
+        LegacyLookupMaps {
             by_roman,
             by_normalized,
             by_target,
             roman_normalized,
             roman_prefix_index,
-            index: SearchIndex::new(&roman_keys, true, 2, 3),
-            ranked,
+            roman_keys: entries.iter().map(|entry| entry.roman.clone()).collect::<Vec<_>>(),
         }
     }
 
@@ -1313,6 +1403,19 @@ mod tests {
     use super::*;
     const DEFAULT_DATA_TSV: &str = include_str!("../data/roman_lookup.tsv");
 
+    fn compile_test_lexicon(entries: &[(&str, &str)]) -> Vec<u8> {
+        let mut bytes = Vec::new();
+        bytes.extend_from_slice(COMPILED_MAGIC);
+        bytes.extend_from_slice(&(entries.len() as u32).to_le_bytes());
+        for (roman, target) in entries {
+            bytes.extend_from_slice(roman.as_bytes());
+            bytes.push(0);
+            bytes.extend_from_slice(target.as_bytes());
+            bytes.push(0);
+        }
+        bytes
+    }
+
     #[test]
     fn loads_embedded_data() {
         let transliterator = Transliterator::from_default_data().unwrap();
@@ -1463,6 +1566,15 @@ mod tests {
         let history = HashMap::new();
         assert_eq!(transliterator.suggest("21212", &history), vec!["២១២១២".to_owned()]);
         assert_eq!(transliterator.suggest("09876", &history), vec!["០៩៨៧៦".to_owned()]);
+    }
+
+    #[test]
+    fn phase_a_compiled_lexicon_produces_legacy_suggestions() {
+        let compiled = compile_test_lexicon(&[("jea", "ជា"), ("jeat", "ជាត"), ("jeam", "ជាម")]);
+        let transliterator = Transliterator::from_compiled_lexicon_bytes(&compiled, DecoderConfig::default()).unwrap();
+        let suggestions = transliterator.suggest("jea", &HashMap::new());
+        assert!(!suggestions.is_empty());
+        assert_eq!(suggestions[0], "ជា");
     }
 
     #[test]
