@@ -3,12 +3,18 @@ use std::env;
 use std::fs;
 use std::path::PathBuf;
 
+const DATA_PATHS_CONFIG_PATH: &str = "config/data_paths.toml";
 const DEFAULT_TSV_PATH: &str = "data/roman_lookup.tsv";
 const DEFAULT_CSV_PATH: &str = "data/roman_lookup.csv";
-const KHPOS_TRAIN_PATH: &str = "data/khPOS/corpus-draft-ver-1.0/data/after-replace/train.all";
-const KHPOS_TAG_PATH: &str = "data/khPOS/corpus-draft-ver-1.0/data/after-replace/train.all.tag";
+const DEFAULT_KHPOS_TRAIN_PATH: &str = "data/khPOS/corpus-draft-ver-1.0/data/after-replace/train.all";
+const DEFAULT_KHPOS_TAG_PATH: &str = "data/khPOS/corpus-draft-ver-1.0/data/after-replace/train.all.tag";
+const DEFAULT_MOBILE_KEYBOARD_1GRAM_PATH: &str =
+    "data/khmerlang-mobile-keyboard-data/keyboard-data/extracted/mobile-keyboard-data-1gram.csv";
+const DEFAULT_MOBILE_KEYBOARD_2GRAM_PATH: &str =
+    "data/khmerlang-mobile-keyboard-data/keyboard-data/extracted/mobile-keyboard-data-2gram.csv";
 const MAGIC: &[u8; 4] = b"RLX1";
 const KHPOS_MAGIC: &[u8; 4] = b"KPS1";
+const NEXT_WORD_MAGIC: &[u8; 4] = b"NWS1";
 const MAX_JOINED_SURFACE_TOKENS: usize = 4;
 
 #[derive(Clone, Copy)]
@@ -17,30 +23,66 @@ enum LexiconSourceFormat {
     Tsv,
 }
 
-fn main() {
-    println!("cargo:rerun-if-changed={DEFAULT_CSV_PATH}");
-    println!("cargo:rerun-if-changed={DEFAULT_TSV_PATH}");
-    println!("cargo:rerun-if-changed={KHPOS_TRAIN_PATH}");
-    println!("cargo:rerun-if-changed={KHPOS_TAG_PATH}");
+#[derive(Clone, Debug)]
+struct BuildDataPaths {
+    lexicon_csv: String,
+    lexicon_tsv: String,
+    khpos_train: String,
+    khpos_tag: String,
+    mobile_keyboard_1gram: String,
+    mobile_keyboard_2gram: String,
+}
 
-    let (source, source_format) = match fs::read_to_string(DEFAULT_CSV_PATH) {
+impl Default for BuildDataPaths {
+    fn default() -> Self {
+        Self {
+            lexicon_csv: DEFAULT_CSV_PATH.to_owned(),
+            lexicon_tsv: DEFAULT_TSV_PATH.to_owned(),
+            khpos_train: DEFAULT_KHPOS_TRAIN_PATH.to_owned(),
+            khpos_tag: DEFAULT_KHPOS_TAG_PATH.to_owned(),
+            mobile_keyboard_1gram: DEFAULT_MOBILE_KEYBOARD_1GRAM_PATH.to_owned(),
+            mobile_keyboard_2gram: DEFAULT_MOBILE_KEYBOARD_2GRAM_PATH.to_owned(),
+        }
+    }
+}
+
+fn main() {
+    let data_paths = load_data_paths_from_config();
+    println!("cargo:rerun-if-changed={}", data_paths.lexicon_csv);
+    println!("cargo:rerun-if-changed={}", data_paths.lexicon_tsv);
+    println!("cargo:rerun-if-changed={}", data_paths.khpos_train);
+    println!("cargo:rerun-if-changed={}", data_paths.khpos_tag);
+    println!("cargo:rerun-if-changed={}", data_paths.mobile_keyboard_1gram);
+    println!("cargo:rerun-if-changed={}", data_paths.mobile_keyboard_2gram);
+
+    let (source, source_format) = match fs::read_to_string(&data_paths.lexicon_csv) {
         Ok(source) => (source, LexiconSourceFormat::Csv),
         Err(_) => (
-            fs::read_to_string(DEFAULT_TSV_PATH).expect("default lexicon CSV/TSV must be readable"),
+            fs::read_to_string(&data_paths.lexicon_tsv).expect("default lexicon CSV/TSV must be readable"),
             LexiconSourceFormat::Tsv,
         ),
     };
     let compiled = compile_lexicon(&source, source_format).expect("default lexicon CSV/TSV must compile");
-    let khpos_train = fs::read_to_string(KHPOS_TRAIN_PATH).expect("khPOS after-replace train corpus must be readable");
-    let khpos_tags = fs::read_to_string(KHPOS_TAG_PATH).expect("khPOS after-replace tag corpus must be readable");
+    let khpos_train =
+        fs::read_to_string(&data_paths.khpos_train).expect("khPOS after-replace train corpus must be readable");
+    let khpos_tags =
+        fs::read_to_string(&data_paths.khpos_tag).expect("khPOS after-replace tag corpus must be readable");
     let compiled_khpos =
         compile_khpos_stats(&khpos_train, &khpos_tags).expect("khPOS after-replace corpus must compile");
+    let mobile_keyboard_1gram =
+        fs::read_to_string(&data_paths.mobile_keyboard_1gram).expect("mobile keyboard 1-gram data must be readable");
+    let mobile_keyboard_2gram =
+        fs::read_to_string(&data_paths.mobile_keyboard_2gram).expect("mobile keyboard 2-gram data must be readable");
+    let compiled_next_word = compile_next_word_stats(&mobile_keyboard_1gram, &mobile_keyboard_2gram)
+        .expect("mobile keyboard n-gram data must compile");
 
     let out_dir = PathBuf::from(env::var("OUT_DIR").expect("OUT_DIR must be set"));
     let output_path = out_dir.join("roman_lookup.lexicon.bin");
     fs::write(&output_path, compiled).expect("compiled lexicon must be written");
     let khpos_output_path = out_dir.join("khpos.stats.bin");
     fs::write(&khpos_output_path, compiled_khpos).expect("compiled khPOS stats must be written");
+    let next_word_output_path = out_dir.join("next_word.stats.bin");
+    fs::write(&next_word_output_path, compiled_next_word).expect("compiled next-word stats must be written");
 
     // When building for wasm32 with the fetch-data feature, copy the compiled
     // binary blobs into assets/data/ so Dioxus serves them as static files.
@@ -53,7 +95,184 @@ fn main() {
         fs::copy(&output_path, assets_data.join("roman_lookup.lexicon.bin"))
             .expect("lexicon bin must copy to assets/data");
         fs::copy(&khpos_output_path, assets_data.join("khpos.stats.bin")).expect("khpos bin must copy to assets/data");
+        fs::copy(&next_word_output_path, assets_data.join("next_word.stats.bin"))
+            .expect("next-word bin must copy to assets/data");
     }
+}
+
+fn load_data_paths_from_config() -> BuildDataPaths {
+    println!("cargo:rerun-if-changed={DATA_PATHS_CONFIG_PATH}");
+    let mut paths = BuildDataPaths::default();
+    let Ok(source) = fs::read_to_string(DATA_PATHS_CONFIG_PATH) else {
+        return paths;
+    };
+    if let Err(error) = apply_data_paths_config(&source, &mut paths) {
+        panic!("{DATA_PATHS_CONFIG_PATH} parse failed: {error}");
+    }
+    paths
+}
+
+fn apply_data_paths_config(source: &str, paths: &mut BuildDataPaths) -> Result<(), String> {
+    let mut in_data_paths_section = false;
+    for (line_no, raw_line) in source.lines().enumerate() {
+        let line = raw_line.split('#').next().unwrap_or("").trim();
+        if line.is_empty() {
+            continue;
+        }
+        if line.starts_with('[') && line.ends_with(']') {
+            let section = line[1..line.len() - 1].trim();
+            in_data_paths_section = section == "data_paths";
+            continue;
+        }
+        if !in_data_paths_section {
+            continue;
+        }
+
+        let Some((raw_key, raw_value)) = line.split_once('=') else {
+            return Err(format!("invalid config format on line {}", line_no + 1));
+        };
+        let key = raw_key.trim();
+        let value = parse_data_path_value(raw_value.trim(), line_no + 1)?;
+        if value.is_empty() {
+            return Err(format!("empty value for '{}' on line {}", key, line_no + 1));
+        }
+        match key {
+            "lexicon_csv" => paths.lexicon_csv = value,
+            "lexicon_tsv" => paths.lexicon_tsv = value,
+            "khpos_train" => paths.khpos_train = value,
+            "khpos_tag" => paths.khpos_tag = value,
+            "mobile_keyboard_1gram" => paths.mobile_keyboard_1gram = value,
+            "mobile_keyboard_2gram" => paths.mobile_keyboard_2gram = value,
+            _ => return Err(format!("unknown key '{}' in [data_paths] on line {}", key, line_no + 1)),
+        }
+    }
+    Ok(())
+}
+
+fn parse_data_path_value(raw: &str, line_no: usize) -> Result<String, String> {
+    if raw.starts_with('"') {
+        if !raw.ends_with('"') || raw.len() < 2 {
+            return Err(format!("unterminated quoted value on line {}", line_no));
+        }
+        let content = &raw[1..raw.len() - 1];
+        return Ok(content.replace("\\\\", "\\").replace("\\\"", "\""));
+    }
+    Ok(raw.to_owned())
+}
+
+fn compile_next_word_stats(unigram_source: &str, bigram_source: &str) -> Result<Vec<u8>, String> {
+    let mut unigram_counts = HashMap::<String, u32>::new();
+    let mut bigram_counts = HashMap::<(String, String), u32>::new();
+
+    parse_unigram_rows(unigram_source, &mut unigram_counts)?;
+    parse_bigram_rows(bigram_source, &mut bigram_counts)?;
+
+    let mut output = Vec::new();
+    output.extend_from_slice(NEXT_WORD_MAGIC);
+    write_string_count_map(&mut output, &unigram_counts)?;
+    write_pair_count_map(&mut output, &bigram_counts)?;
+    Ok(output)
+}
+
+fn parse_unigram_rows(source: &str, unigram_counts: &mut HashMap<String, u32>) -> Result<(), String> {
+    let mut first_row = true;
+    for (line_no, line) in source.lines().enumerate() {
+        if line.trim().is_empty() {
+            continue;
+        }
+        let mut fields = parse_csv_fields(line, line_no + 1)?;
+        if fields.len() < 2 {
+            continue;
+        }
+        if line_no == 0 {
+            fields[0] = fields[0].trim_start_matches('\u{feff}').to_owned();
+        }
+        if first_row
+            && fields[0].trim().eq_ignore_ascii_case("word")
+            && fields[1].trim().eq_ignore_ascii_case("frequency")
+        {
+            first_row = false;
+            continue;
+        }
+        first_row = false;
+
+        let raw_word = fields[0].trim();
+        let Ok(raw_frequency) = fields[1].trim().parse::<u32>() else {
+            continue;
+        };
+        if raw_frequency == 0 {
+            continue;
+        }
+
+        let word = normalize_next_word_token(raw_word);
+        if !is_khmer_token(&word) {
+            continue;
+        }
+        *unigram_counts.entry(word).or_default() += raw_frequency;
+    }
+    Ok(())
+}
+
+fn parse_bigram_rows(source: &str, bigram_counts: &mut HashMap<(String, String), u32>) -> Result<(), String> {
+    let mut first_row = true;
+    for (line_no, line) in source.lines().enumerate() {
+        if line.trim().is_empty() {
+            continue;
+        }
+        let mut fields = parse_csv_fields(line, line_no + 1)?;
+        if fields.len() < 2 {
+            continue;
+        }
+        if line_no == 0 {
+            fields[0] = fields[0].trim_start_matches('\u{feff}').to_owned();
+        }
+        if first_row
+            && fields[0].trim().eq_ignore_ascii_case("word")
+            && fields[1].trim().eq_ignore_ascii_case("frequency")
+        {
+            first_row = false;
+            continue;
+        }
+        first_row = false;
+
+        let raw_phrase = fields[0].trim();
+        let Ok(raw_frequency) = fields[1].trim().parse::<u32>() else {
+            continue;
+        };
+        if raw_frequency == 0 {
+            continue;
+        }
+
+        let parts = raw_phrase.split_whitespace().collect::<Vec<_>>();
+        if parts.len() != 2 {
+            continue;
+        }
+        let left = normalize_next_word_token(parts[0]);
+        let right = normalize_next_word_token(parts[1]);
+        if !is_valid_left_context(&left) || !is_khmer_token(&right) {
+            continue;
+        }
+        *bigram_counts.entry((left, right)).or_default() += raw_frequency;
+    }
+    Ok(())
+}
+
+fn normalize_next_word_token(token: &str) -> String {
+    token.trim().chars().filter(|ch| *ch != '\u{200b}').collect::<String>()
+}
+
+fn is_valid_left_context(token: &str) -> bool {
+    matches!(token, "<s>" | "<num>" | "<oth>" | "<unk>") || is_khmer_token(token)
+}
+
+fn is_khmer_token(token: &str) -> bool {
+    !token.is_empty()
+        && token.chars().all(|ch| {
+            ('\u{1780}'..='\u{17ff}').contains(&ch)
+                || ('\u{19e0}'..='\u{19ff}').contains(&ch)
+                || ch == '\u{200c}'
+                || ch == '\u{200d}'
+        })
 }
 
 fn compile_lexicon(source: &str, source_format: LexiconSourceFormat) -> Result<Vec<u8>, String> {

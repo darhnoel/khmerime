@@ -46,6 +46,13 @@ impl InputMode {
     }
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum CandidateMode {
+    None,
+    Transliteration,
+    NextWord,
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) struct ManualTypingState {
     pub raw_roman: String,
@@ -139,6 +146,7 @@ pub(crate) struct EditorSignals {
     pub segmented_refine_mode: Signal<bool>,
     pub suggestion_loading: Signal<bool>,
     pub suggestion_request_id: Signal<u64>,
+    pub candidate_mode: Signal<CandidateMode>,
     pub active_token: Signal<String>,
     pub recommended_indices: Signal<Vec<usize>>,
     pub roman_variant_hints: Signal<HashMap<usize, Vec<String>>>,
@@ -213,6 +221,10 @@ impl EditorSignals {
         (self.suggestion_request_id)()
     }
 
+    pub(crate) fn candidate_mode(self) -> CandidateMode {
+        (self.candidate_mode)()
+    }
+
     pub(crate) fn active_token(self) -> String {
         (self.active_token)()
     }
@@ -261,6 +273,7 @@ impl EditorSignals {
         self.segmented_session.set(None);
         self.segmented_refine_mode.set(false);
         self.suggestion_loading.set(false);
+        self.candidate_mode.set(CandidateMode::None);
         self.active_token.set(String::new());
         self.recommended_indices.set(Vec::new());
         self.roman_variant_hints.set(HashMap::new());

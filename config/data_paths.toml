@@ -1,0 +1,7 @@
+[data_paths]
+lexicon_csv = "data/roman_lookup.csv"
+lexicon_tsv = "data/roman_lookup.tsv"
+khpos_train = "data/khPOS/corpus-draft-ver-1.0/data/after-replace/train.all"
+khpos_tag = "data/khPOS/corpus-draft-ver-1.0/data/after-replace/train.all.tag"
+mobile_keyboard_1gram = "data/khmerlang-mobile-keyboard-data/keyboard-data/extracted/mobile-keyboard-data-1gram.csv"
+mobile_keyboard_2gram = "data/khmerlang-mobile-keyboard-data/keyboard-data/extracted/mobile-keyboard-data-2gram.csv"

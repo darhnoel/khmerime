@@ -6,8 +6,8 @@ use crate::ui::editor::{
     click_candidate, commit_active_selection, composition_preview_style, composition_style, is_space_key,
     move_segment_focus, popup_style, segmented_composition_preview_style, segmented_preview_parts,
     select_segment_candidate, set_manual_kind_filter, shortcut_index, shortcut_label, should_exit_number_pick,
-    skip_manual_roman_char, undo_manual_step, update_candidates, visible_page_start, EditorSignals, InputMode,
-    SegmentedSession,
+    skip_manual_roman_char, undo_manual_step, update_candidates, visible_page_start, CandidateMode, EditorSignals,
+    InputMode, SegmentedSession,
 };
 use crate::ui::platform::move_editor_caret;
 use crate::ui::storage::{save_editor_text, save_enabled};
@@ -32,6 +32,22 @@ fn render_segmented_composition_preview(
             }
             span { class: "composition-caret", aria_hidden: "true" }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::space_cycle_enabled;
+    use crate::ui::editor::CandidateMode;
+
+    #[test]
+    fn space_cycle_is_disabled_for_next_word_mode() {
+        assert!(!space_cycle_enabled(true, CandidateMode::NextWord));
+    }
+
+    #[test]
+    fn space_cycle_is_enabled_for_transliteration_mode() {
+        assert!(space_cycle_enabled(true, CandidateMode::Transliteration));
     }
 }
 
@@ -91,6 +107,10 @@ fn handle_horizontal_arrow(delta: isize, has_live_suggestions: bool, mut state: 
     }
 
     false
+}
+
+fn space_cycle_enabled(has_live_suggestions: bool, candidate_mode: CandidateMode) -> bool {
+    has_live_suggestions && candidate_mode == CandidateMode::Transliteration
 }
 
 #[component]
@@ -214,6 +234,7 @@ pub(crate) fn EditorCard(state: EditorSignals, font_size: Signal<usize>) -> Elem
 
                         let live_suggestions = state.suggestions();
                         let has_live_suggestions = !live_suggestions.is_empty();
+                        let can_cycle_with_space = space_cycle_enabled(has_live_suggestions, state.candidate_mode());
                         let live_suggestion_len = live_suggestions.len();
                         let manual_cycle_mode_active = state.input_mode() == InputMode::ManualCharacterTyping
                             && state.manual_typing_state().is_some()
@@ -284,7 +305,11 @@ pub(crate) fn EditorCard(state: EditorSignals, font_size: Signal<usize>) -> Elem
                             "Tab" if has_live_suggestions => {
                                 event.prevent_default();
                                 let len = live_suggestion_len;
-                                let next = (state.selected() + 1) % len;
+                                let next = if !state.selection_started() {
+                                    0
+                                } else {
+                                    (state.selected() + 1) % len
+                                };
                                 if state.segmented_refine_mode() && state.segmented_session().is_some() {
                                     select_segment_candidate(next, state);
                                 } else {
@@ -369,11 +394,15 @@ pub(crate) fn EditorCard(state: EditorSignals, font_size: Signal<usize>) -> Elem
                                 }
                                 state.number_pick_mode.set(false);
                             }
-                            key if is_space_key(key) && modifiers.contains(Modifiers::SHIFT) && has_live_suggestions => {
+                            key
+                                if is_space_key(key)
+                                    && modifiers.contains(Modifiers::SHIFT)
+                                    && can_cycle_with_space =>
+                            {
                                 event.prevent_default();
                                 spawn(commit_active_selection(false, state));
                             }
-                            key if is_space_key(key) && has_live_suggestions && !state.selection_started() => {
+                            key if is_space_key(key) && can_cycle_with_space && !state.selection_started() => {
                                 event.prevent_default();
                                 if state.segmented_refine_mode() && state.segmented_session().is_some() {
                                     select_segment_candidate(0, state);
@@ -383,7 +412,7 @@ pub(crate) fn EditorCard(state: EditorSignals, font_size: Signal<usize>) -> Elem
                                 }
                                 state.number_pick_mode.set(true);
                             }
-                            key if is_space_key(key) && has_live_suggestions => {
+                            key if is_space_key(key) && can_cycle_with_space => {
                                 event.prevent_default();
                                 let len = live_suggestion_len;
                                 let next = (state.selected() + 1) % len;

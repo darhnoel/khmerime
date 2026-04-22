@@ -13,8 +13,8 @@ pub(crate) use manual_flow::{
 };
 pub(crate) use segmented_flow::{move_segment_focus, select_segment_candidate};
 pub(crate) use state::{
-    char_len, slice_chars, EditorSignals, InputMode, ManualSaveRequest, ManualTypingState, SegmentedChoice,
-    SegmentedSession,
+    char_len, slice_chars, CandidateMode, EditorSignals, InputMode, ManualSaveRequest, ManualTypingState,
+    SegmentedChoice, SegmentedSession,
 };
 pub(crate) use view_helpers::{
     composition_preview_style, composition_style, is_space_key, popup_style, refresh_popup_position,
@@ -23,7 +23,10 @@ pub(crate) use view_helpers::{
 };
 
 #[cfg(test)]
-use candidate_pipeline::{choose_visible_suggestions, connect_khmer_display, recommended_indices_and_roman_hints};
+use candidate_pipeline::{
+    choose_visible_suggestions, connect_khmer_display, next_word_boundary, next_word_context,
+    recommended_indices_and_roman_hints, request_matches_snapshot,
+};
 #[cfg(test)]
 use segmented_flow::{build_segmented_session, reflow_segmented_session_from_selection};
 
@@ -32,9 +35,9 @@ mod tests {
     use roman_lookup::{DecodeSegment, DecoderMode, ShadowMismatch, ShadowObservation, Transliterator};
 
     use super::{
-        build_segmented_session, char_len, choose_visible_suggestions, connect_khmer_display,
-        recommended_indices_and_roman_hints, reflow_segmented_session_from_selection, slice_chars, SegmentedChoice,
-        SegmentedSession,
+        build_segmented_session, char_len, choose_visible_suggestions, connect_khmer_display, next_word_boundary,
+        next_word_context, recommended_indices_and_roman_hints, reflow_segmented_session_from_selection,
+        request_matches_snapshot, slice_chars, SegmentedChoice, SegmentedSession,
     };
 
     fn sample_observation() -> ShadowObservation {
@@ -204,5 +207,35 @@ mod tests {
         let (indices, hints) = recommended_indices_and_roman_hints(&transliterator, "jea", &items);
         assert_eq!(indices, vec![0]);
         assert_eq!(hints.get(&0).cloned(), Some(vec!["jea".to_owned(), "chea".to_owned()]));
+    }
+
+    #[test]
+    fn next_word_context_extracts_previous_word_mid_sentence() {
+        let (previous, sentence_start) = next_word_context("ខ្ញុំ ទៅ ", "ខ្ញុំ ទៅ ".chars().count());
+        assert_eq!(previous, "ទៅ");
+        assert!(!sentence_start);
+    }
+
+    #[test]
+    fn next_word_context_marks_sentence_start_after_terminal_punctuation() {
+        let (previous, sentence_start) = next_word_context("ខ្ញុំ។ ", "ខ្ញុំ។ ".chars().count());
+        assert_eq!(previous, "");
+        assert!(sentence_start);
+    }
+
+    #[test]
+    fn next_word_boundary_requires_separator_before_caret() {
+        let no_boundary = "ខ្ញុំទៅ";
+        assert!(!next_word_boundary(no_boundary, no_boundary.chars().count()));
+
+        let with_boundary = "ខ្ញុំ ទៅ ";
+        assert!(next_word_boundary(with_boundary, with_boundary.chars().count()));
+    }
+
+    #[test]
+    fn request_snapshot_requires_matching_request_and_text() {
+        assert!(request_matches_snapshot(12, 12, "abc", "abc"));
+        assert!(!request_matches_snapshot(13, 12, "abc", "abc"));
+        assert!(!request_matches_snapshot(12, 12, "abc", "abd"));
     }
 }

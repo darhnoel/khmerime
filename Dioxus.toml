@@ -7,4 +7,4 @@ asset_dir = "assets"
 title = "Roman Lookup IME"
 
 [web.watcher]
-watch_path = ["src", "assets", "data"]
+watch_path = ["src", "assets", "data", "config"]
