@@ -55,3 +55,8 @@ Example:
 ```bash
 KHPOS_SURFACE_MIN_COUNT=2 KHPOS_SURFACE_TOP_N=120000 make web-release
 ```
+
+## Data Credits
+
+- khPOS: https://github.com/ye-kyaw-thu/khPOS/tree/master
+- Khmerlang Keyboard: https://github.com/khmerlang/Khmerlang-Keyboard
