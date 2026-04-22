@@ -93,38 +93,45 @@ pub(crate) fn AppToolbar(state: EditorSignals, show_guide: Signal<bool>, font_si
                             }
                         },
                         if state.roman_enabled() {
-                            "Live Edit"
+                            span { class: "toolbar-label-long", "Live Edit" }
+                            span { class: "toolbar-label-short", "Live" }
                         } else {
-                            "Live Edit Off"
+                            span { class: "toolbar-label-long", "Live Edit Off" }
+                            span { class: "toolbar-label-short", "Off" }
                         }
                     }
                     button {
                         class: if state.input_mode() == InputMode::NormalWordSuggestion { "mode-pill active" } else { "mode-pill" },
                         "data-testid": "mode-word",
                         onclick: move |_| switch_input_mode(InputMode::NormalWordSuggestion, state),
-                        {InputMode::NormalWordSuggestion.label()}
+                        span { class: "toolbar-label-long", {InputMode::NormalWordSuggestion.label()} }
+                        span { class: "toolbar-label-short", "Word" }
                     }
                     button {
                         class: if state.input_mode() == InputMode::ManualCharacterTyping { "mode-pill active" } else { "mode-pill" },
                         "data-testid": "mode-manual",
                         onclick: move |_| switch_input_mode(InputMode::ManualCharacterTyping, state),
-                        {InputMode::ManualCharacterTyping.label()}
+                        span { class: "toolbar-label-long", {InputMode::ManualCharacterTyping.label()} }
+                        span { class: "toolbar-label-short", "Man" }
                     }
                     button {
                         class: if show_guide() { "ghost active" } else { "ghost" },
                         "data-testid": "toggle-rules",
                         onclick: move |_| show_guide.set(!show_guide()),
                         if show_guide() {
-                            "Hide Rules"
+                            span { class: "toolbar-label-long", "Hide Rules" }
+                            span { class: "toolbar-label-short", "Close" }
                         } else {
-                            "Rules"
+                            span { class: "toolbar-label-long", "Rules" }
+                            span { class: "toolbar-label-short", "Guide" }
                         }
                     }
                     button {
                         class: if show_saved_dictionary() { "ghost active" } else { "ghost" },
                         "data-testid": "toggle-saved-mappings",
                         onclick: move |_| show_saved_dictionary.set(!show_saved_dictionary()),
-                        "Saved ({saved_entries.len()})"
+                        span { class: "toolbar-label-long", "Saved ({saved_entries.len()})" }
+                        span { class: "toolbar-label-short", "Saved {saved_entries.len()}" }
                     }
                 }
             }

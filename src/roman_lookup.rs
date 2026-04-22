@@ -270,6 +270,22 @@ impl Transliterator {
     }
 
     #[cfg(not(all(target_arch = "wasm32", feature = "fetch-data")))]
+    pub fn from_csv_path(path: impl AsRef<Path>) -> Result<Self> {
+        let source = fs::read_to_string(path)?;
+        Self::from_csv_str_with_config(&source, DecoderConfig::default())
+    }
+
+    #[cfg(not(all(target_arch = "wasm32", feature = "fetch-data")))]
+    pub fn from_csv_str(source: &str) -> Result<Self> {
+        Self::from_csv_str_with_config(source, DecoderConfig::default())
+    }
+
+    #[cfg(not(all(target_arch = "wasm32", feature = "fetch-data")))]
+    pub fn from_data_path(path: impl AsRef<Path>) -> Result<Self> {
+        Self::from_data_path_with_config(path, DecoderConfig::default())
+    }
+
+    #[cfg(not(all(target_arch = "wasm32", feature = "fetch-data")))]
     pub fn from_default_data_with_config(config: DecoderConfig) -> Result<Self> {
         let entries = parse_compiled_lexicon(DEFAULT_COMPILED_DATA)?;
         Self::from_entries_with_config(entries, config)
@@ -284,6 +300,35 @@ impl Transliterator {
     #[cfg(not(all(target_arch = "wasm32", feature = "fetch-data")))]
     pub fn from_tsv_str_with_config(source: &str, config: DecoderConfig) -> Result<Self> {
         let entries = parse_tsv(source)?;
+        Self::from_entries_with_config(entries, config)
+    }
+
+    #[cfg(not(all(target_arch = "wasm32", feature = "fetch-data")))]
+    pub fn from_csv_path_with_config(path: impl AsRef<Path>, config: DecoderConfig) -> Result<Self> {
+        let source = fs::read_to_string(path)?;
+        Self::from_csv_str_with_config(&source, config)
+    }
+
+    #[cfg(not(all(target_arch = "wasm32", feature = "fetch-data")))]
+    pub fn from_csv_str_with_config(source: &str, config: DecoderConfig) -> Result<Self> {
+        let entries = parse_csv(source)?;
+        Self::from_entries_with_config(entries, config)
+    }
+
+    #[cfg(not(all(target_arch = "wasm32", feature = "fetch-data")))]
+    pub fn from_data_path_with_config(path: impl AsRef<Path>, config: DecoderConfig) -> Result<Self> {
+        let path_ref = path.as_ref();
+        let source = fs::read_to_string(path_ref)?;
+        let entries = if path_ref
+            .extension()
+            .and_then(|ext| ext.to_str())
+            .map(|ext| ext.eq_ignore_ascii_case("csv"))
+            .unwrap_or(false)
+        {
+            parse_csv(&source)?
+        } else {
+            parse_tsv(&source)?
+        };
         Self::from_entries_with_config(entries, config)
     }
 
@@ -992,12 +1037,12 @@ impl SearchIndex {
 fn parse_tsv(source: &str) -> Result<Vec<Entry>> {
     let mut entries = Vec::new();
     for (line_no, line) in source.lines().enumerate() {
-        if line.is_empty() {
+        if line.trim().is_empty() {
             continue;
         }
         let Some((roman, target)) = line.split_once('\t') else {
             return Err(LexiconError::Parse(format!(
-                "invalid data format on line {}",
+                "invalid TSV data format on line {}",
                 line_no + 1
             )));
         };
@@ -1007,6 +1052,90 @@ fn parse_tsv(source: &str) -> Result<Vec<Entry>> {
         });
     }
     Ok(entries)
+}
+
+#[cfg(not(all(target_arch = "wasm32", feature = "fetch-data")))]
+fn parse_csv(source: &str) -> Result<Vec<Entry>> {
+    let mut entries = Vec::new();
+    let mut first_row = true;
+    for (line_no, line) in source.lines().enumerate() {
+        if line.trim().is_empty() {
+            continue;
+        }
+        let mut fields = parse_csv_fields(line, line_no + 1)?;
+        if fields.len() != 2 {
+            return Err(LexiconError::Parse(format!(
+                "invalid CSV data format on line {}: expected 2 columns, got {}",
+                line_no + 1,
+                fields.len()
+            )));
+        }
+        if line_no == 0 {
+            fields[0] = fields[0].trim_start_matches('\u{feff}').to_owned();
+        }
+        if first_row
+            && fields[0].trim().eq_ignore_ascii_case("roman")
+            && fields[1].trim().eq_ignore_ascii_case("target")
+        {
+            first_row = false;
+            continue;
+        }
+        first_row = false;
+        entries.push(Entry {
+            roman: fields.remove(0),
+            target: fields.remove(0),
+        });
+    }
+    Ok(entries)
+}
+
+#[cfg(not(all(target_arch = "wasm32", feature = "fetch-data")))]
+fn parse_csv_fields(line: &str, line_no: usize) -> Result<Vec<String>> {
+    let mut fields = Vec::new();
+    let mut current = String::new();
+    let mut chars = line.chars().peekable();
+    let mut in_quotes = false;
+
+    while let Some(ch) = chars.next() {
+        if in_quotes {
+            if ch == '"' {
+                if chars.peek() == Some(&'"') {
+                    current.push('"');
+                    chars.next();
+                } else {
+                    in_quotes = false;
+                }
+            } else {
+                current.push(ch);
+            }
+            continue;
+        }
+
+        match ch {
+            '"' => {
+                if current.is_empty() {
+                    in_quotes = true;
+                } else {
+                    return Err(LexiconError::Parse(format!(
+                        "invalid CSV data format on line {}: unexpected quote",
+                        line_no
+                    )));
+                }
+            }
+            ',' => fields.push(std::mem::take(&mut current)),
+            _ => current.push(ch),
+        }
+    }
+
+    if in_quotes {
+        return Err(LexiconError::Parse(format!(
+            "invalid CSV data format on line {}: unterminated quote",
+            line_no
+        )));
+    }
+
+    fields.push(current);
+    Ok(fields)
 }
 
 fn parse_compiled_lexicon(source: &[u8]) -> Result<Vec<Entry>> {

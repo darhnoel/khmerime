@@ -78,6 +78,21 @@ fn cycle_live_candidate(delta: isize, mut state: EditorSignals) -> bool {
     changed
 }
 
+fn handle_horizontal_arrow(delta: isize, has_live_suggestions: bool, mut state: EditorSignals) -> bool {
+    if state.segmented_session().is_some() {
+        if move_segment_focus(delta, state) {
+            state.number_pick_mode.set(false);
+            return true;
+        }
+    }
+
+    if has_live_suggestions && (state.selection_started() || state.number_pick_mode()) {
+        return cycle_live_candidate(delta, state);
+    }
+
+    false
+}
+
 #[component]
 pub(crate) fn EditorCard(state: EditorSignals, font_size: Signal<usize>) -> Element {
     let text_value = state.text();
@@ -207,29 +222,15 @@ pub(crate) fn EditorCard(state: EditorSignals, font_size: Signal<usize>) -> Elem
                         let selection_lock_active = has_live_suggestions && state.number_pick_mode();
 
                         match key.as_str() {
-                            "ArrowLeft" if state.segmented_session().is_some() => {
-                                if move_segment_focus(-1, state) {
+                            "ArrowLeft" => {
+                                if handle_horizontal_arrow(-1, has_live_suggestions, state) {
                                     event.prevent_default();
                                 }
                             }
-                            "ArrowRight" if state.segmented_session().is_some() => {
-                                if move_segment_focus(1, state) {
+                            "ArrowRight" => {
+                                if handle_horizontal_arrow(1, has_live_suggestions, state) {
                                     event.prevent_default();
                                 }
-                            }
-                            "ArrowLeft"
-                                if has_live_suggestions
-                                    && (state.selection_started() || state.number_pick_mode()) =>
-                            {
-                                event.prevent_default();
-                                let _ = cycle_live_candidate(-1, state);
-                            }
-                            "ArrowRight"
-                                if has_live_suggestions
-                                    && (state.selection_started() || state.number_pick_mode()) =>
-                            {
-                                event.prevent_default();
-                                let _ = cycle_live_candidate(1, state);
                             }
                             "Tab" if state.input_mode() == InputMode::ManualCharacterTyping => {
                                 event.prevent_default();
@@ -592,11 +593,11 @@ pub(crate) fn EditorCard(state: EditorSignals, font_size: Signal<usize>) -> Elem
                                 }
                                 span { class: "candidate-hint",
                                     span { class: "keycap", "S" }
-                                    span { class: "editor-tip-text", "skip 1 roman char after Space (manual cycle/edit mode)" }
+                                    span { class: "editor-tip-text", "skip 1 character" }
                                 }
                                 span { class: "candidate-hint",
                                     span { class: "keycap", "U" }
-                                    span { class: "editor-tip-text", "undo step after Space (manual cycle/edit mode)" }
+                                    span { class: "editor-tip-text", "undo step" }
                                 }
                             }
                             if state.input_mode() != InputMode::ManualCharacterTyping {
@@ -611,22 +612,26 @@ pub(crate) fn EditorCard(state: EditorSignals, font_size: Signal<usize>) -> Elem
                                 button {
                                     class: "mobile-caret-btn",
                                     "data-testid": "mobile-caret-left",
-                                    aria_label: "Move caret left",
+                                    aria_label: "Arrow-left behavior",
                                     onclick: move |_| {
-                                        spawn(async move {
-                                            let _ = move_editor_caret(-1).await;
-                                        });
+                                        if !handle_horizontal_arrow(-1, has_suggestions, state) {
+                                            spawn(async move {
+                                                let _ = move_editor_caret(-1).await;
+                                            });
+                                        }
                                     },
                                     "←"
                                 }
                                 button {
                                     class: "mobile-caret-btn",
                                     "data-testid": "mobile-caret-right",
-                                    aria_label: "Move caret right",
+                                    aria_label: "Arrow-right behavior",
                                     onclick: move |_| {
-                                        spawn(async move {
-                                            let _ = move_editor_caret(1).await;
-                                        });
+                                        if !handle_horizontal_arrow(1, has_suggestions, state) {
+                                            spawn(async move {
+                                                let _ = move_editor_caret(1).await;
+                                            });
+                                        }
                                     },
                                     "→"
                                 }
@@ -652,6 +657,9 @@ pub(crate) fn EditorCard(state: EditorSignals, font_size: Signal<usize>) -> Elem
                                 }
                             }
                             div { class: "mobile-candidate-hints",
+                                if state.suggestion_loading() {
+                                    span { class: "candidate-hint-loading", "ranking..." }
+                                }
                                 span { class: "keycap", "↑↓" }
                                 span { class: "editor-tip-text", "select" }
                                 span { class: "keycap", "Space" }

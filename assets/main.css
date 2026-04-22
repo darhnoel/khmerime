@@ -356,6 +356,10 @@ body {
   font-weight: 700;
 }
 
+.toolbar-label-short {
+  display: none;
+}
+
 .font-stepper-group {
   display: inline-flex;
   align-items: center;
@@ -892,6 +896,27 @@ body {
   line-height: 1.2;
 }
 
+.candidate-hint-loading {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--accent-strong);
+  font-size: 0.68rem;
+  font-weight: 700;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.candidate-hint-loading::before {
+  content: "";
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  border: 1.5px solid rgba(177, 77, 30, 0.2);
+  border-top-color: var(--accent);
+  animation: loading-spin 0.8s linear infinite;
+}
+
 .editor-tip-text {
   color: var(--ink);
   font-weight: 600;
@@ -1223,10 +1248,36 @@ code.debug-value {
   .mode-tools {
     margin-left: 0;
     width: 100%;
-    justify-content: flex-start;
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-    scrollbar-width: none;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    justify-content: stretch;
+    gap: 6px;
+    overflow: visible;
+  }
+
+  .mode-tools > .mode-pill,
+  .mode-tools > .ghost {
+    width: 100%;
+    min-width: 0;
+    padding: 6px 8px;
+    font-size: 0.8rem;
+    border-radius: 11px;
+    justify-content: center;
+    text-align: center;
+  }
+
+  .mode-tools > .engine-status {
+    grid-column: 1 / -1;
+    justify-self: center;
+    width: auto;
+  }
+
+  .toolbar-label-long {
+    display: none;
+  }
+
+  .toolbar-label-short {
+    display: inline;
   }
 
   .mode-tools::-webkit-scrollbar {

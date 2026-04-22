@@ -472,6 +472,8 @@ fn App() -> Element {
     let shadow_debug = use_signal(|| None::<ShadowObservation>);
     let segmented_session = use_signal(|| None::<SegmentedSession>);
     let segmented_refine_mode = use_signal(|| false);
+    let suggestion_loading = use_signal(|| false);
+    let suggestion_request_id = use_signal(|| 0u64);
     let active_token = use_signal(String::new);
     let recommended_indices = use_signal(Vec::<usize>::new);
     let roman_variant_hints = use_signal(HashMap::<usize, Vec<String>>::new);
@@ -497,6 +499,8 @@ fn App() -> Element {
         shadow_debug,
         segmented_session,
         segmented_refine_mode,
+        suggestion_loading,
+        suggestion_request_id,
         active_token,
         recommended_indices,
         roman_variant_hints,

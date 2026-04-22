@@ -137,6 +137,8 @@ pub(crate) struct EditorSignals {
     pub shadow_debug: Signal<Option<ShadowObservation>>,
     pub segmented_session: Signal<Option<SegmentedSession>>,
     pub segmented_refine_mode: Signal<bool>,
+    pub suggestion_loading: Signal<bool>,
+    pub suggestion_request_id: Signal<u64>,
     pub active_token: Signal<String>,
     pub recommended_indices: Signal<Vec<usize>>,
     pub roman_variant_hints: Signal<HashMap<usize, Vec<String>>>,
@@ -203,6 +205,14 @@ impl EditorSignals {
         (self.segmented_refine_mode)()
     }
 
+    pub(crate) fn suggestion_loading(self) -> bool {
+        (self.suggestion_loading)()
+    }
+
+    pub(crate) fn suggestion_request_id(self) -> u64 {
+        (self.suggestion_request_id)()
+    }
+
     pub(crate) fn active_token(self) -> String {
         (self.active_token)()
     }
@@ -250,6 +260,7 @@ impl EditorSignals {
         self.shadow_debug.set(None);
         self.segmented_session.set(None);
         self.segmented_refine_mode.set(false);
+        self.suggestion_loading.set(false);
         self.active_token.set(String::new());
         self.recommended_indices.set(Vec::new());
         self.roman_variant_hints.set(HashMap::new());

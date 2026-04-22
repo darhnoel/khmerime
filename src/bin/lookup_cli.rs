@@ -84,7 +84,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     let transliterator = if let Some(path) = data_path {
-        Transliterator::from_tsv_path_with_config(path, config.clone())?
+        Transliterator::from_data_path_with_config(path, config.clone())?
     } else {
         Transliterator::from_default_data_with_config(config.clone())?
     };
@@ -128,15 +128,15 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
 fn print_usage(bin: &str) {
     eprintln!("Usage:");
     eprintln!(
-        "  {} [--data <path/to/data.tsv>] [--decoder-mode legacy|shadow|wfst|hybrid] [--shadow-log] [--shadow-sample-bps 0..10000] stats",
+        "  {} [--data <path/to/data.csv|data.tsv>] [--decoder-mode legacy|shadow|wfst|hybrid] [--shadow-log] [--shadow-sample-bps 0..10000] stats",
         bin
     );
     eprintln!(
-        "  {} [--data <path/to/data.tsv>] [--decoder-mode legacy|shadow|wfst|hybrid] [--shadow-log] [--shadow-sample-bps 0..10000] suggest <roman>",
+        "  {} [--data <path/to/data.csv|data.tsv>] [--decoder-mode legacy|shadow|wfst|hybrid] [--shadow-log] [--shadow-sample-bps 0..10000] suggest <roman>",
         bin
     );
     eprintln!(
-        "  {} [--data <path/to/data.tsv>] [--decoder-mode legacy|shadow|wfst|hybrid] [--emit-shadow-rows] [--output <report.txt>] shadow-eval <queries.txt>",
+        "  {} [--data <path/to/data.csv|data.tsv>] [--decoder-mode legacy|shadow|wfst|hybrid] [--emit-shadow-rows] [--output <report.txt>] shadow-eval <queries.txt>",
         bin
     );
 }

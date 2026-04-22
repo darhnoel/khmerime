@@ -4,19 +4,33 @@ use std::fs;
 use std::path::PathBuf;
 
 const DEFAULT_TSV_PATH: &str = "data/roman_lookup.tsv";
+const DEFAULT_CSV_PATH: &str = "data/roman_lookup.csv";
 const KHPOS_TRAIN_PATH: &str = "data/khPOS/corpus-draft-ver-1.0/data/after-replace/train.all";
 const KHPOS_TAG_PATH: &str = "data/khPOS/corpus-draft-ver-1.0/data/after-replace/train.all.tag";
 const MAGIC: &[u8; 4] = b"RLX1";
 const KHPOS_MAGIC: &[u8; 4] = b"KPS1";
 const MAX_JOINED_SURFACE_TOKENS: usize = 4;
 
+#[derive(Clone, Copy)]
+enum LexiconSourceFormat {
+    Csv,
+    Tsv,
+}
+
 fn main() {
+    println!("cargo:rerun-if-changed={DEFAULT_CSV_PATH}");
     println!("cargo:rerun-if-changed={DEFAULT_TSV_PATH}");
     println!("cargo:rerun-if-changed={KHPOS_TRAIN_PATH}");
     println!("cargo:rerun-if-changed={KHPOS_TAG_PATH}");
 
-    let source = fs::read_to_string(DEFAULT_TSV_PATH).expect("default lexicon TSV must be readable");
-    let compiled = compile_lexicon(&source).expect("default lexicon TSV must compile");
+    let (source, source_format) = match fs::read_to_string(DEFAULT_CSV_PATH) {
+        Ok(source) => (source, LexiconSourceFormat::Csv),
+        Err(_) => (
+            fs::read_to_string(DEFAULT_TSV_PATH).expect("default lexicon CSV/TSV must be readable"),
+            LexiconSourceFormat::Tsv,
+        ),
+    };
+    let compiled = compile_lexicon(&source, source_format).expect("default lexicon CSV/TSV must compile");
     let khpos_train = fs::read_to_string(KHPOS_TRAIN_PATH).expect("khPOS after-replace train corpus must be readable");
     let khpos_tags = fs::read_to_string(KHPOS_TAG_PATH).expect("khPOS after-replace tag corpus must be readable");
     let compiled_khpos =
@@ -30,9 +44,9 @@ fn main() {
 
     // When building for wasm32 with the fetch-data feature, copy the compiled
     // binary blobs into assets/data/ so Dioxus serves them as static files.
-    let target_arch = env::var("CARGO_CFG_TARGET_ARCH").unwrap_or_default();
+    let target = env::var("TARGET").unwrap_or_default();
     let fetch_data = env::var("CARGO_FEATURE_FETCH_DATA").is_ok();
-    if target_arch == "wasm32" && fetch_data {
+    if target.starts_with("wasm32") && fetch_data {
         let manifest_dir = env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR must be set");
         let assets_data = PathBuf::from(manifest_dir).join("assets/data");
         fs::create_dir_all(&assets_data).expect("assets/data dir must be creatable");
@@ -42,20 +56,15 @@ fn main() {
     }
 }
 
-fn compile_lexicon(source: &str) -> Result<Vec<u8>, String> {
+fn compile_lexicon(source: &str, source_format: LexiconSourceFormat) -> Result<Vec<u8>, String> {
     let mut output = Vec::with_capacity(source.len() + 8);
     output.extend_from_slice(MAGIC);
 
-    let entry_count = source.lines().filter(|line| !line.is_empty()).count() as u32;
+    let entries = parse_lexicon_entries(source, source_format)?;
+    let entry_count = entries.len() as u32;
     output.extend_from_slice(&entry_count.to_le_bytes());
 
-    for (line_no, line) in source.lines().enumerate() {
-        if line.is_empty() {
-            continue;
-        }
-        let Some((roman, target)) = line.split_once('\t') else {
-            return Err(format!("invalid data format on line {}", line_no + 1));
-        };
+    for (line_no, (roman, target)) in entries.into_iter().enumerate() {
         if roman.contains('\0') || target.contains('\0') {
             return Err(format!("NUL byte is not supported on line {}", line_no + 1));
         }
@@ -66,6 +75,105 @@ fn compile_lexicon(source: &str) -> Result<Vec<u8>, String> {
     }
 
     Ok(output)
+}
+
+fn parse_lexicon_entries(source: &str, source_format: LexiconSourceFormat) -> Result<Vec<(String, String)>, String> {
+    match source_format {
+        LexiconSourceFormat::Csv => parse_csv_entries(source),
+        LexiconSourceFormat::Tsv => parse_tsv_entries(source),
+    }
+}
+
+fn parse_tsv_entries(source: &str) -> Result<Vec<(String, String)>, String> {
+    let mut entries = Vec::new();
+    for (line_no, line) in source.lines().enumerate() {
+        if line.trim().is_empty() {
+            continue;
+        }
+        let Some((roman, target)) = line.split_once('\t') else {
+            return Err(format!("invalid TSV data format on line {}", line_no + 1));
+        };
+        entries.push((roman.to_owned(), target.to_owned()));
+    }
+    Ok(entries)
+}
+
+fn parse_csv_entries(source: &str) -> Result<Vec<(String, String)>, String> {
+    let mut entries = Vec::new();
+    let mut first_row = true;
+    for (line_no, line) in source.lines().enumerate() {
+        if line.trim().is_empty() {
+            continue;
+        }
+        let mut fields = parse_csv_fields(line, line_no + 1)?;
+        if fields.len() != 2 {
+            return Err(format!(
+                "invalid CSV data format on line {}: expected 2 columns, got {}",
+                line_no + 1,
+                fields.len()
+            ));
+        }
+        if line_no == 0 {
+            fields[0] = fields[0].trim_start_matches('\u{feff}').to_owned();
+        }
+        if first_row
+            && fields[0].trim().eq_ignore_ascii_case("roman")
+            && fields[1].trim().eq_ignore_ascii_case("target")
+        {
+            first_row = false;
+            continue;
+        }
+        first_row = false;
+        entries.push((fields.remove(0), fields.remove(0)));
+    }
+    Ok(entries)
+}
+
+fn parse_csv_fields(line: &str, line_no: usize) -> Result<Vec<String>, String> {
+    let mut fields = Vec::new();
+    let mut current = String::new();
+    let mut chars = line.chars().peekable();
+    let mut in_quotes = false;
+
+    while let Some(ch) = chars.next() {
+        if in_quotes {
+            if ch == '"' {
+                if chars.peek() == Some(&'"') {
+                    current.push('"');
+                    chars.next();
+                } else {
+                    in_quotes = false;
+                }
+            } else {
+                current.push(ch);
+            }
+            continue;
+        }
+
+        match ch {
+            '"' => {
+                if current.is_empty() {
+                    in_quotes = true;
+                } else {
+                    return Err(format!("invalid CSV data format on line {}: unexpected quote", line_no));
+                }
+            }
+            ',' => {
+                fields.push(std::mem::take(&mut current));
+            }
+            _ => current.push(ch),
+        }
+    }
+
+    if in_quotes {
+        return Err(format!(
+            "invalid CSV data format on line {}: unterminated quote",
+            line_no
+        ));
+    }
+
+    fields.push(current);
+    Ok(fields)
 }
 
 fn compile_khpos_stats(train_source: &str, tag_source: &str) -> Result<Vec<u8>, String> {

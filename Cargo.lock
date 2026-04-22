@@ -3656,6 +3656,7 @@ dependencies = [
  "dioxus",
  "gloo-timers",
  "js-sys",
+ "tokio",
  "wasm-bindgen-futures",
  "web-sys",
 ]

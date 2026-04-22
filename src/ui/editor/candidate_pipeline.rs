@@ -10,8 +10,109 @@ use super::segmented_flow::build_segmented_session;
 use super::view_helpers::{candidate_composition_mark, suggestion_popup_position};
 use super::{slice_chars, EditorSignals, InputMode, SegmentedSession};
 
+const SHADOW_DEBOUNCE_SHORT_MS: u32 = 220;
+const SHADOW_DEBOUNCE_MEDIUM_MS: u32 = 320;
+const SHADOW_DEBOUNCE_LONG_MS: u32 = 420;
+
+fn cancel_suggestion_loading(mut state: EditorSignals) {
+    state.suggestion_loading.set(false);
+    state
+        .suggestion_request_id
+        .set(state.suggestion_request_id().wrapping_add(1));
+}
+
+fn begin_shadow_request(mut state: EditorSignals) -> u64 {
+    let request_id = state.suggestion_request_id().wrapping_add(1);
+    state.suggestion_request_id.set(request_id);
+    state.suggestion_loading.set(false);
+    request_id
+}
+
+fn shadow_request_is_stale(state: EditorSignals, request_id: u64, text: &str, token: &str) -> bool {
+    state.suggestion_request_id() != request_id || state.text() != text || state.active_token() != token
+}
+
+fn shadow_debounce_ms(token: &str) -> u32 {
+    match token.chars().count() {
+        0..=7 => SHADOW_DEBOUNCE_SHORT_MS,
+        8..=11 => SHADOW_DEBOUNCE_MEDIUM_MS,
+        _ => SHADOW_DEBOUNCE_LONG_MS,
+    }
+}
+
+#[cfg(target_arch = "wasm32")]
+async fn shadow_debounce_delay(delay_ms: u32) {
+    gloo_timers::future::TimeoutFuture::new(delay_ms).await;
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+async fn shadow_debounce_delay(delay_ms: u32) {
+    tokio::time::sleep(std::time::Duration::from_millis(u64::from(delay_ms))).await;
+}
+
+fn spawn_shadow_refinement(mut state: EditorSignals, value: String, token: String, legacy_items: Vec<String>) {
+    let request_id = begin_shadow_request(state);
+    let delay_ms = shadow_debounce_ms(&token);
+
+    let mut state_loading = state;
+    let value_loading = value.clone();
+    let token_loading = token.clone();
+    spawn(async move {
+        shadow_debounce_delay(delay_ms).await;
+        if state_loading.suggestion_request_id() != request_id {
+            return;
+        }
+        if shadow_request_is_stale(state_loading, request_id, &value_loading, &token_loading) {
+            state_loading.suggestion_loading.set(false);
+            return;
+        }
+        state_loading.suggestion_loading.set(true);
+    });
+
+    spawn(async move {
+        // Keep shadow decode off the hot typing path and only refine after debounce.
+        shadow_debounce_delay(delay_ms).await;
+        if state.suggestion_request_id() != request_id {
+            return;
+        }
+        if shadow_request_is_stale(state, request_id, &value, &token) {
+            state.suggestion_loading.set(false);
+            return;
+        }
+        let history_shadow = state.history();
+        let observation = engine(DecoderMode::Shadow).shadow_observation(&token, &history_shadow);
+        if shadow_request_is_stale(state, request_id, &value, &token) {
+            state.suggestion_loading.set(false);
+            return;
+        }
+        let next_segmented = build_segmented_session(&observation, &token, &history_shadow);
+        let visible = choose_visible_suggestions(
+            &legacy_items,
+            &observation,
+            next_segmented.as_ref(),
+            state.segmented_refine_mode(),
+        );
+        let (visible, user_keys) = merge_with_user_dictionary(&token, &state.user_dictionary(), &visible, 15);
+        let (recommended_indices, mut roman_variant_hints) =
+            recommended_indices_and_roman_hints(engine(DecoderMode::Legacy), &token, &visible);
+        decorate_user_dictionary_hints(&visible, &user_keys, &mut roman_variant_hints);
+
+        state.shadow_debug.set(Some(observation));
+        state.segmented_session.set(next_segmented);
+        state.segmented_refine_mode.set(false);
+        state.recommended_indices.set(recommended_indices);
+        state.roman_variant_hints.set(roman_variant_hints);
+        let preserve_selection = state.active_token() == token && !state.suggestions().is_empty();
+        apply_visible_candidates(state, visible, preserve_selection);
+        if state.suggestion_request_id() == request_id {
+            state.suggestion_loading.set(false);
+        }
+    });
+}
+
 pub(crate) async fn update_candidates(value: String, mut state: EditorSignals) {
     if !state.roman_enabled() {
+        cancel_suggestion_loading(state);
         state.clear_candidate_state_and_picker();
         return;
     }
@@ -27,11 +128,13 @@ pub(crate) async fn update_candidates(value: String, mut state: EditorSignals) {
     let bounds = Transliterator::token_bounds(&value, caret, false);
     let token = slice_chars(&value, bounds.clone());
     if token.trim().is_empty() {
+        cancel_suggestion_loading(state);
         state.clear_candidate_state_and_picker();
         return;
     }
 
     if state.input_mode() == InputMode::ManualCharacterTyping {
+        cancel_suggestion_loading(state);
         state.shadow_debug.set(None);
         state.segmented_session.set(None);
         state.segmented_refine_mode.set(false);
@@ -66,6 +169,7 @@ pub(crate) async fn update_candidates(value: String, mut state: EditorSignals) {
     }
 
     if !state.engine_ready() {
+        cancel_suggestion_loading(state);
         state.clear_candidate_state_and_picker();
         state.active_token.set(token);
         return;
@@ -79,6 +183,9 @@ pub(crate) async fn update_candidates(value: String, mut state: EditorSignals) {
     }
     let shadow_requested =
         state.engine_full_ready() && state.decoder_mode() == DecoderMode::Shadow && token.chars().count() >= 3;
+    if !shadow_requested {
+        cancel_suggestion_loading(state);
+    }
     state.shadow_debug.set(None);
     state.segmented_session.set(None);
     state.segmented_refine_mode.set(false);
@@ -105,72 +212,8 @@ pub(crate) async fn update_candidates(value: String, mut state: EditorSignals) {
     state.roman_variant_hints.set(roman_variant_hints);
     apply_visible_candidates(state, items, preserve_selection);
 
-    #[cfg(all(target_arch = "wasm32", feature = "fetch-data"))]
     if shadow_requested {
-        let mut state_shadow = state;
-        let value_shadow = value.clone();
-        let token_shadow = token.clone();
-        let legacy_items_shadow = legacy_items.clone();
-        spawn(async move {
-            // Debounce heavy shadow decode so typing stays responsive.
-            gloo_timers::future::TimeoutFuture::new(120).await;
-            if state_shadow.text() != value_shadow {
-                return;
-            }
-            let history_shadow = state_shadow.history();
-            let observation = engine(DecoderMode::Shadow).shadow_observation(&token_shadow, &history_shadow);
-            if state_shadow.text() != value_shadow {
-                return;
-            }
-            let next_segmented = build_segmented_session(&observation, &token_shadow, &history_shadow);
-            let visible = choose_visible_suggestions(
-                &legacy_items_shadow,
-                &observation,
-                next_segmented.as_ref(),
-                state_shadow.segmented_refine_mode(),
-            );
-            let (visible, user_keys) =
-                merge_with_user_dictionary(&token_shadow, &state_shadow.user_dictionary(), &visible, 15);
-            let (recommended_indices, mut roman_variant_hints) =
-                recommended_indices_and_roman_hints(engine(DecoderMode::Legacy), &token_shadow, &visible);
-            decorate_user_dictionary_hints(&visible, &user_keys, &mut roman_variant_hints);
-
-            state_shadow.shadow_debug.set(Some(observation));
-            state_shadow.segmented_session.set(next_segmented);
-            state_shadow.segmented_refine_mode.set(false);
-            state_shadow.recommended_indices.set(recommended_indices);
-            state_shadow.roman_variant_hints.set(roman_variant_hints);
-            let preserve_selection =
-                state_shadow.active_token() == token_shadow && !state_shadow.suggestions().is_empty();
-            apply_visible_candidates(state_shadow, visible, preserve_selection);
-        });
-    }
-
-    #[cfg(not(all(target_arch = "wasm32", feature = "fetch-data")))]
-    if shadow_requested {
-        let observation = engine(DecoderMode::Shadow).shadow_observation(&token, &history_snapshot);
-        if live_text() != value {
-            return;
-        }
-        let next_segmented = build_segmented_session(&observation, &token, &history_snapshot);
-        let visible = choose_visible_suggestions(
-            &legacy_items,
-            &observation,
-            next_segmented.as_ref(),
-            state.segmented_refine_mode(),
-        );
-        let (visible, user_keys) = merge_with_user_dictionary(&token, &state.user_dictionary(), &visible, 15);
-        let (recommended_indices, mut roman_variant_hints) =
-            recommended_indices_and_roman_hints(engine(DecoderMode::Legacy), &token, &visible);
-        decorate_user_dictionary_hints(&visible, &user_keys, &mut roman_variant_hints);
-
-        state.shadow_debug.set(Some(observation));
-        state.segmented_session.set(next_segmented);
-        state.segmented_refine_mode.set(false);
-        state.recommended_indices.set(recommended_indices);
-        state.roman_variant_hints.set(roman_variant_hints);
-        let preserve_selection = state.active_token() == token && !state.suggestions().is_empty();
-        apply_visible_candidates(state, visible, preserve_selection);
+        spawn_shadow_refinement(state, value, token, legacy_items);
     }
 }
 

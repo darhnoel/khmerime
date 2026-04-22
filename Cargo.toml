@@ -14,6 +14,7 @@ cli = []
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 dioxus = { version = "0.7.4", default-features = false, features = ["desktop", "document", "signals", "hooks", "html", "macro", "asset", "launch"] }
+tokio = { version = "1.48.0", features = ["time"] }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 console_error_panic_hook = "0.1.7"
