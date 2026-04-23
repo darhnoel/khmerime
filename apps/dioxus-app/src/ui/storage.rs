@@ -1,5 +1,7 @@
 use std::collections::HashMap;
 
+#[cfg(not(target_arch = "wasm32"))]
+use khmerime_linux_ibus::{load_desktop_history, save_desktop_history};
 use roman_lookup::DecoderMode;
 
 #[cfg(target_arch = "wasm32")]
@@ -89,7 +91,7 @@ pub(crate) fn load_history() -> HashMap<String, usize> {
 
 #[cfg(not(target_arch = "wasm32"))]
 pub(crate) fn load_history() -> HashMap<String, usize> {
-    HashMap::new()
+    load_desktop_history()
 }
 
 #[cfg(target_arch = "wasm32")]
@@ -103,7 +105,9 @@ pub(crate) fn save_history(history: &HashMap<String, usize>) {
 }
 
 #[cfg(not(target_arch = "wasm32"))]
-pub(crate) fn save_history(_: &HashMap<String, usize>) {}
+pub(crate) fn save_history(history: &HashMap<String, usize>) {
+    let _ = save_desktop_history(history);
+}
 
 #[cfg(target_arch = "wasm32")]
 pub(crate) fn load_user_dictionary() -> HashMap<String, Vec<String>> {

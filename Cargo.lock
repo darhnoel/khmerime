@@ -2381,6 +2381,67 @@ dependencies = [
 ]
 
 [[package]]
+name = "khmerime_core"
+version = "0.1.0"
+dependencies = [
+ "js-sys",
+ "wasm-bindgen-futures",
+ "web-sys",
+]
+
+[[package]]
+name = "khmerime_dioxus_app"
+version = "0.1.0"
+dependencies = [
+ "console_error_panic_hook",
+ "dioxus",
+ "gloo-timers",
+ "js-sys",
+ "khmerime_linux_ibus",
+ "roman_lookup",
+ "tokio",
+ "wasm-bindgen-futures",
+ "web-sys",
+]
+
+[[package]]
+name = "khmerime_ios_keyboard"
+version = "0.1.0"
+
+[[package]]
+name = "khmerime_linux_ibus"
+version = "0.1.0"
+dependencies = [
+ "khmerime_core",
+ "khmerime_session",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "khmerime_lookup_cli"
+version = "0.1.0"
+dependencies = [
+ "roman_lookup",
+]
+
+[[package]]
+name = "khmerime_macos_imk"
+version = "0.1.0"
+
+[[package]]
+name = "khmerime_session"
+version = "0.1.0"
+dependencies = [
+ "khmerime_core",
+ "serde",
+]
+
+[[package]]
+name = "khmerime_windows_tsf"
+version = "0.1.0"
+
+[[package]]
 name = "kuchikiki"
 version = "0.8.8-speedreader"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3652,13 +3713,8 @@ dependencies = [
 name = "roman_lookup"
 version = "0.1.0"
 dependencies = [
- "console_error_panic_hook",
- "dioxus",
- "gloo-timers",
- "js-sys",
- "tokio",
- "wasm-bindgen-futures",
- "web-sys",
+ "khmerime_core",
+ "khmerime_session",
 ]
 
 [[package]]

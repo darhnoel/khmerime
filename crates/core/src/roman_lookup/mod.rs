@@ -32,7 +32,7 @@ pub(crate) use types::{LegacyData, RankedLexicon, RankedLexiconEntry};
 #[cfg(test)]
 mod tests {
     use super::*;
-    const DEFAULT_DATA_CSV: &str = include_str!("../../data/roman_lookup.csv");
+    const DEFAULT_DATA_CSV: &str = include_str!("../../../../data/roman_lookup.csv");
 
     fn compile_test_lexicon(entries: &[(&str, &str)]) -> Vec<u8> {
         let mut bytes = Vec::new();

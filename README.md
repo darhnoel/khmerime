@@ -6,9 +6,12 @@ Standalone Rust lookup engine with:
 
 ## Layout
 
-- Core logic: [src/roman_lookup.rs](src/roman_lookup.rs)
-- Dioxus app: [src/main.rs](src/main.rs)
-- CLI: [src/bin/lookup_cli.rs](src/bin/lookup_cli.rs)
+- Workspace core engine: `crates/core/`
+- Session contract/state machine: `crates/session/`
+- Linux IBus adapter + bridge: `adapters/linux-ibus/`
+- Dioxus app: `apps/dioxus-app/`
+- CLI app: `apps/lookup-cli/`
+- IBus adapter script: `scripts/khmerime_ibus_engine.py`
 - Architecture guide: [docs/architecture.md](docs/architecture.md)
 - Default embedded data: `data/roman_lookup.csv`
 
@@ -18,6 +21,29 @@ Preferred entrypoint:
 
 ```
 $ make help
+```
+
+### Ubuntu Native IBus (Mozc-like Source Switching)
+
+For local development on Ubuntu GNOME/Wayland:
+
+```bash
+make ibus-install
+make ibus-smoke
+```
+
+`make ibus-install` may prompt for `sudo` because IBus scans system component
+paths on Ubuntu.
+
+Then add from **Settings -> Keyboard -> Input Sources**:
+- search for `Khmer` (not `KhmerIME`), then select `KhmerIME`
+
+Switch sources with the desktop shortcut (for example `Super+Space`).
+
+Remove local install files with:
+
+```bash
+make ibus-uninstall
 ```
 
 ### Web Release Base Path

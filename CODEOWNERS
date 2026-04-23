@@ -1,0 +1,11 @@
+# Workspace ownership map (update handles as needed)
+
+/crates/core/ @linak
+/crates/session/ @linak
+/adapters/linux-ibus/ @linak
+/adapters/macos-imk/ @linak
+/adapters/windows-tsf/ @linak
+/adapters/ios-keyboard/ @linak
+/apps/dioxus-app/ @linak
+/apps/lookup-cli/ @linak
+/scripts/khmerime_ibus_engine.py @linak

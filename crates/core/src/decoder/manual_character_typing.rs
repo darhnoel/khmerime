@@ -3,7 +3,7 @@ use std::sync::OnceLock;
 
 const CHARACTER_RELATION_CSV: &str = include_str!(concat!(
     env!("CARGO_MANIFEST_DIR"),
-    "/data/khmer_character_relation.csv"
+    "/../../data/khmer_character_relation.csv"
 ));
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

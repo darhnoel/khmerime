@@ -1,7 +1,8 @@
-.PHONY: help web web-release web-phone desktop stats suggest suggest-wfst suggest-shadow shadow-eval visualize-lexicon visualize-lexicon-streamlit fmt test test-golden test-ui paper-current paper-current-clean
+.PHONY: help web web-release web-phone desktop stats suggest suggest-wfst suggest-shadow shadow-eval visualize-lexicon visualize-lexicon-streamlit fmt test test-golden test-ui ibus-install ibus-uninstall ibus-smoke paper-current paper-current-clean
 
 DX ?= dx
-CLI := cargo run --bin lookup_cli --features cli --
+APP_DIR := apps/dioxus-app
+CLI := cargo run -p khmerime_lookup_cli --bin lookup_cli --
 QUERY ?= tver
 MODE ?= shadow
 QUERIES ?=
@@ -29,13 +30,16 @@ help:
 	"  make test                        Run cargo test" \
 	"  make test-golden                 Run the WFST golden snapshot test" \
 	"  make test-ui                     Run the browser/UI Python test file" \
+	"  make ibus-install                Build and install KhmerIME IBus engine files (may use sudo)" \
+	"  make ibus-uninstall              Remove KhmerIME IBus engine files" \
+	"  make ibus-smoke                  Run bridge + IBus discovery smoke checks" \
 	"  make paper-current               Build the current implementation paper PDF" \
 	"  make paper-current-clean         Remove LaTeX build byproducts from the paper folder" \
 	"" \
 	"Read docs/development.md for the workflow and command details."
 
 web:
-	$(DX) serve
+	cd $(APP_DIR) && $(DX) serve
 
 web-release:
 	bash scripts/build_web_release.sh
@@ -44,7 +48,7 @@ web-phone:
 	bash scripts/serve_web_phone.sh
 
 desktop:
-	$(DX) serve --platform desktop
+	cd $(APP_DIR) && $(DX) serve --platform desktop
 
 stats:
 	$(CLI) stats
@@ -86,6 +90,15 @@ test-golden:
 
 test-ui:
 	python3 -m pytest tests/test_web_ui.py
+
+ibus-install:
+	bash scripts/install_ibus_engine.sh
+
+ibus-uninstall:
+	bash scripts/uninstall_ibus_engine.sh
+
+ibus-smoke:
+	bash scripts/smoke_test_ibus_engine.sh
 
 paper-current:
 	cd $(PAPER_CURRENT_DIR) && TEXMFVAR=/tmp/texmf-var lualatex -interaction=nonstopmode -halt-on-error $(PAPER_CURRENT_TEX)

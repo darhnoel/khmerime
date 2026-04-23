@@ -6,6 +6,7 @@ PORT="${PORT:-4173}"
 FEATURES="${DX_FEATURES:-}"
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+APP_DIR="$ROOT_DIR/apps/dioxus-app"
 INDEX_HTML="$ROOT_DIR/target/dx/roman_lookup/debug/web/public/index.html"
 HEAD_SNIPPET="$ROOT_DIR/assets/web_preboot_head.html"
 BODY_SNIPPET="$ROOT_DIR/assets/web_preboot_body.html"
@@ -50,7 +51,10 @@ if [[ -n "$FEATURES" ]]; then
   DX_CMD+=(--features "$FEATURES")
 fi
 
-"${DX_CMD[@]}" &
+(
+  cd "$APP_DIR"
+  "${DX_CMD[@]}"
+) &
 DX_PID=$!
 watch_and_patch_shell &
 PATCH_PID=$!

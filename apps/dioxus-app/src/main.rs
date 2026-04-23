@@ -24,7 +24,7 @@ use self::ui::storage::{
     load_decoder_mode, load_editor_text, load_enabled, load_font_size, load_history, load_user_dictionary,
 };
 
-const APP_CSS: &str = include_str!("../assets/main.css");
+const APP_CSS: &str = include_str!("../../../assets/main.css");
 
 pub(crate) const EDITOR_ID: &str = "ime-editor";
 const DEFAULT_FONT_SIZE: usize = 24;

@@ -1,7 +1,7 @@
 use std::collections::{HashMap, HashSet};
 
 use dioxus::prelude::*;
-use roman_lookup::{DecoderMode, ShadowObservation, Transliterator};
+use roman_lookup::{normalize_visible_suggestions, DecoderMode, ShadowObservation, Transliterator};
 
 use crate::{engine, CompositionMark, SuggestionPopup};
 
@@ -13,6 +13,10 @@ use super::{slice_chars, CandidateMode, EditorSignals, InputMode, SegmentedSessi
 const SHADOW_DEBOUNCE_SHORT_MS: u32 = 220;
 const SHADOW_DEBOUNCE_MEDIUM_MS: u32 = 320;
 const SHADOW_DEBOUNCE_LONG_MS: u32 = 420;
+
+#[cfg(test)]
+pub(super) use roman_lookup::connect_khmer_display;
+pub(crate) use roman_lookup::normalized_suggestion_key;
 
 fn cancel_suggestion_loading(mut state: EditorSignals) {
     state.suggestion_loading.set(false);
@@ -537,41 +541,6 @@ pub(super) fn recommended_indices_and_roman_hints(
     }
 
     (indices, hints)
-}
-
-pub(crate) fn normalized_suggestion_key(item: &str) -> String {
-    item.chars().filter(|ch| !ch.is_whitespace()).collect()
-}
-
-pub(super) fn connect_khmer_display(item: &str) -> String {
-    let parts = item.split_whitespace().collect::<Vec<_>>();
-    if parts.len() <= 1 {
-        return item.to_owned();
-    }
-    if parts.iter().all(|part| part.chars().any(is_khmer_char)) {
-        parts.concat()
-    } else {
-        item.to_owned()
-    }
-}
-
-fn is_khmer_char(ch: char) -> bool {
-    ('\u{1780}'..='\u{17ff}').contains(&ch) || ('\u{19e0}'..='\u{19ff}').contains(&ch)
-}
-
-pub(super) fn normalize_visible_suggestions(items: Vec<String>) -> Vec<String> {
-    let mut normalized = Vec::new();
-    let mut seen = std::collections::HashSet::<String>::new();
-
-    for item in items {
-        let display = connect_khmer_display(&item);
-        let key = normalized_suggestion_key(&display);
-        if seen.insert(key) {
-            normalized.push(display);
-        }
-    }
-
-    normalized
 }
 
 fn merge_suggestion_lists(primary: &[String], fallback: &[String], limit: usize) -> Vec<String> {

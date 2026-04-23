@@ -1,17 +1,17 @@
 use std::collections::HashMap;
 use std::env;
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
-const DATA_PATHS_CONFIG_PATH: &str = "config/data_paths.toml";
-const DEFAULT_TSV_PATH: &str = "data/roman_lookup.tsv";
-const DEFAULT_CSV_PATH: &str = "data/roman_lookup.csv";
-const DEFAULT_KHPOS_TRAIN_PATH: &str = "data/khPOS/corpus-draft-ver-1.0/data/after-replace/train.all";
-const DEFAULT_KHPOS_TAG_PATH: &str = "data/khPOS/corpus-draft-ver-1.0/data/after-replace/train.all.tag";
+const DATA_PATHS_CONFIG_PATH: &str = "../../config/data_paths.toml";
+const DEFAULT_TSV_PATH: &str = "../../data/roman_lookup.tsv";
+const DEFAULT_CSV_PATH: &str = "../../data/roman_lookup.csv";
+const DEFAULT_KHPOS_TRAIN_PATH: &str = "../../data/khPOS/corpus-draft-ver-1.0/data/after-replace/train.all";
+const DEFAULT_KHPOS_TAG_PATH: &str = "../../data/khPOS/corpus-draft-ver-1.0/data/after-replace/train.all.tag";
 const DEFAULT_MOBILE_KEYBOARD_1GRAM_PATH: &str =
-    "data/khmerlang-mobile-keyboard-data/keyboard-data/extracted/mobile-keyboard-data-1gram.csv";
+    "../../data/khmerlang-mobile-keyboard-data/keyboard-data/extracted/mobile-keyboard-data-1gram.csv";
 const DEFAULT_MOBILE_KEYBOARD_2GRAM_PATH: &str =
-    "data/khmerlang-mobile-keyboard-data/keyboard-data/extracted/mobile-keyboard-data-2gram.csv";
+    "../../data/khmerlang-mobile-keyboard-data/keyboard-data/extracted/mobile-keyboard-data-2gram.csv";
 const MAGIC: &[u8; 4] = b"RLX1";
 const KHPOS_MAGIC: &[u8; 4] = b"KPS1";
 const NEXT_WORD_MAGIC: &[u8; 4] = b"NWS1";
@@ -46,8 +46,26 @@ impl Default for BuildDataPaths {
     }
 }
 
+fn normalize_workspace_path(path: &str) -> String {
+    if Path::new(path).is_absolute() || Path::new(path).exists() {
+        return path.to_owned();
+    }
+    let candidate = format!("../../{path}");
+    if Path::new(&candidate).exists() {
+        candidate
+    } else {
+        path.to_owned()
+    }
+}
+
 fn main() {
-    let data_paths = load_data_paths_from_config();
+    let mut data_paths = load_data_paths_from_config();
+    data_paths.lexicon_csv = normalize_workspace_path(&data_paths.lexicon_csv);
+    data_paths.lexicon_tsv = normalize_workspace_path(&data_paths.lexicon_tsv);
+    data_paths.khpos_train = normalize_workspace_path(&data_paths.khpos_train);
+    data_paths.khpos_tag = normalize_workspace_path(&data_paths.khpos_tag);
+    data_paths.mobile_keyboard_1gram = normalize_workspace_path(&data_paths.mobile_keyboard_1gram);
+    data_paths.mobile_keyboard_2gram = normalize_workspace_path(&data_paths.mobile_keyboard_2gram);
     println!("cargo:rerun-if-changed={}", data_paths.lexicon_csv);
     println!("cargo:rerun-if-changed={}", data_paths.lexicon_tsv);
     println!("cargo:rerun-if-changed={}", data_paths.khpos_train);
@@ -90,7 +108,7 @@ fn main() {
     let fetch_data = env::var("CARGO_FEATURE_FETCH_DATA").is_ok();
     if target.starts_with("wasm32") && fetch_data {
         let manifest_dir = env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR must be set");
-        let assets_data = PathBuf::from(manifest_dir).join("assets/data");
+        let assets_data = PathBuf::from(manifest_dir).join("../../assets/data");
         fs::create_dir_all(&assets_data).expect("assets/data dir must be creatable");
         fs::copy(&output_path, assets_data.join("roman_lookup.lexicon.bin"))
             .expect("lexicon bin must copy to assets/data");

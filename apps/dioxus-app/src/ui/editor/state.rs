@@ -1,35 +1,9 @@
 use std::collections::HashMap;
 
 use dioxus::prelude::*;
-use roman_lookup::{DecoderMode, ManualComposeCandidate, ManualComposeKind, ShadowObservation};
+use roman_lookup::{DecoderMode, ManualComposeCandidate, ManualComposeKind, SegmentedSession, ShadowObservation};
 
 use crate::{CompositionMark, EngineReadiness, SuggestionPopup};
-
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub(crate) struct SegmentedChoice {
-    pub input: String,
-    pub start: usize,
-    pub end: usize,
-    pub candidates: Vec<String>,
-    pub selected: usize,
-}
-
-impl SegmentedChoice {
-    pub(crate) fn selected_text(&self) -> String {
-        self.candidates
-            .get(self.selected)
-            .cloned()
-            .or_else(|| self.candidates.first().cloned())
-            .unwrap_or_default()
-    }
-}
-
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub(crate) struct SegmentedSession {
-    pub raw_input: String,
-    pub segments: Vec<SegmentedChoice>,
-    pub focused: usize,
-}
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum InputMode {
@@ -285,36 +259,6 @@ impl EditorSignals {
     pub(crate) fn clear_candidate_state_and_picker(mut self) {
         self.clear_candidate_state();
         self.number_pick_mode.set(false);
-    }
-}
-
-impl SegmentedSession {
-    pub(crate) fn focused_candidates(&self) -> Vec<String> {
-        self.segments
-            .get(self.focused)
-            .map(|segment| segment.candidates.clone())
-            .unwrap_or_default()
-    }
-
-    pub(crate) fn current_candidate_len(&self) -> usize {
-        self.segments
-            .get(self.focused)
-            .map(|segment| segment.candidates.len())
-            .unwrap_or(0)
-    }
-
-    pub(crate) fn focused_selected(&self) -> usize {
-        self.segments
-            .get(self.focused)
-            .map(|segment| segment.selected)
-            .unwrap_or(0)
-    }
-
-    pub(crate) fn composed_text(&self) -> String {
-        self.segments
-            .iter()
-            .map(SegmentedChoice::selected_text)
-            .collect::<String>()
     }
 }
 

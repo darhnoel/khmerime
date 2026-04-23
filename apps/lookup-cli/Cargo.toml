@@ -1,0 +1,11 @@
+[package]
+name = "khmerime_lookup_cli"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+roman_lookup = { path = "../.." }
+
+[[bin]]
+name = "lookup_cli"
+path = "src/main.rs"

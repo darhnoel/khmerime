@@ -11,10 +11,12 @@ pub(crate) use manual_flow::{
     dismiss_manual_save_request, remove_user_dictionary_mapping, save_manual_save_request, set_manual_kind_filter,
     skip_manual_roman_char, undo_manual_step,
 };
+#[cfg(test)]
+pub(crate) use roman_lookup::SegmentedChoice;
+pub(crate) use roman_lookup::SegmentedSession;
 pub(crate) use segmented_flow::{move_segment_focus, select_segment_candidate};
 pub(crate) use state::{
     char_len, slice_chars, CandidateMode, EditorSignals, InputMode, ManualSaveRequest, ManualTypingState,
-    SegmentedChoice, SegmentedSession,
 };
 pub(crate) use view_helpers::{
     composition_preview_style, composition_style, is_space_key, popup_style, refresh_popup_position,

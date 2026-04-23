@@ -1,0 +1,30 @@
+[package]
+name = "khmerime_dioxus_app"
+version = "0.1.0"
+edition = "2021"
+default-run = "roman_lookup"
+
+[features]
+default = []
+wfst-decoder = ["roman_lookup/wfst-decoder"]
+fetch-data = ["roman_lookup/fetch-data"]
+
+[dependencies]
+roman_lookup = { path = "../.." }
+khmerime_linux_ibus = { path = "../../adapters/linux-ibus" }
+
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+dioxus = { version = "0.7.4", default-features = false, features = ["desktop", "document", "signals", "hooks", "html", "macro", "asset", "launch"] }
+tokio = { version = "1.48.0", features = ["time"] }
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+console_error_panic_hook = "0.1.7"
+dioxus = { version = "0.7.4", default-features = false, features = ["web", "document", "signals", "hooks", "html", "macro", "asset", "launch"] }
+gloo-timers = { version = "0.3", features = ["futures"] }
+js-sys = "0.3.77"
+wasm-bindgen-futures = "0.4"
+web-sys = { version = "0.3.77", features = ["console", "CssStyleDeclaration", "Document", "DomRect", "Element", "Headers", "HtmlElement", "HtmlTextAreaElement", "KeyboardEvent", "Location", "Node", "Performance", "Response", "Storage", "Window"] }
+
+[[bin]]
+name = "roman_lookup"
+path = "src/main.rs"
