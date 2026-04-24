@@ -1,0 +1,92 @@
+name: Workspace CI
+
+on:
+  pull_request:
+  push:
+    branches: [ main, master ]
+
+jobs:
+  policy-guard:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Detect golden snapshot changes
+        id: golden
+        run: |
+          set -euo pipefail
+          BASE_SHA="${{ github.event.pull_request.base.sha }}"
+          HEAD_SHA="${{ github.event.pull_request.head.sha }}"
+          CHANGED_FILES="$(git diff --name-only "$BASE_SHA" "$HEAD_SHA")"
+          echo "Changed files:"
+          echo "$CHANGED_FILES"
+
+          if echo "$CHANGED_FILES" | grep -Eq '^tests/golden/'; then
+            echo "golden_changed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "golden_changed=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Enforce golden metadata in PR body
+        if: steps.golden.outputs.golden_changed == 'true'
+        env:
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: |
+          set -euo pipefail
+          BODY_FILE="$(mktemp)"
+          printf "%s\n" "$PR_BODY" > "$BODY_FILE"
+
+          if ! grep -Eqi 'Golden-Discussion:[[:space:]]*https?://.+' "$BODY_FILE"; then
+            echo "Missing required Golden-Discussion URL in PR body."
+            exit 1
+          fi
+
+          if ! grep -Eqi 'Golden-Rationale:[[:space:]]*.+' "$BODY_FILE"; then
+            echo "Missing required Golden-Rationale in PR body."
+            exit 1
+          fi
+
+          if ! grep -Eqi 'Golden-Approval:[[:space:]]*requested' "$BODY_FILE"; then
+            echo "Missing required Golden-Approval: requested in PR body."
+            exit 1
+          fi
+
+  core-session:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Check core
+        run: cargo check -p khmerime_core
+      - name: Check session
+        run: cargo check -p khmerime_session
+      - name: Test core
+        run: cargo test -p khmerime_core
+      - name: Test session
+        run: cargo test -p khmerime_session
+
+  linux-ibus:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Check linux adapter
+        run: cargo check -p khmerime_linux_ibus
+      - name: Test linux bridge protocol
+        run: cargo test -p khmerime_linux_ibus --test ibus_bridge_protocol
+
+  scaffold-check:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        pkg: [khmerime_macos_imk, khmerime_windows_tsf, khmerime_ios_keyboard, khmerime_android_ime]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Check scaffold package
+        run: cargo check -p ${{ matrix.pkg }}

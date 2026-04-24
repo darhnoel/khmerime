@@ -1,0 +1,59 @@
+name: Golden Behavior Change Proposal
+description: Propose intentional decoder/golden behavior changes before snapshot updates
+title: "[Golden] "
+labels:
+  - golden
+  - needs-discussion
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this template before changing locked golden snapshots.
+
+  - type: input
+    id: impacted_surface
+    attributes:
+      label: Impacted Surface
+      description: Which decoder behavior is changing?
+      placeholder: "Example: Transliterator::suggest Wfst ordering for khnhomttov"
+    validations:
+      required: true
+
+  - type: textarea
+    id: motivation
+    attributes:
+      label: Motivation
+      description: Why should the locked behavior change?
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected_change
+    attributes:
+      label: Expected Output Change
+      description: Describe expected golden diff shape and why it is correct.
+    validations:
+      required: true
+
+  - type: textarea
+    id: verification_plan
+    attributes:
+      label: Verification Plan
+      description: List exact tests/manual checks you will run.
+      placeholder: |
+        cargo test
+        cargo test --test decoder_golden
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: Policy Checklist
+      options:
+        - label: I understand golden snapshots are locked by default.
+          required: true
+        - label: I will include this issue URL in `Golden-Discussion:` when opening the PR.
+          required: true
+        - label: I will request maintainer approval before merge.
+          required: true

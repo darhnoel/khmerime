@@ -6,6 +6,8 @@
 /adapters/macos-imk/ @linak
 /adapters/windows-tsf/ @linak
 /adapters/ios-keyboard/ @linak
+/adapters/android-ime/ @linak
 /apps/dioxus-app/ @linak
 /apps/lookup-cli/ @linak
+/docs/platforms/ @linak
 /scripts/khmerime_ibus_engine.py @linak

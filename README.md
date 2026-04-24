@@ -9,10 +9,16 @@ Standalone Rust lookup engine with:
 - Workspace core engine: `crates/core/`
 - Session contract/state machine: `crates/session/`
 - Linux IBus adapter + bridge: `adapters/linux-ibus/`
+- iOS keyboard scaffold: `adapters/ios-keyboard/`
+- macOS InputMethodKit scaffold: `adapters/macos-imk/`
+- Windows TSF scaffold: `adapters/windows-tsf/`
+- Android IME scaffold: `adapters/android-ime/`
 - Dioxus app: `apps/dioxus-app/`
 - CLI app: `apps/lookup-cli/`
 - IBus adapter script: `scripts/khmerime_ibus_engine.py`
 - Architecture guide: [docs/architecture.md](docs/architecture.md)
+- Contributor guide: [CONTRIBUTING.md](CONTRIBUTING.md)
+- Platform docs: `docs/platforms/`
 - Default embedded data: `data/roman_lookup.csv`
 
 ## Usage
