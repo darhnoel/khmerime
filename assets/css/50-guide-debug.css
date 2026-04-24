@@ -1,0 +1,261 @@
+/* Guide panel and debug/shadow side panel */
+
+.debug-card {
+  margin-top: 16px;
+}
+
+.shadow-side-panel {
+  margin-top: 0;
+  position: sticky;
+  top: 18px;
+}
+
+.debug-grid {
+  display: grid;
+  gap: 10px;
+}
+
+.debug-row {
+  display: grid;
+  grid-template-columns: minmax(110px, 140px) minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.66);
+}
+
+.debug-label {
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.debug-value {
+  min-width: 0;
+  font-size: 0.95rem;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+code.debug-value {
+  font-family: "IBM Plex Mono", monospace;
+  color: var(--accent-strong);
+}
+
+.suggestion-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.candidate-list .suggestion {
+  min-width: 0;
+}
+
+/* Desktop-first dense horizontal candidate row using available width. */
+.candidate-track-mobile .suggestion-list {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px;
+}
+
+.candidate-track-mobile .candidate-list .suggestion {
+  flex: 0 1 180px;
+  max-width: 220px;
+}
+
+.suggestion button {
+  width: 100%;
+  min-height: 32px;
+  padding: 4px 5px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  text-align: left;
+  background: var(--surface-strong);
+}
+
+.suggestion.active button {
+  background: var(--active);
+  border-color: rgba(175, 79, 32, 0.35);
+}
+
+.suggestion-rank {
+  min-width: 15px;
+  color: var(--muted);
+  font-size: 0.68rem;
+  font-weight: 700;
+}
+
+.suggestion-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.suggestion-word {
+  font-size: 0.92rem;
+  line-height: 1.15;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.suggestion-roman-hint {
+  color: var(--muted);
+  font-size: 0.6rem;
+  line-height: 1.2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.suggestion-recommended {
+  margin-left: 4px;
+  padding: 1px 5px;
+  border: 1px solid rgba(177, 77, 30, 0.3);
+  border-radius: 7px;
+  background: rgba(177, 77, 30, 0.12);
+  color: var(--accent-strong);
+  font-size: 0.64rem;
+  font-weight: 700;
+  line-height: 1.1;
+  white-space: nowrap;
+}
+
+.empty-state {
+  padding: 16px;
+  border: 1px dashed var(--line);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.52);
+}
+
+.empty-state p {
+  margin: 0;
+  font-weight: 700;
+}
+
+.empty-state span {
+  display: block;
+  margin-top: 8px;
+  color: var(--muted);
+  font-size: 0.9rem;
+  line-height: 1.45;
+}
+
+.guide {
+  align-content: start;
+  position: relative;
+}
+
+.guide-open {
+  padding-left: 10px;
+}
+
+.guide-panel {
+  display: grid;
+  gap: 18px;
+}
+
+.guide-handle {
+  position: absolute;
+  z-index: 4;
+  width: 24px;
+  min-width: 24px;
+  height: 72px;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: rgba(255, 251, 246, 0.96);
+  color: var(--accent-strong);
+  font-size: 1rem;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+  box-shadow: 0 12px 28px rgba(74, 43, 18, 0.12);
+}
+
+.guide-handle:hover {
+  border-color: rgba(177, 77, 30, 0.28);
+  background: var(--hover);
+}
+
+.guide-handle-collapsed {
+  top: 50%;
+  right: -12px;
+  transform: translateY(-50%);
+}
+
+.guide-handle-open {
+  top: 50%;
+  left: -2px;
+  transform: translate(-50%, -50%);
+}
+
+.chip-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.rule-chip {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 11px 12px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.7);
+}
+
+.chip-khmer,
+.chip-roman {
+  font-weight: 700;
+}
+
+.chip-arrow {
+  color: var(--muted);
+}
+
+.rule-list {
+  margin: 12px 0 0;
+  padding-left: 18px;
+  color: var(--ink);
+}
+
+.rule-list li + li {
+  margin-top: 8px;
+}
+
+.example-list {
+  display: grid;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.example-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 11px 12px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.7);
+  border: 1px solid var(--line);
+}
+
+.example-row code {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.92rem;
+  color: var(--accent-strong);
+}

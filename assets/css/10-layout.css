@@ -1,0 +1,202 @@
+/* Shell, board, workspace, and card layout */
+
+.shell {
+  min-height: 100vh;
+  padding: 28px 18px;
+}
+
+.shell-loading {
+  display: grid;
+  place-items: center;
+}
+
+.loading-screen {
+  width: min(520px, 100%);
+}
+
+.loading-card {
+  border: 1px solid var(--line);
+  border-radius: 28px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  backdrop-filter: blur(14px);
+  padding: 28px 24px;
+  display: grid;
+  gap: 12px;
+  justify-items: center;
+  text-align: center;
+}
+
+.loading-card h1 {
+  margin: 0;
+  font-size: clamp(1.4rem, 3vw, 2rem);
+}
+
+.loading-card p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.98rem;
+  line-height: 1.5;
+}
+
+.loading-spinner {
+  width: 38px;
+  height: 38px;
+  border-radius: 999px;
+  border: 3px solid rgba(177, 77, 30, 0.16);
+  border-top-color: var(--accent);
+  animation: loading-spin 0.9s linear infinite;
+}
+
+
+.board {
+  width: min(1180px, 100%);
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: minmax(0, 1.55fr) minmax(300px, 0.95fr);
+  gap: 18px;
+}
+
+.board-wide {
+  grid-template-columns: 1fr;
+}
+
+.workspace,
+.guide {
+  display: grid;
+  gap: 18px;
+}
+
+.workspace {
+  position: relative;
+}
+
+.workspace-top,
+.editor-card,
+.guide-card {
+  border: 1px solid var(--line);
+  border-radius: 24px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  backdrop-filter: blur(14px);
+}
+
+.workspace-top {
+  padding: 14px 20px;
+  display: grid;
+  gap: 10px;
+}
+
+.manual-save-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+  border: 1px solid rgba(177, 77, 30, 0.22);
+  border-radius: 14px;
+  background: rgba(255, 247, 237, 0.85);
+  padding: 8px 10px;
+}
+
+.manual-save-text {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+.manual-save-label {
+  font-size: 0.72rem;
+  font-weight: 800;
+  color: var(--accent-strong);
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.manual-save-map {
+  font-size: 0.82rem;
+  color: var(--ink);
+}
+
+.manual-save-actions {
+  display: inline-flex;
+  gap: 8px;
+}
+
+.dictionary-panel {
+  display: grid;
+  gap: 8px;
+  border: 1px solid rgba(177, 77, 30, 0.2);
+  border-radius: 14px;
+  background: rgba(255, 250, 242, 0.8);
+  padding: 10px;
+}
+
+.dictionary-panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.dictionary-panel-title {
+  font-size: 0.78rem;
+  font-weight: 800;
+  color: var(--accent-strong);
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.dictionary-panel-empty {
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.dictionary-list {
+  display: grid;
+  gap: 6px;
+  max-height: 220px;
+  overflow-y: auto;
+  padding-right: 2px;
+}
+
+.dictionary-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 6px 8px;
+  border: 1px solid rgba(93, 68, 40, 0.12);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.82);
+}
+
+.dictionary-map {
+  font-size: 0.82rem;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+
+.dictionary-remove {
+  padding: 6px 10px;
+  font-size: 0.78rem;
+}
+
+.editor-card,
+.guide-card {
+  padding: 18px;
+}
+
+.workspace-body {
+  display: block;
+}
+
+.workspace-body-shadow {
+  display: grid;
+  grid-template-columns: minmax(280px, 340px) minmax(0, 1fr);
+  align-items: start;
+  gap: 18px;
+}

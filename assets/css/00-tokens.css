@@ -1,0 +1,38 @@
+/* Theme tokens and shared animations */
+
+:root {
+  color-scheme: light;
+  --bg: #f6efe4;
+  --surface: rgba(255, 251, 246, 0.94);
+  --surface-strong: #fffdfa;
+  --surface-elevated: rgba(255, 255, 255, 0.9);
+  --ink: #1f1710;
+  --muted: #6d6053;
+  --line: rgba(93, 68, 40, 0.14);
+  --accent: #b14d1e;
+  --accent-strong: #8c3913;
+  --accent-soft: rgba(177, 77, 30, 0.1);
+  --active: #fff2e0;
+  --hover: #fff8f0;
+  --shadow: 0 28px 80px rgba(74, 43, 18, 0.12);
+  --mobile-keyboard-offset: 0px;
+  --mobile-segment-min-height: 34px;
+  --mobile-candidate-footer-min-height: 34px;
+}
+
+
+@keyframes loading-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes segment-placeholder-pulse {
+  0% {
+    background-position: 200% 0;
+  }
+
+  100% {
+    background-position: -200% 0;
+  }
+}

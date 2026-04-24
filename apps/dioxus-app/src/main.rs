@@ -24,8 +24,6 @@ use self::ui::storage::{
     load_decoder_mode, load_editor_text, load_enabled, load_font_size, load_history, load_user_dictionary,
 };
 
-const APP_CSS: &str = include_str!("../../../assets/main.css");
-
 pub(crate) const EDITOR_ID: &str = "ime-editor";
 const DEFAULT_FONT_SIZE: usize = 24;
 pub(crate) const MIN_FONT_SIZE: usize = 18;
@@ -175,7 +173,7 @@ fn App() -> Element {
     });
 
     rsx! {
-        document::Style { {APP_CSS} }
+        document::Stylesheet { href: "/assets/main.css" }
         div { class: "shell",
             div { class: if show_guide() { "board" } else { "board board-wide" },
                 section { class: "workspace",
