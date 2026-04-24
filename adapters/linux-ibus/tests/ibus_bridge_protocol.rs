@@ -80,6 +80,35 @@ fn bridge_tracks_cursor_location_callback() {
 }
 
 #[test]
+fn bridge_exposes_candidate_display_metadata() {
+    let (child, mut stdin, mut stdout) = spawn_bridge();
+
+    send_command(&mut stdin, r#"{"cmd":"focus_in"}"#);
+    let _ = read_response(&mut stdout);
+
+    for keyval in ['j' as u32, 'e' as u32, 'a' as u32] {
+        send_command(
+            &mut stdin,
+            &format!(r#"{{"cmd":"process_key_event","keyval":{keyval},"keycode":0,"state":0}}"#),
+        );
+        let _ = read_response(&mut stdout);
+    }
+
+    send_command(&mut stdin, r#"{"cmd":"snapshot"}"#);
+    let snapshot = read_response(&mut stdout);
+    let candidates = snapshot["snapshot"]["candidates"]
+        .as_array()
+        .expect("candidates should be an array");
+    let display = snapshot["snapshot"]["candidate_display"]
+        .as_array()
+        .expect("candidate_display should be an array");
+    assert_eq!(display.len(), candidates.len());
+    assert!(display.iter().any(|entry| entry["recommended"] == Value::Bool(true)));
+
+    shutdown_and_assert_ok(child, &mut stdin, &mut stdout);
+}
+
+#[test]
 fn bridge_supports_segment_focus_and_full_phrase_commit() {
     let (child, mut stdin, mut stdout) = spawn_bridge();
 

@@ -41,6 +41,7 @@ pub fn fallback_empty_snapshot_json(error: impl Into<String>) -> serde_json::Val
             "preedit": "",
             "raw_preedit": "",
             "candidates": [],
+            "candidate_display": [],
             "selected_index": serde_json::Value::Null,
             "segmented_active": false,
             "focused_segment_index": serde_json::Value::Null,

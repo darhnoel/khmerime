@@ -1,7 +1,7 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use khmerime_core::{
-    build_segmented_session, move_session_focus, normalize_visible_suggestions,
+    build_segmented_session, move_session_focus, normalize_visible_suggestions, normalized_suggestion_key,
     reflow_segmented_session_from_selection, SegmentedSession, Transliterator,
 };
 use serde::Serialize;
@@ -70,11 +70,19 @@ pub struct SessionSnapshot {
     pub preedit: String,
     pub raw_preedit: String,
     pub candidates: Vec<String>,
+    pub candidate_display: Vec<CandidateDisplayEntry>,
     pub selected_index: Option<usize>,
     pub segmented_active: bool,
     pub focused_segment_index: Option<usize>,
     pub segment_preview: Vec<SegmentPreviewEntry>,
     pub cursor_location: CursorLocation,
+}
+
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize)]
+pub struct CandidateDisplayEntry {
+    pub output: String,
+    pub recommended: bool,
+    pub roman_hints: Vec<String>,
 }
 
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
@@ -177,6 +185,30 @@ impl ImeSession {
                 .map(SegmentedSession::focused_selected)
                 .or(Some(self.selected_index))
         };
+        let candidate_input = self
+            .segmented_session
+            .as_ref()
+            .and_then(|session| session.segments.get(session.focused))
+            .map(|segment| segment.input.as_str())
+            .unwrap_or(self.composition_raw.as_str());
+        let recommended_keys = self
+            .transliterator
+            .exact_match_targets(candidate_input)
+            .into_iter()
+            .map(|item| normalized_suggestion_key(&item))
+            .collect::<HashSet<_>>();
+        let candidate_display = candidates
+            .iter()
+            .map(|item| {
+                let mut roman_hints = self.transliterator.exact_match_roman_variants(candidate_input, item);
+                roman_hints.truncate(3);
+                CandidateDisplayEntry {
+                    output: item.clone(),
+                    recommended: recommended_keys.contains(&normalized_suggestion_key(item)),
+                    roman_hints,
+                }
+            })
+            .collect::<Vec<_>>();
         let focused_segment_index = self.segmented_session.as_ref().map(|session| session.focused);
         let segment_preview = self
             .segmented_session
@@ -201,6 +233,7 @@ impl ImeSession {
             preedit,
             raw_preedit: self.composition_raw.clone(),
             candidates,
+            candidate_display,
             selected_index,
             segmented_active,
             focused_segment_index,
@@ -583,10 +616,30 @@ mod tests {
     fn space_cycles_candidates() {
         let mut session = session();
         type_ascii(&mut session, "jea");
-        assert_eq!(session.snapshot().selected_index, Some(0));
+        let snapshot = session.snapshot();
+        assert_eq!(snapshot.selected_index, Some(0));
+        assert_eq!(snapshot.candidate_display.len(), snapshot.candidates.len());
         let update = session.process_key_event(0x20, 0, 0);
         assert!(update.consumed);
         assert_eq!(session.snapshot().selected_index, Some(0));
+    }
+
+    #[test]
+    fn snapshot_exposes_recommended_and_roman_hint_metadata() {
+        let mut session = session();
+        type_ascii(&mut session, "jea");
+        let snapshot = session.snapshot();
+        assert!(!snapshot.candidate_display.is_empty());
+
+        let recommended = snapshot
+            .candidate_display
+            .iter()
+            .filter(|entry| entry.recommended)
+            .collect::<Vec<_>>();
+        assert!(!recommended.is_empty());
+        assert!(recommended
+            .iter()
+            .any(|entry| entry.roman_hints.iter().any(|hint| hint == "jea")));
     }
 
     #[test]
