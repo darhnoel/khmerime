@@ -9,7 +9,9 @@ use serde::Serialize;
 const KEY_BACKSPACE: u32 = 0xFF08;
 const KEY_ESCAPE: u32 = 0xFF1B;
 const KEY_LEFT: u32 = 0xFF51;
+const KEY_UP: u32 = 0xFF52;
 const KEY_RIGHT: u32 = 0xFF53;
+const KEY_DOWN: u32 = 0xFF54;
 const KEY_RETURN: u32 = 0xFF0D;
 const KEY_KP_ENTER: u32 = 0xFF8D;
 const KEY_SPACE: u32 = 0x20;
@@ -255,7 +257,9 @@ impl ImeSession {
 
         match keyval {
             KEY_LEFT => self.handle_left(),
+            KEY_UP => self.handle_up(),
             KEY_RIGHT => self.handle_right(),
+            KEY_DOWN => self.handle_down(),
             KEY_SPACE => self.handle_space(),
             KEY_RETURN | KEY_KP_ENTER => self.commit_selected_or_raw(),
             KEY_BACKSPACE => self.handle_backspace(),
@@ -310,7 +314,19 @@ impl ImeSession {
         }
     }
 
+    fn handle_up(&mut self) -> SessionResult {
+        self.cycle_candidates(-1)
+    }
+
+    fn handle_down(&mut self) -> SessionResult {
+        self.cycle_candidates(1)
+    }
+
     fn handle_space(&mut self) -> SessionResult {
+        self.cycle_candidates(1)
+    }
+
+    fn cycle_candidates(&mut self, delta: isize) -> SessionResult {
         if self.composition_raw.is_empty() {
             return SessionResult::default();
         }
@@ -326,7 +342,7 @@ impl ImeSession {
                     ..SessionResult::default()
                 };
             }
-            let next_index = (segment.selected + 1) % segment.candidates.len();
+            let next_index = offset_index(segment.selected, segment.candidates.len(), delta);
             self.select_focused_segment_candidate(next_index);
             return SessionResult {
                 consumed: true,
@@ -338,7 +354,7 @@ impl ImeSession {
             return SessionResult::default();
         }
 
-        self.selected_index = (self.selected_index + 1) % self.candidates.len();
+        self.selected_index = offset_index(self.selected_index, self.candidates.len(), delta);
         SessionResult {
             consumed: true,
             ..SessionResult::default()
@@ -517,6 +533,11 @@ fn keyval_to_ascii_char(keyval: u32) -> Option<char> {
     }
 }
 
+fn offset_index(current: usize, len: usize, delta: isize) -> usize {
+    debug_assert!(len > 0);
+    (current as isize + delta).rem_euclid(len as isize) as usize
+}
+
 #[cfg(test)]
 mod tests {
     use super::{CursorLocation, ImeSession, NativeKeyEvent, SessionCommand};
@@ -524,7 +545,7 @@ mod tests {
     use std::collections::HashMap;
 
     fn session() -> ImeSession {
-        let fixture = "jea\tជា\nchea\tជា\ntov\tទៅ\nkhnhom\tខ្ញុំ\nkhnhom\tខ្ញំ\n";
+        let fixture = "jea\tជា\nchea\tជា\ntov\tទៅ\nkhnhom\tខ្ញុំ\nkhnhom\tខ្ញំ\nfoo\tអា\nfoo\tអូ\n";
         let transliterator = Transliterator::from_tsv_str_with_config(fixture, DecoderConfig::shadow_interactive())
             .expect("fixture must parse");
         let mut session = ImeSession::new(transliterator, HashMap::new());
@@ -608,6 +629,30 @@ mod tests {
     }
 
     #[test]
+    fn up_down_cycle_segment_candidates_without_moving_focus() {
+        let mut session = session();
+        type_ascii(&mut session, "khnhomtov");
+
+        let snapshot = session.snapshot();
+        assert!(snapshot.segmented_active);
+        assert_eq!(snapshot.focused_segment_index, Some(0));
+        assert_eq!(snapshot.selected_index, Some(0));
+        assert_eq!(snapshot.candidates.len(), 2);
+
+        let down = session.process_key_event(0xFF54, 0, 0);
+        assert!(down.consumed);
+        let snapshot = session.snapshot();
+        assert_eq!(snapshot.focused_segment_index, Some(0));
+        assert_eq!(snapshot.selected_index, Some(1));
+
+        let up = session.process_key_event(0xFF52, 0, 0);
+        assert!(up.consumed);
+        let snapshot = session.snapshot();
+        assert_eq!(snapshot.focused_segment_index, Some(0));
+        assert_eq!(snapshot.selected_index, Some(0));
+    }
+
+    #[test]
     fn enter_commits_full_segmented_phrase() {
         let mut session = session();
         type_ascii(&mut session, "khnhomtov");
@@ -625,6 +670,38 @@ mod tests {
         let right = session.process_key_event(0xFF53, 0, 0);
         assert!(!left.consumed);
         assert!(!right.consumed);
+    }
+
+    #[test]
+    fn up_down_cycle_flat_candidates() {
+        let mut session = session();
+        type_ascii(&mut session, "foo");
+        let snapshot = session.snapshot();
+        assert!(!snapshot.segmented_active);
+        assert_eq!(snapshot.selected_index, Some(0));
+        assert_eq!(snapshot.candidates.len(), 2);
+
+        let down = session.process_key_event(0xFF54, 0, 0);
+        assert!(down.consumed);
+        assert_eq!(session.snapshot().selected_index, Some(1));
+
+        let up = session.process_key_event(0xFF52, 0, 0);
+        assert!(up.consumed);
+        assert_eq!(session.snapshot().selected_index, Some(0));
+    }
+
+    #[test]
+    fn up_down_pass_through_without_active_candidate_ui() {
+        let mut session = session();
+        type_ascii(&mut session, "xxx");
+        let snapshot = session.snapshot();
+        assert!(snapshot.candidates.is_empty());
+        assert!(!snapshot.segmented_active);
+
+        let down = session.process_key_event(0xFF54, 0, 0);
+        let up = session.process_key_event(0xFF52, 0, 0);
+        assert!(!down.consumed);
+        assert!(!up.consumed);
     }
 
     #[test]
