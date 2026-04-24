@@ -2381,6 +2381,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "khmerime_android_ime"
+version = "0.1.0"
+dependencies = [
+ "khmerime_session",
+]
+
+[[package]]
 name = "khmerime_core"
 version = "0.1.0"
 dependencies = [
@@ -2407,6 +2414,9 @@ dependencies = [
 [[package]]
 name = "khmerime_ios_keyboard"
 version = "0.1.0"
+dependencies = [
+ "khmerime_session",
+]
 
 [[package]]
 name = "khmerime_linux_ibus"
@@ -2428,6 +2438,9 @@ dependencies = [
 [[package]]
 name = "khmerime_macos_imk"
 version = "0.1.0"
+dependencies = [
+ "khmerime_session",
+]
 
 [[package]]
 name = "khmerime_session"
@@ -2440,6 +2453,9 @@ dependencies = [
 [[package]]
 name = "khmerime_windows_tsf"
 version = "0.1.0"
+dependencies = [
+ "khmerime_session",
+]
 
 [[package]]
 name = "kuchikiki"

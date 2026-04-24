@@ -7,6 +7,7 @@ members = [
   "adapters/macos-imk",
   "adapters/windows-tsf",
   "adapters/ios-keyboard",
+  "adapters/android-ime",
   "apps/dioxus-app",
   "apps/lookup-cli",
 ]

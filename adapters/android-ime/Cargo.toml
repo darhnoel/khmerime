@@ -1,5 +1,5 @@
 [package]
-name = "khmerime_macos_imk"
+name = "khmerime_android_ime"
 version = "0.1.0"
 edition = "2021"
 

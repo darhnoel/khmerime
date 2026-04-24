@@ -5,3 +5,6 @@ edition = "2021"
 
 [lib]
 path = "src/lib.rs"
+
+[dependencies]
+khmerime_session = { path = "../../crates/session" }
