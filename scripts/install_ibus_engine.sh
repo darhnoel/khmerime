@@ -4,8 +4,10 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 INSTALL_LIBEXEC_DIR="${KHMERIME_IBUS_LIBEXEC_DIR:-/usr/libexec/khmerime}"
 INSTALL_COMPONENT_DIR="${KHMERIME_IBUS_COMPONENT_DIR:-/usr/share/ibus/component}"
-ENGINE_SCRIPT_SRC="${ROOT_DIR}/scripts/khmerime_ibus_engine.py"
+ENGINE_SCRIPT_SRC="${ROOT_DIR}/adapters/linux-ibus/python/khmerime_ibus_engine.py"
+ENGINE_HELPER_SRC="${ROOT_DIR}/adapters/linux-ibus/python/ibus_segment_preview.py"
 ENGINE_SCRIPT_DST="${INSTALL_LIBEXEC_DIR}/khmerime-ibus-engine"
+ENGINE_HELPER_DST="${INSTALL_LIBEXEC_DIR}/ibus_segment_preview.py"
 BRIDGE_BINARY_DST="${INSTALL_LIBEXEC_DIR}/khmerime-ibus-bridge"
 COMPONENT_XML_PATH="${INSTALL_COMPONENT_DIR}/khmerime.xml"
 LEGACY_USER_COMPONENT_PATH="${HOME}/.local/share/ibus/component/khmerime.xml"
@@ -59,13 +61,14 @@ run_install install -d "${INSTALL_LIBEXEC_DIR}" "${INSTALL_COMPONENT_DIR}"
 echo "[khmerime] installing bridge + ibus adapter..."
 run_install install -m 0755 "${ROOT_DIR}/target/release/khmerime_ibus_bridge" "${BRIDGE_BINARY_DST}"
 run_install install -m 0755 "${ENGINE_SCRIPT_SRC}" "${ENGINE_SCRIPT_DST}"
+run_install install -m 0644 "${ENGINE_HELPER_SRC}" "${ENGINE_HELPER_DST}"
 
 echo "[khmerime] writing IBus component XML..."
 TMP_COMPONENT_XML="$(mktemp)"
 cat > "${TMP_COMPONENT_XML}" <<EOF
 <component>
     <name>org.freedesktop.IBus.KhmerIME</name>
-    <description>AngkorIME input method engine (formerly KhmerIME)</description>
+    <description>AngkorIME input method engine</description>
     <version>0.1.0</version>
     <license>MIT</license>
     <author>AngkorIME contributors</author>
@@ -75,7 +78,7 @@ cat > "${TMP_COMPONENT_XML}" <<EOF
     <engines>
         <engine>
             <name>khmerime</name>
-            <longname>AngkorIME (KhmerIME)</longname>
+            <longname>AngkorIME</longname>
             <description>Khmer romanization IME powered by AngkorIME</description>
             <language>km</language>
             <license>MIT</license>

@@ -8,4 +8,4 @@ Linux-first adapter package.
 - Linux adapter protocol types consumed by the Python engine
 
 ## Contract
-- Snapshot shape must remain compatible with `scripts/khmerime_ibus_engine.py`
+- Snapshot shape must remain compatible with `adapters/linux-ibus/python/khmerime_ibus_engine.py`

@@ -10,4 +10,4 @@
 /apps/dioxus-app/ @linak
 /apps/lookup-cli/ @linak
 /docs/platforms/ @linak
-/scripts/khmerime_ibus_engine.py @linak
+/adapters/linux-ibus/python/khmerime_ibus_engine.py @linak

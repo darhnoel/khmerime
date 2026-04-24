@@ -16,9 +16,15 @@ import sys
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Tuple
 
 import gi
+
+SCRIPT_DIR = Path(__file__).resolve().parent
+if str(SCRIPT_DIR) not in sys.path:
+    sys.path.insert(0, str(SCRIPT_DIR))
+
+from ibus_segment_preview import FOCUSED_MARKER_MODE, SegmentSpan, build_segment_preview
 
 gi.require_version("IBus", "1.0")
 from gi.repository import GLib, IBus  # noqa: E402
@@ -26,14 +32,19 @@ from gi.repository import GLib, IBus  # noqa: E402
 
 SERVICE_NAME = "org.freedesktop.IBus.KhmerIME"
 ENGINE_NAME = "khmerime"
-ENGINE_LONGNAME = "KhmerIME"
-ENGINE_DESCRIPTION = "Khmer romanization IME powered by khmerime"
+ENGINE_LONGNAME = "AngkorIME"
+ENGINE_DESCRIPTION = "Khmer romanization IME powered by AngkorIME"
 ENGINE_LANGUAGE = "km"
 ENGINE_LAYOUT = "us"
 ENGINE_SYMBOL = "ខ"
 KEY_RETURN = 0xFF0D
 KEY_KP_ENTER = 0xFF8D
 LOG_PATH = Path(os.environ.get("KHMERIME_IBUS_LOG", "~/.cache/khmerime/ibus_engine.log")).expanduser()
+SEGMENT_PREVIEW_ALT_FOREGROUNDS = (0x2E6FD9, 0x0A8A5B)
+SEGMENT_PREVIEW_FOCUSED_FOREGROUND = 0xFFFFFF
+SEGMENT_PREVIEW_FOCUSED_BACKGROUND = 0x005FCC
+RECOMMENDED_MARK = "✓"
+DERIVED_MARK = "≈"
 
 
 def log_line(message: str) -> None:
@@ -169,41 +180,149 @@ class KhmerIMEEngine(IBus.Engine):
         self.update_preedit_text(IBus.Text.new_from_string(preedit), len(preedit), preedit_visible)
 
         candidates = snapshot.get("candidates") or []
+        candidate_display = snapshot.get("candidate_display") or []
+        candidate_rows = self._candidate_rows(candidates, candidate_display)
         self._table.clear()
-        for candidate in candidates:
+        for candidate in candidate_rows:
             self._table.append_candidate(IBus.Text.new_from_string(str(candidate)))
 
         selected = snapshot.get("selected_index")
         if isinstance(selected, int):
             self._table.set_cursor_pos(selected)
 
-        self.update_lookup_table(self._table, bool(candidates))
+        self.update_lookup_table(self._table, bool(candidate_rows))
 
         segment_preview = snapshot.get("segment_preview") or []
         segmented_active = bool(snapshot.get("segmented_active", False))
         if segmented_active and segment_preview:
-            auxiliary_text = self._format_segment_preview(segment_preview)
+            auxiliary_text, chunk_spans, focused_chunk_index = build_segment_preview(segment_preview)
             if auxiliary_text:
-                self.update_auxiliary_text(IBus.Text.new_from_string(auxiliary_text), True)
+                focused_span = self._resolve_focused_chunk_span(chunk_spans, focused_chunk_index)
+                focused_span_label = "none"
+                focused_style_span_label = "none"
+                if focused_span is not None:
+                    focused_span_label = f"{focused_span.start}:{focused_span.end}"
+                    padded_start, padded_end = self._focus_span_with_padding(
+                        auxiliary_text, focused_span.start, focused_span.end
+                    )
+                    focused_style_span_label = f"{padded_start}:{padded_end}"
+                render_mode = "styled"
+                try:
+                    auxiliary_render = self._build_styled_auxiliary_text(
+                        auxiliary_text, chunk_spans, focused_chunk_index
+                    )
+                except Exception as err:
+                    render_mode = "fallback"
+                    auxiliary_render = IBus.Text.new_from_string(auxiliary_text)
+                    log_line(f"segment_preview style_failed err={err}")
+                self.update_auxiliary_text(auxiliary_render, True)
                 self.show_auxiliary_text()
+                log_line(
+                    "segment_preview segmented_active=%s chunks=%s focused_chunk=%s focused_span=%s "
+                    "focus_style_span=%s marker_mode=%s render=%s text_len=%s recommended=%s derived=%s"
+                    % (
+                        segmented_active,
+                        len(chunk_spans),
+                        focused_chunk_index,
+                        focused_span_label,
+                        focused_style_span_label,
+                        FOCUSED_MARKER_MODE,
+                        render_mode,
+                        len(auxiliary_text),
+                        sum(1 for row in candidate_display if isinstance(row, dict) and bool(row.get("recommended"))),
+                        sum(
+                            1
+                            for row in candidate_display
+                            if isinstance(row, dict)
+                            and not bool(row.get("recommended"))
+                            and not (row.get("roman_hints") or [])
+                        ),
+                    )
+                )
                 return
         self.hide_auxiliary_text()
 
     @staticmethod
-    def _format_segment_preview(entries: Any) -> str:
-        parts = []
-        for entry in entries:
+    def _candidate_rows(candidates: Any, candidate_display: Any) -> list[str]:
+        if not isinstance(candidates, list):
+            return []
+
+        rendered = []
+        use_display = isinstance(candidate_display, list) and len(candidate_display) == len(candidates)
+        for index, candidate in enumerate(candidates):
+            text = str(candidate)
+            if not use_display:
+                rendered.append(text)
+                continue
+
+            entry = candidate_display[index]
             if not isinstance(entry, dict):
+                rendered.append(text)
                 continue
-            output = str(entry.get("output", "")).strip()
-            if not output:
+
+            output = str(entry.get("output", "")).strip() or text
+            recommended = bool(entry.get("recommended", False))
+            hints = [str(hint).strip() for hint in (entry.get("roman_hints") or []) if str(hint).strip()]
+            label = output
+            if recommended:
+                label = f"{RECOMMENDED_MARK} {label}"
+            elif not hints:
+                label = f"{DERIVED_MARK} {label}"
+            if hints:
+                label = f"{label} ({' / '.join(hints[:3])})"
+            rendered.append(label)
+        return rendered
+
+    @staticmethod
+    def _build_styled_auxiliary_text(
+        text: str, chunk_spans: list[SegmentSpan], focused_chunk_index: Optional[int]
+    ) -> IBus.Text:
+        rendered = IBus.Text.new_from_string(text)
+        attrs = IBus.AttrList.new()
+        for index, chunk in enumerate(chunk_spans):
+            if chunk.end <= chunk.start:
                 continue
-            input_roman = str(entry.get("input", "")).strip()
-            segment = output if not input_roman else f"{output}({input_roman})"
-            if bool(entry.get("focused", False)):
-                segment = f"[{segment}]"
-            parts.append(segment)
-        return " ".join(parts)
+            is_focused = chunk.focused or (focused_chunk_index is not None and index == focused_chunk_index)
+            if is_focused:
+                styled_start, styled_end = KhmerIMEEngine._focus_span_with_padding(text, chunk.start, chunk.end)
+                attrs.append(
+                    IBus.attr_foreground_new(SEGMENT_PREVIEW_FOCUSED_FOREGROUND, styled_start, styled_end)
+                )
+                attrs.append(
+                    IBus.attr_background_new(SEGMENT_PREVIEW_FOCUSED_BACKGROUND, styled_start, styled_end)
+                )
+                attrs.append(IBus.attr_underline_new(IBus.AttrUnderline.DOUBLE, styled_start, styled_end))
+            else:
+                attrs.append(
+                    IBus.attr_foreground_new(
+                        SEGMENT_PREVIEW_ALT_FOREGROUNDS[index % len(SEGMENT_PREVIEW_ALT_FOREGROUNDS)],
+                        chunk.start,
+                        chunk.end,
+                    )
+                )
+        rendered.set_attributes(attrs)
+        return rendered
+
+    @staticmethod
+    def _resolve_focused_chunk_span(
+        chunk_spans: list[SegmentSpan], focused_chunk_index: Optional[int]
+    ) -> Optional[SegmentSpan]:
+        if focused_chunk_index is not None and 0 <= focused_chunk_index < len(chunk_spans):
+            return chunk_spans[focused_chunk_index]
+        for chunk in chunk_spans:
+            if chunk.focused:
+                return chunk
+        return None
+
+    @staticmethod
+    def _focus_span_with_padding(text: str, start: int, end: int) -> Tuple[int, int]:
+        padded_start = start
+        padded_end = end
+        if padded_start > 0 and text[padded_start - 1].isspace():
+            padded_start -= 1
+        if padded_end < len(text) and text[padded_end].isspace():
+            padded_end += 1
+        return padded_start, padded_end
 
     def do_process_key_event(self, keyval: int, keycode: int, state: int) -> bool:
         try:
@@ -326,11 +445,11 @@ def component_xml(exec_path: Path) -> str:
     exec_cmd = f"{exec_path} --ibus"
     return f"""<component>
     <name>{SERVICE_NAME}</name>
-    <description>KhmerIME input method engine</description>
+    <description>AngkorIME input method engine</description>
     <version>0.1.0</version>
     <license>MIT</license>
-    <author>khmerime contributors</author>
-    <homepage>https://github.com/khmerime/khmerime</homepage>
+    <author>AngkorIME contributors</author>
+    <homepage>https://github.com/darhnoel/angkorime</homepage>
     <textdomain>khmerime</textdomain>
     <exec>{exec_cmd}</exec>
     <engines>
@@ -340,7 +459,7 @@ def component_xml(exec_path: Path) -> str:
             <description>{ENGINE_DESCRIPTION}</description>
             <language>{ENGINE_LANGUAGE}</language>
             <license>MIT</license>
-            <author>khmerime contributors</author>
+            <author>AngkorIME contributors</author>
             <icon></icon>
             <layout>{ENGINE_LAYOUT}</layout>
             <symbol>{ENGINE_SYMBOL}</symbol>
@@ -352,11 +471,11 @@ def component_xml(exec_path: Path) -> str:
 def register_component(bus: IBus.Bus, exec_path: Path) -> None:
     component = IBus.Component.new(
         SERVICE_NAME,
-        "KhmerIME input method engine",
+        "AngkorIME input method engine",
         "0.1.0",
         "MIT",
-        "khmerime contributors",
-        "https://github.com/khmerime/khmerime",
+        "AngkorIME contributors",
+        "https://github.com/darhnoel/angkorime",
         "khmerime",
         str(exec_path),
     )
@@ -366,7 +485,7 @@ def register_component(bus: IBus.Bus, exec_path: Path) -> None:
         ENGINE_DESCRIPTION,
         ENGINE_LANGUAGE,
         "MIT",
-        "khmerime contributors",
+        "AngkorIME contributors",
         "",
         ENGINE_LAYOUT,
     )

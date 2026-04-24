@@ -15,7 +15,7 @@ Standalone Rust lookup engine with:
 - Android IME scaffold: `adapters/android-ime/`
 - Dioxus app: `apps/dioxus-app/`
 - CLI app: `apps/lookup-cli/`
-- IBus adapter script: `scripts/khmerime_ibus_engine.py`
+- IBus adapter script: `adapters/linux-ibus/python/khmerime_ibus_engine.py`
 - Architecture guide: [docs/architecture.md](docs/architecture.md)
 - Contributor guide: [CONTRIBUTING.md](CONTRIBUTING.md)
 - Platform docs: `docs/platforms/`
