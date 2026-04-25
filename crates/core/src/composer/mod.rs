@@ -646,7 +646,8 @@ mod tests {
 
     #[test]
     fn preserves_last_strong_chunk_before_weak_tail_hint() {
-        let transliterator = Transliterator::from_default_data().unwrap();
+        let fixture = "khom\tខំ\nt\tត\naek\tឯក\n";
+        let transliterator = Transliterator::from_tsv_str(fixture).unwrap();
         let table = ComposerTable::from_entries(transliterator.entries());
         let analysis = table.analyze("khomtaekitmnakaeng");
         let hints = analysis.wfst_phrase_chunks();

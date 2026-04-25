@@ -19,7 +19,9 @@ Standalone Rust lookup engine with:
 - Architecture guide: [docs/architecture.md](docs/architecture.md)
 - Contributor guide: [CONTRIBUTING.md](CONTRIBUTING.md)
 - Platform docs: `docs/platforms/`
-- Default embedded data: `data/roman_lookup.csv`
+- Default embedded data:
+  - primary: `data/roman_lookup.csv`
+  - secondary experimental code-switch source: `data/google-10000-english.csv`
 
 ## Usage
 
@@ -28,6 +30,9 @@ Preferred entrypoint:
 ```
 $ make help
 ```
+
+Suggestion behavior note:
+- for roman-token queries, the literal typed token is always kept as the last candidate fallback (for example `leonhard`).
 
 ### Ubuntu Native IBus (Mozc-like Source Switching)
 

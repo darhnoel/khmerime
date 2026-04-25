@@ -6,6 +6,7 @@ use std::path::{Path, PathBuf};
 const DATA_PATHS_CONFIG_PATH: &str = "../../config/data_paths.toml";
 const DEFAULT_TSV_PATH: &str = "../../data/roman_lookup.tsv";
 const DEFAULT_CSV_PATH: &str = "../../data/roman_lookup.csv";
+const DEFAULT_ADDITIONAL_CSV_PATH: &str = "../../data/google-10000-english.csv";
 const DEFAULT_KHPOS_TRAIN_PATH: &str = "../../data/khPOS/corpus-draft-ver-1.0/data/after-replace/train.all";
 const DEFAULT_KHPOS_TAG_PATH: &str = "../../data/khPOS/corpus-draft-ver-1.0/data/after-replace/train.all.tag";
 const DEFAULT_MOBILE_KEYBOARD_1GRAM_PATH: &str =
@@ -66,8 +67,10 @@ fn main() {
     data_paths.khpos_tag = normalize_workspace_path(&data_paths.khpos_tag);
     data_paths.mobile_keyboard_1gram = normalize_workspace_path(&data_paths.mobile_keyboard_1gram);
     data_paths.mobile_keyboard_2gram = normalize_workspace_path(&data_paths.mobile_keyboard_2gram);
+    let additional_lexicon_csv = normalize_workspace_path(DEFAULT_ADDITIONAL_CSV_PATH);
     println!("cargo:rerun-if-changed={}", data_paths.lexicon_csv);
     println!("cargo:rerun-if-changed={}", data_paths.lexicon_tsv);
+    println!("cargo:rerun-if-changed={additional_lexicon_csv}");
     println!("cargo:rerun-if-changed={}", data_paths.khpos_train);
     println!("cargo:rerun-if-changed={}", data_paths.khpos_tag);
     println!("cargo:rerun-if-changed={}", data_paths.mobile_keyboard_1gram);
@@ -80,7 +83,11 @@ fn main() {
             LexiconSourceFormat::Tsv,
         ),
     };
-    let compiled = compile_lexicon(&source, source_format).expect("default lexicon CSV/TSV must compile");
+    let mut entries = parse_lexicon_entries(&source, source_format).expect("default lexicon CSV/TSV must compile");
+    let additional_source =
+        fs::read_to_string(&additional_lexicon_csv).expect("additional google-10000 CSV must be readable");
+    entries.extend(parse_additional_csv_entries(&additional_source));
+    let compiled = compile_lexicon_entries(entries).expect("default lexicon entries must compile");
     let khpos_train =
         fs::read_to_string(&data_paths.khpos_train).expect("khPOS after-replace train corpus must be readable");
     let khpos_tags =
@@ -293,11 +300,10 @@ fn is_khmer_token(token: &str) -> bool {
         })
 }
 
-fn compile_lexicon(source: &str, source_format: LexiconSourceFormat) -> Result<Vec<u8>, String> {
-    let mut output = Vec::with_capacity(source.len() + 8);
+fn compile_lexicon_entries(entries: Vec<(String, String)>) -> Result<Vec<u8>, String> {
+    let mut output = Vec::new();
     output.extend_from_slice(MAGIC);
 
-    let entries = parse_lexicon_entries(source, source_format)?;
     let entry_count = entries.len() as u32;
     output.extend_from_slice(&entry_count.to_le_bytes());
 
@@ -312,6 +318,48 @@ fn compile_lexicon(source: &str, source_format: LexiconSourceFormat) -> Result<V
     }
 
     Ok(output)
+}
+
+fn parse_additional_csv_entries(source: &str) -> Vec<(String, String)> {
+    let mut entries = Vec::new();
+    let mut first_row = true;
+
+    for (line_no, line) in source.lines().enumerate() {
+        if line.trim().is_empty() {
+            continue;
+        }
+
+        let mut fields = match parse_csv_fields(line, line_no + 1) {
+            Ok(fields) => fields,
+            Err(_) => continue,
+        };
+        if fields.len() != 2 {
+            continue;
+        }
+        if line_no == 0 {
+            fields[0] = fields[0].trim_start_matches('\u{feff}').to_owned();
+        }
+
+        let roman = fields.remove(0).trim().to_owned();
+        let target = fields.remove(0).trim().to_owned();
+
+        if first_row {
+            let left = roman.to_ascii_lowercase();
+            let right = target.to_ascii_lowercase();
+            if (left == "roman" && right == "target") || (left == "english" && right == "khmer") {
+                first_row = false;
+                continue;
+            }
+        }
+        first_row = false;
+
+        if roman.is_empty() || target.is_empty() {
+            continue;
+        }
+        entries.push((roman, target));
+    }
+
+    entries
 }
 
 fn parse_lexicon_entries(source: &str, source_format: LexiconSourceFormat) -> Result<Vec<(String, String)>, String> {

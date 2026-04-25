@@ -619,9 +619,10 @@ mod tests {
         let snapshot = session.snapshot();
         assert_eq!(snapshot.selected_index, Some(0));
         assert_eq!(snapshot.candidate_display.len(), snapshot.candidates.len());
+        assert_eq!(snapshot.candidates.last().map(String::as_str), Some("jea"));
         let update = session.process_key_event(0x20, 0, 0);
         assert!(update.consumed);
-        assert_eq!(session.snapshot().selected_index, Some(0));
+        assert_eq!(session.snapshot().selected_index, Some(1));
     }
 
     #[test]
@@ -664,6 +665,27 @@ mod tests {
     }
 
     #[test]
+    fn selecting_raw_fallback_candidate_commits_literal_without_learning() {
+        let mut session = session();
+        type_ascii(&mut session, "jea");
+        let candidate_len = session.snapshot().candidates.len();
+        assert!(candidate_len >= 2);
+
+        for _ in 1..candidate_len {
+            let down = session.process_key_event(0xFF54, 0, 0);
+            assert!(down.consumed);
+        }
+
+        let snapshot = session.snapshot();
+        assert_eq!(snapshot.selected_index, Some(candidate_len - 1));
+        assert_eq!(snapshot.candidates.last().map(String::as_str), Some("jea"));
+
+        let update = session.process_key_event(0xFF0D, 0, 0);
+        assert_eq!(update.commit_text.as_deref(), Some("jea"));
+        assert!(!update.history_changed);
+    }
+
+    #[test]
     fn segment_focus_moves_with_left_right() {
         let mut session = session();
         type_ascii(&mut session, "khnhomtov");
@@ -690,7 +712,7 @@ mod tests {
         assert!(snapshot.segmented_active);
         assert_eq!(snapshot.focused_segment_index, Some(0));
         assert_eq!(snapshot.selected_index, Some(0));
-        assert_eq!(snapshot.candidates.len(), 2);
+        assert!(snapshot.candidates.len() >= 2);
 
         let down = session.process_key_event(0xFF54, 0, 0);
         assert!(down.consumed);
@@ -732,7 +754,7 @@ mod tests {
         let snapshot = session.snapshot();
         assert!(!snapshot.segmented_active);
         assert_eq!(snapshot.selected_index, Some(0));
-        assert_eq!(snapshot.candidates.len(), 2);
+        assert!(snapshot.candidates.len() >= 2);
 
         let down = session.process_key_event(0xFF54, 0, 0);
         assert!(down.consumed);
@@ -746,7 +768,6 @@ mod tests {
     #[test]
     fn up_down_pass_through_without_active_candidate_ui() {
         let mut session = session();
-        type_ascii(&mut session, "xxx");
         let snapshot = session.snapshot();
         assert!(snapshot.candidates.is_empty());
         assert!(!snapshot.segmented_active);

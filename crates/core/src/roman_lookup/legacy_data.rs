@@ -297,6 +297,7 @@ impl LegacyData {
                 })
         });
         suggestions.truncate(MAX_SUGGESTIONS);
+        append_raw_query_fallback(&mut suggestions, query);
         suggestions
     }
 
@@ -367,6 +368,22 @@ impl LegacyData {
     pub(crate) fn exact_targets(&self, normalized: &str) -> Option<&[String]> {
         self.by_normalized.get(normalized).map(Vec::as_slice)
     }
+}
+
+fn append_raw_query_fallback(suggestions: &mut Vec<String>, query: &str) {
+    if !is_raw_query_fallback_token(query) || MAX_SUGGESTIONS == 0 {
+        return;
+    }
+
+    suggestions.retain(|item| item != query);
+    if suggestions.len() >= MAX_SUGGESTIONS {
+        suggestions.truncate(MAX_SUGGESTIONS - 1);
+    }
+    suggestions.push(query.to_owned());
+}
+
+fn is_raw_query_fallback_token(query: &str) -> bool {
+    !query.is_empty() && query.chars().all(|ch| ch.is_ascii_alphanumeric() || ch == '_')
 }
 
 fn max_next_word_context_chars(next_word: &NextWordStats) -> usize {

@@ -45,7 +45,9 @@ impl DecoderManager {
 
         let mut visible = self.choose_visible_result(&legacy, wfst.as_ref());
         visible.candidates.truncate(self.config.max_candidates);
-        visible.visible_strings()
+        let mut suggestions = visible.visible_strings();
+        append_raw_query_fallback_tail(&mut suggestions, input, &legacy, self.config.max_candidates);
+        suggestions
     }
 
     pub(crate) fn shadow_observation(&self, input: &str, history: &HashMap<String, usize>) -> ShadowObservation {
@@ -116,6 +118,35 @@ impl DecoderManager {
             DecoderMode::Hybrid => merge_results(legacy, wfst, self.config.max_candidates),
         }
     }
+}
+
+fn append_raw_query_fallback_tail(
+    suggestions: &mut Vec<String>,
+    input: &str,
+    legacy: &DecodeResult,
+    max_candidates: usize,
+) {
+    if max_candidates == 0 {
+        return;
+    }
+
+    let query = input.strip_suffix(' ').unwrap_or(input);
+    if query.is_empty() || !query.chars().all(|ch| ch.is_ascii_alphanumeric() || ch == '_') {
+        return;
+    }
+
+    let Some(raw_literal) = legacy.candidates.last().map(|candidate| candidate.text.as_str()) else {
+        return;
+    };
+    if raw_literal != query {
+        return;
+    }
+
+    suggestions.retain(|candidate| candidate != raw_literal);
+    if suggestions.len() >= max_candidates {
+        suggestions.truncate(max_candidates - 1);
+    }
+    suggestions.push(raw_literal.to_owned());
 }
 
 fn merge_results(legacy: &DecodeResult, wfst: Option<&DecodeResult>, limit: usize) -> DecodeResult {

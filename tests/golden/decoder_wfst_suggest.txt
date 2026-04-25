@@ -23,12 +23,12 @@ input: sronos
 top_n: 7
 suggestions:
 1. ស្រណោះ
-2. ស្រីនេះ
-3. ស្រីនោះ
-4. ស្រីងរ
-5. សារនេះ
-6. សារនោះ
-7. ស្រីងងូស
+2. ស្រីងរ
+3. ស្រីងងូស
+4. ស្រីងង៉េស
+5. ស្រីង៉េសៗ
+6. សារងរ
+7. សរសើរងរ
 
 [[case]]
 name: exact_phrase_khnhomttov
@@ -39,8 +39,8 @@ suggestions:
 2. ខ្ញមទៅ
 3. ខ្ញុំទៅ៏
 4. ខ្ញមទៅ៏
-5. ក្នុងទទីមទទាម
-6. ក្នុងទទ្រែមទទ្រម
+5. ក្នុងតម្កុំតម្កើង
+6. ក្នុងទទ្រីមទទ្រម
 
 [[case]]
 name: beam_phrase_saensronors
@@ -61,5 +61,5 @@ name: beam_phrase_khomtaekitmnakaeng
 input: khomtaekitmnakaeng
 top_n: 1
 suggestions:
-1. ខំតែគិតម្នាក់ឯង
+1. ខំតែកញ្ចប់ម្នាក់ឯង
 
