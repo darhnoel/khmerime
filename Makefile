@@ -42,10 +42,10 @@ web:
 	cd $(APP_DIR) && $(DX) serve
 
 web-release:
-	bash scripts/build_web_release.sh
+	bash scripts/web/build_release.sh
 
 web-phone:
-	bash scripts/serve_web_phone.sh
+	bash scripts/web/serve_phone.sh
 
 desktop:
 	cd $(APP_DIR) && $(DX) serve --platform desktop
@@ -74,10 +74,10 @@ shadow-eval:
 	fi
 
 visualize-lexicon:
-	python3 scripts/visualize_roman_lookup.py
+	python3 scripts/data/lexicon/visualize_roman_lookup.py
 
 visualize-lexicon-streamlit:
-	python3 -m streamlit run scripts/visualize_roman_lookup_streamlit.py
+	python3 -m streamlit run scripts/data/lexicon/visualize_roman_lookup_streamlit.py
 
 fmt:
 	cargo fmt --all
@@ -92,13 +92,13 @@ test-ui:
 	python3 -m pytest tests/test_web_ui.py
 
 ibus-install:
-	bash scripts/install_ibus_engine.sh
+	bash scripts/platforms/linux/ibus/install_engine.sh
 
 ibus-uninstall:
-	bash scripts/uninstall_ibus_engine.sh
+	bash scripts/platforms/linux/ibus/uninstall_engine.sh
 
 ibus-smoke:
-	bash scripts/smoke_test_ibus_engine.sh
+	bash scripts/platforms/linux/ibus/smoke_test.sh
 
 paper-current:
 	cd $(PAPER_CURRENT_DIR) && TEXMFVAR=/tmp/texmf-var lualatex -interaction=nonstopmode -halt-on-error $(PAPER_CURRENT_TEX)

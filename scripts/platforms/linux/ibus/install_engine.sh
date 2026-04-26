@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../../.." && pwd)"
 INSTALL_LIBEXEC_DIR="${KHMERIME_IBUS_LIBEXEC_DIR:-/usr/libexec/khmerime}"
 INSTALL_COMPONENT_DIR="${KHMERIME_IBUS_COMPONENT_DIR:-/usr/share/ibus/component}"
 ENGINE_SCRIPT_SRC="${ROOT_DIR}/adapters/linux-ibus/python/khmerime_ibus_engine.py"

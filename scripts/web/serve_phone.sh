@@ -5,7 +5,7 @@ ADDR="${ADDR:-0.0.0.0}"
 PORT="${PORT:-4173}"
 FEATURES="${DX_FEATURES:-}"
 
-ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 APP_DIR="$ROOT_DIR/apps/dioxus-app"
 INDEX_HTML="$ROOT_DIR/target/dx/roman_lookup/debug/web/public/index.html"
 HEAD_SNIPPET="$ROOT_DIR/assets/web_preboot_head.html"

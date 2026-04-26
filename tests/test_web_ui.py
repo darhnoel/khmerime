@@ -130,7 +130,7 @@ def web_server():
     env["PORT"] = str(port)
     env["DX_FEATURES"] = "wfst-decoder"
     process = subprocess.Popen(
-        ["bash", "scripts/serve_web_phone.sh"],
+        ["bash", "scripts/web/serve_phone.sh"],
         cwd=ROOT,
         env=env,
         stdout=subprocess.DEVNULL,
