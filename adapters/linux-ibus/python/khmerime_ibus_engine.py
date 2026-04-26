@@ -32,8 +32,8 @@ from gi.repository import GLib, IBus  # noqa: E402
 
 SERVICE_NAME = "org.freedesktop.IBus.KhmerIME"
 ENGINE_NAME = "khmerime"
-ENGINE_LONGNAME = "AngkorIME"
-ENGINE_DESCRIPTION = "Khmer romanization IME powered by AngkorIME"
+ENGINE_LONGNAME = "KhmerIME"
+ENGINE_DESCRIPTION = "Khmer romanization IME powered by KhmerIME"
 ENGINE_LANGUAGE = "km"
 ENGINE_LAYOUT = "us"
 ENGINE_SYMBOL = "ខ"
@@ -445,11 +445,11 @@ def component_xml(exec_path: Path) -> str:
     exec_cmd = f"{exec_path} --ibus"
     return f"""<component>
     <name>{SERVICE_NAME}</name>
-    <description>AngkorIME input method engine</description>
+    <description>KhmerIME input method engine</description>
     <version>0.1.0</version>
     <license>MIT</license>
-    <author>AngkorIME contributors</author>
-    <homepage>https://github.com/darhnoel/angkorime</homepage>
+    <author>KhmerIME contributors</author>
+    <homepage>https://github.com/darhnoel/khmerime</homepage>
     <textdomain>khmerime</textdomain>
     <exec>{exec_cmd}</exec>
     <engines>
@@ -459,7 +459,7 @@ def component_xml(exec_path: Path) -> str:
             <description>{ENGINE_DESCRIPTION}</description>
             <language>{ENGINE_LANGUAGE}</language>
             <license>MIT</license>
-            <author>AngkorIME contributors</author>
+            <author>KhmerIME contributors</author>
             <icon></icon>
             <layout>{ENGINE_LAYOUT}</layout>
             <symbol>{ENGINE_SYMBOL}</symbol>
@@ -471,11 +471,11 @@ def component_xml(exec_path: Path) -> str:
 def register_component(bus: IBus.Bus, exec_path: Path) -> None:
     component = IBus.Component.new(
         SERVICE_NAME,
-        "AngkorIME input method engine",
+        "KhmerIME input method engine",
         "0.1.0",
         "MIT",
-        "AngkorIME contributors",
-        "https://github.com/darhnoel/angkorime",
+        "KhmerIME contributors",
+        "https://github.com/darhnoel/khmerime",
         "khmerime",
         str(exec_path),
     )
@@ -485,7 +485,7 @@ def register_component(bus: IBus.Bus, exec_path: Path) -> None:
         ENGINE_DESCRIPTION,
         ENGINE_LANGUAGE,
         "MIT",
-        "AngkorIME contributors",
+        "KhmerIME contributors",
         "",
         ENGINE_LAYOUT,
     )

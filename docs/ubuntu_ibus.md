@@ -54,7 +54,7 @@ That XML says roughly:
 ```text
 name:        org.freedesktop.IBus.KhmerIME
 engine:      khmerime
-long name:   AngkorIME
+long name:   KhmerIME
 language:    km
 layout:      us
 symbol:      ខ

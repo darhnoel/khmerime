@@ -1,4 +1,4 @@
-# Contributing to AngkorIME
+# Contributing to KhmerIME
 
 Thank you for contributing. This project is an open-source Khmer IME with a locked regression surface for decoder behavior and native input flows.
 

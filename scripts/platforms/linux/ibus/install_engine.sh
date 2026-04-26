@@ -68,21 +68,21 @@ TMP_COMPONENT_XML="$(mktemp)"
 cat > "${TMP_COMPONENT_XML}" <<EOF
 <component>
     <name>org.freedesktop.IBus.KhmerIME</name>
-    <description>AngkorIME input method engine</description>
+    <description>KhmerIME input method engine</description>
     <version>0.1.0</version>
     <license>MIT</license>
-    <author>AngkorIME contributors</author>
-    <homepage>https://github.com/darhnoel/angkorime</homepage>
+    <author>KhmerIME contributors</author>
+    <homepage>https://github.com/darhnoel/khmerime</homepage>
     <textdomain>khmerime</textdomain>
     <exec>${ENGINE_SCRIPT_DST} --ibus --bridge-path ${BRIDGE_BINARY_DST}</exec>
     <engines>
         <engine>
             <name>khmerime</name>
-            <longname>AngkorIME</longname>
-            <description>Khmer romanization IME powered by AngkorIME</description>
+            <longname>KhmerIME</longname>
+            <description>Khmer romanization IME powered by KhmerIME</description>
             <language>km</language>
             <license>MIT</license>
-            <author>AngkorIME contributors</author>
+            <author>KhmerIME contributors</author>
             <icon></icon>
             <layout>us</layout>
             <symbol>ខ</symbol>
