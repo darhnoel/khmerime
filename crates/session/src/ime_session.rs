@@ -317,6 +317,15 @@ impl ImeSession {
         };
         self.composition_raw.push(normalized);
         self.recompute_composition_state();
+        if self.should_auto_commit_single_keycap(normalized) {
+            let commit_text = self.selected_or_raw_fallback();
+            self.reset();
+            return SessionResult {
+                consumed: true,
+                commit_text: Some(commit_text),
+                history_changed: false,
+            };
+        }
         SessionResult {
             consumed: true,
             ..SessionResult::default()
@@ -518,6 +527,19 @@ impl ImeSession {
         .unwrap_or(session)
     }
 
+    fn should_auto_commit_single_keycap(&self, typed_char: char) -> bool {
+        if !is_single_keycap_char(typed_char) {
+            return false;
+        }
+        if self.composition_raw.chars().count() != 1 {
+            return false;
+        }
+        if self.segmented_session.is_some() {
+            return false;
+        }
+        self.candidates.len() == 1
+    }
+
     fn recompute_composition_state(&mut self) {
         if self.composition_raw.is_empty() {
             self.candidates.clear();
@@ -569,6 +591,13 @@ fn keyval_to_ascii_char(keyval: u32) -> Option<char> {
 fn offset_index(current: usize, len: usize, delta: isize) -> usize {
     debug_assert!(len > 0);
     (current as isize + delta).rem_euclid(len as isize) as usize
+}
+
+fn is_single_keycap_char(ch: char) -> bool {
+    matches!(
+        ch,
+        '0'..='9' | '!' | '"' | '#' | '$' | '%' | '&' | '\'' | '(' | ')' | '~' | '='
+    )
 }
 
 #[cfg(test)]
@@ -662,6 +691,26 @@ mod tests {
         assert!(update.commit_text.is_none());
         let committed = session.process_key_event(0xFF0D, 0, 0);
         assert_eq!(committed.commit_text.as_deref(), Some("ជា"));
+    }
+
+    #[test]
+    fn single_digit_keycap_commits_immediately() {
+        let mut session = session();
+        let update = session.process_key_event('1' as u32, 0, 0);
+        assert!(update.consumed);
+        assert_eq!(update.commit_text.as_deref(), Some("១"));
+        assert!(!update.history_changed);
+        assert!(session.snapshot().preedit.is_empty());
+    }
+
+    #[test]
+    fn single_symbol_keycap_commits_immediately() {
+        let mut session = session();
+        let update = session.process_key_event('=' as u32, 0, 0);
+        assert!(update.consumed);
+        assert_eq!(update.commit_text.as_deref(), Some("៌"));
+        assert!(!update.history_changed);
+        assert!(session.snapshot().preedit.is_empty());
     }
 
     #[test]

@@ -43,7 +43,7 @@ fn bridge_commits_raw_roman_when_no_candidate() {
     send_command(&mut stdin, r#"{"cmd":"focus_in"}"#);
     let _ = read_response(&mut stdout);
 
-    for keyval in [35, 36, 37] {
+    for keyval in [96, 96, 96] {
         send_command(
             &mut stdin,
             &format!(r#"{{"cmd":"process_key_event","keyval":{keyval},"keycode":0,"state":0}}"#),
@@ -56,8 +56,28 @@ fn bridge_commits_raw_roman_when_no_candidate() {
         r#"{"cmd":"process_key_event","keyval":65293,"keycode":0,"state":0}"#,
     );
     let commit_response = read_response(&mut stdout);
-    assert_eq!(commit_response["commit_text"], Value::String("#$%".to_owned()));
+    assert_eq!(commit_response["commit_text"], Value::String("```".to_owned()));
     assert_eq!(commit_response["consumed"], Value::Bool(true));
+
+    shutdown_and_assert_ok(child, &mut stdin, &mut stdout);
+}
+
+#[test]
+fn bridge_commits_single_keycap_digit_immediately() {
+    let (child, mut stdin, mut stdout) = spawn_bridge();
+
+    send_command(&mut stdin, r#"{"cmd":"focus_in"}"#);
+    let _ = read_response(&mut stdout);
+
+    send_command(
+        &mut stdin,
+        r#"{"cmd":"process_key_event","keyval":49,"keycode":0,"state":0}"#,
+    );
+    let response = read_response(&mut stdout);
+    assert_eq!(response["consumed"], Value::Bool(true));
+    assert_eq!(response["commit_text"], Value::String("១".to_owned()));
+    assert_eq!(response["history_changed"], Value::Bool(false));
+    assert_eq!(response["snapshot"]["preedit"], Value::String(String::new()));
 
     shutdown_and_assert_ok(child, &mut stdin, &mut stdout);
 }
