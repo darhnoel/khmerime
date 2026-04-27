@@ -3,6 +3,9 @@
 Windows Text Services Framework (TSF) scaffold crate.
 
 This package is intentionally contract-first and non-runnable in phase 1.
+It contains documented skeleton modules for the future TSF COM DLL shape, but it
+does not implement COM exports, TSF registration, edit sessions, candidate UI, or
+packaging yet.
 
 ## Prerequisites
 
@@ -21,11 +24,11 @@ This package is intentionally contract-first and non-runnable in phase 1.
 
 ## First 5 Contributor Tasks
 
-1. Add Windows TSF COM host shell for callback routing.
-2. Define Rust boundary for callback/render structs.
-3. Implement callback mapping to session commands.
-4. Implement composition/preedit/candidate UI wiring.
-5. Add Notepad/browser text-field smoke checklist.
+1. Keep the skeleton compiling cross-platform.
+2. Add a pure Rust `session_driver` test around `khmerime_session::ImeSession`.
+3. Add Windows key-conversion tests before COM code.
+4. Add COM lifecycle logging only after the pure Rust path works.
+5. Add TSF edit-session mutation only after activation and key sink callbacks work on Windows.
 
 ## Debugging Checklist
 
@@ -39,3 +42,5 @@ This package is intentionally contract-first and non-runnable in phase 1.
 - Do not embed Dioxus runtime in adapter code.
 - Do not fork transliteration/session logic into TSF crate.
 - Do not alter session contracts in scaffold-only work.
+- Do not add `windows` crate bindings, COM exports, registry writes, or packaging
+  targets until the relevant milestone needs them.
