@@ -1,3 +1,8 @@
+//! Developer CLI for inspecting KhmerIME data and decoder behavior.
+//!
+//! This binary is diagnostic tooling: stats, suggestions, and shadow evaluation.
+//! It may call `khmerime_core` directly because it is not a platform IME runtime.
+
 use std::collections::HashMap;
 use std::env;
 use std::fmt::Write;

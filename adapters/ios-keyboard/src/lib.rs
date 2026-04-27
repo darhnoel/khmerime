@@ -4,6 +4,8 @@
 //! It documents how an iOS keyboard extension (`UIInputViewController`)
 //! should translate platform callbacks into shared `khmerime_session`
 //! commands without embedding Dioxus runtime code.
+//! The Swift/Obj-C layer should remain a thin platform shell over the shared
+//! session contract rather than owning transliteration or ranking behavior.
 //!
 //! References:
 //! - UIInputViewController: <https://developer.apple.com/documentation/uikit/uiinputviewcontroller>

@@ -5,6 +5,9 @@
 //! shared `khmerime_session` commands.
 //!
 //! Dioxus runtime code is intentionally excluded from this adapter.
+//! Android code should translate platform lifecycle/key events into
+//! `SessionCommand` values and render snapshots; it should not call
+//! `khmerime_core` directly.
 //!
 //! References:
 //! - Create an input method:

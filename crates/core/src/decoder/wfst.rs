@@ -13,6 +13,12 @@ const MIN_SPAN_LEN: usize = 3;
 const CHUNK_EDIT_FLOOR: f64 = 0.46;
 const SEGMENT_LIMIT_PER_START: usize = 12;
 
+// This decoder is WFST-style rather than a compiled finite-state transducer. It
+// builds span candidates from lexicon retrieval signals and runs a beam search
+// with weighted chunk, segmentation, language-model, POS, and history scores.
+// Keep score components separated so shadow/hybrid modes can explain ranking
+// changes without platform adapters knowing decoder internals.
+
 #[derive(Clone, Debug)]
 struct RetrievalSignals {
     raw_exact_hit: bool,

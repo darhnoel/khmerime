@@ -23,6 +23,11 @@ const STATE_HYPER_MASK: u32 = 1 << 27;
 const STATE_META_MASK: u32 = 1 << 28;
 const STATE_RELEASE_MASK: u32 = 1 << 30;
 
+/// Persistence boundary for learned candidate usage.
+///
+/// Implementations should store the map as simple word/candidate keys to usage
+/// counts. The desktop adapters currently use TSV so Khmer text and roman keys
+/// do not require CSV quoting.
 pub trait HistoryStore {
     type Error;
 
@@ -32,19 +37,36 @@ pub trait HistoryStore {
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize)]
 pub struct CursorLocation {
+    /// Screen-space x coordinate used by adapters to anchor candidate UI.
     pub x: i32,
+    /// Screen-space y coordinate used by adapters to anchor candidate UI.
     pub y: i32,
+    /// Caret or composition rectangle width, when the platform provides it.
     pub width: i32,
+    /// Caret or composition rectangle height, when the platform provides it.
     pub height: i32,
 }
 
+/// Platform-neutral key payload accepted by `ImeSession`.
+///
+/// `keyval` follows the current XKB-style contract used by the session for
+/// printable Unicode scalars and special keys. Platform adapters must translate
+/// native key events into this representation before calling the session.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize)]
 pub struct NativeKeyEvent {
+    /// Printable Unicode scalar or one of the session's special key constants.
     pub keyval: u32,
+    /// Native platform key code for diagnostics or future platform-specific use.
     pub keycode: u32,
+    /// Modifier/release bitmask normalized by the adapter.
     pub state: u32,
 }
 
+/// Adapter-facing command model for native IME integrations.
+///
+/// All platform callbacks should be reduced to this enum before they affect
+/// shared IME behavior. This keeps OS-specific lifecycle and key APIs out of
+/// the core transliteration engine.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum SessionCommand {
     ProcessKeyEvent(NativeKeyEvent),
@@ -58,11 +80,19 @@ pub enum SessionCommand {
 
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize)]
 pub struct SegmentPreviewEntry {
+    /// Khmer output for this segment using the current selected candidate.
     pub output: String,
+    /// Roman input range represented by the segment.
     pub input: String,
+    /// Whether this segment currently owns candidate navigation focus.
     pub focused: bool,
 }
 
+/// Render-facing snapshot of the current IME state.
+///
+/// Adapters should treat this as the single source of truth for preedit,
+/// candidate list, segment preview, selected candidate, and cursor anchoring.
+/// It intentionally contains no platform widget handles.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize)]
 pub struct SessionSnapshot {
     pub enabled: bool,
@@ -80,11 +110,20 @@ pub struct SessionSnapshot {
 
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize)]
 pub struct CandidateDisplayEntry {
+    /// Candidate text to render.
     pub output: String,
+    /// Whether ranking marks this candidate as the recommended/default choice.
     pub recommended: bool,
+    /// Roman hints that explain why this candidate matched the current input.
     pub roman_hints: Vec<String>,
 }
 
+/// Result of processing one adapter command.
+///
+/// `consumed` controls whether the host application should also receive the
+/// original key. `commit_text` is one-shot: adapters must commit it once and then
+/// rely on the next snapshot for display state. `history_changed` tells adapters
+/// when learned usage should be persisted.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct SessionResult {
     pub consumed: bool,

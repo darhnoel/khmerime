@@ -12,6 +12,9 @@ use std::path::PathBuf;
 #[cfg(not(target_arch = "wasm32"))]
 const DESKTOP_HISTORY_FILE: &str = "history.tsv";
 
+// Desktop history is internal app state, not user-facing import/export data.
+// TSV keeps the format compatible with `HistoryStore` while avoiding CSV quoting
+// for Khmer text and roman keys.
 #[cfg(not(target_arch = "wasm32"))]
 pub fn desktop_history_path() -> Option<PathBuf> {
     if let Some(config_home) = std::env::var_os("XDG_CONFIG_HOME") {

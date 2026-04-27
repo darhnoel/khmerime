@@ -5,6 +5,8 @@
 //! callback events into shared `khmerime_session` commands.
 //!
 //! Dioxus is intentionally out-of-scope for this adapter runtime.
+//! InputMethodKit code should own native composition/candidate rendering only;
+//! shared key semantics and candidate ranking belong in `khmerime_session`.
 //!
 //! References:
 //! - InputMethodKit overview: <https://developer.apple.com/documentation/inputmethodkit>

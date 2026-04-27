@@ -1,3 +1,10 @@
+//! Shared KhmerIME transliteration engine.
+//!
+//! This crate owns roman normalization, lexicon lookup, decoder orchestration,
+//! phrase segmentation, Khmer normalization, and compiled data loading. Platform
+//! adapters and UI crates should call this through `khmerime_session` unless
+//! they are inspection tools such as the CLI.
+
 mod composer;
 mod decoder;
 mod roman_lookup;

@@ -1,3 +1,9 @@
+//! Transliterator registry for the Dioxus runtime.
+//!
+//! The app keeps one lazily initialized engine per decoder mode. On wasm with
+//! `fetch-data`, startup uses a small phase-A lexicon before swapping to full
+//! compiled blobs; non-wasm builds use embedded data immediately.
+
 #[cfg(all(target_arch = "wasm32", feature = "fetch-data"))]
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::OnceLock;

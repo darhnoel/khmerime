@@ -1,13 +1,25 @@
+//! Segment refinement for long roman phrases.
+//!
+//! The decoder can identify multiple roman chunks inside a long token. This
+//! module turns those observations into a focused editing session so UI/native
+//! adapters can move between segments and cycle candidates without reimplementing
+//! phrase segmentation.
+
 use std::collections::{HashMap, HashSet};
 
 use crate::ShadowObservation;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct SegmentedChoice {
+    /// Roman input for this segment.
     pub input: String,
+    /// Character start offset inside the normalized raw input.
     pub start: usize,
+    /// Character end offset inside the normalized raw input.
     pub end: usize,
+    /// Visible candidates for the segment, already normalized for display.
     pub candidates: Vec<String>,
+    /// Selected candidate index within `candidates`.
     pub selected: usize,
 }
 
@@ -23,8 +35,11 @@ impl SegmentedChoice {
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct SegmentedSession {
+    /// Original roman phrase being refined.
     pub raw_input: String,
+    /// Editable segment choices, in phrase order.
     pub segments: Vec<SegmentedChoice>,
+    /// Segment index that currently receives navigation/candidate commands.
     pub focused: usize,
 }
 

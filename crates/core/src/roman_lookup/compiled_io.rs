@@ -1,5 +1,10 @@
 use super::*;
 
+// Compiled data is intentionally simple and append-only: fixed magic bytes,
+// counts, then length-prefixed UTF-8 records and little-endian integers. Keep
+// parsers strict so stale generated blobs fail during startup instead of
+// producing corrupted candidates.
+
 impl CorpusStats {
     #[cfg(not(all(target_arch = "wasm32", feature = "fetch-data")))]
     pub(super) fn from_default_data() -> Result<Self> {

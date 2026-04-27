@@ -1,3 +1,9 @@
+//! Linux IBus bridge protocol types and desktop persistence exports.
+//!
+//! The Linux runtime has two native pieces: a Python IBus adapter that receives
+//! desktop callbacks, and a Rust bridge process that owns `khmerime_session`.
+//! This crate defines the JSON command/response boundary between them.
+
 use khmerime_session::CursorLocation;
 use serde::{Deserialize, Serialize};
 
@@ -19,6 +25,10 @@ pub enum BridgeCommand {
     Shutdown,
 }
 
+/// JSON response returned by the Rust bridge after every command.
+///
+/// Python should render `snapshot`, commit `commit_text` once, and use
+/// `consumed` to decide whether IBus should swallow the original key event.
 #[derive(Debug, Serialize)]
 pub struct BridgeResponse<S> {
     pub ok: bool,

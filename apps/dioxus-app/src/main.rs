@@ -1,3 +1,9 @@
+//! Dioxus web/desktop shell for KhmerIME.
+//!
+//! This app owns browser/desktop UI state, storage, caret/popup positioning, and
+//! startup loading. Transliteration, segmentation, and ranking remain in the
+//! shared engine crates so native adapters and CLI tools see the same behavior.
+
 use std::collections::HashMap;
 
 use dioxus::document;

@@ -13,6 +13,10 @@ const DEFAULT_MOBILE_KEYBOARD_1GRAM_PATH: &str =
     "../../data/khmerlang-mobile-keyboard-data/keyboard-data/extracted/mobile-keyboard-data-1gram.csv";
 const DEFAULT_MOBILE_KEYBOARD_2GRAM_PATH: &str =
     "../../data/khmerlang-mobile-keyboard-data/keyboard-data/extracted/mobile-keyboard-data-2gram.csv";
+
+// These magic bytes version the compact binary blobs embedded into the Rust
+// binary. Runtime parsers use them to reject stale or mismatched generated data
+// before interpreting offsets and counts.
 const MAGIC: &[u8; 4] = b"RLX1";
 const KHPOS_MAGIC: &[u8; 4] = b"KPS1";
 const NEXT_WORD_MAGIC: &[u8; 4] = b"NWS1";
@@ -77,6 +81,8 @@ fn main() {
     println!("cargo:rerun-if-changed={}", data_paths.mobile_keyboard_2gram);
     println!("cargo:rerun-if-env-changed=KHMERIME_WARN_MISSING_OPTIONAL_DATA");
 
+    // The checked-in CSV is canonical, but the TSV fallback keeps older local
+    // worktrees usable while data migrations are in flight.
     let (source, source_format) = match fs::read_to_string(&data_paths.lexicon_csv) {
         Ok(source) => (source, LexiconSourceFormat::Csv),
         Err(_) => (
@@ -95,6 +101,10 @@ fn main() {
         fs::read_to_string(&data_paths.khpos_tag).expect("khPOS after-replace tag corpus must be readable");
     let compiled_khpos =
         compile_khpos_stats(&khpos_train, &khpos_tags).expect("khPOS after-replace corpus must compile");
+    // Mobile keyboard n-grams improve next-word scoring, but they are optional
+    // for normal development. Set KHMERIME_WARN_MISSING_OPTIONAL_DATA=1 when
+    // auditing data-path configuration and you want missing optional files to be
+    // visible as Cargo warnings.
     let warn_missing_optional_data = env::var_os("KHMERIME_WARN_MISSING_OPTIONAL_DATA").is_some();
     let mobile_keyboard_1gram = read_optional_source(
         &data_paths.mobile_keyboard_1gram,
@@ -152,6 +162,8 @@ fn read_optional_source(path: &str, label: &str, warn_when_missing: bool) -> Str
             if warn_when_missing {
                 println!("cargo:warning={label} data not found at {path}: {error}; compiling empty optional dataset");
             }
+            // Empty optional data compiles to a valid empty stats blob so every
+            // target can build without vendoring large experimental datasets.
             String::new()
         }
     }
