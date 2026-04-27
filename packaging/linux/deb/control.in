@@ -1,0 +1,10 @@
+Package: khmerime
+Version: @VERSION@
+Section: utils
+Priority: optional
+Architecture: @ARCH@
+Depends: ibus, python3, python3-gi, gir1.2-ibus-1.0
+Maintainer: KhmerIME contributors
+Description: Khmer romanization input method for IBus
+ KhmerIME is a Khmer romanization input method engine. This package installs
+ the IBus adapter, Rust bridge, and IBus component metadata for Linux desktops.

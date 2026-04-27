@@ -1,4 +1,4 @@
-.PHONY: help web web-release web-phone desktop stats suggest suggest-wfst suggest-shadow shadow-eval visualize-lexicon visualize-lexicon-streamlit fmt test test-golden test-ui ibus-install ibus-uninstall ibus-smoke paper-current paper-current-clean
+.PHONY: help web web-release web-phone desktop stats suggest suggest-wfst suggest-shadow shadow-eval visualize-lexicon visualize-lexicon-streamlit fmt test test-golden test-ui platform-check platform-check-linux platform-check-android platform-check-ios platform-check-macos platform-check-windows linux-package ibus-install ibus-uninstall ibus-smoke paper-current paper-current-clean
 
 DX ?= dx
 APP_DIR := apps/dioxus-app
@@ -30,6 +30,9 @@ help:
 	"  make test                        Run cargo test" \
 	"  make test-golden                 Run the WFST golden snapshot test" \
 	"  make test-ui                     Run the browser/UI Python test file" \
+	"  make platform-check              Check all native platform adapter crates" \
+	"  make platform-check-<platform>   Check one adapter: linux, android, ios, macos, windows" \
+	"  make linux-package               Build the Linux IBus .deb package under dist/linux/" \
 	"  make ibus-install                Build and install KhmerIME IBus engine files (may use sudo)" \
 	"  make ibus-uninstall              Remove KhmerIME IBus engine files" \
 	"  make ibus-smoke                  Run bridge + IBus discovery smoke checks" \
@@ -90,6 +93,26 @@ test-golden:
 
 test-ui:
 	python3 -m pytest tests/test_web_ui.py
+
+platform-check: platform-check-linux platform-check-android platform-check-ios platform-check-macos platform-check-windows
+
+platform-check-linux:
+	cargo check -p khmerime_linux_ibus
+
+platform-check-android:
+	cargo check -p khmerime_android_ime
+
+platform-check-ios:
+	cargo check -p khmerime_ios_keyboard
+
+platform-check-macos:
+	cargo check -p khmerime_macos_imk
+
+platform-check-windows:
+	cargo check -p khmerime_windows_tsf
+
+linux-package:
+	bash scripts/platforms/linux/ibus/build_deb.sh
 
 ibus-install:
 	bash scripts/platforms/linux/ibus/install_engine.sh

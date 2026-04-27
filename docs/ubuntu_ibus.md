@@ -65,7 +65,7 @@ After IBus refreshes its cache, Ubuntu Settings can show this as an input source
 
 The user switches to it with the desktop input-source shortcut, usually `Super+Space` on GNOME. That switch is the v1 on/off model. We are not adding a separate in-app toggle for the native keyboard path.
 
-## Installed Files
+## Developer-Local Installed Files
 
 `make ibus-install` runs `scripts/platforms/linux/ibus/install_engine.sh`.
 
@@ -92,6 +92,21 @@ Remove those files with:
 ```bash
 make ibus-uninstall
 ```
+
+This is the developer-local path. It is useful while changing the IBus adapter,
+Rust bridge, or session behavior because it installs directly from the working
+tree.
+
+For a general Ubuntu/Debian user, build and install the `.deb` package instead:
+
+```bash
+make linux-package
+sudo apt install ./dist/linux/khmerime_0.1.0_amd64.deb
+```
+
+The package installs the same runtime files under `/usr/libexec/khmerime/` and
+`/usr/share/ibus/component/`, then refreshes the IBus cache. It prints restart or
+login guidance but does not forcibly restart the user's desktop input session.
 
 ## Runtime Pieces
 
@@ -331,7 +346,7 @@ user commits candidate
 
 That history can influence future ranking.
 
-## How To Install And Try It
+## How To Install And Try It Locally
 
 Run:
 
@@ -360,6 +375,20 @@ ibus restart
 ```
 
 If it still does not appear, log out and log back in. IBus discovery can be session-cache sensitive.
+
+For a packaged install, build the Debian package first:
+
+```bash
+make linux-package
+sudo apt install ./dist/linux/khmerime_0.1.0_amd64.deb
+ibus restart
+```
+
+Then add `KhmerIME` from Ubuntu Settings in the same way. Remove the package with:
+
+```bash
+sudo apt remove khmerime
+```
 
 ## How To Smoke Test Without The Desktop UI
 
@@ -478,7 +507,7 @@ cargo test
 cargo test --test decoder_golden
 ```
 
-For final manual confidence on Ubuntu:
+For final manual confidence on Ubuntu with the developer-local install:
 
 1. Run `make ibus-install`.
 2. Add `KhmerIME` in Settings if needed.
@@ -491,12 +520,22 @@ For final manual confidence on Ubuntu:
 
 ## Current Scope And Limitations
 
-The current Ubuntu path is a developer-local v1 integration.
+The current Ubuntu path has two supported install modes:
+
+```text
+developer-local install
+  make ibus-install / make ibus-uninstall
+
+packaged install
+  make linux-package, then install dist/linux/khmerime_<version>_amd64.deb
+```
+
+The `.deb` package is the first concrete general-user package track. The
+developer-local install remains useful for adapter and bridge development.
 
 It does not yet provide:
 
 ```text
-Debian package
 Ubuntu PPA
 GNOME extension
 custom settings UI

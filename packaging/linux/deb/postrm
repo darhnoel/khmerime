@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+set -e
+
+if command -v ibus >/dev/null 2>&1; then
+  ibus write-cache || true
+fi
+
+cat <<'MSG'
+KhmerIME was removed.
+
+If it still appears in input sources, restart IBus or log out and back in.
+If needed, run: ibus restart
+MSG
