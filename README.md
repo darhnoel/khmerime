@@ -21,7 +21,7 @@ Standalone Rust lookup engine with:
 - Platform docs: `docs/platforms/`
 - Default embedded data:
   - primary: `data/roman_lookup.csv`
-  - secondary experimental code-switch source: `data/google-10000-english.csv`
+  - secondary most-common English-Khmer source: `data/most-common-en-kh.csv`
 
 ## Usage
 

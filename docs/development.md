@@ -34,6 +34,7 @@ make shadow-eval QUERIES=path/to/queries.txt
 make test
 make test-golden
 make test-ui
+make platform-check
 make ibus-install
 make ibus-uninstall
 make ibus-smoke
@@ -78,6 +79,12 @@ make test-golden
 
 make test-ui
   Run the browser/UI Python test file.
+
+make platform-check
+  Run cargo check for every native platform adapter crate.
+
+make platform-check-<platform>
+  Run cargo check for one adapter: linux, android, ios, macos, or windows.
 
 make ibus-install
   Build and install KhmerIME IBus engine files for Ubuntu desktop testing.

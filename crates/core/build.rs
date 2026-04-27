@@ -6,7 +6,7 @@ use std::path::{Path, PathBuf};
 const DATA_PATHS_CONFIG_PATH: &str = "../../config/data_paths.toml";
 const DEFAULT_TSV_PATH: &str = "../../data/roman_lookup.tsv";
 const DEFAULT_CSV_PATH: &str = "../../data/roman_lookup.csv";
-const DEFAULT_ADDITIONAL_CSV_PATH: &str = "../../data/google-10000-english.csv";
+const DEFAULT_ADDITIONAL_CSV_PATH: &str = "../../data/most-common-en-kh.csv";
 const DEFAULT_KHPOS_TRAIN_PATH: &str = "../../data/khPOS/corpus-draft-ver-1.0/data/after-replace/train.all";
 const DEFAULT_KHPOS_TAG_PATH: &str = "../../data/khPOS/corpus-draft-ver-1.0/data/after-replace/train.all.tag";
 const DEFAULT_MOBILE_KEYBOARD_1GRAM_PATH: &str =
@@ -75,6 +75,7 @@ fn main() {
     println!("cargo:rerun-if-changed={}", data_paths.khpos_tag);
     println!("cargo:rerun-if-changed={}", data_paths.mobile_keyboard_1gram);
     println!("cargo:rerun-if-changed={}", data_paths.mobile_keyboard_2gram);
+    println!("cargo:rerun-if-env-changed=KHMERIME_WARN_MISSING_OPTIONAL_DATA");
 
     let (source, source_format) = match fs::read_to_string(&data_paths.lexicon_csv) {
         Ok(source) => (source, LexiconSourceFormat::Csv),
@@ -85,7 +86,7 @@ fn main() {
     };
     let mut entries = parse_lexicon_entries(&source, source_format).expect("default lexicon CSV/TSV must compile");
     let additional_source =
-        fs::read_to_string(&additional_lexicon_csv).expect("additional google-10000 CSV must be readable");
+        fs::read_to_string(&additional_lexicon_csv).expect("additional most-common English-Khmer CSV must be readable");
     entries.extend(parse_additional_csv_entries(&additional_source));
     let compiled = compile_lexicon_entries(entries).expect("default lexicon entries must compile");
     let khpos_train =
@@ -94,10 +95,17 @@ fn main() {
         fs::read_to_string(&data_paths.khpos_tag).expect("khPOS after-replace tag corpus must be readable");
     let compiled_khpos =
         compile_khpos_stats(&khpos_train, &khpos_tags).expect("khPOS after-replace corpus must compile");
-    let mobile_keyboard_1gram =
-        fs::read_to_string(&data_paths.mobile_keyboard_1gram).expect("mobile keyboard 1-gram data must be readable");
-    let mobile_keyboard_2gram =
-        fs::read_to_string(&data_paths.mobile_keyboard_2gram).expect("mobile keyboard 2-gram data must be readable");
+    let warn_missing_optional_data = env::var_os("KHMERIME_WARN_MISSING_OPTIONAL_DATA").is_some();
+    let mobile_keyboard_1gram = read_optional_source(
+        &data_paths.mobile_keyboard_1gram,
+        "mobile keyboard 1-gram",
+        warn_missing_optional_data,
+    );
+    let mobile_keyboard_2gram = read_optional_source(
+        &data_paths.mobile_keyboard_2gram,
+        "mobile keyboard 2-gram",
+        warn_missing_optional_data,
+    );
     let compiled_next_word = compile_next_word_stats(&mobile_keyboard_1gram, &mobile_keyboard_2gram)
         .expect("mobile keyboard n-gram data must compile");
 
@@ -135,6 +143,18 @@ fn load_data_paths_from_config() -> BuildDataPaths {
         panic!("{DATA_PATHS_CONFIG_PATH} parse failed: {error}");
     }
     paths
+}
+
+fn read_optional_source(path: &str, label: &str, warn_when_missing: bool) -> String {
+    match fs::read_to_string(path) {
+        Ok(source) => source,
+        Err(error) => {
+            if warn_when_missing {
+                println!("cargo:warning={label} data not found at {path}: {error}; compiling empty optional dataset");
+            }
+            String::new()
+        }
+    }
 }
 
 fn apply_data_paths_config(source: &str, paths: &mut BuildDataPaths) -> Result<(), String> {
