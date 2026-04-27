@@ -1,5 +1,7 @@
 # iOS (Keyboard Extension)
 
+For the shared platform workflow, read [`docs/platforms/README.md`](README.md).
+
 ## Adapter
 
 - Planned crate: `adapters/ios-keyboard`
@@ -28,6 +30,17 @@
 2. Implement callback-to-session mapping and render state wiring.
 3. Implement candidate/preedit/commit behavior through `textDocumentProxy`.
 4. Add manual smoke checklist in sample host apps.
+
+## Package Criteria
+
+Do not add `make ios-package` yet. Add iOS packaging only after a real keyboard
+extension target exists and can run inside a host app or simulator.
+
+The target package workflow should use Xcode archive/export and write artifacts
+under `dist/ios/`.
+
+The smoke checklist must prove the extension can be enabled, opened from a text
+field, render candidates, and commit Khmer text through `UITextDocumentProxy`.
 
 ## First Contributor Tasks
 

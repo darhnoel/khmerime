@@ -1,5 +1,7 @@
 # Android (InputMethodService)
 
+For the shared platform workflow, read [`docs/platforms/README.md`](README.md).
+
 ## Adapter
 
 - Planned crate: `adapters/android-ime`
@@ -28,6 +30,22 @@
 2. Implement callback-to-session mapping bridge.
 3. Wire candidate/preedit/commit behavior with `InputConnection`.
 4. Add emulator/device smoke matrix.
+
+## Package Criteria
+
+Do not add `make android-package` yet. Add Android packaging only after a real
+`InputMethodService` shell exists and can be installed on an emulator or device.
+
+The target package format should be:
+
+```text
+APK for local testing
+AAB for store/distribution builds
+```
+
+The package workflow should use Gradle, write artifacts under `dist/android/`,
+and include an emulator/device smoke checklist that proves the keyboard appears
+as an Android input method and can commit Khmer text.
 
 ## First Contributor Tasks
 

@@ -1,5 +1,7 @@
 # macOS (InputMethodKit)
 
+For the shared platform workflow, read [`docs/platforms/README.md`](README.md).
+
 ## Adapter
 
 - Planned crate: `adapters/macos-imk`
@@ -26,6 +28,17 @@
 2. Implement callback routing to session commands.
 3. Implement marked/preedit text and commit flow.
 4. Add manual editor smoke matrix.
+
+## Package Criteria
+
+Do not add `make macos-package` yet. Add macOS packaging only after a real
+InputMethodKit bundle exists and can be enabled as a macOS input source.
+
+The target artifact should be a signed `.pkg` under `dist/macos/`.
+
+The smoke checklist must prove the input method can be installed, selected from
+macOS input sources, show marked/preedit text, and commit Khmer text in TextEdit
+and a browser text field.
 
 ## First Contributor Tasks
 
