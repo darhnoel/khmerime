@@ -198,6 +198,7 @@ impl KhmerImeEditSession_Impl {
                     window.update(
                         &self.render_state.candidates,
                         &self.render_state.candidate_display,
+                        &self.render_state.segment_preview,
                         self.render_state.selected_index.unwrap_or(0),
                         anchor,
                     );

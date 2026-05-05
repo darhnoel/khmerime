@@ -5,7 +5,8 @@
 //! conversion, render-state derivation, and TSF document mutation.
 
 use khmerime_session::{
-    CandidateDisplayEntry, CursorLocation, NativeKeyEvent, SessionCommand, SessionResult, SessionSnapshot,
+    CandidateDisplayEntry, CursorLocation, NativeKeyEvent, SegmentPreviewEntry, SessionCommand, SessionResult,
+    SessionSnapshot,
 };
 
 #[cfg(windows)]
@@ -75,6 +76,12 @@ pub struct WindowsRenderState {
     pub candidate_display: Vec<CandidateDisplayEntry>,
     /// Active candidate index for TSF candidate UI highlighting.
     pub selected_index: Option<usize>,
+    /// Whether the shared session is showing segmented phrase refinement.
+    pub segmented_active: bool,
+    /// Segment preview rows used by IBus auxiliary text and TSF popup header.
+    pub segment_preview: Vec<SegmentPreviewEntry>,
+    /// Focused segment index when segmented phrase refinement is active.
+    pub focused_segment_index: Option<usize>,
     /// Composition string for marked/preedit text.
     pub preedit: String,
     /// Optional commit text to finalize in host document.
@@ -132,6 +139,9 @@ pub fn derive_render_state(snapshot: &SessionSnapshot, result: &SessionResult) -
         candidates: snapshot.candidates.clone(),
         candidate_display: snapshot.candidate_display.clone(),
         selected_index: snapshot.selected_index,
+        segmented_active: snapshot.segmented_active,
+        segment_preview: snapshot.segment_preview.clone(),
+        focused_segment_index: snapshot.focused_segment_index,
         preedit: snapshot.preedit.clone(),
         commit_text: result.commit_text.clone(),
         cursor_location: snapshot.cursor_location,
@@ -186,6 +196,13 @@ mod tests {
                 },
             ],
             selected_index: Some(0),
+            segmented_active: true,
+            segment_preview: vec![SegmentPreviewEntry {
+                output: "candidate".to_owned(),
+                input: "chea".to_owned(),
+                focused: true,
+            }],
+            focused_segment_index: Some(0),
             cursor_location: CursorLocation {
                 x: 10,
                 y: 20,
@@ -207,6 +224,9 @@ mod tests {
         assert_eq!(render_state.candidates, vec!["candidate", "chea"]);
         assert_eq!(render_state.candidate_display.len(), 2);
         assert_eq!(render_state.selected_index, Some(0));
+        assert!(render_state.segmented_active);
+        assert_eq!(render_state.segment_preview.len(), 1);
+        assert_eq!(render_state.focused_segment_index, Some(0));
         assert_eq!(render_state.commit_text.as_deref(), Some("candidate"));
         assert_eq!(render_state.cursor_location.x, 10);
         assert!(render_state.actions.contains(&render::RenderAction::CommitText));

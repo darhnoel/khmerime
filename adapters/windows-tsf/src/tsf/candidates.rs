@@ -17,7 +17,7 @@ use windows::Win32::UI::WindowsAndMessaging::{
     WS_EX_NOACTIVATE, WS_EX_TOOLWINDOW, WS_EX_TOPMOST, WS_POPUP,
 };
 
-use khmerime_session::{CandidateDisplayEntry, CursorLocation};
+use khmerime_session::{CandidateDisplayEntry, CursorLocation, SegmentPreviewEntry};
 
 use crate::com::dll_module::module_instance;
 use crate::diagnostics::log;
@@ -41,6 +41,7 @@ const MAX_ROWS: usize = 9;
 const ANCHOR_GAP: i32 = 2;
 const RECOMMENDED_MARK: &str = "\u{2713}";
 const DERIVED_MARK: &str = "~";
+const SEGMENT_SEPARATOR: &str = " | ";
 
 static CLASS_REGISTERED: OnceLock<()> = OnceLock::new();
 
@@ -98,6 +99,7 @@ impl CandidateWindow {
         &self,
         candidates: &[String],
         candidate_display: &[CandidateDisplayEntry],
+        segment_preview: &[SegmentPreviewEntry],
         selected: usize,
         location: &CursorLocation,
     ) {
@@ -107,13 +109,18 @@ impl CandidateWindow {
         }
 
         let display = display_candidate_rows(candidates, candidate_display);
-        let rows: Vec<(String, bool)> = candidates
-            .iter()
-            .zip(display.iter())
-            .take(MAX_ROWS)
-            .enumerate()
-            .map(|(i, (_candidate, label))| (format!("{}  {}", i + 1, label), i == selected))
-            .collect();
+        let mut rows: Vec<(String, bool)> = Vec::new();
+        if let Some(preview) = segment_preview_text(segment_preview) {
+            rows.push((preview, false));
+        }
+        rows.extend(
+            candidates
+                .iter()
+                .zip(display.iter())
+                .take(MAX_ROWS)
+                .enumerate()
+                .map(|(i, (_candidate, label))| (format!("{}  {}", i + 1, label), i == selected)),
+        );
 
         let height = candidate_window_height(rows.len());
         let placement = candidate_window_placement(location, WIN_W, height, monitor_work_area_for_location(location));
@@ -313,6 +320,13 @@ pub fn inline_preview_text(render_state: &WindowsRenderState) -> Option<String> 
         return None;
     }
     let mut preview = render_state.preedit.clone();
+    if render_state.segmented_active {
+        if let Some(segment_preview) = segment_preview_text(&render_state.segment_preview) {
+            preview.push_str("  {");
+            preview.push_str(&segment_preview);
+            preview.push('}');
+        }
+    }
     if !render_state.candidates.is_empty() {
         let display = display_candidate_rows(&render_state.candidates, &render_state.candidate_display);
         let candidates = display
@@ -333,6 +347,37 @@ pub fn inline_preview_text(render_state: &WindowsRenderState) -> Option<String> 
         preview.push(']');
     }
     Some(preview)
+}
+
+pub fn segment_preview_text(entries: &[SegmentPreviewEntry]) -> Option<String> {
+    let parts = entries
+        .iter()
+        .filter_map(|entry| {
+            let output = entry.output.trim();
+            if output.is_empty() {
+                return None;
+            }
+
+            let input = entry.input.trim();
+            let segment = if input.is_empty() {
+                output.to_owned()
+            } else {
+                format!("{output}({input})")
+            };
+
+            if entry.focused {
+                Some(format!("[{segment}]"))
+            } else {
+                Some(segment)
+            }
+        })
+        .collect::<Vec<_>>();
+
+    if parts.is_empty() {
+        None
+    } else {
+        Some(parts.join(SEGMENT_SEPARATOR))
+    }
 }
 
 fn display_candidate_rows(candidates: &[String], candidate_display: &[CandidateDisplayEntry]) -> Vec<String> {
@@ -393,8 +438,54 @@ mod tests {
     }
 
     #[test]
+    fn inline_preview_includes_segment_preview_when_active() {
+        let preview = inline_preview_text(&WindowsRenderState {
+            preedit: "firstsecond".to_owned(),
+            candidates: vec!["first".to_owned()],
+            selected_index: Some(0),
+            segmented_active: true,
+            segment_preview: vec![
+                SegmentPreviewEntry {
+                    output: "first".to_owned(),
+                    input: "foo".to_owned(),
+                    focused: true,
+                },
+                SegmentPreviewEntry {
+                    output: "second".to_owned(),
+                    input: "bar".to_owned(),
+                    focused: false,
+                },
+            ],
+            ..WindowsRenderState::default()
+        });
+
+        assert_eq!(
+            preview.as_deref(),
+            Some("firstsecond  {[first(foo)] | second(bar)}  [1. *first]")
+        );
+    }
+
+    #[test]
     fn empty_preedit_hides_preview() {
         assert!(inline_preview_text(&WindowsRenderState::default()).is_none());
+    }
+
+    #[test]
+    fn segment_preview_marks_focused_chunk() {
+        let preview = segment_preview_text(&[
+            SegmentPreviewEntry {
+                output: "first".to_owned(),
+                input: "foo".to_owned(),
+                focused: true,
+            },
+            SegmentPreviewEntry {
+                output: "second".to_owned(),
+                input: "bar".to_owned(),
+                focused: false,
+            },
+        ]);
+
+        assert_eq!(preview.as_deref(), Some("[first(foo)] | second(bar)"));
     }
 
     #[test]
