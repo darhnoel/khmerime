@@ -1,4 +1,4 @@
-.PHONY: help web web-release web-phone desktop stats suggest suggest-wfst suggest-shadow shadow-eval visualize-lexicon visualize-lexicon-streamlit fmt test test-golden test-ui platform-check platform-check-linux platform-check-android platform-check-ios platform-check-macos platform-check-windows linux-package ibus-install ibus-uninstall ibus-smoke paper-current paper-current-clean
+.PHONY: help web web-release web-phone desktop stats suggest suggest-wfst suggest-shadow shadow-eval visualize-lexicon visualize-lexicon-streamlit fmt test test-golden test-ui platform-check platform-check-linux platform-check-android platform-check-ios platform-check-macos platform-check-windows platform-build-windows platform-install-windows platform-uninstall-windows platform-smoke-windows-notepad platform-smoke-windows-notepad-python linux-package ibus-install ibus-uninstall ibus-smoke paper-current paper-current-clean
 
 DX ?= dx
 APP_DIR := apps/dioxus-app
@@ -9,6 +9,12 @@ QUERIES ?=
 OUTPUT ?=
 PAPER_CURRENT_DIR := papers/current-implementation
 PAPER_CURRENT_TEX := khmerime_current_implementation_paper.tex
+WINDOWS_TSF_TARGET ?= x86_64-pc-windows-msvc
+WINDOWS_TSF_TARGET_DIR ?= target/windows-tsf
+WINDOWS_TSF_DLL := $(WINDOWS_TSF_TARGET_DIR)/$(WINDOWS_TSF_TARGET)/debug/khmerime_windows_tsf.dll
+# Absolute path — regsvr32 runs elevated and its cwd may not be the project root.
+WINDOWS_TSF_DLL_ABS := $(subst /,\,$(CURDIR)/$(WINDOWS_TSF_DLL))
+WINDOWS_TSF_SMOKE_DELAY ?= 8
 
 help:
 	@printf "%s\n" \
@@ -32,6 +38,12 @@ help:
 	"  make test-ui                     Run the browser/UI Python test file" \
 	"  make platform-check              Check all native platform adapter crates" \
 	"  make platform-check-<platform>   Check one adapter: linux, android, ios, macos, windows" \
+	"  make platform-build-windows      Build the Windows TSF DLL target under target/windows-tsf/" \
+	"  make platform-install-windows    Build and register the Windows TSF DLL with regsvr32" \
+	"  make platform-uninstall-windows  Unregister the Windows TSF DLL with regsvr32 /u" \
+	"  make platform-reinstall-windows  Kill Notepad, unregister, rebuild, and re-register in one step" \
+	"  make platform-smoke-windows-notepad  Launch Notepad and check for TSF crash events" \
+	"  make platform-smoke-windows-notepad-python  Python Notepad smoke with clipboard/log output" \
 	"  make linux-package               Build the Linux IBus .deb package under dist/linux/" \
 	"  make ibus-install                Build and install KhmerIME IBus engine files (may use sudo)" \
 	"  make ibus-uninstall              Remove KhmerIME IBus engine files" \
@@ -110,6 +122,30 @@ platform-check-macos:
 
 platform-check-windows:
 	cargo check -p khmerime_windows_tsf
+
+platform-build-windows:
+	cargo build -p khmerime_windows_tsf --target $(WINDOWS_TSF_TARGET) --target-dir $(WINDOWS_TSF_TARGET_DIR)
+
+platform-install-windows: platform-build-windows
+	powershell -NoProfile -ExecutionPolicy Bypass -Command "Start-Process -FilePath regsvr32.exe -ArgumentList @('$(WINDOWS_TSF_DLL_ABS)') -Verb RunAs -Wait"
+
+platform-uninstall-windows:
+	powershell -NoProfile -ExecutionPolicy Bypass -Command "Start-Process -FilePath regsvr32.exe -ArgumentList @('/u', '$(WINDOWS_TSF_DLL_ABS)') -Verb RunAs -Wait"
+
+# Unregister (releasing the file lock), rebuild, and re-register in one step.
+# Silently ignores "not registered" errors so it works on a clean machine too.
+# Close Notepad first to ensure the DLL is not held by a TSF client process.
+platform-reinstall-windows:
+	powershell -NoProfile -ExecutionPolicy Bypass -Command "Stop-Process -Name notepad -Force -ErrorAction SilentlyContinue"
+	-powershell -NoProfile -ExecutionPolicy Bypass -Command "Start-Process -FilePath regsvr32.exe -ArgumentList @('/u', '$(WINDOWS_TSF_DLL_ABS)') -Verb RunAs -Wait"
+	cargo build -p khmerime_windows_tsf --target $(WINDOWS_TSF_TARGET) --target-dir $(WINDOWS_TSF_TARGET_DIR)
+	powershell -NoProfile -ExecutionPolicy Bypass -Command "Start-Process -FilePath regsvr32.exe -ArgumentList @('$(WINDOWS_TSF_DLL_ABS)') -Verb RunAs -Wait"
+
+platform-smoke-windows-notepad:
+	powershell -NoProfile -ExecutionPolicy Bypass -File scripts/platforms/windows/tsf/notepad_smoke.ps1
+
+platform-smoke-windows-notepad-python:
+	python scripts/platforms/windows/tsf/notepad_smoke.py --delay $(WINDOWS_TSF_SMOKE_DELAY)
 
 linux-package:
 	bash scripts/platforms/linux/ibus/build_deb.sh

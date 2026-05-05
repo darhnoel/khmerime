@@ -1,13 +1,20 @@
-//! Placeholder for future Windows render actions.
+//! Render action vocabulary for the Windows TSF adapter.
 //!
-//! The current public `derive_render_state` helper in `lib.rs` is the contract
-//! skeleton. Future TSF code can replace or extend it with explicit render
-//! actions once edit-session mutation is implemented.
+//! The public `derive_render_state` helper in `lib.rs` converts
+//! `SessionSnapshot` + `SessionResult` into this coarse action set. Windows-only
+//! TSF edit-session code then performs the native document mutations.
 
-/// Render actions expected when the TSF adapter becomes runnable.
-pub const PLANNED_RENDER_ACTIONS: &[&str] = &[
-    "update preedit composition",
-    "refresh candidate list",
-    "commit text exactly once",
-    "clear composition",
-];
+/// Coarse-grained native rendering responsibilities.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum RenderAction {
+    /// Update or start TSF composition text from the session preedit.
+    UpdateComposition,
+    /// Clear/end the active TSF composition.
+    ClearComposition,
+    /// Refresh the candidate UI from the session candidate list.
+    UpdateCandidates,
+    /// Hide the candidate UI.
+    ClearCandidates,
+    /// Commit one-shot text to the host document.
+    CommitText,
+}
