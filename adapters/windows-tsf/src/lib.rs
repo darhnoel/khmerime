@@ -1,26 +1,14 @@
-//! Windows TSF adapter scaffold.
+//! Windows TSF adapter.
 //!
-//! This crate is intentionally a **commented contract skeleton**.
-//! It documents how a Windows Text Services Framework (TSF) IME should map
-//! native callbacks/sinks to shared `khmerime_session` commands.
-//!
-//! Dioxus runtime code is intentionally excluded from this adapter.
-//! TSF code must use `khmerime_session::ImeSession` as the IME boundary and
-//! must not call `khmerime_core` directly.
-//!
-//! This crate is still a skeleton. It intentionally does not export a COM DLL,
-//! register a TSF text service, mutate TSF document ranges, or render candidate
-//! UI yet.
-//!
-//! References:
-//! - IME overview: <https://learn.microsoft.com/en-us/windows/apps/develop/input/input-method-editors>
-//! - IME requirements: <https://learn.microsoft.com/en-us/windows/apps/develop/input/input-method-editor-requirements>
-//! - ITfTextInputProcessor: <https://learn.microsoft.com/en-us/windows/win32/api/msctf/nn-msctf-itftextinputprocessor>
+//! The shared IME behavior lives in `khmerime_session`. This crate owns the
+//! Windows Text Services Framework boundary: COM registration/lifecycle, key
+//! conversion, render-state derivation, and TSF document mutation.
 
 use khmerime_session::{CursorLocation, NativeKeyEvent, SessionCommand, SessionResult, SessionSnapshot};
 
 #[cfg(windows)]
 pub mod com;
+pub mod diagnostics;
 pub mod history;
 pub mod input;
 pub mod render;
@@ -74,15 +62,23 @@ const CALLBACK_MAP: &[CallbackMapping] = &[
     },
 ];
 
-/// Minimal render responsibilities from session snapshot/result.
+/// Render responsibilities from session snapshot/result.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct WindowsRenderState {
+    /// Whether TSF should eat the original key.
+    pub consumed: bool,
     /// Candidate list for TSF candidate UI.
     pub candidates: Vec<String>,
+    /// Active candidate index for TSF candidate UI highlighting.
+    pub selected_index: Option<usize>,
     /// Composition string for marked/preedit text.
     pub preedit: String,
     /// Optional commit text to finalize in host document.
     pub commit_text: Option<String>,
+    /// Current caret/composition rectangle for candidate anchoring.
+    pub cursor_location: CursorLocation,
+    /// Coarse-grained render actions for the native TSF layer.
+    pub actions: Vec<render::RenderAction>,
 }
 
 /// Returns static callback mapping for docs and contract tests.
@@ -90,23 +86,51 @@ pub fn callback_map() -> &'static [CallbackMapping] {
     CALLBACK_MAP
 }
 
-/// Converts callback intent to session command.
+/// Converts callback intent to session command(s).
+pub fn map_callback_to_session_commands(callback: &WindowsTsfCallback) -> Vec<SessionCommand> {
+    match callback {
+        WindowsTsfCallback::Activate => vec![SessionCommand::Enable, SessionCommand::FocusIn],
+        WindowsTsfCallback::Deactivate => vec![SessionCommand::FocusOut, SessionCommand::Disable],
+        WindowsTsfCallback::KeyDown(event) => vec![SessionCommand::ProcessKeyEvent(*event)],
+        WindowsTsfCallback::CursorRectChanged(location) => vec![SessionCommand::SetCursorLocation(*location)],
+        WindowsTsfCallback::ResetRequested => vec![SessionCommand::Reset],
+    }
+}
+
+/// Converts callback intent to the first session command.
 ///
-/// Implemented later once COM glue (`msctf`) is added.
-pub fn map_callback_to_session_command(_callback: &WindowsTsfCallback) -> Option<SessionCommand> {
-    // Implemented later:
-    // - wire Activate/Deactivate lifecycle to session focus/enable state.
-    // - convert virtual-key events to NativeKeyEvent.
-    // - update cursor geometry for candidate anchoring.
-    None
+/// Lifecycle callbacks such as activation and deactivation expand to multiple
+/// commands through [`map_callback_to_session_commands`]. This helper preserves
+/// the original single-command API for simple callback paths.
+pub fn map_callback_to_session_command(callback: &WindowsTsfCallback) -> Option<SessionCommand> {
+    map_callback_to_session_commands(callback).into_iter().next()
 }
 
 /// Derives adapter-owned render responsibilities from session output.
 pub fn derive_render_state(snapshot: &SessionSnapshot, result: &SessionResult) -> WindowsRenderState {
+    let mut actions = Vec::new();
+    if result.commit_text.is_some() {
+        actions.push(render::RenderAction::CommitText);
+    }
+    if snapshot.preedit.is_empty() {
+        actions.push(render::RenderAction::ClearComposition);
+    } else {
+        actions.push(render::RenderAction::UpdateComposition);
+    }
+    if snapshot.candidates.is_empty() {
+        actions.push(render::RenderAction::ClearCandidates);
+    } else {
+        actions.push(render::RenderAction::UpdateCandidates);
+    }
+
     WindowsRenderState {
+        consumed: result.consumed,
         candidates: snapshot.candidates.clone(),
+        selected_index: snapshot.selected_index,
         preedit: snapshot.preedit.clone(),
         commit_text: result.commit_text.clone(),
+        cursor_location: snapshot.cursor_location,
+        actions,
     }
 }
 
@@ -124,32 +148,55 @@ mod tests {
     }
 
     #[test]
-    fn callback_mapping_is_still_unimplemented_in_skeleton_phase() {
-        assert_eq!(map_callback_to_session_command(&WindowsTsfCallback::Activate), None);
+    fn callback_mapping_expands_lifecycle_events() {
+        assert_eq!(
+            map_callback_to_session_commands(&WindowsTsfCallback::Activate),
+            vec![SessionCommand::Enable, SessionCommand::FocusIn]
+        );
+        assert_eq!(
+            map_callback_to_session_commands(&WindowsTsfCallback::Deactivate),
+            vec![SessionCommand::FocusOut, SessionCommand::Disable]
+        );
+        assert_eq!(
+            map_callback_to_session_command(&WindowsTsfCallback::ResetRequested),
+            Some(SessionCommand::Reset)
+        );
     }
 
     #[test]
     fn render_state_mirrors_session_snapshot_and_result() {
         let snapshot = SessionSnapshot {
-            preedit: "ជា".to_owned(),
-            candidates: vec!["ជា".to_owned(), "ជ".to_owned()],
+            preedit: "chea".to_owned(),
+            candidates: vec!["candidate".to_owned(), "chea".to_owned()],
+            selected_index: Some(0),
+            cursor_location: CursorLocation {
+                x: 10,
+                y: 20,
+                width: 2,
+                height: 16,
+            },
             ..SessionSnapshot::default()
         };
         let result = SessionResult {
-            commit_text: Some("ជា".to_owned()),
+            consumed: true,
+            commit_text: Some("candidate".to_owned()),
             ..SessionResult::default()
         };
 
         let render_state = derive_render_state(&snapshot, &result);
 
-        assert_eq!(render_state.preedit, "ជា");
-        assert_eq!(render_state.candidates, vec!["ជា", "ជ"]);
-        assert_eq!(render_state.commit_text.as_deref(), Some("ជា"));
+        assert!(render_state.consumed);
+        assert_eq!(render_state.preedit, "chea");
+        assert_eq!(render_state.candidates, vec!["candidate", "chea"]);
+        assert_eq!(render_state.selected_index, Some(0));
+        assert_eq!(render_state.commit_text.as_deref(), Some("candidate"));
+        assert_eq!(render_state.cursor_location.x, 10);
+        assert!(render_state.actions.contains(&render::RenderAction::CommitText));
     }
 
     #[test]
-    fn skeleton_exports_future_module_boundaries() {
-        assert!(!input::key_convert::KEY_CONVERSION_IMPLEMENTED);
+    fn exports_module_boundaries() {
+        assert!(input::key_convert::KEY_CONVERSION_IMPLEMENTED);
         assert_eq!(
             session_driver::FIRST_IMPLEMENTATION_MILESTONE,
             "pure Rust Windows session driver around ImeSession"
