@@ -95,7 +95,9 @@ impl ITfKeyEventSink_Impl for KhmerImeKeyEventSink_Impl {
         ));
 
         if let Some(context) = pic {
-            if let Err(e) = request_render_edit_session(context, client_id, render_state.clone(), Arc::clone(&self.state)) {
+            if let Err(e) =
+                request_render_edit_session(context, client_id, render_state.clone(), Arc::clone(&self.state))
+            {
                 // Never propagate edit-session failures to TSF. TSF does not expect OnKeyDown to
                 // return a failure HRESULT and may deactivate the text service if it does.
                 log(format!("KeyEventSink::OnKeyDown edit session failed: {e:?}"));

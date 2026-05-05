@@ -3,37 +3,44 @@
 use std::sync::OnceLock;
 
 use windows::core::{w, Result, PCWSTR};
-use windows::Win32::Foundation::{COLORREF, HWND, LPARAM, LRESULT, RECT, WPARAM};
+use windows::Win32::Foundation::{COLORREF, HWND, LPARAM, LRESULT, POINT, RECT, WPARAM};
 use windows::Win32::Graphics::Gdi::{
-    BeginPaint, EndPaint, FillRect, GetStockObject, GetSysColor, GetSysColorBrush, InvalidateRect,
-    SelectObject, SetBkMode, SetTextColor, TextOutW, UpdateWindow, COLOR_HIGHLIGHT,
-    COLOR_HIGHLIGHTTEXT, COLOR_WINDOW, COLOR_WINDOWTEXT, DEFAULT_GUI_FONT, PAINTSTRUCT, TRANSPARENT,
+    BeginPaint, CreateFontW, DeleteObject, EndPaint, FillRect, GetMonitorInfoW, GetSysColor, GetSysColorBrush,
+    InvalidateRect, MonitorFromPoint, SelectObject, SetBkMode, SetTextColor, TextOutW, UpdateWindow, COLOR_HIGHLIGHT,
+    COLOR_HIGHLIGHTTEXT, COLOR_WINDOW, COLOR_WINDOWTEXT, MONITORINFO, MONITOR_DEFAULTTONEAREST, PAINTSTRUCT,
+    TRANSPARENT,
 };
 use windows::Win32::UI::WindowsAndMessaging::{
-    CreateWindowExW, DefWindowProcW, DestroyWindow, GetSystemMetrics, GetWindowLongPtrW,
-    RegisterClassExW, SetWindowLongPtrW, SetWindowPos, ShowWindow, CS_HREDRAW, CS_VREDRAW,
-    GWLP_USERDATA, HMENU, HWND_TOPMOST, SM_CXSCREEN, SM_CYSCREEN, SW_HIDE, SWP_NOACTIVATE,
-    SWP_SHOWWINDOW, WM_NCHITTEST, WM_PAINT, WNDCLASSEXW, WS_BORDER, WS_EX_NOACTIVATE,
-    WS_EX_TOOLWINDOW, WS_EX_TOPMOST, WS_POPUP,
+    CreateWindowExW, DefWindowProcW, DestroyWindow, GetSystemMetrics, GetWindowLongPtrW, RegisterClassExW,
+    SetWindowLongPtrW, SetWindowPos, ShowWindow, CS_HREDRAW, CS_VREDRAW, GWLP_USERDATA, HMENU, HWND_TOPMOST,
+    SM_CXSCREEN, SM_CYSCREEN, SWP_NOACTIVATE, SWP_SHOWWINDOW, SW_HIDE, WM_NCHITTEST, WM_PAINT, WNDCLASSEXW, WS_BORDER,
+    WS_EX_NOACTIVATE, WS_EX_TOOLWINDOW, WS_EX_TOPMOST, WS_POPUP,
 };
 
-use khmerime_session::CursorLocation;
+use khmerime_session::{CandidateDisplayEntry, CursorLocation};
 
 use crate::com::dll_module::module_instance;
 use crate::diagnostics::log;
 use crate::WindowsRenderState;
 
-pub const CANDIDATE_SOURCE_FIELDS: &[&str] =
-    &["SessionSnapshot.candidates", "SessionSnapshot.selected_index"];
+pub const CANDIDATE_SOURCE_FIELDS: &[&str] = &[
+    "SessionSnapshot.candidates",
+    "SessionSnapshot.candidate_display",
+    "SessionSnapshot.selected_index",
+];
 
 // Window class name — registered once per process.
 const WCLASS: PCWSTR = w!("KhmerIMECandidates");
 
-const WIN_W: i32 = 220;
-const ROW_H: i32 = 22;
-const PAD_X: i32 = 8;
-const PAD_Y: i32 = 4;
+const WIN_W: i32 = 300;
+const ROW_H: i32 = 32;
+const PAD_X: i32 = 10;
+const PAD_Y: i32 = 6;
+const FONT_HEIGHT: i32 = 22;
 const MAX_ROWS: usize = 9;
+const ANCHOR_GAP: i32 = 2;
+const RECOMMENDED_MARK: &str = "\u{2713}";
+const DERIVED_MARK: &str = "~";
 
 static CLASS_REGISTERED: OnceLock<()> = OnceLock::new();
 
@@ -85,23 +92,31 @@ impl CandidateWindow {
         Ok(Self { hwnd })
     }
 
-    /// Refresh the candidate list and show the window below `location`.
+    /// Refresh the candidate list and show the window next to `location`.
     /// Hides the window if `candidates` is empty.
-    pub fn update(&self, candidates: &[String], selected: usize, location: &CursorLocation) {
+    pub fn update(
+        &self,
+        candidates: &[String],
+        candidate_display: &[CandidateDisplayEntry],
+        selected: usize,
+        location: &CursorLocation,
+    ) {
         if candidates.is_empty() {
             self.hide();
             return;
         }
 
+        let display = display_candidate_rows(candidates, candidate_display);
         let rows: Vec<(String, bool)> = candidates
             .iter()
+            .zip(display.iter())
             .take(MAX_ROWS)
             .enumerate()
-            .map(|(i, c)| (format!("{}  {}", i + 1, c), i == selected))
+            .map(|(i, (_candidate, label))| (format!("{}  {}", i + 1, label), i == selected))
             .collect();
 
-        let count = rows.len() as i32;
-        let height = PAD_Y * 2 + count * ROW_H;
+        let height = candidate_window_height(rows.len());
+        let placement = candidate_window_placement(location, WIN_W, height, monitor_work_area_for_location(location));
 
         unsafe {
             // Replace paint data atomically (still on the STA thread).
@@ -112,25 +127,13 @@ impl CandidateWindow {
             let data = Box::new(CandidateData { rows });
             SetWindowLongPtrW(self.hwnd, GWLP_USERDATA, Box::into_raw(data) as isize);
 
-            // Position below the preedit cursor; flip above when near screen bottom.
-            let screen_h = GetSystemMetrics(SM_CYSCREEN);
-            let screen_w = GetSystemMetrics(SM_CXSCREEN);
-            let cx = location.x as i32;
-            let cy = (location.y + location.height) as i32;
-            let x = cx.min(screen_w - WIN_W).max(0);
-            let y = if cy + height > screen_h && location.y as i32 >= height {
-                location.y as i32 - height
-            } else {
-                cy
-            };
-
             let _ = SetWindowPos(
                 self.hwnd,
                 HWND_TOPMOST,
-                x,
-                y,
-                WIN_W,
-                height,
+                placement.x,
+                placement.y,
+                placement.width,
+                placement.height,
                 SWP_NOACTIVATE | SWP_SHOWWINDOW,
             );
             let _ = InvalidateRect(self.hwnd, None, true);
@@ -139,7 +142,77 @@ impl CandidateWindow {
     }
 
     pub fn hide(&self) {
-        unsafe { let _ = ShowWindow(self.hwnd, SW_HIDE); }
+        unsafe {
+            let _ = ShowWindow(self.hwnd, SW_HIDE);
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct CandidateWindowPlacement {
+    x: i32,
+    y: i32,
+    width: i32,
+    height: i32,
+}
+
+fn candidate_window_height(row_count: usize) -> i32 {
+    PAD_Y * 2 + row_count as i32 * ROW_H
+}
+
+fn candidate_window_placement(
+    anchor: &CursorLocation,
+    width: i32,
+    height: i32,
+    work_area: RECT,
+) -> CandidateWindowPlacement {
+    let anchor_left = anchor.x;
+    let anchor_top = anchor.y;
+    let anchor_bottom = anchor.y + anchor.height.max(0);
+    let below_y = anchor_bottom + ANCHOR_GAP;
+    let above_y = anchor_top - height - ANCHOR_GAP;
+
+    let x = clamp(anchor_left, work_area.left, work_area.right - width);
+    let y = if below_y + height <= work_area.bottom {
+        below_y
+    } else if above_y >= work_area.top {
+        above_y
+    } else {
+        clamp(below_y, work_area.top, work_area.bottom - height)
+    };
+
+    CandidateWindowPlacement { x, y, width, height }
+}
+
+fn monitor_work_area_for_location(location: &CursorLocation) -> RECT {
+    unsafe {
+        let point = POINT {
+            x: location.x,
+            y: location.y + location.height.max(0),
+        };
+        let monitor = MonitorFromPoint(point, MONITOR_DEFAULTTONEAREST);
+        let mut info = MONITORINFO {
+            cbSize: std::mem::size_of::<MONITORINFO>() as u32,
+            ..MONITORINFO::default()
+        };
+        if GetMonitorInfoW(monitor, &mut info).as_bool() {
+            return info.rcWork;
+        }
+
+        RECT {
+            left: 0,
+            top: 0,
+            right: GetSystemMetrics(SM_CXSCREEN),
+            bottom: GetSystemMetrics(SM_CYSCREEN),
+        }
+    }
+}
+
+fn clamp(value: i32, min: i32, max: i32) -> i32 {
+    if min > max {
+        min
+    } else {
+        value.max(min).min(max)
     }
 }
 
@@ -182,12 +255,7 @@ fn register_class() -> Result<()> {
     Ok(())
 }
 
-unsafe extern "system" fn candidate_wnd_proc(
-    hwnd: HWND,
-    msg: u32,
-    wparam: WPARAM,
-    lparam: LPARAM,
-) -> LRESULT {
+unsafe extern "system" fn candidate_wnd_proc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
     match msg {
         WM_PAINT => {
             let data_ptr = GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *const CandidateData;
@@ -196,7 +264,7 @@ unsafe extern "system" fn candidate_wnd_proc(
 
             if !data_ptr.is_null() {
                 let data = &*data_ptr;
-                let hfont = GetStockObject(DEFAULT_GUI_FONT);
+                let hfont = CreateFontW(-FONT_HEIGHT, 0, 0, 0, 400, 0, 0, 0, 1, 0, 0, 5, 34, w!("Khmer UI"));
                 let old_font = SelectObject(hdc, hfont);
                 SetBkMode(hdc, TRANSPARENT);
 
@@ -217,11 +285,11 @@ unsafe extern "system" fn candidate_wnd_proc(
                     }
 
                     let utf16: Vec<u16> = text.encode_utf16().collect();
-                    // Vertically center text in the row (font is ~14 px tall).
-                    let _ = TextOutW(hdc, PAD_X, row_top + (ROW_H - 14) / 2, &utf16);
+                    let _ = TextOutW(hdc, PAD_X, row_top + (ROW_H - FONT_HEIGHT) / 2, &utf16);
                 }
 
                 SelectObject(hdc, old_font);
+                let _ = DeleteObject(hfont);
             }
 
             let _ = EndPaint(hwnd, &ps);
@@ -246,8 +314,8 @@ pub fn inline_preview_text(render_state: &WindowsRenderState) -> Option<String> 
     }
     let mut preview = render_state.preedit.clone();
     if !render_state.candidates.is_empty() {
-        let candidates = render_state
-            .candidates
+        let display = display_candidate_rows(&render_state.candidates, &render_state.candidate_display);
+        let candidates = display
             .iter()
             .take(5)
             .enumerate()
@@ -265,6 +333,48 @@ pub fn inline_preview_text(render_state: &WindowsRenderState) -> Option<String> 
         preview.push(']');
     }
     Some(preview)
+}
+
+fn display_candidate_rows(candidates: &[String], candidate_display: &[CandidateDisplayEntry]) -> Vec<String> {
+    let use_display = candidate_display.len() == candidates.len();
+    candidates
+        .iter()
+        .enumerate()
+        .map(|(index, candidate)| {
+            if !use_display {
+                return candidate.clone();
+            }
+
+            let entry = &candidate_display[index];
+            let output = if entry.output.trim().is_empty() {
+                candidate.as_str()
+            } else {
+                entry.output.trim()
+            };
+            let hints = entry
+                .roman_hints
+                .iter()
+                .map(|hint| hint.trim())
+                .filter(|hint| !hint.is_empty())
+                .take(3)
+                .collect::<Vec<_>>();
+
+            let mut label = if entry.recommended {
+                format!("{RECOMMENDED_MARK} {output}")
+            } else if hints.is_empty() {
+                format!("{DERIVED_MARK} {output}")
+            } else {
+                output.to_owned()
+            };
+
+            if !hints.is_empty() {
+                label.push_str(" (");
+                label.push_str(&hints.join(" / "));
+                label.push(')');
+            }
+            label
+        })
+        .collect()
 }
 
 #[cfg(test)]
@@ -285,5 +395,111 @@ mod tests {
     #[test]
     fn empty_preedit_hides_preview() {
         assert!(inline_preview_text(&WindowsRenderState::default()).is_none());
+    }
+
+    #[test]
+    fn candidate_rows_match_ibus_metadata_labels() {
+        let rows = display_candidate_rows(
+            &["ជា".to_owned(), "ជៀ".to_owned(), "jea".to_owned()],
+            &[
+                CandidateDisplayEntry {
+                    output: "ជា".to_owned(),
+                    recommended: true,
+                    roman_hints: vec!["jea".to_owned(), "chea".to_owned()],
+                },
+                CandidateDisplayEntry {
+                    output: "ជៀ".to_owned(),
+                    recommended: false,
+                    roman_hints: vec!["jia".to_owned()],
+                },
+                CandidateDisplayEntry {
+                    output: "jea".to_owned(),
+                    recommended: false,
+                    roman_hints: vec![],
+                },
+            ],
+        );
+
+        assert_eq!(rows, vec!["\u{2713} ជា (jea / chea)", "ជៀ (jia)", "~ jea"]);
+    }
+
+    #[test]
+    fn candidate_rows_fall_back_to_plain_candidates_without_metadata() {
+        let rows = display_candidate_rows(&["ជា".to_owned(), "jea".to_owned()], &[]);
+
+        assert_eq!(rows, vec!["ជា", "jea"]);
+    }
+
+    #[test]
+    fn placement_sits_just_below_normal_anchor() {
+        let placement = candidate_window_placement(
+            &CursorLocation {
+                x: 100,
+                y: 200,
+                width: 2,
+                height: 18,
+            },
+            220,
+            74,
+            work_area(),
+        );
+
+        assert_eq!(placement.x, 100);
+        assert_eq!(placement.y, 220);
+    }
+
+    #[test]
+    fn placement_flips_above_near_bottom_edge() {
+        let placement = candidate_window_placement(
+            &CursorLocation {
+                x: 100,
+                y: 570,
+                width: 2,
+                height: 18,
+            },
+            220,
+            74,
+            work_area(),
+        );
+
+        assert_eq!(placement.y, 494);
+    }
+
+    #[test]
+    fn placement_clamps_to_work_area_edges() {
+        let left = candidate_window_placement(
+            &CursorLocation {
+                x: -30,
+                y: 100,
+                width: 2,
+                height: 18,
+            },
+            220,
+            74,
+            work_area(),
+        );
+        let right = candidate_window_placement(
+            &CursorLocation {
+                x: 760,
+                y: 100,
+                width: 2,
+                height: 18,
+            },
+            220,
+            74,
+            work_area(),
+        );
+
+        assert_eq!(left.x, 0);
+        assert_eq!(right.x, 580);
+    }
+
+    fn work_area() -> RECT {
+        RECT {
+            left: 0,
+            top: 0,
+            right: 800,
+            bottom: 600,
+        }
     }
 }

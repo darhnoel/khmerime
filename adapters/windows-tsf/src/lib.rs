@@ -4,7 +4,9 @@
 //! Windows Text Services Framework boundary: COM registration/lifecycle, key
 //! conversion, render-state derivation, and TSF document mutation.
 
-use khmerime_session::{CursorLocation, NativeKeyEvent, SessionCommand, SessionResult, SessionSnapshot};
+use khmerime_session::{
+    CandidateDisplayEntry, CursorLocation, NativeKeyEvent, SessionCommand, SessionResult, SessionSnapshot,
+};
 
 #[cfg(windows)]
 pub mod com;
@@ -69,6 +71,8 @@ pub struct WindowsRenderState {
     pub consumed: bool,
     /// Candidate list for TSF candidate UI.
     pub candidates: Vec<String>,
+    /// Display metadata for candidate labels, including recommendation markers and roman hints.
+    pub candidate_display: Vec<CandidateDisplayEntry>,
     /// Active candidate index for TSF candidate UI highlighting.
     pub selected_index: Option<usize>,
     /// Composition string for marked/preedit text.
@@ -126,6 +130,7 @@ pub fn derive_render_state(snapshot: &SessionSnapshot, result: &SessionResult) -
     WindowsRenderState {
         consumed: result.consumed,
         candidates: snapshot.candidates.clone(),
+        candidate_display: snapshot.candidate_display.clone(),
         selected_index: snapshot.selected_index,
         preedit: snapshot.preedit.clone(),
         commit_text: result.commit_text.clone(),
@@ -168,6 +173,18 @@ mod tests {
         let snapshot = SessionSnapshot {
             preedit: "chea".to_owned(),
             candidates: vec!["candidate".to_owned(), "chea".to_owned()],
+            candidate_display: vec![
+                CandidateDisplayEntry {
+                    output: "candidate".to_owned(),
+                    recommended: true,
+                    roman_hints: vec!["chea".to_owned()],
+                },
+                CandidateDisplayEntry {
+                    output: "chea".to_owned(),
+                    recommended: false,
+                    roman_hints: vec![],
+                },
+            ],
             selected_index: Some(0),
             cursor_location: CursorLocation {
                 x: 10,
@@ -188,6 +205,7 @@ mod tests {
         assert!(render_state.consumed);
         assert_eq!(render_state.preedit, "chea");
         assert_eq!(render_state.candidates, vec!["candidate", "chea"]);
+        assert_eq!(render_state.candidate_display.len(), 2);
         assert_eq!(render_state.selected_index, Some(0));
         assert_eq!(render_state.commit_text.as_deref(), Some("candidate"));
         assert_eq!(render_state.cursor_location.x, 10);
