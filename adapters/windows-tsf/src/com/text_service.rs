@@ -1,6 +1,6 @@
 //! `ITfTextInputProcessor` shell for the KhmerIME TSF service.
 
-use std::sync::{Arc, Mutex};
+use std::sync::{mpsc::Receiver, Arc, Mutex};
 
 use windows::core::{implement, Error, Interface, Result};
 use windows::Win32::Foundation::{E_FAIL, TRUE};
@@ -19,6 +19,7 @@ pub const TEXT_SERVICE_LIFECYCLE: &[&str] = &["Activate", "Deactivate"];
 
 pub struct TextServiceState {
     pub driver: Option<WindowsSessionDriver>,
+    pub pending_driver: Option<Receiver<std::result::Result<WindowsSessionDriver, String>>>,
     pub thread_mgr: Option<ITfThreadMgr>,
     pub client_id: u32,
     pub key_sink: Option<ITfKeyEventSink>,
@@ -32,6 +33,7 @@ impl Default for TextServiceState {
     fn default() -> Self {
         Self {
             driver: None,
+            pending_driver: None,
             thread_mgr: None,
             client_id: 0,
             key_sink: None,
@@ -87,6 +89,7 @@ impl ITfTextInputProcessor_Impl for KhmerImeTextService_Impl {
         {
             let mut state = lock_state(&self.state)?;
             state.driver = None;
+            state.pending_driver = Some(crate::session_driver::spawn_default_driver_warmup());
             state.composition = None;
             state.client_id = tid;
             state.thread_mgr = ptim.cloned();
@@ -119,6 +122,7 @@ impl ITfTextInputProcessor_Impl for KhmerImeTextService_Impl {
             state.composition = None;
             state.client_id = 0;
             state.driver = None;
+            state.pending_driver = None;
             (thread_mgr, client_id, key_sink)
         };
 

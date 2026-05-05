@@ -239,7 +239,7 @@ impl KhmerImeEditSession_Impl {
         unsafe {
             view.GetTextExt(ec, range, &mut rect, &mut clipped)?;
         }
-        let location = cursor_location_from_rect(rect);
+        let location = cursor_location_from_text_ext_rect(rect);
         log(format!(
             "edit_session::GetTextExt rect=({}, {}, {}, {}) clipped={} usable={}",
             rect.left,
@@ -262,6 +262,21 @@ fn cursor_location_from_rect(rect: RECT) -> Option<CursorLocation> {
         x: rect.left,
         y: rect.top,
         width: rect.right - rect.left,
+        height: rect.bottom - rect.top,
+    })
+}
+
+fn cursor_location_from_text_ext_rect(rect: RECT) -> Option<CursorLocation> {
+    if !is_usable_anchor_rect(&rect) {
+        return None;
+    }
+
+    // TSF returns the full composition range. Candidate UI should track the
+    // active typing/caret edge, not the start of the roman/composed span.
+    Some(CursorLocation {
+        x: rect.right.saturating_sub(2),
+        y: rect.top,
+        width: 2,
         height: rect.bottom - rect.top,
     })
 }
@@ -425,6 +440,24 @@ mod tests {
                 y: 84,
                 width: 720,
                 height: 48,
+            })
+        );
+    }
+
+    #[test]
+    fn text_ext_anchor_tracks_trailing_caret_edge() {
+        assert_eq!(
+            cursor_location_from_text_ext_rect(RECT {
+                left: 178,
+                top: 235,
+                right: 255,
+                bottom: 271,
+            }),
+            Some(CursorLocation {
+                x: 253,
+                y: 235,
+                width: 2,
+                height: 36,
             })
         );
     }

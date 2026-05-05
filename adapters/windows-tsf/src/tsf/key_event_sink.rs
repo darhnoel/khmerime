@@ -1,6 +1,6 @@
 //! `ITfKeyEventSink` implementation.
 
-use std::sync::{Arc, Mutex};
+use std::sync::{mpsc::TryRecvError, Arc, Mutex};
 
 use windows::core::{implement, Error, Result, GUID};
 use windows::Win32::Foundation::{BOOL, E_FAIL, FALSE, LPARAM, TRUE, WPARAM};
@@ -9,7 +9,6 @@ use windows::Win32::UI::TextServices::{ITfContext, ITfKeyEventSink, ITfKeyEventS
 use crate::com::text_service::TextServiceState;
 use crate::diagnostics::log;
 use crate::input::key_convert::{convert_windows_key, would_handle_windows_key, ConvertedKey, WindowsKeyInput};
-use crate::session_driver::WindowsSessionDriver;
 use crate::tsf::edit_session::request_render_edit_session;
 use crate::WindowsTsfCallback;
 
@@ -45,7 +44,7 @@ impl ITfKeyEventSink_Impl for KhmerImeKeyEventSink_Impl {
 
     fn OnTestKeyDown(&self, _pic: Option<&ITfContext>, wparam: WPARAM, lparam: LPARAM) -> Result<BOOL> {
         let input = windows_key_input(wparam, lparam);
-        let handled = would_handle_windows_key(input);
+        let handled = would_handle_windows_key(input) && driver_ready(&self.state)?;
         log(format!(
             "KeyEventSink::OnTestKeyDown vk=0x{:X} char={:?} handled={handled}",
             input.virtual_key, input.translated_char
@@ -65,21 +64,9 @@ impl ITfKeyEventSink_Impl for KhmerImeKeyEventSink_Impl {
 
         let (client_id, render_state) = {
             let mut state = lock_state(&self.state)?;
-            if state.driver.is_none() {
-                state.driver = match WindowsSessionDriver::from_default_data() {
-                    Ok(mut driver) => {
-                        driver.process_callback(WindowsTsfCallback::Activate);
-                        log("KeyEventSink::OnKeyDown lazy driver initialized");
-                        Some(driver)
-                    }
-                    Err(err) => {
-                        log(format!("KeyEventSink::OnKeyDown driver init failed: {err}"));
-                        return Ok(FALSE);
-                    }
-                };
-            }
+            poll_pending_driver(&mut state);
             let Some(driver) = state.driver.as_mut() else {
-                log("KeyEventSink::OnKeyDown driver unavailable after init");
+                log("KeyEventSink::OnKeyDown driver still warming; passthrough");
                 return Ok(FALSE);
             };
             let render_state = driver.process_callback(WindowsTsfCallback::KeyDown(event));
@@ -118,6 +105,34 @@ impl ITfKeyEventSink_Impl for KhmerImeKeyEventSink_Impl {
 
 fn lock_state(state: &Arc<Mutex<TextServiceState>>) -> Result<std::sync::MutexGuard<'_, TextServiceState>> {
     state.lock().map_err(|_| Error::from(E_FAIL))
+}
+
+fn driver_ready(state: &Arc<Mutex<TextServiceState>>) -> Result<bool> {
+    let mut state = lock_state(state)?;
+    poll_pending_driver(&mut state);
+    Ok(state.driver.is_some())
+}
+
+fn poll_pending_driver(state: &mut TextServiceState) {
+    let Some(receiver) = state.pending_driver.take() else {
+        return;
+    };
+
+    match receiver.try_recv() {
+        Ok(Ok(driver)) => {
+            state.driver = Some(driver);
+            log("KeyEventSink::driver warmup completed");
+        }
+        Ok(Err(err)) => {
+            log(format!("KeyEventSink::driver warmup failed: {err}"));
+        }
+        Err(TryRecvError::Empty) => {
+            state.pending_driver = Some(receiver);
+        }
+        Err(TryRecvError::Disconnected) => {
+            log("KeyEventSink::driver warmup disconnected");
+        }
+    }
 }
 
 fn bool_to_win32(value: bool) -> BOOL {
