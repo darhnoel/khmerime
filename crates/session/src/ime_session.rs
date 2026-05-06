@@ -635,7 +635,7 @@ fn offset_index(current: usize, len: usize, delta: isize) -> usize {
 fn is_single_keycap_char(ch: char) -> bool {
     matches!(
         ch,
-        '0'..='9' | '!' | '"' | '#' | '$' | '%' | '&' | '\'' | '(' | ')' | '~' | '='
+        '0'..='9' | '!' | '@' | '"' | '#' | '$' | '%' | '^' | '&' | '*' | '\'' | '(' | ')' | '~' | '='
     )
 }
 

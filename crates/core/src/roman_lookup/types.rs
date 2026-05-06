@@ -19,28 +19,31 @@ pub(super) const NEXT_WORD_MAGIC: &[u8; 4] = b"NWS1";
 pub(super) const MAX_SUGGESTIONS: usize = 15;
 pub(super) const MAX_MATCHES: usize = 20;
 pub(super) const NEXT_WORD_BACKFILL_POOL: usize = 128;
-pub(super) const KEYCAP_SUGGESTIONS: [(&str, &str); 21] = [
+pub(super) const KEYCAP_SUGGESTIONS: [(&str, &str); 24] = [
     ("1", "១"),
     ("!", "!"),
     ("2", "២"),
+    ("@", "ៗ"),
     ("\"", "ៗ"),
     ("3", "៣"),
-    ("#", "\""),
+    ("#", "\u{17CA}"),
     ("4", "៤"),
     ("$", "៛"),
     ("5", "៥"),
-    ("%", "%"),
-    ("6", "៦"),
-    ("&", "៍"),
-    ("7", "៧"),
+    ("%", "័"),
     ("'", "័"),
-    ("8", "៨"),
-    ("(", "៏"),
-    ("9", "៩"),
-    (")", "("),
-    ("0", "០"),
-    ("~", ")"),
+    ("6", "៦"),
+    ("^", "៌"),
     ("=", "៌"),
+    ("7", "៧"),
+    ("&", "៍"),
+    ("8", "៨"),
+    ("*", "៏"),
+    ("9", "៩"),
+    ("(", "\u{17CE}"),
+    ("0", "០"),
+    (")", "\u{17D1}"),
+    ("~", ")"),
 ];
 
 pub(super) fn khmer_digit(ch: char) -> Option<char> {

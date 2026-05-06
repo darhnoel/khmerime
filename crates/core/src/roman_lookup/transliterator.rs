@@ -296,7 +296,11 @@ fn is_roman_letter(ch: char) -> bool {
 }
 
 fn is_keycap_token_char(ch: char) -> bool {
-    ch.is_ascii_digit() || matches!(ch, '!' | '"' | '#' | '$' | '%' | '&' | '\'' | '(' | ')' | '~' | '=')
+    ch.is_ascii_digit()
+        || matches!(
+            ch,
+            '!' | '@' | '"' | '#' | '$' | '%' | '^' | '&' | '*' | '\'' | '(' | ')' | '~' | '='
+        )
 }
 
 fn is_period(ch: char) -> bool {
