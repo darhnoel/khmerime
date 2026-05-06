@@ -13,7 +13,9 @@ use crate::input::key_convert::{
     convert_windows_key, would_handle_windows_key, ConvertedKey, WindowsKeyInput, STATE_ALT_MASK, STATE_CONTROL_MASK,
     STATE_RELEASE_MASK, STATE_SUPER_MASK,
 };
-use crate::tsf::edit_session::request_render_edit_session;
+
+const VK_SHIFT: i32 = 0x10;
+use crate::tsf::edit_session::{refresh_candidates, request_render_edit_session};
 use crate::WindowsTsfCallback;
 
 /// Key sink callbacks expected in the first runnable TSF spike.
@@ -48,11 +50,7 @@ impl ITfKeyEventSink_Impl for KhmerImeKeyEventSink_Impl {
 
     fn OnTestKeyDown(&self, _pic: Option<&ITfContext>, wparam: WPARAM, lparam: LPARAM) -> Result<BOOL> {
         let input = windows_key_input(wparam, lparam);
-        let handled = would_handle_windows_key(input) && driver_can_handle_key(&self.state, input)?;
-        log(format!(
-            "KeyEventSink::OnTestKeyDown vk=0x{:X} char={:?} handled={handled}",
-            input.virtual_key, input.translated_char
-        ));
+        let handled = would_handle_windows_key(input) && driver_is_ready(&self.state)?;
         Ok(bool_to_win32(handled))
     }
 
@@ -62,43 +60,39 @@ impl ITfKeyEventSink_Impl for KhmerImeKeyEventSink_Impl {
 
     fn OnKeyDown(&self, pic: Option<&ITfContext>, wparam: WPARAM, lparam: LPARAM) -> Result<BOOL> {
         let ConvertedKey::Event(event) = convert_windows_key(windows_key_input(wparam, lparam)) else {
-            log(format!("KeyEventSink::OnKeyDown passthrough vk=0x{:X}", wparam.0));
             return Ok(FALSE);
         };
 
-        let (client_id, render_state) = {
+        let (client_id, current_preedit, has_active_composition, render_state) = {
             let mut state = lock_state(&self.state)?;
             poll_pending_driver(&mut state);
             let Some(driver) = state.driver.as_mut() else {
                 log("KeyEventSink::OnKeyDown driver still warming; passthrough");
                 return Ok(FALSE);
             };
-            if is_idle_digit_passthrough(driver, event.keyval) {
-                log(format!(
-                    "KeyEventSink::OnKeyDown idle digit passthrough keyval=0x{:X}",
-                    event.keyval
-                ));
-                return Ok(FALSE);
-            }
             let render_state = driver.process_callback(WindowsTsfCallback::KeyDown(event));
-            (state.client_id, render_state)
+            let current_preedit = state.current_preedit.clone();
+            let has_active_composition = state.composition.is_some();
+            (state.client_id, current_preedit, has_active_composition, render_state)
         };
-        log(format!(
-            "KeyEventSink::OnKeyDown keyval=0x{:X} consumed={} commit={:?} preedit_len={} candidates={}",
-            event.keyval,
-            render_state.consumed,
-            render_state.commit_text,
-            render_state.preedit.len(),
-            render_state.candidates.len()
-        ));
 
         if let Some(context) = pic {
-            if let Err(e) =
-                request_render_edit_session(context, client_id, render_state.clone(), Arc::clone(&self.state))
-            {
-                // Never propagate edit-session failures to TSF. TSF does not expect OnKeyDown to
-                // return a failure HRESULT and may deactivate the text service if it does.
-                log(format!("KeyEventSink::OnKeyDown edit session failed: {e:?}"));
+            // Only request a TSF edit session when composition text actually changes.
+            // Candidate-only updates (Space / arrow cycling) skip the TSF document
+            // mutation and refresh the popup window directly with the cached anchor.
+            let preedit_changed = render_state.commit_text.is_some()
+                || render_state.preedit != current_preedit
+                || (render_state.preedit.is_empty() && has_active_composition);
+
+            if preedit_changed {
+                if let Err(e) =
+                    request_render_edit_session(context, client_id, render_state.clone(), Arc::clone(&self.state))
+                {
+                    // Never propagate edit-session failures to TSF.
+                    log(format!("KeyEventSink::OnKeyDown edit session failed: {e:?}"));
+                }
+            } else {
+                refresh_candidates(&self.state, &render_state);
             }
         }
 
@@ -118,16 +112,10 @@ fn lock_state(state: &Arc<Mutex<TextServiceState>>) -> Result<std::sync::MutexGu
     state.lock().map_err(|_| Error::from(E_FAIL))
 }
 
-fn driver_can_handle_key(state: &Arc<Mutex<TextServiceState>>, input: WindowsKeyInput) -> Result<bool> {
+fn driver_is_ready(state: &Arc<Mutex<TextServiceState>>) -> Result<bool> {
     let mut state = lock_state(state)?;
     poll_pending_driver(&mut state);
-    let Some(driver) = state.driver.as_ref() else {
-        return Ok(false);
-    };
-    let ConvertedKey::Event(event) = convert_windows_key(input) else {
-        return Ok(false);
-    };
-    Ok(!is_idle_digit_passthrough(driver, event.keyval))
+    Ok(state.driver.is_some())
 }
 
 fn poll_pending_driver(state: &mut TextServiceState) {
@@ -160,18 +148,6 @@ fn bool_to_win32(value: bool) -> BOOL {
     }
 }
 
-fn is_idle_digit_passthrough(driver: &crate::session_driver::WindowsSessionDriver, keyval: u32) -> bool {
-    let Some(ch) = char::from_u32(keyval) else {
-        return false;
-    };
-    if !ch.is_ascii_digit() {
-        return false;
-    }
-
-    let snapshot = driver.session().snapshot();
-    snapshot.preedit.is_empty() && snapshot.candidates.is_empty()
-}
-
 fn windows_key_input(wparam: WPARAM, lparam: LPARAM) -> WindowsKeyInput {
     windows_key_input_with_state(wparam, lparam, current_modifier_state(lparam))
 }
@@ -182,7 +158,7 @@ fn windows_key_input_with_state(wparam: WPARAM, lparam: LPARAM, state: u32) -> W
         virtual_key,
         scan_code: ((lparam.0 as u64 >> 16) & 0xff) as u32,
         state,
-        translated_char: translated_ascii_char(virtual_key),
+        translated_char: translated_key_char(virtual_key),
     }
 }
 
@@ -203,29 +179,50 @@ fn current_modifier_state(lparam: LPARAM) -> u32 {
     state
 }
 
+fn shift_is_down() -> bool {
+    key_is_down(VK_SHIFT)
+}
+
 fn key_is_down(virtual_key: i32) -> bool {
     unsafe { (GetKeyState(virtual_key) as u16 & 0x8000) != 0 }
 }
 
-fn translated_ascii_char(virtual_key: u32) -> Option<char> {
+fn translated_key_char(virtual_key: u32) -> Option<char> {
+    let shift = shift_is_down();
     match virtual_key {
-        0x30..=0x39 => char::from_u32(virtual_key),
+        0x30..=0x39 => {
+            if shift {
+                Some(shift_digit_char(virtual_key))
+            } else {
+                char::from_u32(virtual_key)
+            }
+        }
         0x41..=0x5A => char::from_u32(virtual_key).map(|ch| ch.to_ascii_lowercase()),
-        0xBA..=0xC0 | 0xDB..=0xDE => None,
         _ => None,
+    }
+}
+
+fn shift_digit_char(vk: u32) -> char {
+    match vk {
+        0x30 => ')',
+        0x31 => '!',
+        0x32 => '@',
+        0x33 => '#',
+        0x34 => '$',
+        0x35 => '%',
+        0x36 => '^',
+        0x37 => '&',
+        0x38 => '*',
+        0x39 => '(',
+        _ => unreachable!(),
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::collections::HashMap;
-
-    use khmerime_core::{DecoderConfig, Transliterator};
-    use khmerime_session::ImeSession;
 
     use crate::input::key_convert::{ConvertedKey, STATE_CONTROL_MASK};
-    use crate::session_driver::WindowsSessionDriver;
 
     #[test]
     fn ctrl_a_passes_through_to_host_shortcut() {
@@ -244,34 +241,25 @@ mod tests {
     }
 
     #[test]
-    fn idle_digit_passes_through_before_composition() {
-        let driver = test_driver();
+    fn plain_digit_is_ime_handled() {
+        // Digits should always be sent to the session (no idle passthrough).
+        let input = windows_key_input_with_state(WPARAM(0x32), LPARAM(0), 0);
 
-        assert!(is_idle_digit_passthrough(&driver, '2' as u32));
+        assert!(matches!(convert_windows_key(input), ConvertedKey::Event(_)));
+        assert!(would_handle_windows_key(input));
     }
 
     #[test]
-    fn digit_still_handles_candidate_selection_when_composing() {
-        let mut driver = test_driver();
-        driver.process_key_event(k('f'));
-        driver.process_key_event(k('o'));
-        driver.process_key_event(k('o'));
-
-        assert!(!is_idle_digit_passthrough(&driver, '2' as u32));
-    }
-
-    fn test_driver() -> WindowsSessionDriver {
-        let fixture = "foo\tfirst\nfoo\tsecond\n";
-        let transliterator = Transliterator::from_tsv_str_with_config(fixture, DecoderConfig::shadow_interactive())
-            .expect("fixture must parse");
-        WindowsSessionDriver::new(ImeSession::new(transliterator, HashMap::new()))
-    }
-
-    fn k(ch: char) -> khmerime_session::NativeKeyEvent {
-        khmerime_session::NativeKeyEvent {
-            keyval: ch as u32,
-            keycode: ch as u32,
-            state: 0,
-        }
+    fn shift_digit_chars_cover_full_row() {
+        assert_eq!(shift_digit_char(0x30), ')');
+        assert_eq!(shift_digit_char(0x31), '!');
+        assert_eq!(shift_digit_char(0x32), '@');
+        assert_eq!(shift_digit_char(0x33), '#');
+        assert_eq!(shift_digit_char(0x34), '$');
+        assert_eq!(shift_digit_char(0x35), '%');
+        assert_eq!(shift_digit_char(0x36), '^');
+        assert_eq!(shift_digit_char(0x37), '&');
+        assert_eq!(shift_digit_char(0x38), '*');
+        assert_eq!(shift_digit_char(0x39), '(');
     }
 }

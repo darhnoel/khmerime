@@ -9,8 +9,8 @@ use windows::Win32::System::Com::{CoCreateInstance, CLSCTX_INPROC_SERVER};
 use windows::Win32::UI::Accessibility::{CUIAutomation, IUIAutomation};
 use windows::Win32::UI::TextServices::{
     ITfCompositionSink, ITfContext, ITfContextComposition, ITfEditSession, ITfEditSession_Impl, ITfInsertAtSelection,
-    ITfRange, TF_AE_END, TF_ANCHOR_END, TF_CONTEXT_EDIT_CONTEXT_FLAGS, TF_ES_READWRITE, TF_ES_SYNC, TF_IAS_NOQUERY,
-    TF_IAS_QUERYONLY, TF_SELECTION, TF_SELECTIONSTYLE,
+    ITfRange, TF_AE_END, TF_ANCHOR_END, TF_CONTEXT_EDIT_CONTEXT_FLAGS, TF_ES_READWRITE, TF_ES_SYNC, TF_IAS_QUERYONLY,
+    TF_SELECTION, TF_SELECTIONSTYLE,
 };
 use windows::Win32::UI::WindowsAndMessaging::{GetGUIThreadInfo, GUITHREADINFO};
 
@@ -96,6 +96,44 @@ impl ITfEditSession_Impl for KhmerImeEditSession_Impl {
     }
 }
 
+/// Update the candidate popup without requesting a TSF edit session.
+///
+/// Used when the composition text is unchanged (candidate cycling via Space /
+/// arrow keys).  Avoids an unnecessary `range.SetText` call on the TSF document.
+pub fn refresh_candidates(state: &Arc<Mutex<TextServiceState>>, render_state: &WindowsRenderState) {
+    let last_anchor = state.lock().ok().and_then(|s| s.last_candidate_anchor);
+    let anchor = last_anchor
+        .or_else(gui_caret_location)
+        .or_else(uia_focused_element_location)
+        .or_else(|| usable_cursor_location(render_state.cursor_location));
+
+    if let Ok(mut guard) = state.lock() {
+        if render_state.candidates.is_empty() {
+            if let Some(window) = &guard.candidate_window {
+                window.hide();
+            }
+            return;
+        }
+        if guard.candidate_window.is_none() {
+            guard.candidate_window = CandidateWindow::create()
+                .map_err(|e| log(format!("CandidateWindow::create failed: {e:?}")))
+                .ok();
+        }
+        if let Some(window) = &guard.candidate_window {
+            match &anchor {
+                Some(a) => window.update(
+                    &render_state.candidates,
+                    &render_state.candidate_display,
+                    &render_state.segment_preview,
+                    render_state.selected_index.unwrap_or(0),
+                    a,
+                ),
+                None => window.hide(),
+            }
+        }
+    }
+}
+
 impl KhmerImeEditSession_Impl {
     fn update_composition(&self, ec: u32, preedit: &str) -> Result<ITfRange> {
         let text = preedit.encode_utf16().collect::<Vec<_>>();
@@ -115,6 +153,7 @@ impl KhmerImeEditSession_Impl {
                 selection_range.Collapse(ec, TF_ANCHOR_END)?;
             }
             set_selection_to_range(&self.context, ec, selection_range)?;
+            state.current_preedit = preedit.to_owned();
             return Ok(measure_range);
         }
 
@@ -141,6 +180,7 @@ impl KhmerImeEditSession_Impl {
         }
         set_selection_to_range(&self.context, ec, selection_range)?;
         state.composition = Some(composition);
+        state.current_preedit = preedit.to_owned();
         Ok(measure_range)
     }
 
@@ -161,12 +201,18 @@ impl KhmerImeEditSession_Impl {
             set_selection_to_range(&self.context, ec, range)?;
         } else {
             let insert_at_selection = self.context.cast::<ITfInsertAtSelection>()?;
-            let range = unsafe { insert_at_selection.InsertTextAtSelection(ec, TF_IAS_NOQUERY, &text)? };
+            // TF_IAS_NOQUERY may not return a usable range. Query first so the
+            // selection update below never runs on a null COM range.
+            let range = unsafe { insert_at_selection.InsertTextAtSelection(ec, TF_IAS_QUERYONLY, &[])? };
+            unsafe {
+                range.SetText(ec, 0, &text)?;
+            }
             unsafe {
                 range.Collapse(ec, TF_ANCHOR_END)?;
             }
             set_selection_to_range(&self.context, ec, range)?;
         }
+        state.current_preedit.clear();
         Ok(())
     }
 
@@ -182,12 +228,16 @@ impl KhmerImeEditSession_Impl {
                 composition.EndComposition(ec)?;
             }
         }
+        state.current_preedit.clear();
         Ok(())
     }
 
     /// Show or update the candidate popup after a successful composition update.
     fn update_candidates(&self, anchor: Option<&CursorLocation>) {
         if let Ok(mut state) = self.state.lock() {
+            if let Some(anchor) = anchor {
+                state.last_candidate_anchor = Some(*anchor);
+            }
             if state.candidate_window.is_none() {
                 state.candidate_window = CandidateWindow::create()
                     .map_err(|e| log(format!("CandidateWindow::create failed: {e:?}")))
@@ -221,11 +271,7 @@ impl KhmerImeEditSession_Impl {
 
     fn measure_range_location(&self, ec: u32, range: &ITfRange) -> Option<CursorLocation> {
         match self.try_measure_range_location(ec, range) {
-            Ok(Some(location)) => Some(location),
-            Ok(None) => {
-                log("edit_session::GetTextExt returned unusable candidate anchor");
-                None
-            }
+            Ok(location) => location,
             Err(err) => {
                 log(format!("edit_session::GetTextExt failed: {err:?}"));
                 None
@@ -240,17 +286,7 @@ impl KhmerImeEditSession_Impl {
         unsafe {
             view.GetTextExt(ec, range, &mut rect, &mut clipped)?;
         }
-        let location = cursor_location_from_text_ext_rect(rect);
-        log(format!(
-            "edit_session::GetTextExt rect=({}, {}, {}, {}) clipped={} usable={}",
-            rect.left,
-            rect.top,
-            rect.right,
-            rect.bottom,
-            clipped.as_bool(),
-            location.is_some()
-        ));
-        Ok(location)
+        Ok(cursor_location_from_text_ext_rect(rect))
     }
 }
 
@@ -331,32 +367,18 @@ fn gui_caret_location() -> Option<CursorLocation> {
             return None;
         }
 
-        let location = cursor_location_from_rect(RECT {
+        cursor_location_from_rect(RECT {
             left: top_left.x,
             top: top_left.y,
             right: bottom_right.x,
             bottom: bottom_right.y,
-        });
-        log(format!(
-            "edit_session::GetGUIThreadInfo caret=({}, {}, {}, {}) hwnd=0x{:X} usable={}",
-            top_left.x,
-            top_left.y,
-            bottom_right.x,
-            bottom_right.y,
-            info.hwndCaret.0 as usize,
-            location.is_some()
-        ));
-        location
+        })
     }
 }
 
 fn uia_focused_element_location() -> Option<CursorLocation> {
     match try_uia_focused_element_location() {
-        Ok(Some(location)) => Some(location),
-        Ok(None) => {
-            log("edit_session::UIA focused element returned unusable anchor");
-            None
-        }
+        Ok(location) => location,
         Err(err) => {
             log(format!("edit_session::UIA focused element failed: {err:?}"));
             None
@@ -369,16 +391,7 @@ fn try_uia_focused_element_location() -> Result<Option<CursorLocation>> {
         let automation: IUIAutomation = CoCreateInstance(&CUIAutomation, None, CLSCTX_INPROC_SERVER)?;
         let element = automation.GetFocusedElement()?;
         let rect = element.CurrentBoundingRectangle()?;
-        let location = cursor_location_from_rect(rect);
-        log(format!(
-            "edit_session::UIA focused rect=({}, {}, {}, {}) usable={}",
-            rect.left,
-            rect.top,
-            rect.right,
-            rect.bottom,
-            location.is_some()
-        ));
-        Ok(location)
+        Ok(cursor_location_from_rect(rect))
     }
 }
 
