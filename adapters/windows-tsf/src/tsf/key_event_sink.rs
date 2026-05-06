@@ -7,11 +7,14 @@ use windows::Win32::Foundation::{BOOL, E_FAIL, FALSE, LPARAM, TRUE, WPARAM};
 use windows::Win32::UI::Input::KeyboardAndMouse::GetKeyState;
 use windows::Win32::UI::TextServices::{ITfContext, ITfKeyEventSink, ITfKeyEventSink_Impl};
 
+use khmerime_session::{NativeKeyEvent, SessionSnapshot};
+
 use crate::com::text_service::TextServiceState;
 use crate::diagnostics::log;
 use crate::input::key_convert::{
-    convert_windows_key, would_handle_windows_key, ConvertedKey, WindowsKeyInput, STATE_ALT_MASK, STATE_CONTROL_MASK,
-    STATE_RELEASE_MASK, STATE_SUPER_MASK,
+    convert_windows_key, ConvertedKey, WindowsKeyInput, SESSION_KEY_BACKSPACE, SESSION_KEY_DOWN, SESSION_KEY_ESCAPE,
+    SESSION_KEY_LEFT, SESSION_KEY_RETURN, SESSION_KEY_RIGHT, SESSION_KEY_SPACE, SESSION_KEY_UP, STATE_ALT_MASK,
+    STATE_CONTROL_MASK, STATE_RELEASE_MASK, STATE_SUPER_MASK,
 };
 
 const VK_SHIFT: i32 = 0x10;
@@ -50,7 +53,7 @@ impl ITfKeyEventSink_Impl for KhmerImeKeyEventSink_Impl {
 
     fn OnTestKeyDown(&self, _pic: Option<&ITfContext>, wparam: WPARAM, lparam: LPARAM) -> Result<BOOL> {
         let input = windows_key_input(wparam, lparam);
-        let handled = would_handle_windows_key(input) && driver_is_ready(&self.state)?;
+        let handled = driver_would_handle_key(&self.state, input)?;
         Ok(bool_to_win32(handled))
     }
 
@@ -70,6 +73,9 @@ impl ITfKeyEventSink_Impl for KhmerImeKeyEventSink_Impl {
                 log("KeyEventSink::OnKeyDown driver still warming; passthrough");
                 return Ok(FALSE);
             };
+            if !event_would_be_consumed(event, &driver.session().snapshot()) {
+                return Ok(FALSE);
+            }
             let render_state = driver.process_callback(WindowsTsfCallback::KeyDown(event));
             let current_preedit = state.current_preedit.clone();
             let has_active_composition = state.composition.is_some();
@@ -112,10 +118,16 @@ fn lock_state(state: &Arc<Mutex<TextServiceState>>) -> Result<std::sync::MutexGu
     state.lock().map_err(|_| Error::from(E_FAIL))
 }
 
-fn driver_is_ready(state: &Arc<Mutex<TextServiceState>>) -> Result<bool> {
+fn driver_would_handle_key(state: &Arc<Mutex<TextServiceState>>, input: WindowsKeyInput) -> Result<bool> {
     let mut state = lock_state(state)?;
     poll_pending_driver(&mut state);
-    Ok(state.driver.is_some())
+    let Some(driver) = state.driver.as_ref() else {
+        return Ok(false);
+    };
+    let ConvertedKey::Event(event) = convert_windows_key(input) else {
+        return Ok(false);
+    };
+    Ok(event_would_be_consumed(event, &driver.session().snapshot()))
 }
 
 fn poll_pending_driver(state: &mut TextServiceState) {
@@ -218,18 +230,38 @@ fn shift_digit_char(vk: u32) -> char {
     }
 }
 
+fn event_would_be_consumed(event: NativeKeyEvent, snapshot: &SessionSnapshot) -> bool {
+    match event.keyval {
+        SESSION_KEY_BACKSPACE | SESSION_KEY_ESCAPE | SESSION_KEY_RETURN | SESSION_KEY_SPACE => {
+            !snapshot.raw_preedit.is_empty()
+        }
+        SESSION_KEY_LEFT | SESSION_KEY_RIGHT => snapshot.segmented_active,
+        SESSION_KEY_UP | SESSION_KEY_DOWN => snapshot.segmented_active || !snapshot.candidates.is_empty(),
+        _ => char::from_u32(event.keyval)
+            .map(|ch| ch.is_ascii_graphic())
+            .unwrap_or(false),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    use crate::input::key_convert::{ConvertedKey, STATE_CONTROL_MASK};
+    use crate::input::key_convert::{ConvertedKey, STATE_CONTROL_MASK, VK_BACK, VK_RETURN, VK_SPACE};
+
+    fn event(keyval: u32) -> NativeKeyEvent {
+        NativeKeyEvent {
+            keyval,
+            keycode: keyval,
+            state: 0,
+        }
+    }
 
     #[test]
     fn ctrl_a_passes_through_to_host_shortcut() {
         let input = windows_key_input_with_state(WPARAM(0x41), LPARAM(0), STATE_CONTROL_MASK);
 
         assert_eq!(convert_windows_key(input), ConvertedKey::PassThrough);
-        assert!(!would_handle_windows_key(input));
     }
 
     #[test]
@@ -237,16 +269,74 @@ mod tests {
         let input = windows_key_input_with_state(WPARAM(0x41), LPARAM(0), 0);
 
         assert!(matches!(convert_windows_key(input), ConvertedKey::Event(_)));
-        assert!(would_handle_windows_key(input));
     }
 
     #[test]
     fn plain_digit_is_ime_handled() {
-        // Digits should always be sent to the session (no idle passthrough).
         let input = windows_key_input_with_state(WPARAM(0x32), LPARAM(0), 0);
 
         assert!(matches!(convert_windows_key(input), ConvertedKey::Event(_)));
-        assert!(would_handle_windows_key(input));
+    }
+
+    #[test]
+    fn idle_editor_control_keys_pass_through() {
+        let snapshot = SessionSnapshot::default();
+
+        for keyval in [
+            SESSION_KEY_BACKSPACE,
+            SESSION_KEY_ESCAPE,
+            SESSION_KEY_RETURN,
+            SESSION_KEY_SPACE,
+            SESSION_KEY_LEFT,
+            SESSION_KEY_RIGHT,
+            SESSION_KEY_UP,
+            SESSION_KEY_DOWN,
+        ] {
+            assert!(!event_would_be_consumed(event(keyval), &snapshot));
+        }
+    }
+
+    #[test]
+    fn composing_editor_control_keys_are_handled() {
+        let snapshot = SessionSnapshot {
+            raw_preedit: "jea".to_owned(),
+            preedit: "jea".to_owned(),
+            candidates: vec!["candidate".to_owned()],
+            ..SessionSnapshot::default()
+        };
+
+        for keyval in [
+            SESSION_KEY_BACKSPACE,
+            SESSION_KEY_ESCAPE,
+            SESSION_KEY_RETURN,
+            SESSION_KEY_SPACE,
+        ] {
+            assert!(event_would_be_consumed(event(keyval), &snapshot));
+        }
+        assert!(event_would_be_consumed(event(SESSION_KEY_UP), &snapshot));
+        assert!(event_would_be_consumed(event(SESSION_KEY_DOWN), &snapshot));
+    }
+
+    #[test]
+    fn printable_keys_still_start_composition_or_keycap_commit() {
+        let snapshot = SessionSnapshot::default();
+
+        assert!(event_would_be_consumed(event('a' as u32), &snapshot));
+        assert!(event_would_be_consumed(event('2' as u32), &snapshot));
+        assert!(event_would_be_consumed(event('@' as u32), &snapshot));
+    }
+
+    #[test]
+    fn converted_idle_editor_control_keys_match_prediction() {
+        for virtual_key in [VK_BACK, VK_RETURN, VK_SPACE] {
+            let ConvertedKey::Event(event) = convert_windows_key(WindowsKeyInput {
+                virtual_key,
+                ..WindowsKeyInput::default()
+            }) else {
+                panic!("special key should convert");
+            };
+            assert!(!event_would_be_consumed(event, &SessionSnapshot::default()));
+        }
     }
 
     #[test]

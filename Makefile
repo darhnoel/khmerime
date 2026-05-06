@@ -1,4 +1,4 @@
-.PHONY: help web web-release web-phone desktop stats suggest suggest-wfst suggest-shadow shadow-eval visualize-lexicon visualize-lexicon-streamlit fmt test test-golden test-ui platform-check platform-check-linux platform-check-android platform-check-ios platform-check-macos platform-check-windows platform-build-windows platform-install-windows platform-uninstall-windows platform-smoke-windows-notepad platform-smoke-windows-notepad-python linux-package ibus-install ibus-uninstall ibus-smoke paper-current paper-current-clean
+.PHONY: help web web-release web-phone desktop stats suggest suggest-wfst suggest-shadow shadow-eval visualize-lexicon visualize-lexicon-streamlit fmt test test-golden test-ui platform-check platform-check-linux platform-check-android platform-check-ios platform-check-macos platform-check-windows platform-build-windows platform-install-windows platform-uninstall-windows platform-reinstall-windows platform-smoke-windows-notepad platform-smoke-windows-notepad-python windows-package linux-package ibus-install ibus-uninstall ibus-smoke paper-current paper-current-clean
 
 DX ?= dx
 APP_DIR := apps/dioxus-app
@@ -51,6 +51,7 @@ help:
 	"  make platform-reinstall-windows  Build once, copy to a fresh DLL path, and re-register" \
 	"  make platform-smoke-windows-notepad  Launch Notepad and check for TSF crash events" \
 	"  make platform-smoke-windows-notepad-python  Python Notepad smoke with clipboard/log output" \
+	"  make windows-package            Build the Windows TSF MSI under dist/windows/" \
 	"  make linux-package               Build the Linux IBus .deb package under dist/linux/" \
 	"  make ibus-install                Build and install KhmerIME IBus engine files (may use sudo)" \
 	"  make ibus-uninstall              Remove KhmerIME IBus engine files" \
@@ -153,6 +154,9 @@ platform-smoke-windows-notepad:
 
 platform-smoke-windows-notepad-python:
 	python scripts/platforms/windows/tsf/notepad_smoke.py --delay $(WINDOWS_TSF_SMOKE_DELAY)
+
+windows-package:
+	powershell -NoProfile -ExecutionPolicy Bypass -File scripts/platforms/windows/tsf/build_msi.ps1
 
 linux-package:
 	bash scripts/platforms/linux/ibus/build_deb.sh

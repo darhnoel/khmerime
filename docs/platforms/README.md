@@ -24,7 +24,7 @@ Do not reimplement roman normalization, segmentation, ranking, candidate cycling
 | Android | `adapters/android-ime` | `docs/platforms/android.md` | add only when real Android build/install scripts exist | Scaffold |
 | iOS | `adapters/ios-keyboard` | `docs/platforms/ios.md` | add only when real Xcode/build scripts exist | Scaffold |
 | macOS | `adapters/macos-imk` | `docs/platforms/macos.md` | add only when real IMK build/install scripts exist | Scaffold |
-| Windows | `adapters/windows-tsf` | `docs/platforms/windows.md` | add only when real TSF register/package scripts exist | Scaffold |
+| Windows | `adapters/windows-tsf` | `docs/platforms/windows.md` | `scripts/platforms/windows/tsf/`, `packaging/windows/wix/` | Working developer-local TSF path and unsigned MSI package |
 
 Use this layout rule:
 
@@ -95,6 +95,14 @@ make linux-package
 ```
 
 This writes `dist/linux/khmerime_<version>_amd64.deb`.
+
+Windows has an unsigned x64 MSI package target:
+
+```bash
+make windows-package
+```
+
+This writes `dist/windows/KhmerIME-<version>-x64.msi`.
 
 When another platform grows real package scripts, add matching make targets only after the script works locally. Prefer names like:
 

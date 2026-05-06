@@ -35,6 +35,7 @@ make test
 make test-golden
 make test-ui
 make platform-check
+make windows-package
 make ibus-install
 make ibus-uninstall
 make ibus-smoke
@@ -85,6 +86,9 @@ make platform-check
 
 make platform-check-<platform>
   Run cargo check for one adapter: linux, android, ios, macos, or windows.
+
+make windows-package
+  Build the unsigned Windows TSF x64 MSI under dist/windows/.
 
 make ibus-install
   Build and install KhmerIME IBus engine files for Ubuntu desktop testing.

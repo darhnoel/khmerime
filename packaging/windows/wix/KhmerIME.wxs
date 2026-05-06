@@ -1,0 +1,44 @@
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
+  <Package
+    Name="KhmerIME"
+    Manufacturer="KhmerIME"
+    Version="$(var.ProductVersion)"
+    UpgradeCode="8B44C718-0D1D-4FA6-B8B0-018D0F3C7E6A"
+    Scope="perMachine">
+
+    <MajorUpgrade DowngradeErrorMessage="A newer version of KhmerIME is already installed." />
+    <MediaTemplate EmbedCab="yes" />
+
+    <StandardDirectory Id="ProgramFiles64Folder">
+      <Directory Id="INSTALLFOLDER" Name="KhmerIME">
+        <Component Id="KhmerImeTsfDllComponent" Guid="9C04A3E8-8FA2-4303-9A6B-6947B5A4AF08">
+          <File Id="KhmerImeTsfDllFile" Source="$(var.KhmerImeDll)" KeyPath="yes" />
+        </Component>
+      </Directory>
+    </StandardDirectory>
+
+    <Feature Id="MainFeature" Title="KhmerIME" Level="1">
+      <ComponentRef Id="KhmerImeTsfDllComponent" />
+    </Feature>
+
+    <CustomAction
+      Id="RegisterKhmerImeTsf"
+      Directory="INSTALLFOLDER"
+      Execute="deferred"
+      Impersonate="no"
+      ExeCommand="&quot;[System64Folder]regsvr32.exe&quot; /s &quot;[#KhmerImeTsfDllFile]&quot;"
+      Return="check" />
+    <CustomAction
+      Id="UnregisterKhmerImeTsf"
+      Directory="INSTALLFOLDER"
+      Execute="deferred"
+      Impersonate="no"
+      ExeCommand="&quot;[System64Folder]regsvr32.exe&quot; /s /u &quot;[#KhmerImeTsfDllFile]&quot;"
+      Return="ignore" />
+
+    <InstallExecuteSequence>
+      <Custom Action="RegisterKhmerImeTsf" After="InstallFiles" Condition="NOT Installed" />
+      <Custom Action="UnregisterKhmerImeTsf" Before="RemoveFiles" Condition="REMOVE=&quot;ALL&quot;" />
+    </InstallExecuteSequence>
+  </Package>
+</Wix>

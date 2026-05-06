@@ -21,12 +21,13 @@ Do not embed the Dioxus app in the Windows adapter. Do not fork transliteration 
 
 ## Current Status
 
-The Windows adapter is currently a documentation and skeleton phase only. It is
-not a runnable Windows IME yet: it does not export a COM DLL, register a TSF
-profile, mutate TSF document ranges, or render native candidate UI.
+The Windows adapter now builds a TSF COM DLL that can be registered locally,
+selected as a Windows input method, and smoke-tested in Notepad. It includes COM
+exports, TSF profile registration, key sink routing, edit-session mutation,
+native candidate UI, and an unsigned x64 MSI package workflow.
 
-The current scaffold is intentionally cross-platform compilable so Linux/macOS
-development checks can validate the contract without Windows APIs installed:
+The crate remains cross-platform testable for contract/session-driver checks,
+while Windows-only COM and packaging paths require a Windows host:
 
 ```text
 adapters/windows-tsf/
@@ -36,13 +37,14 @@ adapters/windows-tsf/
     lib.rs
     history.rs
     session_driver.rs
-    com/          Windows-only placeholder modules
+    com/          Windows-only COM registration and text-service modules
     input/        documented key-conversion boundary
     render/       documented render-action boundary
-    tsf/          Windows-only placeholder modules
+    tsf/          Windows-only edit-session, composition, and candidate modules
 ```
 
-`adapters/windows-tsf/src/lib.rs` is a contract skeleton. It documents the callback surface and render responsibilities but does not yet register a real Windows COM text service.
+`adapters/windows-tsf/src/lib.rs` keeps the adapter callback surface and render
+responsibilities testable without loading COM.
 
 The current crate exposes:
 
@@ -59,16 +61,15 @@ WindowsRenderState
 callback_map()
   Static mapping used by docs/tests.
 
-map_callback_to_session_command(...)
-  Placeholder for future TSF -> SessionCommand conversion.
+map_callback_to_session_commands(...)
+  Converts TSF callback intent into one or more SessionCommand values.
 
 derive_render_state(...)
   Converts session output into preedit/candidates/commit responsibilities.
 ```
 
-The first real implementation after this skeleton should be a pure Rust
-`session_driver` test around `khmerime_session::ImeSession`, still before COM
-registration or TSF edit-session mutation.
+The first packaged installer is unsigned and intended for Windows development
+and manual validation before broader release.
 
 ## What TSF Owns
 
@@ -142,9 +143,7 @@ service, class factory, edit sessions, key handling, composition utilities,
 candidate lists, display attributes, and UI handlers. KhmerIME should borrow
 that separation while keeping the first implementation much smaller.
 
-In the current phase, the files below are skeleton boundaries with documentation
-and placeholder constants only. They are not allowed to pretend to register,
-activate, edit, or package a working Windows IME.
+The files below are the maintained adapter boundaries:
 
 Recommended adapter shape:
 
@@ -223,9 +222,8 @@ Do not let TSF code call `khmerime_core` directly. The adapter should go through
 `khmerime_session` so behavior stays shared with Linux, web, CLI, and future
 mobile adapters.
 
-Do not add the `windows` crate dependency, `cdylib`, exported COM symbols,
-registry writes, installer scripts, or `make windows-package` while this remains
-a skeleton-only phase.
+Keep package/registration code separate from runtime typing behavior. Do not
+mix installer work with candidate ranking, lexicon, or decoder changes.
 
 ### Mozc Lessons To Borrow
 
@@ -406,7 +404,7 @@ Tasks:
 
 1. Add unit tests in `adapters/windows-tsf` for `callback_map()`.
 2. Add tests for `derive_render_state()`.
-3. Add a placeholder test proving `map_callback_to_session_command()` returns `None` until implemented.
+3. Add tests for lifecycle callbacks that expand into multiple session commands.
 4. Run `cargo test -p khmerime_windows_tsf`.
 
 ### Milestone 2: Local Session Driver
@@ -478,17 +476,55 @@ Tasks:
 
 Goal: let non-developer Windows users install and test.
 
-Do not add `make windows-package` yet. Add Windows packaging only after a real
-TSF COM text service exists and can be registered, selected, and used on Windows.
+The first package is an unsigned, per-machine x64 MSI built with WiX Toolset.
+It installs the TSF DLL under `Program Files\KhmerIME` and uses the DLL's
+existing COM registration exports through silent `regsvr32`.
 
-Tasks:
+Build prerequisites:
 
-1. Decide package format, likely MSI via WiX or an equivalent signed installer.
-2. Register/unregister the TSF COM text service.
-3. Include architecture-specific binaries.
-4. Add uninstall cleanup.
-5. Document how to enable the input method in Windows language/input settings.
-6. Add a manual smoke checklist for Notepad, Chromium textarea, and a Microsoft Office text field.
+1. Windows host.
+2. Rust stable toolchain with `x86_64-pc-windows-msvc` installed.
+3. WiX Toolset available as `wix` on `PATH`.
+
+Package command:
+
+```powershell
+make windows-package
+```
+
+This runs:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts/platforms/windows/tsf/build_msi.ps1
+```
+
+Produced artifact:
+
+```text
+dist/windows/KhmerIME-<version>-x64.msi
+```
+
+Install/uninstall notes:
+
+1. Install the MSI as administrator.
+2. The package registers `khmerime_windows_tsf.dll` with `regsvr32 /s`.
+3. On uninstall, the package runs `regsvr32 /s /u` before removing the DLL.
+4. Because v1 is unsigned, Windows SmartScreen or enterprise policy may warn or block the installer.
+5. After install, enable KhmerIME from Windows language/input settings or the input switcher.
+
+Manual package smoke checklist:
+
+```text
+Install KhmerIME MSI as administrator
+Confirm KhmerIME appears in Windows language/input settings
+Open Notepad
+Switch input method to KhmerIME
+Type jea
+Press Enter
+Verify Khmer text commits once and Notepad does not crash
+Uninstall KhmerIME from Windows Apps/Programs
+Verify KhmerIME disappears from Windows input methods
+```
 
 ## First Contributor Tasks
 
@@ -503,7 +539,7 @@ Start with these in order:
 7. Add composition/preedit rendering.
 8. Add candidate rendering.
 9. Add history persistence.
-10. Add packaging.
+10. Expand packaging with signing and CI artifact publishing after manual MSI validation.
 
 ## Manual Smoke Checklist
 
