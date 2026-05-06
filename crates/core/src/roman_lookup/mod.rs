@@ -246,31 +246,41 @@ mod tests {
         let transliterator = Transliterator::from_default_data().unwrap();
         let history = HashMap::new();
         let expectations = [
+            // Unshifted digits → Khmer digits
             ("1", "១"),
-            ("!", "!"),
             ("2", "២"),
-            ("\"", "ៗ"),
             ("3", "៣"),
-            ("#", "\""),
             ("4", "៤"),
-            ("$", "៛"),
             ("5", "៥"),
-            ("%", "%"),
             ("6", "៦"),
-            ("&", "៍"),
             ("7", "៧"),
-            ("'", "័"),
             ("8", "៨"),
-            ("(", "៏"),
             ("9", "៩"),
-            (")", "("),
             ("0", "០"),
-            ("~", ")"),
+            // US keyboard Shift+digit (NiDA-compatible)
+            ("!", "!"),
+            ("@", "ៗ"),
+            ("#", "\u{17CA}"),
+            ("$", "៛"),
+            ("%", "័"),
+            ("^", "៌"),
+            ("&", "៍"),
+            ("*", "៏"),
+            ("(", "\u{17CE}"),
+            (")", "\u{17D1}"),
+            // OEM key legacy entries
+            ("\"", "ៗ"),
+            ("'", "័"),
             ("=", "៌"),
+            ("~", ")"),
         ];
 
         for (input, expected) in expectations {
-            assert_eq!(transliterator.suggest(input, &history), vec![expected.to_owned()]);
+            assert_eq!(
+                transliterator.suggest(input, &history),
+                vec![expected.to_owned()],
+                "keycap suggestion mismatch for key {input:?}"
+            );
         }
     }
 

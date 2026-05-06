@@ -4,6 +4,8 @@
 //! and let this driver own the shared IME session.
 
 use std::collections::HashMap;
+use std::sync::mpsc::{self, Receiver};
+use std::thread;
 
 use khmerime_core::{DecoderConfig, Result as KhmerResult, Transliterator};
 use khmerime_session::{HistoryStore, ImeSession, NativeKeyEvent, SessionCommand};
@@ -57,6 +59,20 @@ impl WindowsSessionDriver {
     pub fn session(&self) -> &ImeSession {
         &self.session
     }
+}
+
+pub fn spawn_default_driver_warmup() -> Receiver<Result<WindowsSessionDriver, String>> {
+    let (sender, receiver) = mpsc::channel();
+    thread::spawn(move || {
+        let result = WindowsSessionDriver::from_default_data()
+            .map(|mut driver| {
+                driver.process_callback(WindowsTsfCallback::Activate);
+                driver
+            })
+            .map_err(|err| err.to_string());
+        let _ = sender.send(result);
+    });
+    receiver
 }
 
 #[cfg(test)]

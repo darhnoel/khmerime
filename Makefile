@@ -11,9 +11,16 @@ PAPER_CURRENT_DIR := papers/current-implementation
 PAPER_CURRENT_TEX := khmerime_current_implementation_paper.tex
 WINDOWS_TSF_TARGET ?= x86_64-pc-windows-msvc
 WINDOWS_TSF_TARGET_DIR ?= target/windows-tsf
+WINDOWS_TSF_DEV_TARGET_DIR ?= target/windows-tsf-dev
+WINDOWS_TSF_REINSTALL_STAMP := $(or $(WINDOWS_TSF_REINSTALL_STAMP),$(shell powershell -NoProfile -Command Get-Date -Format yyyyMMddHHmmss))
+WINDOWS_TSF_DEPLOY_DIR ?= target/windows-tsf-deploy/$(WINDOWS_TSF_REINSTALL_STAMP)
 WINDOWS_TSF_DLL := $(WINDOWS_TSF_TARGET_DIR)/$(WINDOWS_TSF_TARGET)/debug/khmerime_windows_tsf.dll
+WINDOWS_TSF_DEV_DLL := $(WINDOWS_TSF_DEV_TARGET_DIR)/$(WINDOWS_TSF_TARGET)/debug/khmerime_windows_tsf.dll
+WINDOWS_TSF_DEPLOY_DLL := $(WINDOWS_TSF_DEPLOY_DIR)/khmerime_windows_tsf.dll
 # Absolute path — regsvr32 runs elevated and its cwd may not be the project root.
 WINDOWS_TSF_DLL_ABS := $(subst /,\,$(CURDIR)/$(WINDOWS_TSF_DLL))
+WINDOWS_TSF_DEV_DLL_ABS := $(subst /,\,$(CURDIR)/$(WINDOWS_TSF_DEV_DLL))
+WINDOWS_TSF_DEPLOY_DLL_ABS := $(subst /,\,$(CURDIR)/$(WINDOWS_TSF_DEPLOY_DLL))
 WINDOWS_TSF_SMOKE_DELAY ?= 8
 
 help:
@@ -41,7 +48,7 @@ help:
 	"  make platform-build-windows      Build the Windows TSF DLL target under target/windows-tsf/" \
 	"  make platform-install-windows    Build and register the Windows TSF DLL with regsvr32" \
 	"  make platform-uninstall-windows  Unregister the Windows TSF DLL with regsvr32 /u" \
-	"  make platform-reinstall-windows  Kill Notepad, unregister, rebuild, and re-register in one step" \
+	"  make platform-reinstall-windows  Build once, copy to a fresh DLL path, and re-register" \
 	"  make platform-smoke-windows-notepad  Launch Notepad and check for TSF crash events" \
 	"  make platform-smoke-windows-notepad-python  Python Notepad smoke with clipboard/log output" \
 	"  make linux-package               Build the Linux IBus .deb package under dist/linux/" \
@@ -132,14 +139,14 @@ platform-install-windows: platform-build-windows
 platform-uninstall-windows:
 	powershell -NoProfile -ExecutionPolicy Bypass -Command "Start-Process -FilePath regsvr32.exe -ArgumentList @('/u', '$(WINDOWS_TSF_DLL_ABS)') -Verb RunAs -Wait"
 
-# Unregister (releasing the file lock), rebuild, and re-register in one step.
-# Silently ignores "not registered" errors so it works on a clean machine too.
-# Close Notepad first to ensure the DLL is not held by a TSF client process.
+# Build in an unregistered stable Cargo target dir for incremental speed, then
+# register a copied DLL from a fresh deploy dir so loaded TSF DLLs do not block rebuilds.
 platform-reinstall-windows:
-	powershell -NoProfile -ExecutionPolicy Bypass -Command "Stop-Process -Name notepad -Force -ErrorAction SilentlyContinue"
-	-powershell -NoProfile -ExecutionPolicy Bypass -Command "Start-Process -FilePath regsvr32.exe -ArgumentList @('/u', '$(WINDOWS_TSF_DLL_ABS)') -Verb RunAs -Wait"
-	cargo build -p khmerime_windows_tsf --target $(WINDOWS_TSF_TARGET) --target-dir $(WINDOWS_TSF_TARGET_DIR)
-	powershell -NoProfile -ExecutionPolicy Bypass -Command "Start-Process -FilePath regsvr32.exe -ArgumentList @('$(WINDOWS_TSF_DLL_ABS)') -Verb RunAs -Wait"
+	powershell -NoProfile -ExecutionPolicy Bypass -Command "Stop-Process -Name notepad -Force -ErrorAction SilentlyContinue; exit 0"
+	cargo build -p khmerime_windows_tsf --target $(WINDOWS_TSF_TARGET) --target-dir $(WINDOWS_TSF_DEV_TARGET_DIR)
+	powershell -NoProfile -ExecutionPolicy Bypass -Command "New-Item -ItemType Directory -Force '$(WINDOWS_TSF_DEPLOY_DIR)' | Out-Null; Copy-Item -Force '$(WINDOWS_TSF_DEV_DLL)' '$(WINDOWS_TSF_DEPLOY_DLL)'"
+	powershell -NoProfile -ExecutionPolicy Bypass -Command "Start-Process -FilePath regsvr32.exe -ArgumentList @('$(WINDOWS_TSF_DEPLOY_DLL_ABS)') -Verb RunAs -Wait"
+	powershell -NoProfile -ExecutionPolicy Bypass -Command "Stop-Process -Name ctfmon -Force -ErrorAction SilentlyContinue; Start-Process ctfmon.exe"
 
 platform-smoke-windows-notepad:
 	powershell -NoProfile -ExecutionPolicy Bypass -File scripts/platforms/windows/tsf/notepad_smoke.ps1
