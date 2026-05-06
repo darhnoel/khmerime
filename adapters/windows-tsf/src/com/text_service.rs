@@ -8,6 +8,8 @@ use windows::Win32::UI::TextServices::{
     ITfComposition, ITfKeyEventSink, ITfKeystrokeMgr, ITfTextInputProcessor, ITfTextInputProcessor_Impl, ITfThreadMgr,
 };
 
+use khmerime_session::CursorLocation;
+
 use crate::com::dll_module;
 use crate::diagnostics::log;
 use crate::session_driver::WindowsSessionDriver;
@@ -27,6 +29,12 @@ pub struct TextServiceState {
     /// Native Win32 popup window for the candidate list.
     /// Created lazily on first use; hidden on Deactivate.
     pub candidate_window: Option<CandidateWindow>,
+    /// Last preedit text successfully written to the TSF composition range.
+    /// Used to skip redundant edit sessions when only candidates changed.
+    pub current_preedit: String,
+    /// Last candidate popup anchor resolved from a composition range.
+    /// Reused for candidate-only updates that don't need a TSF edit session.
+    pub last_candidate_anchor: Option<CursorLocation>,
 }
 
 impl Default for TextServiceState {
@@ -39,6 +47,8 @@ impl Default for TextServiceState {
             key_sink: None,
             composition: None,
             candidate_window: None,
+            current_preedit: String::new(),
+            last_candidate_anchor: None,
         }
     }
 }
@@ -123,6 +133,7 @@ impl ITfTextInputProcessor_Impl for KhmerImeTextService_Impl {
             state.client_id = 0;
             state.driver = None;
             state.pending_driver = None;
+            state.current_preedit.clear();
             (thread_mgr, client_id, key_sink)
         };
 
