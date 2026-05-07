@@ -41,6 +41,8 @@ pub struct ShadowObservation {
     pub composer_hint_chunks: Vec<String>,
     pub composer_pending_tail: String,
     pub composer_fully_segmented: bool,
+    // Compatibility field names: shadow reports still use `wfst_*` keys for
+    // existing tooling, but these values now come from WeightedSpanDecoder.
     pub wfst_used_hint_chunks: bool,
     pub wfst_top_segment_details: Vec<DecodeSegment>,
     pub wfst_top_segments: Vec<String>,
@@ -159,11 +161,11 @@ pub(crate) fn build_shadow_observation(
     input: &str,
     composer: &ComposerAnalysis,
     legacy: &DecodeResult,
-    wfst: Option<&DecodeResult>,
+    weighted_span: Option<&DecodeResult>,
 ) -> ShadowObservation {
-    let mismatch = categorize_mismatch(legacy, wfst);
+    let mismatch = categorize_mismatch(legacy, weighted_span);
     let legacy_top5 = top_candidates(legacy);
-    let wfst_top5 = wfst.map(top_candidates).unwrap_or_default();
+    let wfst_top5 = weighted_span.map(top_candidates).unwrap_or_default();
     let legacy_top = legacy_top5.first().cloned();
     let wfst_top = wfst_top5.first().cloned();
     let legacy_top_in_wfst = legacy_top
@@ -174,7 +176,7 @@ pub(crate) fn build_shadow_observation(
         .as_ref()
         .map(|top| legacy_top5.iter().any(|candidate| candidate == top))
         .unwrap_or(false);
-    let wfst_top_segments = wfst
+    let wfst_top_segments = weighted_span
         .and_then(|result| result.candidates.first())
         .map(|candidate| {
             candidate
@@ -184,7 +186,7 @@ pub(crate) fn build_shadow_observation(
                 .collect::<Vec<_>>()
         })
         .unwrap_or_default();
-    let wfst_top_segment_details = wfst
+    let wfst_top_segment_details = weighted_span
         .and_then(|result| result.candidates.first())
         .map(|candidate| candidate.segments.clone())
         .unwrap_or_default();
@@ -194,13 +196,13 @@ pub(crate) fn build_shadow_observation(
         .map(|chunk| chunk.normalized.clone())
         .collect::<Vec<_>>();
     let composer_hint_chunks = composer
-        .wfst_phrase_chunks()
+        .weighted_span_phrase_chunks()
         .into_iter()
         .filter(|chunk| chunk.kind == ComposerChunkKind::Hint)
         .map(|chunk| chunk.normalized)
         .collect::<Vec<_>>();
     let wfst_used_hint_chunks = !composer_hint_chunks.is_empty()
-        && wfst
+        && weighted_span
             .and_then(|result| result.candidates.first())
             .map(|candidate| candidate.segments.len() > 1)
             .unwrap_or(false);
@@ -217,9 +219,9 @@ pub(crate) fn build_shadow_observation(
         wfst_top_segment_details,
         wfst_top_segments,
         legacy_latency_us: legacy.latency_us,
-        wfst_latency_us: wfst.map(|result| result.latency_us),
+        wfst_latency_us: weighted_span.map(|result| result.latency_us),
         legacy_failure: legacy.failure.as_ref().map(format_failure),
-        wfst_failure: wfst.and_then(|result| result.failure.as_ref().map(format_failure)),
+        wfst_failure: weighted_span.and_then(|result| result.failure.as_ref().map(format_failure)),
         legacy_top,
         wfst_top,
         legacy_top5,
@@ -238,16 +240,19 @@ fn top_candidates(result: &DecodeResult) -> Vec<String> {
         .collect()
 }
 
-fn categorize_mismatch(legacy: &DecodeResult, wfst: Option<&DecodeResult>) -> ShadowMismatch {
-    let Some(wfst) = wfst else {
+fn categorize_mismatch(legacy: &DecodeResult, weighted_span: Option<&DecodeResult>) -> ShadowMismatch {
+    let Some(weighted_span) = weighted_span else {
         return ShadowMismatch::WfstUnavailable;
     };
-    if wfst.failure.is_some() {
+    if weighted_span.failure.is_some() {
         return ShadowMismatch::WfstFailed;
     }
 
     let legacy_top = legacy.candidates.first().map(|candidate| candidate.text.as_str());
-    let wfst_top = wfst.candidates.first().map(|candidate| candidate.text.as_str());
+    let wfst_top = weighted_span
+        .candidates
+        .first()
+        .map(|candidate| candidate.text.as_str());
     if legacy_top == wfst_top {
         return ShadowMismatch::Top1Match;
     }
@@ -257,7 +262,7 @@ fn categorize_mismatch(legacy: &DecodeResult, wfst: Option<&DecodeResult>) -> Sh
         .iter()
         .map(|candidate| candidate.text.as_str())
         .collect::<Vec<_>>();
-    let wfst_set = wfst
+    let wfst_set = weighted_span
         .candidates
         .iter()
         .map(|candidate| candidate.text.as_str())
@@ -269,7 +274,7 @@ fn categorize_mismatch(legacy: &DecodeResult, wfst: Option<&DecodeResult>) -> Sh
         ShadowMismatch::LegacyTopFoundInWfst
     } else if wfst_top.is_some() && legacy_set.contains(&wfst_top.unwrap_or_default()) {
         ShadowMismatch::WfstTopFoundInLegacy
-    } else if wfst.candidates.is_empty() {
+    } else if weighted_span.candidates.is_empty() {
         ShadowMismatch::WfstEmpty
     } else {
         ShadowMismatch::OutputMismatch
@@ -313,7 +318,7 @@ mod tests {
         let composer = ComposerAnalysis {
             normalized: "jea".to_owned(),
             chunks: Vec::new(),
-            wfst_chunk_paths: Vec::new(),
+            weighted_span_chunk_paths: Vec::new(),
             pending_tail: String::new(),
             fully_segmented: false,
         };

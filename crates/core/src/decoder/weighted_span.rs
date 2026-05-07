@@ -12,11 +12,14 @@ const MIN_SPAN_LEN: usize = 3;
 const CHUNK_EDIT_FLOOR: f64 = 0.46;
 const SEGMENT_LIMIT_PER_START: usize = 12;
 
-// This decoder is WFST-style rather than a compiled finite-state transducer. It
-// builds span candidates from lexicon retrieval signals and runs a beam search
-// with weighted chunk, segmentation, language-model, POS, and history scores.
-// Keep score components separated so shadow/hybrid modes can explain ranking
-// changes without platform adapters knowing decoder internals.
+// Weighted span decoder.
+//
+// This is not a compiled WFST implementation. It builds a lattice of candidate
+// roman-input spans from lexicon retrieval signals, then uses beam search to
+// choose the best sequence of output chunks.
+//
+// Scores are kept as separate components so shadow/hybrid modes can explain why
+// a candidate won without exposing decoder internals to platform adapters.
 
 #[derive(Clone, Debug)]
 struct RetrievalSignals {
@@ -44,7 +47,7 @@ struct SpanCandidate {
 struct ScoreBreakdown {
     chunk: i32,
     segmentation: i32,
-    lm: i32,
+    context: i32,
     pos: i32,
     history: i32,
 }
@@ -63,7 +66,7 @@ impl ScoreBreakdown {
     fn total(&self, config: &DecoderConfig) -> i32 {
         self.chunk * config.chunk_score_weight
             + self.segmentation * config.segmentation_score_weight
-            + self.lm * config.lm_score_weight
+            + self.context * config.context_score_weight
             + self.pos * config.pos_score_weight
             + self.history * config.history_score_weight
     }
@@ -79,12 +82,12 @@ impl BeamItem {
     }
 }
 
-pub(crate) struct WfstDecoder {
+pub(crate) struct WeightedSpanDecoder {
     data: Arc<LegacyData>,
     config: DecoderConfig,
 }
 
-impl WfstDecoder {
+impl WeightedSpanDecoder {
     pub(crate) fn new(data: Arc<LegacyData>, config: DecoderConfig) -> Self {
         Self { data, config }
     }
@@ -540,7 +543,7 @@ impl WfstDecoder {
         beam.scores.chunk += candidate.score;
         beam.scores.segmentation += segmentation_delta(candidate.input.chars().count(), candidate.edit_similarity);
         beam.scores.segmentation += composer_alignment_delta(request.composer, candidate.start, candidate.end);
-        beam.scores.lm += lm_delta(self.data.ranked(), beam.words.last(), &candidate.output);
+        beam.scores.context += context_delta(self.data.ranked(), beam.words.last(), &candidate.output);
         beam.scores.pos += pos_delta(
             self.data.ranked(),
             beam.last_tags.last().and_then(|tag| tag.as_deref()),
@@ -557,7 +560,7 @@ impl WfstDecoder {
     fn has_anchor_chunks(&self, request: &DecodeRequest<'_>) -> bool {
         request
             .composer
-            .all_wfst_phrase_chunks()
+            .all_weighted_span_phrase_chunks()
             .iter()
             .flatten()
             .any(|chunk| chunk.end.saturating_sub(chunk.start) >= MIN_SPAN_LEN)
@@ -569,38 +572,42 @@ impl WfstDecoder {
     }
 
     fn preferred_anchor_ranges(&self, request: &DecodeRequest<'_>, total_len: usize) -> Option<Vec<(usize, usize)>> {
-        request.composer.all_wfst_phrase_chunks().iter().find_map(|chunks| {
-            if chunks.len() < 2 {
-                return None;
-            }
+        request
+            .composer
+            .all_weighted_span_phrase_chunks()
+            .iter()
+            .find_map(|chunks| {
+                if chunks.len() < 2 {
+                    return None;
+                }
 
-            let ranges = chunks
-                .iter()
-                .filter_map(|chunk| {
-                    let len = chunk.end.saturating_sub(chunk.start);
-                    (len >= MIN_SPAN_LEN).then_some((chunk.start, chunk.end))
-                })
-                .collect::<Vec<_>>();
+                let ranges = chunks
+                    .iter()
+                    .filter_map(|chunk| {
+                        let len = chunk.end.saturating_sub(chunk.start);
+                        (len >= MIN_SPAN_LEN).then_some((chunk.start, chunk.end))
+                    })
+                    .collect::<Vec<_>>();
 
-            if ranges.len() < 2 {
-                return None;
-            }
+                if ranges.len() < 2 {
+                    return None;
+                }
 
-            let explicit = chunks
-                .iter()
-                .any(|chunk| chunk.kind == crate::composer::ComposerChunkKind::Explicit);
-            let all_strong = ranges.iter().all(|(start, end)| end.saturating_sub(*start) >= 4);
-            let all_exact = chunks
-                .iter()
-                .all(|chunk| chunk.kind == crate::composer::ComposerChunkKind::Exact);
-            if !explicit && ranges.len() > 2 && !all_strong && !all_exact {
-                return None;
-            }
+                let explicit = chunks
+                    .iter()
+                    .any(|chunk| chunk.kind == crate::composer::ComposerChunkKind::Explicit);
+                let all_strong = ranges.iter().all(|(start, end)| end.saturating_sub(*start) >= 4);
+                let all_exact = chunks
+                    .iter()
+                    .all(|chunk| chunk.kind == crate::composer::ComposerChunkKind::Exact);
+                if !explicit && ranges.len() > 2 && !all_strong && !all_exact {
+                    return None;
+                }
 
-            let covered = ranges.last().map(|(_, end)| *end).unwrap_or_default() == total_len
-                && ranges.first().map(|(start, _)| *start).unwrap_or_default() == 0;
-            covered.then_some(ranges)
-        })
+                let covered = ranges.last().map(|(_, end)| *end).unwrap_or_default() == total_len
+                    && ranges.first().map(|(start, _)| *start).unwrap_or_default() == 0;
+                covered.then_some(ranges)
+            })
     }
 
     fn preferred_lattice_ends(&self, request: &DecodeRequest<'_>, total_len: usize) -> HashMap<usize, Vec<usize>> {
@@ -609,7 +616,7 @@ impl WfstDecoder {
         }
 
         let mut by_start = HashMap::<usize, HashSet<usize>>::new();
-        for path in request.composer.all_wfst_phrase_chunks() {
+        for path in request.composer.all_weighted_span_phrase_chunks() {
             for chunk in path {
                 let len = chunk.end.saturating_sub(chunk.start);
                 if len < MIN_SPAN_LEN {
@@ -638,9 +645,9 @@ impl WfstDecoder {
     }
 }
 
-impl Decoder for WfstDecoder {
+impl Decoder for WeightedSpanDecoder {
     fn name(&self) -> &'static str {
-        "wfst"
+        "weighted_span"
     }
 
     fn decode(&self, request: &DecodeRequest<'_>) -> DecodeResult {
@@ -786,7 +793,7 @@ fn segmentation_delta(span_len: usize, edit_similarity: f64) -> i32 {
     length_bonus + quality_bonus - chunk_penalty - micro_penalty
 }
 
-fn lm_delta(lexicon: &RankedLexicon, previous: Option<&String>, word: &str) -> i32 {
+fn context_delta(lexicon: &RankedLexicon, previous: Option<&String>, word: &str) -> i32 {
     let corpus_surface = lexicon.corpus_surface_unigrams.get(word).copied().unwrap_or(0);
     let corpus_word = lexicon.corpus_word_unigrams.get(word).copied().unwrap_or(0);
     let lexicon_unigram = lexicon.word_unigrams.get(word).copied().unwrap_or(0);
@@ -828,6 +835,7 @@ fn lm_delta(lexicon: &RankedLexicon, previous: Option<&String>, word: &str) -> i
     unigram_score + bigram_score
 }
 
+// Heuristic POS/context transition score from observed tag unigram and bigram counts.
 fn pos_delta(lexicon: &RankedLexicon, previous: Option<&str>, current: Option<&str>) -> i32 {
     let (Some(previous), Some(current)) = (previous, current) else {
         return 0;
@@ -1045,7 +1053,7 @@ mod tests {
     use std::collections::HashMap;
     use std::sync::Arc;
 
-    use super::{lm_delta, pos_delta, WfstDecoder};
+    use super::{context_delta, pos_delta, WeightedSpanDecoder};
     use crate::decoder::{DecoderConfig, DecoderMode};
     use crate::roman_lookup::{LegacyData, RankedLexicon, Transliterator};
 
@@ -1113,7 +1121,7 @@ mod tests {
     fn single_span_reranker_prefers_sronaoh_variant() {
         let transliterator = Transliterator::from_default_data().unwrap();
         let data = Arc::new(LegacyData::from_entries(transliterator.entries().to_vec()));
-        let decoder = WfstDecoder::new(data, DecoderConfig::default().with_mode(DecoderMode::Wfst));
+        let decoder = WeightedSpanDecoder::new(data, DecoderConfig::default().with_mode(DecoderMode::Wfst));
 
         let candidates = decoder.rerank_span_candidates(0, 7, "sronors");
         assert_eq!(
@@ -1138,12 +1146,12 @@ mod tests {
     }
 
     #[test]
-    fn lm_delta_prefers_corpus_surface_counts_for_joined_outputs() {
+    fn context_delta_prefers_corpus_surface_counts_for_joined_outputs() {
         let mut lexicon = RankedLexicon::default();
         lexicon.corpus_surface_unigrams.insert(String::from("ខ្ញុំទៅ"), 3);
         lexicon.word_unigrams.insert(String::from("ខ្ញុំទៅ"), 1);
 
-        assert!(lm_delta(&lexicon, None, "ខ្ញុំទៅ") > 0);
+        assert!(context_delta(&lexicon, None, "ខ្ញុំទៅ") > 0);
     }
 
     #[test]

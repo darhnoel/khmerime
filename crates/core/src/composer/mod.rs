@@ -21,7 +21,7 @@ pub(crate) struct ComposerChunk {
 pub(crate) struct ComposerAnalysis {
     pub normalized: String,
     pub chunks: Vec<ComposerChunk>,
-    pub wfst_chunk_paths: Vec<Vec<ComposerChunk>>,
+    pub weighted_span_chunk_paths: Vec<Vec<ComposerChunk>>,
     pub pending_tail: String,
     pub fully_segmented: bool,
 }
@@ -42,15 +42,15 @@ impl ComposerAnalysis {
                 || all_chunks_are_strong)
     }
 
-    pub(crate) fn wfst_phrase_chunks(&self) -> Vec<ComposerChunk> {
-        self.wfst_chunk_paths.first().cloned().unwrap_or_default()
+    pub(crate) fn weighted_span_phrase_chunks(&self) -> Vec<ComposerChunk> {
+        self.weighted_span_chunk_paths.first().cloned().unwrap_or_default()
     }
 
-    pub(crate) fn all_wfst_phrase_chunks(&self) -> &[Vec<ComposerChunk>] {
-        &self.wfst_chunk_paths
+    pub(crate) fn all_weighted_span_phrase_chunks(&self) -> &[Vec<ComposerChunk>] {
+        &self.weighted_span_chunk_paths
     }
 
-    fn primary_wfst_phrase_chunks(&self) -> Vec<ComposerChunk> {
+    fn primary_weighted_span_phrase_chunks(&self) -> Vec<ComposerChunk> {
         if self.is_multi_chunk() {
             return self.chunks.clone();
         }
@@ -189,7 +189,7 @@ impl ComposerTable {
             return ComposerAnalysis {
                 normalized,
                 chunks: Vec::new(),
-                wfst_chunk_paths: Vec::new(),
+                weighted_span_chunk_paths: Vec::new(),
                 pending_tail: String::new(),
                 fully_segmented: false,
             };
@@ -197,11 +197,11 @@ impl ComposerTable {
 
         let explicit_chunks = self.explicit_chunks(&normalized);
         if explicit_chunks.len() > 1 {
-            let wfst_chunk_paths = vec![explicit_chunks.clone()];
+            let weighted_span_chunk_paths = vec![explicit_chunks.clone()];
             return ComposerAnalysis {
                 normalized,
                 chunks: explicit_chunks,
-                wfst_chunk_paths,
+                weighted_span_chunk_paths,
                 pending_tail: String::new(),
                 fully_segmented: true,
             };
@@ -211,13 +211,13 @@ impl ComposerTable {
             let provisional = ComposerAnalysis {
                 normalized,
                 chunks,
-                wfst_chunk_paths: Vec::new(),
+                weighted_span_chunk_paths: Vec::new(),
                 pending_tail: String::new(),
                 fully_segmented: true,
             };
-            let wfst_chunk_paths = self.wfst_chunk_paths(&provisional);
+            let weighted_span_chunk_paths = self.weighted_span_chunk_paths(&provisional);
             return ComposerAnalysis {
-                wfst_chunk_paths,
+                weighted_span_chunk_paths,
                 ..provisional
             };
         }
@@ -231,14 +231,14 @@ impl ComposerTable {
         let provisional = ComposerAnalysis {
             normalized,
             chunks: prefix_chunks,
-            wfst_chunk_paths: Vec::new(),
+            weighted_span_chunk_paths: Vec::new(),
             pending_tail,
             fully_segmented: false,
         };
-        let wfst_chunk_paths = self.wfst_chunk_paths(&provisional);
+        let weighted_span_chunk_paths = self.weighted_span_chunk_paths(&provisional);
 
         ComposerAnalysis {
-            wfst_chunk_paths,
+            weighted_span_chunk_paths,
             ..provisional
         }
     }
@@ -391,9 +391,9 @@ impl ComposerTable {
         states
     }
 
-    fn wfst_chunk_paths(&self, analysis: &ComposerAnalysis) -> Vec<Vec<ComposerChunk>> {
+    fn weighted_span_chunk_paths(&self, analysis: &ComposerAnalysis) -> Vec<Vec<ComposerChunk>> {
         let mut paths = Vec::<Vec<ComposerChunk>>::new();
-        let primary = analysis.primary_wfst_phrase_chunks();
+        let primary = analysis.primary_weighted_span_phrase_chunks();
         if !primary.is_empty() {
             paths.push(primary.clone());
         }
@@ -404,7 +404,7 @@ impl ComposerTable {
             }
         }
 
-        paths.sort_by(|left, right| compare_wfst_chunk_paths(left, right));
+        paths.sort_by(|left, right| compare_weighted_span_chunk_paths(left, right));
 
         paths
     }
@@ -443,7 +443,7 @@ impl ComposerTable {
                 continue;
             };
             let middle_chars = &chars[prefix_end..suffix_start];
-            let middle = self.middle_wfst_chunks(middle_chars, prefix_end);
+            let middle = self.middle_weighted_span_chunks(middle_chars, prefix_end);
             if middle.is_empty() {
                 continue;
             }
@@ -460,7 +460,7 @@ impl ComposerTable {
         paths
     }
 
-    fn middle_wfst_chunks(&self, chars: &[char], global_start: usize) -> Vec<ComposerChunk> {
+    fn middle_weighted_span_chunks(&self, chars: &[char], global_start: usize) -> Vec<ComposerChunk> {
         if chars.is_empty() {
             return Vec::new();
         }
@@ -548,13 +548,13 @@ impl ComposerTable {
     }
 }
 
-fn compare_wfst_chunk_paths(left: &[ComposerChunk], right: &[ComposerChunk]) -> std::cmp::Ordering {
-    wfst_chunk_path_priority(left)
-        .cmp(&wfst_chunk_path_priority(right))
+fn compare_weighted_span_chunk_paths(left: &[ComposerChunk], right: &[ComposerChunk]) -> std::cmp::Ordering {
+    weighted_span_chunk_path_priority(left)
+        .cmp(&weighted_span_chunk_path_priority(right))
         .then_with(|| right.len().cmp(&left.len()))
 }
 
-fn wfst_chunk_path_priority(path: &[ComposerChunk]) -> (usize, usize, usize) {
+fn weighted_span_chunk_path_priority(path: &[ComposerChunk]) -> (usize, usize, usize) {
     let weak_chunks = path
         .iter()
         .filter(|chunk| chunk.end.saturating_sub(chunk.start) < 3)
@@ -609,11 +609,11 @@ mod tests {
     }
 
     #[test]
-    fn exposes_wfst_phrase_hints_for_prefix_plus_tail() {
+    fn exposes_weighted_span_phrase_hints_for_prefix_plus_tail() {
         let transliterator = Transliterator::from_default_data().unwrap();
         let table = ComposerTable::from_entries(transliterator.entries());
         let analysis = table.analyze("khnhomtov");
-        let hints = analysis.wfst_phrase_chunks();
+        let hints = analysis.weighted_span_phrase_chunks();
         assert_eq!(
             hints.iter().map(|chunk| chunk.normalized.as_str()).collect::<Vec<_>>(),
             vec!["khnhom", "tov"]
@@ -622,11 +622,11 @@ mod tests {
     }
 
     #[test]
-    fn exposes_wfst_phrase_hints_for_weak_full_segmentation() {
+    fn exposes_weighted_span_phrase_hints_for_weak_full_segmentation() {
         let transliterator = Transliterator::from_default_data().unwrap();
         let table = ComposerTable::from_entries(transliterator.entries());
         let analysis = table.analyze("knhhomttovsalarien");
-        let hints = analysis.wfst_phrase_chunks();
+        let hints = analysis.weighted_span_phrase_chunks();
 
         assert!(analysis.fully_segmented);
         assert_eq!(
@@ -650,7 +650,7 @@ mod tests {
         let transliterator = Transliterator::from_tsv_str(fixture).unwrap();
         let table = ComposerTable::from_entries(transliterator.entries());
         let analysis = table.analyze("khomtaekitmnakaeng");
-        let hints = analysis.wfst_phrase_chunks();
+        let hints = analysis.weighted_span_phrase_chunks();
 
         assert!(!analysis.fully_segmented);
         assert_eq!(
@@ -673,7 +673,7 @@ mod tests {
         let transliterator = Transliterator::from_default_data().unwrap();
         let table = ComposerTable::from_entries(transliterator.entries());
         let analysis = table.analyze("saensronors");
-        let hints = analysis.wfst_phrase_chunks();
+        let hints = analysis.weighted_span_phrase_chunks();
 
         assert!(analysis.fully_segmented);
         assert_eq!(

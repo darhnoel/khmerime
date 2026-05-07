@@ -133,15 +133,15 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
 fn print_usage(bin: &str) {
     eprintln!("Usage:");
     eprintln!(
-        "  {} [--data <path/to/data.csv|data.tsv>] [--decoder-mode legacy|shadow|wfst|hybrid] [--shadow-log] [--shadow-sample-bps 0..10000] stats",
+        "  {} [--data <path/to/data.csv|data.tsv>] [--decoder-mode legacy|shadow|weighted-span|wfst|hybrid] [--shadow-log] [--shadow-sample-bps 0..10000] stats",
         bin
     );
     eprintln!(
-        "  {} [--data <path/to/data.csv|data.tsv>] [--decoder-mode legacy|shadow|wfst|hybrid] [--shadow-log] [--shadow-sample-bps 0..10000] suggest <roman>",
+        "  {} [--data <path/to/data.csv|data.tsv>] [--decoder-mode legacy|shadow|weighted-span|wfst|hybrid] [--shadow-log] [--shadow-sample-bps 0..10000] suggest <roman>",
         bin
     );
     eprintln!(
-        "  {} [--data <path/to/data.csv|data.tsv>] [--decoder-mode legacy|shadow|wfst|hybrid] [--emit-shadow-rows] [--output <report.txt>] shadow-eval <queries.txt>",
+        "  {} [--data <path/to/data.csv|data.tsv>] [--decoder-mode legacy|shadow|weighted-span|wfst|hybrid] [--emit-shadow-rows] [--output <report.txt>] shadow-eval <queries.txt>",
         bin
     );
 }
@@ -150,7 +150,7 @@ fn parse_decoder_mode(value: &str) -> Option<DecoderMode> {
     match value {
         "legacy" => Some(DecoderMode::Legacy),
         "shadow" => Some(DecoderMode::Shadow),
-        "wfst" => Some(DecoderMode::Wfst),
+        "weighted-span" | "weighted_span" | "wfst" => Some(DecoderMode::Wfst),
         "hybrid" => Some(DecoderMode::Hybrid),
         _ => None,
     }

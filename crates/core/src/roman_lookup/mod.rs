@@ -8,7 +8,9 @@ use std::fs;
 use std::path::Path;
 
 use crate::composer::ComposerTable;
-use crate::decoder::{DecoderConfig, DecoderManager, DecoderMode, LegacyDecoder, ShadowObservation, WfstDecoder};
+use crate::decoder::{
+    DecoderConfig, DecoderManager, DecoderMode, LegacyDecoder, ShadowObservation, WeightedSpanDecoder,
+};
 
 mod compiled_io;
 mod legacy_data;
@@ -100,7 +102,7 @@ mod tests {
             composer,
             LegacyDecoder::new(Arc::clone(&legacy)),
             (config.mode != crate::decoder::DecoderMode::Legacy)
-                .then(|| WfstDecoder::new(Arc::clone(&legacy), config.clone())),
+                .then(|| WeightedSpanDecoder::new(Arc::clone(&legacy), config.clone())),
             config,
         );
         Transliterator { legacy, decoder }

@@ -126,7 +126,7 @@ impl Transliterator {
         let decoder = DecoderManager::new(
             composer,
             LegacyDecoder::new(Arc::clone(&legacy)),
-            (config.mode != DecoderMode::Legacy).then(|| WfstDecoder::new(Arc::clone(&legacy), config.clone())),
+            (config.mode != DecoderMode::Legacy).then(|| WeightedSpanDecoder::new(Arc::clone(&legacy), config.clone())),
             config,
         );
         Ok(Self { legacy, decoder })
@@ -149,7 +149,7 @@ impl Transliterator {
         let decoder = DecoderManager::new(
             composer,
             LegacyDecoder::new(Arc::clone(&legacy)),
-            (config.mode != DecoderMode::Legacy).then(|| WfstDecoder::new(Arc::clone(&legacy), config.clone())),
+            (config.mode != DecoderMode::Legacy).then(|| WeightedSpanDecoder::new(Arc::clone(&legacy), config.clone())),
             config,
         );
         startup_trace_log("Transliterator::from_compiled_bytes.end");
@@ -169,7 +169,7 @@ impl Transliterator {
         let decoder = DecoderManager::new(
             composer,
             LegacyDecoder::new(Arc::clone(&legacy)),
-            (config.mode != DecoderMode::Legacy).then(|| WfstDecoder::new(Arc::clone(&legacy), config.clone())),
+            (config.mode != DecoderMode::Legacy).then(|| WeightedSpanDecoder::new(Arc::clone(&legacy), config.clone())),
             config,
         );
         startup_trace_log("Transliterator::from_phase_a_bytes.end");

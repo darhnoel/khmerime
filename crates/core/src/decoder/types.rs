@@ -6,6 +6,10 @@ use crate::composer::ComposerAnalysis;
 pub enum DecoderMode {
     Legacy,
     Shadow,
+    /// Compatibility name for the weighted span beam decoder.
+    ///
+    /// The public mode string remains `wfst` for older CLI/config callers, but
+    /// the implementation is `WeightedSpanDecoder`, not a compiled WFST.
     Wfst,
     Hybrid,
 }

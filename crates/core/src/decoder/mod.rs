@@ -4,7 +4,7 @@ mod manager;
 mod manual_character_typing;
 mod observer;
 mod types;
-mod wfst;
+mod weighted_span;
 
 pub use self::config::DecoderConfig;
 pub(crate) use self::legacy::LegacyDecoder;
@@ -15,7 +15,7 @@ pub use self::manual_character_typing::{
 pub(crate) use self::observer::{build_shadow_observation, ShadowReport};
 pub use self::observer::{ShadowMismatch, ShadowObservation, ShadowSummary};
 pub use self::types::{DecodeCandidate, DecodeFailure, DecodeRequest, DecodeResult, DecodeSegment, DecoderMode};
-pub(crate) use self::wfst::WfstDecoder;
+pub(crate) use self::weighted_span::WeightedSpanDecoder;
 
 pub(crate) trait Decoder: Send + Sync {
     fn name(&self) -> &'static str;

@@ -4,13 +4,13 @@ use crate::composer::ComposerTable;
 
 use super::{
     build_shadow_observation, DecodeFailure, DecodeRequest, DecodeResult, Decoder, DecoderConfig, DecoderMode,
-    LegacyDecoder, ShadowObservation, ShadowReport, WfstDecoder,
+    LegacyDecoder, ShadowObservation, ShadowReport, WeightedSpanDecoder,
 };
 
 pub(crate) struct DecoderManager {
     composer: ComposerTable,
     legacy: LegacyDecoder,
-    wfst: Option<WfstDecoder>,
+    weighted_span: Option<WeightedSpanDecoder>,
     config: DecoderConfig,
 }
 
@@ -18,13 +18,13 @@ impl DecoderManager {
     pub(crate) fn new(
         composer: ComposerTable,
         legacy: LegacyDecoder,
-        wfst: Option<WfstDecoder>,
+        weighted_span: Option<WeightedSpanDecoder>,
         config: DecoderConfig,
     ) -> Self {
         Self {
             composer,
             legacy,
-            wfst,
+            weighted_span,
             config,
         }
     }
@@ -37,13 +37,13 @@ impl DecoderManager {
             composer: &composer,
         };
         let legacy = self.legacy.decode(&request);
-        let wfst = self.decode_wfst(&request);
-        let observation = build_shadow_observation(self.config.mode, input, &composer, &legacy, wfst.as_ref());
+        let weighted_span = self.decode_weighted_span(&request);
+        let observation = build_shadow_observation(self.config.mode, input, &composer, &legacy, weighted_span.as_ref());
         if self.config.mode != DecoderMode::Legacy && self.should_sample_shadow(input) {
             self.log_shadow_report(&observation);
         }
 
-        let mut visible = self.choose_visible_result(&legacy, wfst.as_ref());
+        let mut visible = self.choose_visible_result(&legacy, weighted_span.as_ref());
         visible.candidates.truncate(self.config.max_candidates);
         let mut suggestions = visible.visible_strings();
         append_raw_query_fallback_tail(&mut suggestions, input, &legacy, self.config.max_candidates);
@@ -58,14 +58,14 @@ impl DecoderManager {
             composer: &composer,
         };
         let legacy = self.legacy.decode(&request);
-        let wfst = self.decode_wfst(&request);
-        build_shadow_observation(self.config.mode, input, &composer, &legacy, wfst.as_ref())
+        let weighted_span = self.decode_weighted_span(&request);
+        build_shadow_observation(self.config.mode, input, &composer, &legacy, weighted_span.as_ref())
     }
 
-    fn decode_wfst(&self, request: &DecodeRequest<'_>) -> Option<DecodeResult> {
-        self.wfst
+    fn decode_weighted_span(&self, request: &DecodeRequest<'_>) -> Option<DecodeResult> {
+        self.weighted_span
             .as_ref()
-            .map(|decoder| self.guard_wfst_result(decoder.decode(request)))
+            .map(|decoder| self.guard_weighted_span_result(decoder.decode(request)))
     }
 
     fn log_shadow_report(&self, observation: &ShadowObservation) {
@@ -85,7 +85,7 @@ impl DecoderManager {
         stable_sample_bucket(input) < u64::from(self.config.shadow_sample_bps)
     }
 
-    fn guard_wfst_result(&self, mut result: DecodeResult) -> DecodeResult {
+    fn guard_weighted_span_result(&self, mut result: DecodeResult) -> DecodeResult {
         if result.failure.is_some() {
             return result;
         }
@@ -108,14 +108,14 @@ impl DecoderManager {
         result
     }
 
-    fn choose_visible_result(&self, legacy: &DecodeResult, wfst: Option<&DecodeResult>) -> DecodeResult {
+    fn choose_visible_result(&self, legacy: &DecodeResult, weighted_span: Option<&DecodeResult>) -> DecodeResult {
         match self.config.mode {
             DecoderMode::Legacy | DecoderMode::Shadow => legacy.clone(),
-            DecoderMode::Wfst => wfst
+            DecoderMode::Wfst => weighted_span
                 .filter(|result| result.failure.is_none() && !result.candidates.is_empty())
                 .cloned()
                 .unwrap_or_else(|| legacy.clone()),
-            DecoderMode::Hybrid => merge_results(legacy, wfst, self.config.max_candidates),
+            DecoderMode::Hybrid => merge_results(legacy, weighted_span, self.config.max_candidates),
         }
     }
 }
@@ -149,15 +149,15 @@ fn append_raw_query_fallback_tail(
     suggestions.push(raw_literal.to_owned());
 }
 
-fn merge_results(legacy: &DecodeResult, wfst: Option<&DecodeResult>, limit: usize) -> DecodeResult {
+fn merge_results(legacy: &DecodeResult, weighted_span: Option<&DecodeResult>, limit: usize) -> DecodeResult {
     let mut merged = DecodeResult {
         decoder: "hybrid",
         candidates: Vec::new(),
         failure: None,
-        latency_us: legacy.latency_us + wfst.map(|result| result.latency_us).unwrap_or(0),
+        latency_us: legacy.latency_us + weighted_span.map(|result| result.latency_us).unwrap_or(0),
     };
 
-    for candidate in wfst
+    for candidate in weighted_span
         .filter(|result| result.failure.is_none())
         .into_iter()
         .flat_map(|result| result.candidates.iter())
@@ -173,7 +173,8 @@ fn merge_results(legacy: &DecodeResult, wfst: Option<&DecodeResult>, limit: usiz
 
     if merged.candidates.is_empty() {
         merged.failure = Some(
-            wfst.and_then(|result| result.failure.clone())
+            weighted_span
+                .and_then(|result| result.failure.clone())
                 .unwrap_or(DecodeFailure::EmptyResult),
         );
     }
