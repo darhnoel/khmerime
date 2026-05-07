@@ -120,7 +120,7 @@ mod tests {
     }
 
     #[test]
-    fn builds_segmented_session_from_structured_wfst_segments() {
+    fn builds_segmented_session_from_structured_weighted_span_segments() {
         let observation = sample_observation();
         let session = build_segmented_session(&observation, "khnhomtov", &std::collections::HashMap::new()).unwrap();
 
@@ -130,7 +130,7 @@ mod tests {
     }
 
     #[test]
-    fn merges_wfst_and_legacy_suggestions_when_available() {
+    fn merges_weighted_span_and_legacy_suggestions_when_available() {
         let legacy = vec!["ខ្ញុំ ទៅ".to_owned(), "ខ្ញមទៅ".to_owned()];
         let observation = sample_observation();
         assert_eq!(
@@ -184,7 +184,7 @@ mod tests {
     }
 
     #[test]
-    fn falls_back_to_legacy_suggestions_when_wfst_has_no_candidates() {
+    fn falls_back_to_legacy_suggestions_when_weighted_span_has_no_candidates() {
         let legacy = vec!["ខ្ញុំ ទៅ".to_owned()];
         let mut observation = sample_observation();
         observation.wfst_failure = Some("timeout".to_owned());

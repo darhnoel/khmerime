@@ -9,7 +9,7 @@ pub(crate) fn ShadowPanel(debug: Option<ShadowObservation>) -> Element {
             div { class: "card-head",
                 div {
                     h2 { "Shadow Compare" }
-                    p { "Legacy suggestions remain visible. This panel shows the shadow WFST comparison for the active token." }
+                    p { "Legacy suggestions remain visible. This panel shows the weighted span comparison for the active token." }
                 }
             }
             if let Some(debug) = debug {
@@ -61,7 +61,7 @@ pub(crate) fn ShadowPanel(debug: Option<ShadowObservation>) -> Element {
                         )} }
                     }
                     div { class: "debug-row",
-                        span { class: "debug-label", "WFST Segments" }
+                        span { class: "debug-label", "Weighted Span Segments" }
                         span { class: "debug-value", {
                             if debug.wfst_top_segments.is_empty() {
                                 "-".to_owned()
@@ -75,11 +75,11 @@ pub(crate) fn ShadowPanel(debug: Option<ShadowObservation>) -> Element {
                         span { class: "debug-value", {debug.legacy_top.clone().unwrap_or_else(|| "-".to_owned())} }
                     }
                     div { class: "debug-row",
-                        span { class: "debug-label", "WFST Top" }
+                        span { class: "debug-label", "Weighted Span Top" }
                         span { class: "debug-value", {debug.wfst_top.clone().unwrap_or_else(|| "-".to_owned())} }
                     }
                     div { class: "debug-row",
-                        span { class: "debug-label", "WFST Failure" }
+                        span { class: "debug-label", "Weighted Span Failure" }
                         code { class: "debug-value", {debug.wfst_failure.clone().unwrap_or_else(|| "-".to_owned())} }
                     }
                     div { class: "debug-row",
@@ -87,13 +87,13 @@ pub(crate) fn ShadowPanel(debug: Option<ShadowObservation>) -> Element {
                         span { class: "debug-value", {debug.legacy_top5.join(" | ")} }
                     }
                     div { class: "debug-row",
-                        span { class: "debug-label", "WFST Top-5" }
+                        span { class: "debug-label", "Weighted Span Top-5" }
                         span { class: "debug-value", {debug.wfst_top5.join(" | ")} }
                     }
                     div { class: "debug-row",
                         span { class: "debug-label", "Latency" }
                         code { class: "debug-value", {format!(
-                            "legacy {}us / wfst {}us",
+                            "legacy {}us / weighted-span {}us",
                             debug.legacy_latency_us,
                             debug.wfst_latency_us
                                 .map(|value| value.to_string())

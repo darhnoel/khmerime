@@ -34,7 +34,7 @@ static FULL_LEGACY_TRANSLITERATOR: OnceLock<Transliterator> = OnceLock::new();
 #[cfg(all(target_arch = "wasm32", feature = "fetch-data"))]
 static FULL_SHADOW_TRANSLITERATOR: OnceLock<Transliterator> = OnceLock::new();
 #[cfg(all(target_arch = "wasm32", feature = "fetch-data"))]
-static FULL_WFST_TRANSLITERATOR: OnceLock<Transliterator> = OnceLock::new();
+static FULL_WEIGHTED_SPAN_TRANSLITERATOR: OnceLock<Transliterator> = OnceLock::new();
 #[cfg(all(target_arch = "wasm32", feature = "fetch-data"))]
 static FULL_HYBRID_TRANSLITERATOR: OnceLock<Transliterator> = OnceLock::new();
 #[cfg(all(target_arch = "wasm32", feature = "fetch-data"))]
@@ -45,7 +45,7 @@ static LEGACY_TRANSLITERATOR: OnceLock<Transliterator> = OnceLock::new();
 #[cfg(not(all(target_arch = "wasm32", feature = "fetch-data")))]
 static SHADOW_TRANSLITERATOR: OnceLock<Transliterator> = OnceLock::new();
 #[cfg(not(all(target_arch = "wasm32", feature = "fetch-data")))]
-static WFST_TRANSLITERATOR: OnceLock<Transliterator> = OnceLock::new();
+static WEIGHTED_SPAN_TRANSLITERATOR: OnceLock<Transliterator> = OnceLock::new();
 #[cfg(not(all(target_arch = "wasm32", feature = "fetch-data")))]
 static HYBRID_TRANSLITERATOR: OnceLock<Transliterator> = OnceLock::new();
 
@@ -77,7 +77,7 @@ pub(crate) fn engine(mode: DecoderMode) -> &'static Transliterator {
                 )
                 .expect("embedded lexicon must load")
             }),
-            DecoderMode::Wfst => WFST_TRANSLITERATOR.get_or_init(|| {
+            DecoderMode::Wfst => WEIGHTED_SPAN_TRANSLITERATOR.get_or_init(|| {
                 Transliterator::from_default_data_with_config(
                     DecoderConfig::default()
                         .with_mode(DecoderMode::Wfst)
@@ -127,7 +127,7 @@ fn full_engine(mode: DecoderMode) -> &'static Transliterator {
         }
         DecoderMode::Shadow => FULL_SHADOW_TRANSLITERATOR
             .get_or_init(|| init_full_transliterator(DecoderConfig::shadow_interactive().with_shadow_log(false))),
-        DecoderMode::Wfst => FULL_WFST_TRANSLITERATOR.get_or_init(|| {
+        DecoderMode::Wfst => FULL_WEIGHTED_SPAN_TRANSLITERATOR.get_or_init(|| {
             init_full_transliterator(
                 DecoderConfig::default()
                     .with_mode(DecoderMode::Wfst)
