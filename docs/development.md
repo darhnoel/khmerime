@@ -64,19 +64,19 @@ make suggest QUERY=tver
   Print legacy-mode suggestions for one roman query.
 
 make suggest-wfst QUERY=tver
-  Print WFST-mode suggestions for one roman query.
+  Print weighted-span suggestions for one roman query. The `wfst` mode string remains a compatibility alias.
 
 make suggest-shadow QUERY=tver
   Print shadow-mode suggestions for one roman query.
 
-make shadow-eval QUERIES=path/to/queries.txt [MODE=shadow|wfst|hybrid] [OUTPUT=report.txt]
+make shadow-eval QUERIES=path/to/queries.txt [MODE=shadow|weighted-span|wfst|hybrid] [OUTPUT=report.txt]
   Run decoder comparison on a query file.
 
 make test
   Run the Rust test suite.
 
 make test-golden
-  Run the WFST golden snapshot test only.
+  Run the weighted-span golden snapshot test only.
 
 make test-ui
   Run the browser/UI Python test file.
@@ -132,7 +132,7 @@ cd apps/dioxus-app && dx serve --platform desktop
 bash scripts/web/serve_phone.sh
 cargo run -p khmerime_lookup_cli --bin lookup_cli -- stats
 cargo run -p khmerime_lookup_cli --bin lookup_cli -- suggest tver
-cargo run -p khmerime_lookup_cli --bin lookup_cli -- --decoder-mode wfst suggest tver
+cargo run -p khmerime_lookup_cli --bin lookup_cli -- --decoder-mode weighted-span suggest tver
 cargo run -p khmerime_lookup_cli --bin lookup_cli -- --decoder-mode shadow shadow-eval path/to/queries.txt
 cargo test
 cargo test --test decoder_golden

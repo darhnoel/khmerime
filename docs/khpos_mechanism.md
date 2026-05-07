@@ -14,7 +14,7 @@ Implementation status in this repository:
 - build-time compilation of `khPOS` after-replace statistics is implemented
 - a compact binary stats artifact is embedded alongside the lexicon
 - dominant POS tags for single Khmer words are loaded into the ranked lexicon metadata
-- active corpus-LM reranking is intentionally not enabled yet because the first naive weighting destabilized existing WFST phrase-recovery tests
+- active corpus-context reranking is intentionally not enabled yet because the first naive weighting destabilized existing weighted span phrase-recovery tests
 
 ## Attribution
 
@@ -82,7 +82,7 @@ user types: knhhomttovsalarien
    each span retrieves Khmer candidates
               |
               v
-   WFST-style beam combines candidate paths
+   weighted span beam decoder combines candidate paths
               |
               v
    final rank is based on several score parts
@@ -94,7 +94,7 @@ The important design point is that the decoder is already structured like a scor
 total score
   = chunk score
   + segmentation score
-  + lm score
+  + context score
   + pos score
   + history score
 ```

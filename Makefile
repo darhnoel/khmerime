@@ -34,9 +34,9 @@ help:
 	"  make desktop                     Run the desktop app" \
 	"  make stats                       Print lexicon entry count" \
 	"  make suggest QUERY=tver          Print legacy-mode suggestions" \
-	"  make suggest-wfst QUERY=tver     Print WFST-mode suggestions" \
+	"  make suggest-wfst QUERY=tver     Print weighted-span suggestions (wfst alias)" \
 	"  make suggest-shadow QUERY=tver   Print shadow-mode suggestions" \
-	"  make shadow-eval QUERIES=path/to/queries.txt [MODE=shadow|wfst|hybrid] [OUTPUT=report.txt]" \
+	"  make shadow-eval QUERIES=path/to/queries.txt [MODE=shadow|weighted-span|wfst|hybrid] [OUTPUT=report.txt]" \
 	"  make data-split                  Split data/roman_lookup.csv into reviewable chunk CSVs" \
 	"  make data-build                  Generate data/roman_lookup.csv from chunk CSVs" \
 	"  make data-check                  Validate lexicon chunks and generated runtime data" \
@@ -44,7 +44,7 @@ help:
 	"  make visualize-lexicon-streamlit Launch the optional Streamlit explorer for the generated views" \
 	"  make fmt                         Run cargo fmt" \
 	"  make test                        Run cargo test" \
-	"  make test-golden                 Run the WFST golden snapshot test" \
+	"  make test-golden                 Run the weighted-span golden snapshot test" \
 	"  make test-ui                     Run the browser/UI Python test file" \
 	"  make platform-check              Check all native platform adapter crates" \
 	"  make platform-check-<platform>   Check one adapter: linux, android, ios, macos, windows" \

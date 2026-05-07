@@ -1,6 +1,6 @@
-# Locked golden snapshot for Transliterator::suggest in Wfst mode.
+# Locked golden snapshot for Transliterator::suggest in weighted-span mode.
 # This file is verified by cargo test and must be updated explicitly.
-mode: wfst
+mode: weighted-span
 
 [[case]]
 name: exact_jea
@@ -62,4 +62,3 @@ input: khomtaekitmnakaeng
 top_n: 1
 suggestions:
 1. ក្រោមទេកញ្ចប់ម្នាក់ឯង
-

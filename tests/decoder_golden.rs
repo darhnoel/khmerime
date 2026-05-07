@@ -13,7 +13,7 @@ struct GoldenSuite {
     cases: &'static [GoldenCase],
 }
 
-const WFST_CASES: &[GoldenCase] = &[
+const WEIGHTED_SPAN_CASES: &[GoldenCase] = &[
     GoldenCase {
         name: "exact_jea",
         input: "jea",
@@ -52,10 +52,10 @@ const WFST_CASES: &[GoldenCase] = &[
 ];
 
 #[test]
-fn wfst_suggestions_match_locked_golden_snapshot() {
+fn weighted_span_suggestions_match_locked_golden_snapshot() {
     let suite = GoldenSuite {
         mode: DecoderMode::Wfst,
-        cases: WFST_CASES,
+        cases: WEIGHTED_SPAN_CASES,
     };
     let transliterator =
         Transliterator::from_default_data_with_config(DecoderConfig::default().with_mode(suite.mode)).unwrap();
@@ -66,7 +66,7 @@ fn wfst_suggestions_match_locked_golden_snapshot() {
         actual,
         expected,
         "decoder golden mismatch\n\
-         protected surface: Transliterator::suggest(...) in Wfst mode\n\
+         protected surface: Transliterator::suggest(...) in weighted-span mode\n\
          snapshot: {}\n\
          intentional updates must edit the checked-in golden file explicitly",
         snapshot_path().display()
@@ -79,12 +79,15 @@ fn snapshot_path() -> PathBuf {
 
 fn render_suite(suite: &GoldenSuite, transliterator: &Transliterator) -> String {
     let mut output = String::new();
-    output.push_str("# Locked golden snapshot for Transliterator::suggest in Wfst mode.\n");
+    output.push_str("# Locked golden snapshot for Transliterator::suggest in weighted-span mode.\n");
     output.push_str("# This file is verified by cargo test and must be updated explicitly.\n");
-    output.push_str("mode: wfst\n\n");
+    output.push_str("mode: weighted-span\n\n");
 
-    for case in suite.cases {
+    for (index, case) in suite.cases.iter().enumerate() {
         output.push_str(&render_case(case, transliterator));
+        if index + 1 < suite.cases.len() {
+            output.push('\n');
+        }
     }
 
     output
@@ -103,6 +106,5 @@ fn render_case(case: &GoldenCase, transliterator: &Transliterator) -> String {
         output.push_str(&format!("{}. {}\n", index + 1, suggestion));
     }
 
-    output.push('\n');
     output
 }
