@@ -11,9 +11,18 @@ impl RankedLexiconEntry {
 impl RankedLexicon {
     pub(crate) fn from_entries(entries: &[Entry], corpus_stats: &CorpusStats) -> Self {
         let mut ranked = Self::default();
-        let mut target_frequency = HashMap::<String, u32>::new();
+        let mut target_frequency = HashMap::<(String, String), u32>::new();
         for entry in entries {
-            *target_frequency.entry(entry.target.clone()).or_default() += 1;
+            let corpus_frequency = corpus_stats
+                .surface_unigrams
+                .get(&entry.target)
+                .or_else(|| corpus_stats.word_unigrams.get(&entry.target))
+                .copied()
+                .unwrap_or(0);
+            let effective_frequency = entry.frequency.max(corpus_frequency).max(1);
+            target_frequency
+                .entry((entry.target.clone(), entry.frequency_lang.clone()))
+                .or_insert(effective_frequency);
             let words = entry.target.split_whitespace().collect::<Vec<_>>();
             for word in &words {
                 *ranked.word_unigrams.entry((*word).to_owned()).or_default() += 1;
@@ -32,7 +41,7 @@ impl RankedLexicon {
         ranked.tag_unigrams = corpus_stats.tag_unigrams.clone();
         ranked.tag_bigrams = corpus_stats.tag_bigrams.clone();
 
-        for (source_rank, entry) in entries.iter().enumerate() {
+        for entry in entries {
             let normalized_key = normalize(&entry.roman);
             if normalized_key.is_empty() {
                 continue;
@@ -47,8 +56,11 @@ impl RankedLexicon {
                 canonical_roman: entry.roman.clone(),
                 normalized_key: normalized_key.clone(),
                 alias_keys: alias_keys.clone(),
-                frequency: target_frequency.get(&entry.target).copied().unwrap_or(1),
-                source_rank,
+                frequency: target_frequency
+                    .get(&(entry.target.clone(), entry.frequency_lang.clone()))
+                    .copied()
+                    .unwrap_or(entry.frequency),
+                frequency_lang: entry.frequency_lang.clone(),
                 first_tag,
                 last_tag,
             };

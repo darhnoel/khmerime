@@ -17,6 +17,7 @@ impl LegacyData {
             by_roman: maps.by_roman,
             by_normalized: maps.by_normalized,
             by_target: maps.by_target,
+            target_frequency: maps.target_frequency,
             roman_normalized: maps.roman_normalized,
             roman_prefix_index: maps.roman_prefix_index,
             // Phase A avoids building the heavyweight fuzzy gram index.
@@ -34,7 +35,9 @@ impl LegacyData {
         corpus_stats: CorpusStats,
         next_word: NextWordStats,
     ) -> Self {
-        let maps = Self::build_lookup_maps(&entries);
+        let mut maps = Self::build_lookup_maps(&entries);
+        let target_frequency = target_frequency_map(&entries, Some(&corpus_stats));
+        sort_lookup_maps_by_frequency(&mut maps, &target_frequency);
         let next_word_max_context_chars = max_next_word_context_chars(&next_word);
         let ranked = RankedLexicon::from_entries(&entries, &corpus_stats);
         Self {
@@ -42,6 +45,7 @@ impl LegacyData {
             by_roman: maps.by_roman,
             by_normalized: maps.by_normalized,
             by_target: maps.by_target,
+            target_frequency,
             roman_normalized: maps.roman_normalized,
             roman_prefix_index: maps.roman_prefix_index,
             index: SearchIndex::new(&maps.roman_keys, true, 2, 3),
@@ -55,6 +59,7 @@ impl LegacyData {
         let mut by_roman = HashMap::<String, Vec<String>>::new();
         let mut by_normalized = HashMap::<String, Vec<String>>::new();
         let mut by_target = HashMap::<String, Vec<String>>::new();
+        let target_frequency = target_frequency_map(entries, None);
         for entry in entries {
             by_roman
                 .entry(entry.roman.clone())
@@ -68,6 +73,26 @@ impl LegacyData {
                 .entry(entry.target.clone())
                 .or_insert_with(Vec::new)
                 .push(normalize(&entry.roman));
+        }
+        for values in by_roman.values_mut() {
+            values.sort_by(|left, right| {
+                target_frequency
+                    .get(right)
+                    .copied()
+                    .unwrap_or(1)
+                    .cmp(&target_frequency.get(left).copied().unwrap_or(1))
+                    .then_with(|| left.cmp(right))
+            });
+        }
+        for values in by_normalized.values_mut() {
+            values.sort_by(|left, right| {
+                target_frequency
+                    .get(right)
+                    .copied()
+                    .unwrap_or(1)
+                    .cmp(&target_frequency.get(left).copied().unwrap_or(1))
+                    .then_with(|| left.cmp(right))
+            });
         }
         let mut sorted_romans = by_roman.keys().cloned().collect::<Vec<_>>();
         sorted_romans.sort_by(|left, right| left.len().cmp(&right.len()).then_with(|| left.cmp(right)));
@@ -91,6 +116,7 @@ impl LegacyData {
             by_roman,
             by_normalized,
             by_target,
+            target_frequency,
             roman_normalized,
             roman_prefix_index,
             roman_keys: entries.iter().map(|entry| entry.roman.clone()).collect::<Vec<_>>(),
@@ -243,6 +269,7 @@ impl LegacyData {
                         target,
                         CandidateMeta {
                             exact_match: true,
+                            frequency: self.target_frequency.get(target).copied().unwrap_or(1),
                             target_len: target.chars().count(),
                             roman_len: roman.chars().count(),
                             visit_index,
@@ -268,6 +295,7 @@ impl LegacyData {
                         target,
                         CandidateMeta {
                             exact_match,
+                            frequency: self.target_frequency.get(target).copied().unwrap_or(1),
                             target_len: target.chars().count(),
                             roman_len,
                             visit_index,
@@ -399,6 +427,48 @@ fn is_khmer_char(ch: char) -> bool {
     ('\u{1780}'..='\u{17ff}').contains(&ch) || ('\u{19e0}'..='\u{19ff}').contains(&ch)
 }
 
+fn target_frequency_map(entries: &[Entry], corpus_stats: Option<&CorpusStats>) -> HashMap<String, u32> {
+    let mut frequency = HashMap::<String, u32>::new();
+    for entry in entries {
+        let corpus_frequency = corpus_stats
+            .map(|stats| {
+                stats
+                    .surface_unigrams
+                    .get(&entry.target)
+                    .or_else(|| stats.word_unigrams.get(&entry.target))
+                    .copied()
+                    .unwrap_or(0)
+            })
+            .unwrap_or(0);
+        let effective = entry.frequency.max(corpus_frequency).max(1);
+        frequency
+            .entry(entry.target.clone())
+            .and_modify(|current| *current = (*current).max(effective))
+            .or_insert(effective);
+    }
+    frequency
+}
+
+fn sort_lookup_maps_by_frequency(maps: &mut LegacyLookupMaps, target_frequency: &HashMap<String, u32>) {
+    for values in maps.by_roman.values_mut() {
+        sort_targets_by_frequency(values, target_frequency);
+    }
+    for values in maps.by_normalized.values_mut() {
+        sort_targets_by_frequency(values, target_frequency);
+    }
+}
+
+fn sort_targets_by_frequency(values: &mut [String], target_frequency: &HashMap<String, u32>) {
+    values.sort_by(|left, right| {
+        target_frequency
+            .get(right)
+            .copied()
+            .unwrap_or(1)
+            .cmp(&target_frequency.get(left).copied().unwrap_or(1))
+            .then_with(|| left.cmp(right))
+    });
+}
+
 fn push_candidate(
     suggestions: &mut Vec<String>,
     seen: &mut HashMap<String, CandidateMeta>,
@@ -421,6 +491,7 @@ fn push_candidate(
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 struct CandidateMeta {
     exact_match: bool,
+    frequency: u32,
     target_len: usize,
     roman_len: usize,
     visit_index: usize,
@@ -428,19 +499,27 @@ struct CandidateMeta {
 
 impl CandidateMeta {
     fn better_than(self, other: Self) -> bool {
-        self.exact_match != other.exact_match && self.exact_match
-            || self.target_len < other.target_len
-            || (self.target_len == other.target_len && self.roman_len < other.roman_len)
-            || (self.target_len == other.target_len
-                && self.roman_len == other.roman_len
-                && self.visit_index < other.visit_index)
+        self.cmp_priority(other).is_gt()
     }
 
     fn cmp_priority(self, other: Self) -> std::cmp::Ordering {
-        self.exact_match
-            .cmp(&other.exact_match)
-            .then_with(|| other.target_len.cmp(&self.target_len))
+        let base = self.exact_match.cmp(&other.exact_match);
+        if base != std::cmp::Ordering::Equal {
+            return base;
+        }
+        if self.exact_match {
+            return self
+                .frequency
+                .cmp(&other.frequency)
+                .then_with(|| other.target_len.cmp(&self.target_len))
+                .then_with(|| other.roman_len.cmp(&self.roman_len))
+                .then_with(|| other.visit_index.cmp(&self.visit_index));
+        }
+        other
+            .target_len
+            .cmp(&self.target_len)
             .then_with(|| other.roman_len.cmp(&self.roman_len))
+            .then_with(|| self.frequency.cmp(&other.frequency))
             .then_with(|| other.visit_index.cmp(&self.visit_index))
     }
 }

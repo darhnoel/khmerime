@@ -13,7 +13,8 @@ pub(super) const DEFAULT_COMPILED_KHPOS_STATS: &[u8] = include_bytes!(concat!(en
 #[cfg(not(all(target_arch = "wasm32", feature = "fetch-data")))]
 pub(super) const DEFAULT_COMPILED_NEXT_WORD_STATS: &[u8] =
     include_bytes!(concat!(env!("OUT_DIR"), "/next_word.stats.bin"));
-pub(super) const COMPILED_MAGIC: &[u8; 4] = b"RLX1";
+pub(super) const COMPILED_MAGIC: &[u8; 4] = b"RLX2";
+pub(super) const COMPILED_MAGIC_V1: &[u8; 4] = b"RLX1";
 pub(super) const KHPOS_MAGIC: &[u8; 4] = b"KPS1";
 pub(super) const NEXT_WORD_MAGIC: &[u8; 4] = b"NWS1";
 pub(super) const MAX_SUGGESTIONS: usize = 15;
@@ -108,6 +109,8 @@ pub(super) const PRIORITY_SEEDS: [(&str, &str); 39] = [
 pub struct Entry {
     pub roman: String,
     pub target: String,
+    pub frequency: u32,
+    pub frequency_lang: String,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -148,7 +151,7 @@ pub(crate) struct RankedLexiconEntry {
     pub normalized_key: String,
     pub alias_keys: Vec<String>,
     pub frequency: u32,
-    pub source_rank: usize,
+    pub frequency_lang: String,
     pub first_tag: Option<String>,
     pub last_tag: Option<String>,
 }
@@ -199,6 +202,7 @@ pub(crate) struct LegacyData {
     pub(super) by_roman: HashMap<String, Vec<String>>,
     pub(super) by_normalized: HashMap<String, Vec<String>>,
     pub(super) by_target: HashMap<String, Vec<String>>,
+    pub(super) target_frequency: HashMap<String, u32>,
     pub(super) roman_normalized: HashMap<String, String>,
     pub(super) roman_prefix_index: HashMap<String, Vec<String>>,
     pub(super) index: SearchIndex,
@@ -216,6 +220,7 @@ pub(super) struct LegacyLookupMaps {
     pub by_roman: HashMap<String, Vec<String>>,
     pub by_normalized: HashMap<String, Vec<String>>,
     pub by_target: HashMap<String, Vec<String>>,
+    pub target_frequency: HashMap<String, u32>,
     pub roman_normalized: HashMap<String, String>,
     pub roman_prefix_index: HashMap<String, Vec<String>>,
     pub roman_keys: Vec<String>,

@@ -43,6 +43,9 @@ mod tests {
             bytes.push(0);
             bytes.extend_from_slice(target.as_bytes());
             bytes.push(0);
+            bytes.extend_from_slice(&1u32.to_le_bytes());
+            bytes.extend_from_slice(b"km");
+            bytes.push(0);
         }
         bytes
     }
@@ -82,6 +85,8 @@ mod tests {
             .map(|(roman, target)| Entry {
                 roman: (*roman).to_owned(),
                 target: (*target).to_owned(),
+                frequency: 1,
+                frequency_lang: "km".to_owned(),
             })
             .collect::<Vec<_>>();
         let legacy = Arc::new(LegacyData::from_entries_with_stats(
@@ -161,10 +166,14 @@ mod tests {
                 Entry {
                     roman: "khnhom".to_owned(),
                     target: "ខ្ញុំ".to_owned(),
+                    frequency: 1,
+                    frequency_lang: "km".to_owned(),
                 },
                 Entry {
                     roman: "khnhomttov".to_owned(),
                     target: "ខ្ញុំ ទៅ".to_owned(),
+                    frequency: 1,
+                    frequency_lang: "km".to_owned(),
                 },
             ],
             &stats,
@@ -186,7 +195,7 @@ mod tests {
         assert_eq!(jea.first().map(String::as_str), Some("ជា"));
         assert_eq!(
             jea.iter().take(5).map(String::as_str).collect::<Vec<_>>(),
-            vec!["ជា", "ជះ", "ជាត", "ជាម", "ឈាម"]
+            vec!["ជា", "ជះ", "ជាវ", "ឈាម", "ជាម"]
         );
         assert_eq!(jea.last().map(String::as_str), Some("jea"));
 

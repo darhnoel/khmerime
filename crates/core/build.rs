@@ -17,7 +17,7 @@ const DEFAULT_MOBILE_KEYBOARD_2GRAM_PATH: &str =
 // These magic bytes version the compact binary blobs embedded into the Rust
 // binary. Runtime parsers use them to reject stale or mismatched generated data
 // before interpreting offsets and counts.
-const MAGIC: &[u8; 4] = b"RLX1";
+const MAGIC: &[u8; 4] = b"RLX2";
 const KHPOS_MAGIC: &[u8; 4] = b"KPS1";
 const NEXT_WORD_MAGIC: &[u8; 4] = b"NWS1";
 const MAX_JOINED_SURFACE_TOKENS: usize = 4;
@@ -26,6 +26,29 @@ const MAX_JOINED_SURFACE_TOKENS: usize = 4;
 enum LexiconSourceFormat {
     Csv,
     Tsv,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+struct BuildLexiconEntry {
+    roman: String,
+    target: String,
+    frequency: u32,
+    frequency_lang: String,
+}
+
+impl BuildLexiconEntry {
+    fn new(roman: String, target: String, frequency: u32, frequency_lang: String) -> Self {
+        Self {
+            roman,
+            target,
+            frequency,
+            frequency_lang,
+        }
+    }
+
+    fn default_frequency(roman: String, target: String) -> Self {
+        Self::new(roman, target, 1, "km".to_owned())
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -332,27 +355,30 @@ fn is_khmer_token(token: &str) -> bool {
         })
 }
 
-fn compile_lexicon_entries(entries: Vec<(String, String)>) -> Result<Vec<u8>, String> {
+fn compile_lexicon_entries(entries: Vec<BuildLexiconEntry>) -> Result<Vec<u8>, String> {
     let mut output = Vec::new();
     output.extend_from_slice(MAGIC);
 
     let entry_count = entries.len() as u32;
     output.extend_from_slice(&entry_count.to_le_bytes());
 
-    for (line_no, (roman, target)) in entries.into_iter().enumerate() {
-        if roman.contains('\0') || target.contains('\0') {
+    for (line_no, entry) in entries.into_iter().enumerate() {
+        if entry.roman.contains('\0') || entry.target.contains('\0') || entry.frequency_lang.contains('\0') {
             return Err(format!("NUL byte is not supported on line {}", line_no + 1));
         }
-        output.extend_from_slice(roman.as_bytes());
+        output.extend_from_slice(entry.roman.as_bytes());
         output.push(0);
-        output.extend_from_slice(target.as_bytes());
+        output.extend_from_slice(entry.target.as_bytes());
+        output.push(0);
+        write_u32(&mut output, entry.frequency);
+        output.extend_from_slice(entry.frequency_lang.as_bytes());
         output.push(0);
     }
 
     Ok(output)
 }
 
-fn parse_additional_csv_entries(source: &str) -> Vec<(String, String)> {
+fn parse_additional_csv_entries(source: &str) -> Vec<BuildLexiconEntry> {
     let mut entries = Vec::new();
     let mut first_row = true;
 
@@ -388,20 +414,20 @@ fn parse_additional_csv_entries(source: &str) -> Vec<(String, String)> {
         if roman.is_empty() || target.is_empty() {
             continue;
         }
-        entries.push((roman, target));
+        entries.push(BuildLexiconEntry::default_frequency(roman, target));
     }
 
     entries
 }
 
-fn parse_lexicon_entries(source: &str, source_format: LexiconSourceFormat) -> Result<Vec<(String, String)>, String> {
+fn parse_lexicon_entries(source: &str, source_format: LexiconSourceFormat) -> Result<Vec<BuildLexiconEntry>, String> {
     match source_format {
         LexiconSourceFormat::Csv => parse_csv_entries(source),
         LexiconSourceFormat::Tsv => parse_tsv_entries(source),
     }
 }
 
-fn parse_tsv_entries(source: &str) -> Result<Vec<(String, String)>, String> {
+fn parse_tsv_entries(source: &str) -> Result<Vec<BuildLexiconEntry>, String> {
     let mut entries = Vec::new();
     for (line_no, line) in source.lines().enumerate() {
         if line.trim().is_empty() {
@@ -410,12 +436,15 @@ fn parse_tsv_entries(source: &str) -> Result<Vec<(String, String)>, String> {
         let Some((roman, target)) = line.split_once('\t') else {
             return Err(format!("invalid TSV data format on line {}", line_no + 1));
         };
-        entries.push((roman.to_owned(), target.to_owned()));
+        entries.push(BuildLexiconEntry::default_frequency(
+            roman.to_owned(),
+            target.to_owned(),
+        ));
     }
     Ok(entries)
 }
 
-fn parse_csv_entries(source: &str) -> Result<Vec<(String, String)>, String> {
+fn parse_csv_entries(source: &str) -> Result<Vec<BuildLexiconEntry>, String> {
     let mut entries = Vec::new();
     let mut first_row = true;
     for (line_no, line) in source.lines().enumerate() {
@@ -423,9 +452,9 @@ fn parse_csv_entries(source: &str) -> Result<Vec<(String, String)>, String> {
             continue;
         }
         let mut fields = parse_csv_fields(line, line_no + 1)?;
-        if fields.len() != 2 {
+        if !matches!(fields.len(), 2 | 3 | 4) {
             return Err(format!(
-                "invalid CSV data format on line {}: expected 2 columns, got {}",
+                "invalid CSV data format on line {}: expected 2, 3, or 4 columns, got {}",
                 line_no + 1,
                 fields.len()
             ));
@@ -441,9 +470,59 @@ fn parse_csv_entries(source: &str) -> Result<Vec<(String, String)>, String> {
             continue;
         }
         first_row = false;
-        entries.push((fields.remove(0), fields.remove(0)));
+        let frequency = parse_lexicon_frequency(fields.get(2).map(String::as_str).unwrap_or(""), line_no + 1, true)?;
+        let frequency_lang = if let Some(value) = fields.get(3) {
+            let value = value.trim();
+            if value.is_empty() {
+                return Err(format!(
+                    "invalid CSV data format on line {}: freq_lang is required",
+                    line_no + 1
+                ));
+            }
+            validate_frequency_lang(value, line_no + 1)?;
+            value.to_owned()
+        } else {
+            "km".to_owned()
+        };
+        entries.push(BuildLexiconEntry::new(
+            fields.remove(0),
+            fields.remove(0),
+            frequency,
+            frequency_lang,
+        ));
     }
     Ok(entries)
+}
+
+fn parse_lexicon_frequency(raw: &str, line_no: usize, allow_blank: bool) -> Result<u32, String> {
+    let value = raw.trim();
+    if value.is_empty() {
+        if allow_blank {
+            return Ok(1);
+        }
+        return Err(format!(
+            "invalid CSV data format on line {line_no}: frequency is required"
+        ));
+    }
+    let parsed = value
+        .parse::<u32>()
+        .map_err(|_| format!("invalid CSV data format on line {line_no}: frequency must be a positive integer"))?;
+    if parsed == 0 {
+        return Err(format!(
+            "invalid CSV data format on line {line_no}: frequency must be a positive integer"
+        ));
+    }
+    Ok(parsed)
+}
+
+fn validate_frequency_lang(value: &str, line_no: usize) -> Result<(), String> {
+    if matches!(value, "km" | "en" | "ja" | "zh" | "ko") {
+        Ok(())
+    } else {
+        Err(format!(
+            "invalid CSV data format on line {line_no}: unsupported freq_lang '{value}'"
+        ))
+    }
 }
 
 fn parse_csv_fields(line: &str, line_no: usize) -> Result<Vec<String>, String> {

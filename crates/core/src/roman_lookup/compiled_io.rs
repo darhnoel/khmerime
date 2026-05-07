@@ -39,6 +39,8 @@ pub(super) fn parse_tsv(source: &str) -> Result<Vec<Entry>> {
         entries.push(Entry {
             roman: roman.to_owned(),
             target: target.to_owned(),
+            frequency: 1,
+            frequency_lang: "km".to_owned(),
         });
     }
     Ok(entries)
@@ -53,9 +55,9 @@ pub(super) fn parse_csv(source: &str) -> Result<Vec<Entry>> {
             continue;
         }
         let mut fields = parse_csv_fields(line, line_no + 1)?;
-        if fields.len() != 2 {
+        if !matches!(fields.len(), 2 | 3 | 4) {
             return Err(LexiconError::Parse(format!(
-                "invalid CSV data format on line {}: expected 2 columns, got {}",
+                "invalid CSV data format on line {}: expected 2, 3, or 4 columns, got {}",
                 line_no + 1,
                 fields.len()
             )));
@@ -71,12 +73,56 @@ pub(super) fn parse_csv(source: &str) -> Result<Vec<Entry>> {
             continue;
         }
         first_row = false;
+        let frequency = parse_frequency(fields.get(2).map(String::as_str).unwrap_or(""), line_no + 1)?;
+        let frequency_lang = if let Some(value) = fields.get(3) {
+            let value = value.trim();
+            if value.is_empty() {
+                return Err(LexiconError::Parse(format!(
+                    "invalid CSV data format on line {}: freq_lang is required",
+                    line_no + 1
+                )));
+            }
+            validate_frequency_lang(value, line_no + 1)?;
+            value.to_owned()
+        } else {
+            "km".to_owned()
+        };
         entries.push(Entry {
             roman: fields.remove(0),
             target: fields.remove(0),
+            frequency,
+            frequency_lang,
         });
     }
     Ok(entries)
+}
+
+fn parse_frequency(raw: &str, line_no: usize) -> Result<u32> {
+    let value = raw.trim();
+    if value.is_empty() {
+        return Ok(1);
+    }
+    let parsed = value.parse::<u32>().map_err(|_| {
+        LexiconError::Parse(format!(
+            "invalid CSV data format on line {line_no}: frequency must be a positive integer"
+        ))
+    })?;
+    if parsed == 0 {
+        return Err(LexiconError::Parse(format!(
+            "invalid CSV data format on line {line_no}: frequency must be a positive integer"
+        )));
+    }
+    Ok(parsed)
+}
+
+fn validate_frequency_lang(value: &str, line_no: usize) -> Result<()> {
+    if matches!(value, "km" | "en" | "ja" | "zh" | "ko") {
+        Ok(())
+    } else {
+        Err(LexiconError::Parse(format!(
+            "invalid CSV data format on line {line_no}: unsupported freq_lang '{value}'"
+        )))
+    }
 }
 
 #[cfg(not(all(target_arch = "wasm32", feature = "fetch-data")))]
@@ -129,7 +175,12 @@ fn parse_csv_fields(line: &str, line_no: usize) -> Result<Vec<String>> {
 }
 
 pub(super) fn parse_compiled_lexicon(source: &[u8]) -> Result<Vec<Entry>> {
-    if source.len() < 8 || &source[..4] != COMPILED_MAGIC {
+    if source.len() < 8 {
+        return Err(LexiconError::Parse("invalid compiled lexicon header".to_owned()));
+    }
+    let is_v2 = &source[..4] == COMPILED_MAGIC;
+    let is_v1 = &source[..4] == COMPILED_MAGIC_V1;
+    if !is_v1 && !is_v2 {
         return Err(LexiconError::Parse("invalid compiled lexicon header".to_owned()));
     }
 
@@ -146,11 +197,24 @@ pub(super) fn parse_compiled_lexicon(source: &[u8]) -> Result<Vec<Entry>> {
             .map_err(|_| LexiconError::Parse("compiled lexicon contains invalid UTF-8".to_owned()))?;
         let target = std::str::from_utf8(&source[target_start..target_end])
             .map_err(|_| LexiconError::Parse("compiled lexicon contains invalid UTF-8".to_owned()))?;
+        offset = target_end + 1;
+        let (frequency, frequency_lang) = if is_v2 {
+            let frequency = read_u32(source, &mut offset)?;
+            let frequency_lang_end = find_nul(source, offset)
+                .ok_or_else(|| LexiconError::Parse("invalid compiled lexicon payload".to_owned()))?;
+            let frequency_lang = std::str::from_utf8(&source[offset..frequency_lang_end])
+                .map_err(|_| LexiconError::Parse("compiled lexicon contains invalid UTF-8".to_owned()))?;
+            offset = frequency_lang_end + 1;
+            (frequency, frequency_lang.to_owned())
+        } else {
+            (1, "km".to_owned())
+        };
         entries.push(Entry {
             roman: roman.to_owned(),
             target: target.to_owned(),
+            frequency,
+            frequency_lang,
         });
-        offset = target_end + 1;
     }
 
     if entries.len() != entry_count {

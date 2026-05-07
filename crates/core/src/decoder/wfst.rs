@@ -1,4 +1,3 @@
-use std::cmp::Reverse;
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
@@ -34,7 +33,6 @@ struct SpanCandidate {
     input: String,
     output: String,
     recovered_roman: String,
-    source_rank: usize,
     first_tag: Option<String>,
     last_tag: Option<String>,
     score: i32,
@@ -375,7 +373,7 @@ impl WfstDecoder {
                     )
                 })
                 .collect::<Vec<_>>();
-            ranked.sort_by_key(|(entry_index, _)| Reverse(lexicon.entries[*entry_index].frequency));
+            ranked.sort_by(|left, right| compare_retrieval_hits(left, right, lexicon));
             ranked.truncate(self.config.beam_retrieval_shortlist.max(1));
             return ranked;
         }
@@ -507,7 +505,6 @@ impl WfstDecoder {
         let edit_score = (best_edit * 4_600.0).round() as i32;
         let ngram_score = (best_ngram * 2_200.0).round() as i32;
         let frequency_score = frequency_prior(entry.frequency);
-        let source_score = source_rank_prior(entry.source_rank);
         let span_len = end.saturating_sub(start) as i32;
         let span_bonus = span_len * 220;
         let long_span_bonus = if span_len >= 5 && (signals.exact_hit || signals.alias_hit || best_edit >= 0.72) {
@@ -521,7 +518,6 @@ impl WfstDecoder {
             + ngram_score
             + prefix_bonus
             + frequency_score
-            + source_score
             + span_bonus
             + long_span_bonus;
 
@@ -531,7 +527,6 @@ impl WfstDecoder {
             input: span.to_owned(),
             output: entry.target.clone(),
             recovered_roman: entry.canonical_roman.clone(),
-            source_rank: entry.source_rank,
             first_tag: entry.first_tag.clone(),
             last_tag: entry.last_tag.clone(),
             score,
@@ -740,7 +735,6 @@ fn compare_span_candidates(left: &SpanCandidate, right: &SpanCandidate) -> std::
                 .cmp(&left.end.saturating_sub(left.start))
         })
         .then_with(|| right.edit_similarity.total_cmp(&left.edit_similarity))
-        .then_with(|| left.source_rank.cmp(&right.source_rank))
         .then_with(|| left.recovered_roman.cmp(&right.recovered_roman))
         .then_with(|| left.output.cmp(&right.output))
 }
@@ -762,17 +756,13 @@ fn compare_retrieval_hits(
         .then_with(|| right_signal.alias_hit.cmp(&left_signal.alias_hit))
         .then_with(|| right_signal.gram_hits.cmp(&left_signal.gram_hits))
         .then_with(|| right_entry.frequency.cmp(&left_entry.frequency))
-        .then_with(|| left_entry.source_rank.cmp(&right_entry.source_rank))
         .then_with(|| left_entry.canonical_roman.cmp(&right_entry.canonical_roman))
         .then_with(|| left_entry.target.cmp(&right_entry.target))
+        .then_with(|| left_entry.frequency_lang.cmp(&right_entry.frequency_lang))
 }
 
 fn frequency_prior(frequency: u32) -> i32 {
     (((frequency + 1) as f64).ln() * 120.0).round() as i32
-}
-
-fn source_rank_prior(source_rank: usize) -> i32 {
-    1_800i32.saturating_sub((source_rank / 2) as i32)
 }
 
 fn score_to_bps(score: i32) -> u16 {
