@@ -1,4 +1,4 @@
-.PHONY: help web web-release web-phone desktop stats suggest suggest-wfst suggest-shadow shadow-eval visualize-lexicon visualize-lexicon-streamlit fmt test test-golden test-ui platform-check platform-check-linux platform-check-android platform-check-ios platform-check-macos platform-check-windows platform-build-windows platform-install-windows platform-uninstall-windows platform-reinstall-windows platform-smoke-windows-notepad platform-smoke-windows-notepad-python windows-package linux-package ibus-install ibus-uninstall ibus-smoke paper-current paper-current-clean
+.PHONY: help web web-release web-phone desktop stats suggest suggest-wfst suggest-shadow shadow-eval data-split data-build data-check visualize-lexicon visualize-lexicon-streamlit fmt test test-golden test-ui platform-check platform-check-linux platform-check-android platform-check-ios platform-check-macos platform-check-windows platform-build-windows platform-install-windows platform-uninstall-windows platform-reinstall-windows platform-smoke-windows-notepad platform-smoke-windows-notepad-python windows-package linux-package ibus-install ibus-uninstall ibus-smoke paper-current paper-current-clean
 
 DX ?= dx
 APP_DIR := apps/dioxus-app
@@ -37,6 +37,9 @@ help:
 	"  make suggest-wfst QUERY=tver     Print WFST-mode suggestions" \
 	"  make suggest-shadow QUERY=tver   Print shadow-mode suggestions" \
 	"  make shadow-eval QUERIES=path/to/queries.txt [MODE=shadow|wfst|hybrid] [OUTPUT=report.txt]" \
+	"  make data-split                  Split data/roman_lookup.csv into reviewable chunk CSVs" \
+	"  make data-build                  Generate data/roman_lookup.csv from chunk CSVs" \
+	"  make data-check                  Validate lexicon chunks and generated runtime data" \
 	"  make visualize-lexicon           Generate lightweight lexicon relationship views under dist/" \
 	"  make visualize-lexicon-streamlit Launch the optional Streamlit explorer for the generated views" \
 	"  make fmt                         Run cargo fmt" \
@@ -95,6 +98,15 @@ shadow-eval:
 	else \
 		$(CLI) --decoder-mode "$(MODE)" shadow-eval "$(QUERIES)"; \
 	fi
+
+data-split:
+	python3 scripts/data/lexicon/manage_lexicon_chunks.py split
+
+data-build:
+	python3 scripts/data/lexicon/manage_lexicon_chunks.py build
+
+data-check:
+	python3 scripts/data/lexicon/manage_lexicon_chunks.py check
 
 visualize-lexicon:
 	python3 scripts/data/lexicon/visualize_roman_lookup.py
