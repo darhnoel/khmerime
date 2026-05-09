@@ -197,7 +197,7 @@ mod tests {
         assert_eq!(jea.first().map(String::as_str), Some("ជា"));
         assert_eq!(
             jea.iter().take(5).map(String::as_str).collect::<Vec<_>>(),
-            vec!["ជា", "ជះ", "ជាវ", "ឈាម", "ជាម"]
+            vec!["ជា", "ជះ", "ឈាម", "ជាវ", "ជាម"]
         );
         assert_eq!(jea.last().map(String::as_str), Some("jea"));
 

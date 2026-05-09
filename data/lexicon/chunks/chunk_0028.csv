@@ -10,7 +10,7 @@ peru,ប៉េរូ,1,km,unclassified,approved,
 philippines,ហ្វីលីពីន,1,km,unclassified,approved,
 Poland,ប៉ូឡូញ,1,km,unclassified,approved,
 portugal,ព័រទុយហ្គាល់,1,km,unclassified,approved,
-qatar,កាតា,1,km,unclassified,approved,
+qatar,កាតា,311,km,unclassified,approved,
 romania,រូម៉ានី,1,km,unclassified,approved,
 russia,រុស្ស៊ី,1,km,unclassified,approved,
 rwanda,រវ៉ាន់ដា,1,km,unclassified,approved,
@@ -35,11 +35,11 @@ sudan,ស៊ូដង់,1,km,unclassified,approved,
 suriname,ស៊ូរីណាម,1,km,unclassified,approved,
 sweden,ស៊ុយអែត,1,km,unclassified,approved,
 switzerland,ស្វីស,1,km,unclassified,approved,
-siria,ស៊ីរី,1,km,unclassified,approved,
+siria,ស៊ីរី,38,km,unclassified,approved,
 taiwan,តៃវ៉ាន់,1,km,unclassified,approved,
 tajikistan,តាជីគីស្ថាន,1,km,unclassified,approved,
 tanzania,តង់ហ្សានី,1,km,unclassified,approved,
-thailand,ថៃ,1,km,unclassified,approved,
+thailand,ថៃ,6466,km,unclassified,approved,
 togo,តូហ្គោ,1,km,unclassified,approved,
 tonga,តុងហ្គា,1,km,unclassified,approved,
 ttrinidadandTobago,ទ្រីនីដាដនិងតូបាហ្គោ,1,km,unclassified,approved,
@@ -63,196 +63,173 @@ yemen,យេម៉ែន,1,km,unclassified,approved,
 zambia,សំប៊ី,1,km,unclassified,approved,
 zimbabwe,ហ្ស៊ីមបាវ៉េ,1,km,unclassified,approved,
 .,។,1,km,unclassified,approved,
-chea,ជា,1,km,unclassified,approved,
-dl,ដែល,1,km,unclassified,approved,
-nv,នៅ,1,km,unclassified,approved,
-ng,និង,1,km,unclassified,approved,
-ning,ហ្នឹង,1,km,unclassified,approved,
-nong,ហ្នឹង,1,km,unclassified,approved,
-ng,ហ្នឹង,1,km,unclassified,approved,
-nung,ហ្នឹង,1,km,unclassified,approved,
-kng,ក្នុង,1,km,unclassified,approved,
-rbos,របស់,1,km,unclassified,approved,
-rbos,របស់,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-lbos,របស់,1,km,unclassified,approved,
-ta,ថា,1,km,unclassified,approved,
-te,ទេ,1,km,unclassified,approved,
-tae,ទេ,1,km,unclassified,approved,
-tov,ទៅ,1,km,unclassified,approved,
-tv,ទៅ,1,km,unclassified,approved,
-nek,អ្នក,1,km,unclassified,approved,
-ng,នឹង,1,km,unclassified,approved,
-hz,ហើយ,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-ke,គេ,1,km,unclassified,approved,
-tg,ទាំង,1,km,unclassified,approved,
-zoul,ស្រួល,1,km,unclassified,approved,
-zuol,ស្រួល,1,km,unclassified,approved,
-tteng,ទាំង,1,km,unclassified,approved,
-ttang,ទាំង,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-tteang,ទាំង,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-thov,ត្រូវ,1,km,unclassified,approved,
-trov,ត្រូវ,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-chnam,ឆ្នាំ,1,km,unclassified,approved,
-jnam,ឆ្នាំ,1,km,unclassified,approved,
-yg,យ៉ាង,1,km,unclassified,approved,
-yang,យ៉ាង,1,km,unclassified,approved,
-tver,ធ្វើ,1,km,unclassified,approved,
-ther,ធ្វើ,1,km,unclassified,approved,
-ter,ធ្វើ,1,km,unclassified,approved,
-kloun,ខ្លួន,1,km,unclassified,approved,
-knea,គ្នា,1,km,unclassified,approved,
-keu,គឺ,1,km,unclassified,approved,
-kue,គឺ,1,km,unclassified,approved,
-kir,គឺ,1,km,unclassified,approved,
-dl,ដល់,1,km,unclassified,approved,
-teat,ទៀត,1,km,unclassified,approved,
-tiet,ទៀត,1,km,unclassified,approved,
-ti,ទី,1,km,unclassified,approved,
-jrern,ច្រើន,1,km,unclassified,approved,
-jren,ច្រើន,1,km,unclassified,approved,
-zei,ស្រី,1,km,unclassified,approved,
-zei,ស្រេច,1,km,unclassified,approved,
-zout,ស្រូត,1,km,unclassified,approved,
-tmei,ថ្មី,1,km,unclassified,approved,
-tmey,ថ្មី,1,km,unclassified,approved,
-jol,ចូល,1,km,unclassified,approved,
-klang,ខ្លាំង,1,km,unclassified,approved,
-jomnoun,ចំនួន,1,km,unclassified,approved,
-jomnuon,ចំនួន,1,km,unclassified,approved,
-ngai,ថ្ងៃ,1,km,unclassified,approved,
-tgai,ថ្ងៃ,1,km,unclassified,approved,
-thgai,ថ្ងៃ,1,km,unclassified,approved,
+chea,ជា,131865,km,unclassified,approved,
+dl,ដែល,98472,km,unclassified,approved,
+nv,នៅ,89312,km,unclassified,approved,
+ng,និង,81464,km,unclassified,approved,
+ning,ហ្នឹង,560,km,unclassified,approved,
+nong,ហ្នឹង,560,km,unclassified,approved,
+ng,ហ្នឹង,560,km,unclassified,approved,
+nung,ហ្នឹង,560,km,unclassified,approved,
+kng,ក្នុង,71969,km,unclassified,approved,
+rbos,របស់,70801,km,unclassified,approved,
+lbos,របស់,70801,km,unclassified,approved,
+ta,ថា,70631,km,unclassified,approved,
+te,ទេ,21228,km,unclassified,approved,
+tae,ទេ,21228,km,unclassified,approved,
+tov,ទៅ,58083,km,unclassified,approved,
+tv,ទៅ,58083,km,unclassified,approved,
+nek,អ្នក,52630,km,unclassified,approved,
+ng,នឹង,45825,km,unclassified,approved,
+ke,គេ,36949,km,unclassified,approved,
+tg,ទាំង,36552,km,unclassified,approved,
+zoul,ស្រួល,1948,km,unclassified,approved,
+zuol,ស្រួល,1948,km,unclassified,approved,
+tteng,ទាំង,36552,km,unclassified,approved,
+thov,ត្រូវ,32585,km,unclassified,approved,
+chnam,ឆ្នាំ,31482,km,unclassified,approved,
+jnam,ឆ្នាំ,31482,km,unclassified,approved,
+yg,យ៉ាង,28036,km,unclassified,approved,
+yang,យ៉ាង,28036,km,unclassified,approved,
+tver,ធ្វើ,27966,km,unclassified,approved,
+ther,ធ្វើ,27966,km,unclassified,approved,
+kloun,ខ្លួន,27763,km,unclassified,approved,
+knea,គ្នា,27555,km,unclassified,approved,
+keu,គឺ,26841,km,unclassified,approved,
+kue,គឺ,26841,km,unclassified,approved,
+kir,គឺ,26841,km,unclassified,approved,
+dl,ដល់,26733,km,unclassified,approved,
+teat,ទៀត,25967,km,unclassified,approved,
+tiet,ទៀត,25967,km,unclassified,approved,
+ti,ទី,25512,km,unclassified,approved,
+jrern,ច្រើន,22203,km,unclassified,approved,
+jren,ច្រើន,22203,km,unclassified,approved,
+zei,ស្រី,19164,km,unclassified,approved,
+zei,ស្រេច,410,km,unclassified,approved,
+zout,ស្រូត,5,km,unclassified,approved,
+tmei,ថ្មី,18850,km,unclassified,approved,
+tmey,ថ្មី,18850,km,unclassified,approved,
+jol,ចូល,18529,km,unclassified,approved,
+klang,ខ្លាំង,18316,km,unclassified,approved,
+jomnoun,ចំនួន,18093,km,unclassified,approved,
+jomnuon,ចំនួន,18093,km,unclassified,approved,
+ngai,ថ្ងៃ,17817,km,unclassified,approved,
+tgai,ថ្ងៃ,17817,km,unclassified,approved,
+thgai,ថ្ងៃ,17817,km,unclassified,approved,
 thgaichan,ថ្ងៃច័ន្ទ,1,km,unclassified,approved,
 thgaiangkea,ថ្ងៃអង្គារ,1,km,unclassified,approved,
 thgaiputh,ថ្ងៃពុធ,1,km,unclassified,approved,
 thgaiphat,ថ្ងៃព្រហស្បតិ៍,1,km,unclassified,approved,
 thgaisok,ថ្ងៃសុក្រ,1,km,unclassified,approved,
-thgaisao,ថ្ងៃសៅរ៍,1,km,unclassified,approved,
+thgaisao,ថ្ងៃសៅរ៍,6,km,unclassified,approved,
 thgaiatet,ថ្ងៃអាទិត្យ,1,km,unclassified,approved,
-protes,ប្រទេស,1,km,unclassified,approved,
-ptes,ប្រទេស,1,km,unclassified,approved,
-proteh,ប្រទេស,1,km,unclassified,approved,
-pteh,ប្រទេស,1,km,unclassified,approved,
-yg,យើង,1,km,unclassified,approved,
-jit,ចិត្ត,1,km,unclassified,approved,
-jet,ចិត្ត,1,km,unclassified,approved,
-kh,ឃើញ,1,km,unclassified,approved,
-khernh,ឃើញ,1,km,unclassified,approved,
-dg,ដឹង,1,km,unclassified,approved,
-tuek,ទឹក,1,km,unclassified,approved,
-terk,ទឹក,1,km,unclassified,approved,
-teuk,ទឹក,1,km,unclassified,approved,
-tirk,ទឹក,1,km,unclassified,approved,
+protes,ប្រទេស,17581,km,unclassified,approved,
+ptes,ប្រទេស,17581,km,unclassified,approved,
+proteh,ប្រទេស,17581,km,unclassified,approved,
+pteh,ប្រទេស,17581,km,unclassified,approved,
+yg,យើង,16360,km,unclassified,approved,
+jit,ចិត្ត,16006,km,unclassified,approved,
+jet,ចិត្ត,16006,km,unclassified,approved,
+kh,ឃើញ,15934,km,unclassified,approved,
+khernh,ឃើញ,15934,km,unclassified,approved,
+dg,ដឹង,15895,km,unclassified,approved,
+tuek,ទឹក,14856,km,unclassified,approved,
+terk,ទឹក,14856,km,unclassified,approved,
+teuk,ទឹក,14856,km,unclassified,approved,
+tirk,ទឹក,14856,km,unclassified,approved,
 tirkphnek,ទឹកភ្នែក,1,km,unclassified,approved,
 tirkpnek,ទឹកភ្នែក,1,km,unclassified,approved,
 teukpnek,ទឹកភ្នែក,1,km,unclassified,approved,
 terkpnek,ទឹកភ្នែក,1,km,unclassified,approved,
-cheat,ជាតិ,1,km,unclassified,approved,
-pg,ផង,1,km,unclassified,approved,
-phg,ផង,1,km,unclassified,approved,
-phong,ផង,1,km,unclassified,approved,
-phorng,ផង,1,km,unclassified,approved,
-pg,កំពុង,1,km,unclassified,approved,
-kpg,កំពុង,1,km,unclassified,approved,
-jmuy,ជាមួយ,1,km,unclassified,approved,
-jmouy,ជាមួយ,1,km,unclassified,approved,
-jmuy,ជាមួយ,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-jmouy,ជាមួយ,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-chmouy,ជាមួយ,1,km,unclassified,approved,
-chmuy,ជាមួយ,1,km,unclassified,approved,
-jab,ចាប់,1,km,unclassified,approved,
-yk,យក,1,km,unclassified,approved,
-yr,យក,1,km,unclassified,approved,
-bhanh,បង្ហាញ,1,km,unclassified,approved,
-bonghanh,បង្ហាញ,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-phanh,បង្ហាញ,1,km,unclassified,approved,
-gour,គួរ,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-gur,គួរ,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-guor,គួរ,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-gort,គាត់,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-rg,រឿង,1,km,unclassified,approved,
-jenh,ចេញ,1,km,unclassified,approved,
-cheang,ជាង,1,km,unclassified,approved,
-jg,ជាង,1,km,unclassified,approved,
-ml,មើល,1,km,unclassified,approved,
-tortoul,ទទួល,1,km,unclassified,approved,
-ttoul,ទទួល,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-chun,ជន,1,km,unclassified,approved,
-dara,តារា,1,km,unclassified,approved,
-krub,គ្រប់,1,km,unclassified,approved,
-khub,គ្រប់,1,km,unclassified,approved,
-krob,គ្រប់,1,km,unclassified,approved,
-chumngueu,ជំងឺ,1,km,unclassified,approved,
-chumnger,ជំងឺ,1,km,unclassified,approved,
-chumngeu,ជំងឺ,1,km,unclassified,approved,
-jgnir,ជំងឺ,1,km,unclassified,approved,
-jngur,ជំងឺ,1,km,unclassified,approved,
-jnger,ជំងឺ,1,km,unclassified,approved,
-jgg,ចង់,1,km,unclassified,approved,
-jong,ចង់,1,km,unclassified,approved,
-jongg,ចង់,1,km,unclassified,approved,
-mnus,មនុស្ស,1,km,unclassified,approved,
-rk,រក,1,km,unclassified,approved,
-knh,ខ្ញុំ,1,km,unclassified,approved,
-knh,ខ្ញុំ,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-knhom,ខ្ញុំ,1,km,unclassified,approved,
-knhom,ខ្ញុំ,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-nh,ខ្ញុំ,1,km,unclassified,approved,
-nhom,ខ្ញុំ,1,km,unclassified,approved,
-lg,លេង,1,km,unclassified,approved,
-leng,លេង,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-puntae,ប៉ុន្តែ,1,km,unclassified,approved,
-punte,ប៉ុន្តែ,1,km,unclassified,approved,
-pros,ប្រុស,1,km,unclassified,approved,
-pozz,ប្រុស,1,km,unclassified,approved,
-chouy,ជួយ,1,km,unclassified,approved,
-ksae,ខ្សែ,1,km,unclassified,approved,
-ryeak,រយៈ,1,km,unclassified,approved,
-ryek,រយៈ,1,km,unclassified,approved,
-ryeak,រយៈ,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-ryek,រយៈ,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-nv,នូវ,1,km,unclassified,approved,
-cambodia,កម្ពុជា,1,km,unclassified,approved,
-yy,និយាយ,1,km,unclassified,approved,
-yey,និយាយ,1,km,unclassified,approved,
-cherng,ជើង,1,km,unclassified,approved,
-zart,ស្អាត,1,km,unclassified,approved,
-ptorb,បន្ទាប់,1,km,unclassified,approved,
-ptorb,បន្ទាប់,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-kormtror,គាំទ្រ,1,km,unclassified,approved,
-avei,អ្វី,1,km,unclassified,approved,
+cheat,ជាតិ,14579,km,unclassified,approved,
+pg,ផង,14439,km,unclassified,approved,
+phg,ផង,14439,km,unclassified,approved,
+phong,ផង,14439,km,unclassified,approved,
+phorng,ផង,14439,km,unclassified,approved,
+pg,កំពុង,14300,km,unclassified,approved,
+kpg,កំពុង,14300,km,unclassified,approved,
+jmuy,ជាមួយ,14201,km,unclassified,approved,
+jmouy,ជាមួយ,14201,km,unclassified,approved,
+chmouy,ជាមួយ,14201,km,unclassified,approved,
+chmuy,ជាមួយ,14201,km,unclassified,approved,
+jab,ចាប់,13986,km,unclassified,approved,
+yk,យក,13125,km,unclassified,approved,
+yr,យក,13125,km,unclassified,approved,
+bhanh,បង្ហាញ,12662,km,unclassified,approved,
+phanh,បង្ហាញ,12662,km,unclassified,approved,
+rg,រឿង,12212,km,unclassified,approved,
+jenh,ចេញ,12126,km,unclassified,approved,
+jg,ជាង,11950,km,unclassified,approved,
+ml,មើល,11503,km,unclassified,approved,
+tortoul,ទទួល,11468,km,unclassified,approved,
+chun,ជន,11201,km,unclassified,approved,
+dara,តារា,11153,km,unclassified,approved,
+krub,គ្រប់,10933,km,unclassified,approved,
+khub,គ្រប់,10933,km,unclassified,approved,
+krob,គ្រប់,10933,km,unclassified,approved,
+chumngueu,ជំងឺ,10833,km,unclassified,approved,
+chumnger,ជំងឺ,10833,km,unclassified,approved,
+chumngeu,ជំងឺ,10833,km,unclassified,approved,
+jgnir,ជំងឺ,10833,km,unclassified,approved,
+jngur,ជំងឺ,10833,km,unclassified,approved,
+jnger,ជំងឺ,10833,km,unclassified,approved,
+jgg,ចង់,10824,km,unclassified,approved,
+jong,ចង់,10824,km,unclassified,approved,
+jongg,ចង់,10824,km,unclassified,approved,
+mnus,មនុស្ស,10225,km,unclassified,approved,
+rk,រក,10125,km,unclassified,approved,
+knh,ខ្ញុំ,9945,km,unclassified,approved,
+knhom,ខ្ញុំ,9945,km,unclassified,approved,
+nh,ខ្ញុំ,9945,km,unclassified,approved,
+nhom,ខ្ញុំ,9945,km,unclassified,approved,
+lg,លេង,9857,km,unclassified,approved,
+puntae,ប៉ុន្តែ,9643,km,unclassified,approved,
+punte,ប៉ុន្តែ,9643,km,unclassified,approved,
+pros,ប្រុស,9640,km,unclassified,approved,
+pozz,ប្រុស,9640,km,unclassified,approved,
+chouy,ជួយ,9482,km,unclassified,approved,
+ksae,ខ្សែ,9264,km,unclassified,approved,
+ryeak,រយៈ,9250,km,unclassified,approved,
+ryek,រយៈ,9250,km,unclassified,approved,
+nv,នូវ,9240,km,unclassified,approved,
+cambodia,កម្ពុជា,9195,km,unclassified,approved,
+yy,និយាយ,9116,km,unclassified,approved,
+yey,និយាយ,9116,km,unclassified,approved,
+cherng,ជើង,8820,km,unclassified,approved,
+zart,ស្អាត,8820,km,unclassified,approved,
+ptorb,បន្ទាប់,8610,km,unclassified,approved,
+kormtror,គាំទ្រ,8522,km,unclassified,approved,
+avei,អ្វី,8487,km,unclassified,approved,
 avei,អ្វីៗ,1,km,unclassified,approved,
-avey,អ្វី,1,km,unclassified,approved,
+avey,អ្វី,8487,km,unclassified,approved,
 avey,អ្វីៗ,1,km,unclassified,approved,
-chmous,ឈ្មោះ,1,km,unclassified,approved,
-jmous,ឈ្មោះ,1,km,unclassified,approved,
-chhmous,ឈ្មោះ,1,km,unclassified,approved,
-plov,ផ្លូវ,1,km,unclassified,approved,
-ptor,បន្ត,1,km,unclassified,approved,
-ptor,បន្ត,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-PP,ភ្នំពេញ,1,km,unclassified,approved,
-tg,តែង,1,km,unclassified,approved,
+chmous,ឈ្មោះ,8474,km,unclassified,approved,
+jmous,ឈ្មោះ,8474,km,unclassified,approved,
+chhmous,ឈ្មោះ,8474,km,unclassified,approved,
+plov,ផ្លូវ,8233,km,unclassified,approved,
+ptor,បន្ត,7886,km,unclassified,approved,
+PP,ភ្នំពេញ,7874,km,unclassified,approved,
+tg,តែង,7813,km,unclassified,approved,
 pm,ពួកម៉ាក,1,km,unclassified,approved,
-kjork,កញ្ចក់,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-kjos,កញ្ចុះ,1,km,unclassified,approved,
-knot,កំណត់,1,km,unclassified,approved,
-knert,កំណើត,1,km,unclassified,approved,
-kdal,កណ្ដាល,1,km,unclassified,approved,
-klong,កន្លង,1,km,unclassified,approved,
-klorng,កន្លង,1,km,unclassified,approved,
-klg,កន្លែង,1,km,unclassified,approved,
-klaeng,កន្លែង,1,km,unclassified,approved,
-kplaeng,កំប្លែង,1,km,unclassified,approved,
-kpleng,កំប្លែង,1,km,unclassified,approved,
-kpong,កំពង់,1,km,unclassified,approved,
-kpg,កំពង់,1,km,unclassified,approved,
-kpous,កម្ពស់,1,km,unclassified,approved,
-canada,កាណាដា,1,km,unclassified,approved,
-card,កាត,1,km,unclassified,approved,
+kjos,កញ្ចុះ,15,km,unclassified,approved,
+knot,កំណត់,2285,km,unclassified,approved,
+knert,កំណើត,1571,km,unclassified,approved,
+kdal,កណ្ដាល,1583,km,unclassified,approved,
+klong,កន្លង,4316,km,unclassified,approved,
+klorng,កន្លង,4316,km,unclassified,approved,
+klg,កន្លែង,5259,km,unclassified,approved,
+klaeng,កន្លែង,5259,km,unclassified,approved,
+kplaeng,កំប្លែង,824,km,unclassified,approved,
+kpleng,កំប្លែង,824,km,unclassified,approved,
+kpong,កំពង់,1230,km,unclassified,approved,
+kpg,កំពង់,1230,km,unclassified,approved,
+kpous,កម្ពស់,1116,km,unclassified,approved,
+canada,កាណាដា,23,km,unclassified,approved,
+card,កាត,580,km,unclassified,approved,
 dontrei,តន្ត្រី,1,km,unclassified,approved,
 dontrey,តន្ត្រី,1,km,unclassified,approved,
-camera,កាមេរ៉ា,1,km,unclassified,approved,
-ksaet,កាសែត,1,km,unclassified,approved,
+camera,កាមេរ៉ា,1155,km,unclassified,approved,
+ksaet,កាសែត,1378,km,unclassified,approved,
 kdang,ក្ឌាំង,1,km,unclassified,approved,
 kdeung,ក្ឌឺង,1,km,unclassified,approved,
 kdoam,ក្ឌុំ,1,km,unclassified,approved,
@@ -262,46 +239,45 @@ ktampor,ក្ទម្ព,1,km,unclassified,approved,
 ktompor,ក្ទម្ព,1,km,unclassified,approved,
 ktampotes,ក្ទម្ពទេស,1,km,unclassified,approved,
 ktompotes,ក្ទម្ពទេស,1,km,unclassified,approved,
-khmeng,ក្មេង,1,km,unclassified,approved,
-wuhan,វូហាន,1,km,unclassified,approved,
-kmom,ក្រមុំ,1,km,unclassified,approved,
-brovottesas,ប្រវត្តិសាស្ត្រ,1,km,unclassified,approved,
-provottesas,ប្រវត្តិសាស្ត្រ,1,km,unclassified,approved,
-pvottesas,ប្រវត្តិសាស្ត្រ,1,km,unclassified,approved,
-pvoatesas,ប្រវត្តិសាស្ត្រ,1,km,unclassified,approved,
-ksoung,ក្រសួង,1,km,unclassified,approved,
-khorm,ក្រហម,1,km,unclassified,approved,
-prasac,ប្រាសាក់,1,km,unclassified,approved,
-kiloukram,គីឡូក្រាម,1,km,unclassified,approved,
-gram,ក្រាម,1,km,unclassified,approved,
-khom,ក្រោម,1,km,unclassified,approved,
-khla,ក្លា,1,km,unclassified,approved,
-khlay,ក្លាយ,1,km,unclassified,approved,
-knak,ខណៈ,1,km,unclassified,approved,
-knak,ខណៈ,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-khg,ខឹង,1,km,unclassified,approved,
-kheng,ខឹង,1,km,unclassified,approved,
-kerng,ខឹង,1,km,unclassified,approved,
+khmeng,ក្មេង,7072,km,unclassified,approved,
+wuhan,វូហាន,350,km,unclassified,approved,
+kmom,ក្រមុំ,358,km,unclassified,approved,
+brovottesas,ប្រវត្តិសាស្ត្រ,52,km,unclassified,approved,
+provottesas,ប្រវត្តិសាស្ត្រ,52,km,unclassified,approved,
+pvottesas,ប្រវត្តិសាស្ត្រ,52,km,unclassified,approved,
+pvoatesas,ប្រវត្តិសាស្ត្រ,52,km,unclassified,approved,
+ksoung,ក្រសួង,3618,km,unclassified,approved,
+khorm,ក្រហម,2223,km,unclassified,approved,
+prasac,ប្រាសាក់,268,km,unclassified,approved,
+kiloukram,គីឡូក្រាម,367,km,unclassified,approved,
+gram,ក្រាម,939,km,unclassified,approved,
+khom,ក្រោម,5074,km,unclassified,approved,
+khla,ក្លា,648,km,unclassified,approved,
+khlay,ក្លាយ,3695,km,unclassified,approved,
+knak,ខណៈ,5778,km,unclassified,approved,
+khg,ខឹង,499,km,unclassified,approved,
+kheng,ខឹង,499,km,unclassified,approved,
+kerng,ខឹង,499,km,unclassified,approved,
 khjatkjay,ខ្ចាត់ខ្ចាយ,1,km,unclassified,approved,
-kjey,ខ្ចី,1,km,unclassified,approved,
-kjei,ខ្ចី,1,km,unclassified,approved,
-kjos,ខ្ចោះ,1,km,unclassified,approved,
+kjey,ខ្ចី,1120,km,unclassified,approved,
+kjei,ខ្ចី,1120,km,unclassified,approved,
+kjos,ខ្ចោះ,619,km,unclassified,approved,
 khchahkhchay,ខ្ជះខ្ជាយ,1,km,unclassified,approved,
 khcham,ខ្ជាំ,1,km,unclassified,approved,
 khchak,ខ្ជាក,1,km,unclassified,approved,
-khchak,ខ្ជាក់,1,km,unclassified,approved,
+khchak,ខ្ជាក់,8,km,unclassified,approved,
 khchang,ខ្ជាង,1,km,unclassified,approved,
 khchang,ខ្ជាំងៗ,1,km,unclassified,approved,
 khchan,ខ្ជាន់ៗ,1,km,unclassified,approved,
-khchab,ខ្ជាប់,1,km,unclassified,approved,
+khchab,ខ្ជាប់,108,km,unclassified,approved,
 khchabkhchuon,ខ្ជាប់ខ្ជួន,1,km,unclassified,approved,
-khchay,ខ្ជាយ,1,km,unclassified,approved,
-khchel,ខ្ជិល,1,km,unclassified,approved,
-kjel,ខ្ជិល,1,km,unclassified,approved,
+khchay,ខ្ជាយ,59,km,unclassified,approved,
+khchel,ខ្ជិល,45,km,unclassified,approved,
+kjel,ខ្ជិល,45,km,unclassified,approved,
 khcheikhcha,ខ្ជីខ្ជា,1,km,unclassified,approved,
 khchoeng,ខ្ជឹង,1,km,unclassified,approved,
-khchoeb,ខ្ជឹប,1,km,unclassified,approved,
-khchuon,ខ្ជួន,1,km,unclassified,approved,
+khchoeb,ខ្ជឹប,6,km,unclassified,approved,
+khchuon,ខ្ជួន,52,km,unclassified,approved,
 khchaeuch,ខ្ជើច,1,km,unclassified,approved,
 khchenh,ខ្ជេញ,1,km,unclassified,approved,
 khchenhkhchel,ខ្ជេញខ្ជិល,1,km,unclassified,approved,
@@ -309,69 +285,66 @@ khchaeng,ខ្ជែង,1,km,unclassified,approved,
 khchaok,ខ្ជោក,1,km,unclassified,approved,
 khchaokkhchak,ខ្ជោកខ្ជាក,1,km,unclassified,approved,
 khchaol,ខ្ជោល,1,km,unclassified,approved,
-khtah,ខ្ទះ,1,km,unclassified,approved,
-khtong,ខ្ទង់,1,km,unclassified,approved,
+khtah,ខ្ទះ,31,km,unclassified,approved,
+khtong,ខ្ទង់,310,km,unclassified,approved,
 khtahtnaot,ខ្ទះត្នោត,1,km,unclassified,approved,
 khtob,ខ្ទប,1,km,unclassified,approved,
-khtob,ខ្ទប់,1,km,unclassified,approved,
-khtam,ខ្ទម,1,km,unclassified,approved,
-khtom,ខ្ទម,1,km,unclassified,approved,
-khtor,ខ្ទរ,1,km,unclassified,approved,
+khtob,ខ្ទប់,53,km,unclassified,approved,
+khtam,ខ្ទម,15,km,unclassified,approved,
+khtom,ខ្ទម,15,km,unclassified,approved,
+khtor,ខ្ទរ,9,km,unclassified,approved,
 khtoar,ខ្ទ័រ,1,km,unclassified,approved,
 khtarkhtoar,ខ្ទរខ្ទ័រ,1,km,unclassified,approved,
 khtorkhtoar,ខ្ទរខ្ទ័រ,1,km,unclassified,approved,
-khtam,ខ្ទាំ,1,km,unclassified,approved,
-khtat,ខ្ទាត,1,km,unclassified,approved,
-khtar,ខ្ទារ,1,km,unclassified,approved,
-khtas,ខ្ទាស់,1,km,unclassified,approved,
-khtoas,ខ្ទាស់,1,km,unclassified,approved,
-khteh,ខ្ទិះ,1,km,unclassified,approved,
-khteing,ខ្ទីង,1,km,unclassified,approved,
+khtam,ខ្ទាំ,2,km,unclassified,approved,
+khtat,ខ្ទាត,56,km,unclassified,approved,
+khtar,ខ្ទារ,5,km,unclassified,approved,
+khtas,ខ្ទាស់,15,km,unclassified,approved,
+khtoas,ខ្ទាស់,15,km,unclassified,approved,
+khteh,ខ្ទិះ,6,km,unclassified,approved,
+khteing,ខ្ទីង,6,km,unclassified,approved,
 khteit,ខ្ទីត,1,km,unclassified,approved,
 khtoeng,ខ្ទឹង,1,km,unclassified,approved,
-khtoem,ខ្ទឹម,1,km,unclassified,approved,
-khtoh,ខ្ទុះ,1,km,unclassified,approved,
+khtoem,ខ្ទឹម,179,km,unclassified,approved,
+khtoh,ខ្ទុះ,43,km,unclassified,approved,
 khtot,ខ្ទុត,1,km,unclassified,approved,
 khtottdei,ខ្ទុតដី,1,km,unclassified,approved,
 khtotdey,ខ្ទុតដី,1,km,unclassified,approved,
 khtuoy,ខ្ទួយ,1,km,unclassified,approved,
 khtaeut,ខ្ទើត,1,km,unclassified,approved,
-khtaeuy,ខ្ទើយ,1,km,unclassified,approved,
-ktery,ខ្ទើយ,1,km,unclassified,approved,
-khtech,ខ្ទេច,1,km,unclassified,approved,
+khtaeuy,ខ្ទើយ,21,km,unclassified,approved,
+ktery,ខ្ទើយ,21,km,unclassified,approved,
+khtech,ខ្ទេច,128,km,unclassified,approved,
 khtechkhtei,ខ្ទេចខ្ទី,1,km,unclassified,approved,
 khtaeng,ខ្ទែង,1,km,unclassified,approved,
 khtaet,ខ្ទែត,1,km,unclassified,approved,
 khtaok,ខ្ទោកៗ,1,km,unclassified,approved,
-knorng,ខ្នង,1,km,unclassified,approved,
-kpous,ខ្ពស់,1,km,unclassified,approved,
-kperm,ខ្ពើម,1,km,unclassified,approved,
-kmouch,ខ្មោច,1,km,unclassified,approved,
-kmav,ខ្មៅ,1,km,unclassified,approved,
-kjol,ខ្យល់,1,km,unclassified,approved,
-kls,ខ្លះ,1,km,unclassified,approved,
-klas,ខ្លះ,1,km,unclassified,approved,
-kla,ខ្លា,1,km,unclassified,approved,
-klach,ខ្លាច,1,km,unclassified,approved,
-klanh,ខ្លាញ់,1,km,unclassified,approved,
-klei,ខ្លី,1,km,unclassified,approved,
-kloch,ខ្លោច,1,km,unclassified,approved,
-kvas,ខ្វះ,1,km,unclassified,approved,
-kvol,ខ្វល់,1,km,unclassified,approved,
+knorng,ខ្នង,810,km,unclassified,approved,
+kpous,ខ្ពស់,3793,km,unclassified,approved,
+kperm,ខ្ពើម,62,km,unclassified,approved,
+kmouch,ខ្មោច,262,km,unclassified,approved,
+kmav,ខ្មៅ,1403,km,unclassified,approved,
+kjol,ខ្យល់,804,km,unclassified,approved,
+kls,ខ្លះ,4556,km,unclassified,approved,
+klas,ខ្លះ,4556,km,unclassified,approved,
+kla,ខ្លា,408,km,unclassified,approved,
+klach,ខ្លាច,1321,km,unclassified,approved,
+klanh,ខ្លាញ់,1054,km,unclassified,approved,
+klei,ខ្លី,1395,km,unclassified,approved,
+kloch,ខ្លោច,100,km,unclassified,approved,
+kvas,ខ្វះ,803,km,unclassified,approved,
+kvol,ខ្វល់,489,km,unclassified,approved,
 khvaeah,ខ្វែះ,1,km,unclassified,approved,
-ksoy,ខ្សោយ,1,km,unclassified,approved,
-gum,គំ,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-geah,គះ,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-gork,គក,1,km,unclassified,approved,
-gouk,គក់,1,km,unclassified,approved,
-geahkea,គះគា,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
+ksoy,ខ្សោយ,489,km,unclassified,approved,
+gork,គក,17,km,unclassified,approved,
+gouk,គក់,78,km,unclassified,approved,
 gogeach,គគាច,1,km,unclassified,approved,
 gogeat,គគាត,1,km,unclassified,approved,
-gogir,គគីរ,1,km,unclassified,approved,
+gogir,គគីរ,5,km,unclassified,approved,
 goguek,គគឹក,1,km,unclassified,approved,
 goguet,គគឹត,1,km,unclassified,approved,
 goguh,គគុះ,1,km,unclassified,approved,
-goguk,គគុក,1,km,unclassified,approved,
+goguk,គគុក,95,km,unclassified,approved,
 gogukkokeak,គគុកគគាក់,1,km,unclassified,approved,
 gogul,គគុល,1,km,unclassified,approved,
 gogaum,គគើម,1,km,unclassified,approved,
@@ -382,12 +355,12 @@ gogreak,គគ្រាក់,1,km,unclassified,approved,
 gogreang,គគ្រាំង,1,km,unclassified,approved,
 gogreat,គគ្រាត,1,km,unclassified,approved,
 gogris,គគ្រិះ,1,km,unclassified,approved,
-gogringkokreang,គគ្រិងគគ្រាំង,1,km,unclassified,approved,
+gogringgogreang,គគ្រិងគគ្រាំង,1,km,unclassified,approved,
 gogrich,គគ្រិច,1,km,unclassified,approved,
 gogritkokreat,គគ្រីតគគ្រាត,1,km,unclassified,approved,
 gogriv,គគ្រីវ,1,km,unclassified,approved,
 gogriskokrus,គគ្រីសគគ្រូស,1,km,unclassified,approved,
-gogruek,គគ្រឹក,1,km,unclassified,approved,
+gogruek,គគ្រឹក,16,km,unclassified,approved,
 gogruekkokreng,គគ្រឹកគគ្រេង,1,km,unclassified,approved,
 gogruem,គគ្រឹម,1,km,unclassified,approved,
 gogrueut,គគ្រឺត,1,km,unclassified,approved,
@@ -397,7 +370,7 @@ gogruy,គគ្រុយ,1,km,unclassified,approved,
 gogruk,គគ្រូក,1,km,unclassified,approved,
 gogruob,គគ្រួប,1,km,unclassified,approved,
 gograum,គគ្រើម,1,km,unclassified,approved,
-gogreng,គគ្រេង,1,km,unclassified,approved,
+gogreng,គគ្រេង,17,km,unclassified,approved,
 gogrengkokroam,គគ្រេងគគ្រាំ,1,km,unclassified,approved,
 gogrouk,គគ្រោក,1,km,unclassified,approved,
 goghor,គឃរ,1,km,unclassified,approved,
@@ -406,19 +379,6 @@ goghuek,គឃឹក,1,km,unclassified,approved,
 goghus,គឃូស,1,km,unclassified,approved,
 goghier,គឃៀរ,1,km,unclassified,approved,
 goghlaun,គឃ្លើន,1,km,unclassified,approved,
-gong,គង,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-gong,គង់,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-gung,គង់,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-gongtae,គង់តែ,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-gongnov,គង់នៅ,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-gongpisei,គងពិសី,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-gongvong,គង់វង្ស,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-gongkea,គង្គា,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-gongkean,គង្គាន,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-gongkuon,គង្គួន,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-gongveal,គង្វាល,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-goch,គជ,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-goch,គជ់,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
 gojota,គជតា,1,km,unclassified,approved,
 gojoton,គជទន្ត,1,km,unclassified,approved,
 gojomukta,គជមុក្តា,1,km,unclassified,approved,
@@ -426,70 +386,25 @@ gojosar,គជសារ,1,km,unclassified,approved,
 gojoseih,គជសីហ៍,1,km,unclassified,approved,
 gojea,គជា,1,km,unclassified,approved,
 gojrea,គជ្រា,1,km,unclassified,approved,
-gon,គណ,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-ganak,គណៈ,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-gnak,គណៈ,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-ganakkam,គណៈកម្ម,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-ganakkammakar,គណៈកម្មការ,1,km,unclassified,approved,
-ganakkammokar,គណៈកម្មការ,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-ganakkammathikar,គណៈកម្មាធិការ,1,km,unclassified,approved,
-gananea,គណនា,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-gneknei,គណនី,1,km,unclassified,approved,
-ganeknei,គណនី,1,km,unclassified,approved,
-gnaknei,គណនី,1,km,unclassified,approved,
-gananiydthan,គណនីយដ្ឋាន,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-gananei,គណនេយ្យ,1,km,unclassified,approved,
+ganakkammakar,គណៈកម្មការ,95,km,unclassified,approved,
+ganakkammathikar,គណៈកម្មាធិការ,32,km,unclassified,approved,
+gneknei,គណនី,1478,km,unclassified,approved,
+ganeknei,គណនី,1478,km,unclassified,approved,
+gnaknei,គណនី,1478,km,unclassified,approved,
+gananei,គណនេយ្យ,5,km,unclassified,approved,
 gananeyokor,គណនេយ្យករ,1,km,unclassified,approved,
-ganabak,គណបក្ស,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-gonabak,គណបក្ស,1,km,unclassified,approved,
-ganakbratephu,គណៈប្រតិភូ,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-ganakbrotephu,គណៈប្រតិភូ,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-ganakmebrayouk,គណៈមេប្រយោគ,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
+gonabak,គណបក្ស,22,km,unclassified,approved,
 gonakmebroyouk,គណៈមេប្រយោគ,1,km,unclassified,approved,
 ganetsas,គណិតសាស្ត្រ,1,km,unclassified,approved,
-ganes,គណេស,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-ganthei,គណ្ឋី,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-got,គត់,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
 gotmot,គត់មត់,1,km,unclassified,approved,
-gatasanhnha,គតសញ្ញា,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-gate,គតិ,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
 gatebandet,គតិបណ្ឌិត,1,km,unclassified,approved,
 gatebondet,គតិបណ្ឌិត,1,km,unclassified,approved,
-gon,គន,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-gun,គន់,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-gumnok,គំនក់,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
 gonkur,គន់គូរ,1,km,unclassified,approved,
-gumnong,គំនង,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-gumnong,គំនង់,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-gumnon,គំនន់,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
 gumnom,គំនម,1,km,unclassified,approved,
-gumnor,គំនរ,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-gumneak,គំនាក់,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-gumneat,គំនាត,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-gumneab,គំនាប,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-gomneab,គំនាប,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-gumneab,គំនាប់,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-gumneal,គំនាល់,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-gumneas,គំនាស់,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-gumnit,គំនិត,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-gnit,គំនិត,1,km,unclassified,approved,
-gumnum,គំនុំ,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-gumnu,គំនូរ,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-gumnus,គំនូស,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-gumnuob,គំនួប,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-gumnuor,គំនួរ,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-gumnuoh,គំនោះ,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-gontheak,គន្ថៈ,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-gonthothureak,គន្ថធុរៈ,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
+gnit,គំនិត,1046,km,unclassified,approved,
 gonthorochana,គន្ថរចនា,1,km,unclassified,approved,
-medirk,មេដឹក,1,km,unclassified,approved,
-gonthorachanachar,គន្ថរចនាចារ្យ,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-gonthorachonachar,គន្ថរចនាចារ្យ,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-gunthor,គន្ធ,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
+medirk,មេដឹក,111,km,unclassified,approved,
 gonthob,គន្ធព្វ,1,km,unclassified,approved,
-gonlong,គន្លង,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-gonleak,គន្លាក់,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-gonleakknlaun,គន្លាក់គន្លើន,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
 gonleakach,គន្លាក់អាចម៍,1,km,unclassified,approved,
 gonloas,គន្លាស់,1,km,unclassified,approved,
 gonlors,គន្លាស់,1,km,unclassified,approved,
@@ -497,499 +412,35 @@ gonloasknloung,គន្លាស់គន្លោង,1,km,unclassified,approve
 gonlorsknloung,គន្លាស់គន្លោង,1,km,unclassified,approved,
 gonlikgonleak,គន្លិកគន្លាក់,1,km,unclassified,approved,
 gonlikgunleak,គន្លិកគន្លាក់,1,km,unclassified,approved,
-gunleuh,គន្លឹះ,1,km,unclassified,approved,
-gonleuh,គន្លឹះ,1,km,unclassified,approved,
-gonlueh,គន្លឹះ,1,km,unclassified,approved,
-gonloung,គន្លោង,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-gob,គប់,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
+gunleuh,គន្លឹះ,183,km,unclassified,approved,
+gonleuh,គន្លឹះ,183,km,unclassified,approved,
+gonlueh,គន្លឹះ,183,km,unclassified,approved,
 gobgit,គប់គិត,1,km,unclassified,approved,
-gobgit,គប់គិត,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-gorbbei,គប្បី,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-goabbei,គប្បី,1,km,unclassified,approved,
-gobbei,គប្បី,1,km,unclassified,approved,
-gor,គភ៌,1,km,unclassified,approved,
-goar,គភ៌,1,km,unclassified,approved,
-goa,គភ៌,1,km,unclassified,approved,
-gom,គម,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
+goabbei,គប្បី,71,km,unclassified,approved,
+gobbei,គប្បី,71,km,unclassified,approved,
+gor,គភ៌,63,km,unclassified,approved,
+goar,គភ៌,63,km,unclassified,approved,
+goa,គភ៌,63,km,unclassified,approved,
 gamaneakar,គមនាការ,1,km,unclassified,approved,
-gomoneakar,គមនាការ,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-gamaneakom,គមនាគមន៍,1,km,unclassified,approved,
-gomoneakom,គមនាគមន៍,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-gomdeaeng,គម្ដែង,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-gompi,គម្ពីរ,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
+gamaneakom,គមនាគមន៍,16,km,unclassified,approved,
 gumphi,គម្ភីរ,1,km,unclassified,approved,
-gumruok,គម្រក់,1,km,unclassified,approved,
-gomruok,គម្រក់,1,km,unclassified,approved,
-gomrouk,គម្រក់,1,km,unclassified,approved,
-gomrong,គម្រង,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-gomrob,គម្រប,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-gomrobb,គម្រប់,1,km,unclassified,approved,
+gumruok,គម្រក់,2,km,unclassified,approved,
+gomruok,គម្រក់,2,km,unclassified,approved,
+gomrouk,គម្រក់,2,km,unclassified,approved,
+gomrobb,គម្រប់,191,km,unclassified,approved,
 gomrang,គម្រាំង,1,km,unclassified,approved,
-gomreang,គម្រាំង,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
 gomrih,គម្រិះ,1,km,unclassified,approved,
-gomris,គម្រិះ,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-gomringkomrang,គម្រិងគម្រាំង,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-gomriev,គម្រៀវ,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-gomrech,គម្រេច,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-gumrong,គម្រោង,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-gomrong,គម្រោង,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-gomlong,គម្លង់,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-gomlean,គម្លាន,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-goy,គយ,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-goyokon,គយគន់,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-goyokhloam,គយឃ្លាំ,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-gor,គរ,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-gorokouk,គរគោក,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-gumrong,គំរង់,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-gumrol,គំរល,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-goroha,គរហា,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-gumream,គំរាម,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-gumruel,គំរឹល,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-goru,គរុ,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-gorukaosal,គរុកោសល្យ,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-gorukaosol,គរុកោសល្យ,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-gorutous,គរុទោស,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-goruphondar,គរុភណ្ឌ,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-goruphondor,គរុភណ្ឌ,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-goruvichea,គរុវិជ្ជា,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-gorusers,គរុសិស្ស,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-gumru,គំរូ,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-gumrauy,គំរើយ,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-gumrech,គំរេច,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-gumruoh,គំរោះ,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-gumroung,គំរោង,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-gol,គល់,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-golkae,គល់កែ,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-golrang,គល់រាំង,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-gumleat,គំលាត,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-gumhak,គំហក,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-gumhok,គំហក,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-gohabatei,គហបតី,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-gohobotei,គហបតី,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-gumhat,គំហាត់,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-gumhoen,គំហឹន,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-gumhok,គំហុក,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-gumhaet,គំហែត,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-goam,គាំ,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-geak,គាក់,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-gang,គាង,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-geang,គាំង,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-geangkhveay,គាងឃ្វាយ,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-geat,គាត,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-geatha,គាថា,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-geathaponth,គាថាពន្ធ,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-geathapean,គាថាពាន់,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-geab,គាប,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-geab,គាប់,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-goamr,គាំពារ,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-geamokatha,គាមកថា,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-geamokotha,គាមកថា,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-geampheasa,គាមភាសា,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-geamphouchok,គាមភោជក,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-geay,គាយ,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-gearoveak,គារវៈ,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-geal,គាល់,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-geav,គាវ,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-geavut,គាវុត,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-geas,គាស់,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-git,គិត,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-gittae,គិតតែ,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-giri,គិរី,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-girivong,គិរីវង់,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-girivngkot,គិរីវង្កត,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-gil,គិល,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-gilean,គិលាន,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-gingkok,គីង្គក់,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-gitsas,គីតសាស្ត្រ,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-gimi,គីមី,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-gilo,គីឡូ,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-gilokram,គីឡូក្រាម,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-gilogram,គីឡូក្រាម,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-gilotaon,គីឡូតោន,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-gilometre,គីឡូម៉ែត្រ,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-giloumete,គីឡូម៉ែត្រ,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-gilovat,គីឡូវ៉ាត់,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-gilovol,គីឡូវ៉ុល,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-gilosik,គីឡូស៊ីក,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-guek,គឹកៗ,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-guel,គឹល,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-gueuchea,គឺជា,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-guum,គុំ,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-guk,គុក,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-guk,គុកៗ,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-gun,គុណ,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-gunathor,គុណធម៌,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-gunothor,គុណធម៌,1,km,unclassified,approved,
-gunbrayouch,គុណប្រយោជន៍,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-gunbroyouch,គុណប្រយោជន៍,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-gunpheap,គុណភាព,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-gunapheap,គុណភាព,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-gunvibat,គុណវិបត្តិ,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-gut,គុត,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-gumpor,គុម្ព,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-gumpout,គុម្ពោត,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-guy,គុយ,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-guyteav,គុយទាវ,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-guyheak,គុយ្ហៈ,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-gul,គុល,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-gulika,គុលិកា,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-guli,គុលី,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-guha,គុហា,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-gu,គូ,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-guk,គូក,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-gukan,គូកន,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-gukon,គូកន,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-guchhay,គូឆាយ,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-guth,គូថ,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-gut,គូទ,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-gutolan,គូទឡាន,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-gu,គូរ,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-guli,គូលី,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-gulit,គូលីត,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-gulen,គូលែន,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-gus,គូស,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-gusneh,គូស្នេហ៍,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-guob,គួប,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-guobphsam,គួបផ្សំ,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-guorkobbei,គួរគប្បី,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-guorona,គួរណា,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-guoronea,គួរនា,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-guoryor,គួរឲ្យ,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-guoriyer,គួរីយេរ,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-gaum,គើមៗ,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-gg,គេង,1,km,unclassified,approved,
-geng,គេង,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-gech,គេច,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-gechkae,គេចកែ,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-gechves,គេចវេះ,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-geh,គេហ៍,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-gehachon,គេហជន,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-gehochon,គេហជន,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-gehathan,គេហដ្ឋាន,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-gehabal,គេហបាល,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-gehobal,គេហបាល,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-gehssamik,គេហស្សាមិក,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-gehaphibal,គេហាភិបាល,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-geae,គែ,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-gaen,គែន,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-geaeb,គែប,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-geaem,គែម,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-geael,គែល,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-geaelolok,គែលលក,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-geaehov,គែហ៊ៅ,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-gey,គៃ,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-go,គោ,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-guoh,គោះ,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-gok,គោក,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-goukhmear,គោខ្មែរ,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-goukheatak,គោឃាតក៍,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-goukheatok,គោឃាតក៍,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-goukheatkamm,គោឃាតកម្ម,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-goukheatkomm,គោឃាតកម្ម,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-goukheatdthan,គោឃាតដ្ឋាន,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-goukheatsthan,គោឃាតស្ថាន,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-goung,គោង,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-goung,គោងៗ,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-gouchar,គោចរ,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-gouchor,គោចរ,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-gouchhmat,គោឆ្មាត់,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-gout,គោត,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-goutam,គោតម,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-goutom,គោតម,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-goutmokoutt,គោតមគោត្ត,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-goutmoputth,គោតមពុទ្ធ,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-goutt,គោត្ត,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-gouttaneam,គោត្តនាម,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-gouttoneam,គោត្តនាម,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-goutrar,គោត្រ,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-goutror,គោត្រ,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-goutrakoul,គោត្រកូល,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-goutrokoul,គោត្រកូល,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-goutraphu,គោត្រភូ,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-goutrophu,គោត្រភូ,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-goutrphunhean,គោត្រភូញាណ,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-goutrphusang,គោត្រភូសង្ឃ,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-goutrphusong,គោត្រភូសង្ឃ,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-gouteavori,គោទាវរី,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-gouthik,គោធិក,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-gouba,គោបា,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-goubal,គោបាល,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-guohpleak,គោះពព្លាក់,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-gouprey,គោព្រៃ,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-goupros,គោព្រោះ,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-goum,គោម,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-goum,គោម៉,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-goumposthlan,គោមពស់ថ្លាន់,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-goumey,គោម័យ,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-goumhoul,គោមហូល,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-goumhaoh,គោមហោះ,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-goumutrar,គោមូត្រ,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-goumutror,គោមូត្រ,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-goumuoy,គោមួយ,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-gouyon,គោយន្ត,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-gourkkhakamm,គោរក្ខកម្ម,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-gourkkhokomm,គោរក្ខកម្ម,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-gourkkha,គោរក្ខា,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-grob,គោរព,1,km,unclassified,approved,
-gorob,គោរព,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-gourom,គោរម,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
+gunothor,គុណធម៌,5,km,unclassified,approved,
+gg,គេង,1693,km,unclassified,approved,
+grob,គោរព,575,km,unclassified,approved,
 gourmongear,គោរមងារ,1,km,unclassified,approved,
-gouros,គោរស,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-goureat,គោរាត,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-gol,គោល,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-goulka,គោលការណ៍,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-goulcharuek,គោលចារឹក,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-goldov,គោលដៅ,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-goulbamnang,គោលបំណង,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-goulbamnong,គោលបំណង,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-goulout,គោលោត,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-goulbay,គោល្បាយ,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-gouvott,គោវត្ត,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-gousiem,គោសៀម,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-gouhie,គោហៀ,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-gouhmar,គោហ្ម,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-gouhmor,គោហ្ម,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-gnean,គ្នាន់,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-gni,គ្នី,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-gner,គ្នេរ,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-gnerknean,គ្នេរគ្នាន់,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-gmean,គ្មាន,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-gror,គ្រ,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-grum,គ្រំ,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-grok,គ្រក,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-grok,គ្រក់,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-grok,គ្រកៗ,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-grok,គ្រក់ៗ,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-grong,គ្រង,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-grong,គ្រង់,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-grongreach,គ្រងរាជ្យ,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-grochoam,គ្រជាំ,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-grochiv,គ្រជីវ,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-grochueb,គ្រជឹប,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-grochuebkrochiv,គ្រជឹបគ្រជីវ,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-grochuebkrochuoch,គ្រជឹបគ្រជួច,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-grochur,គ្រជូរ,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-gronhich,គ្រញិច,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-gronhuek,គ្រញឹក,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-gronhung,គ្រញូង,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-gronheaeng,គ្រញែង,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-grob,គ្រប,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-grobkrong,គ្របគ្រង,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-grobtae,គ្រប់តែ,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-grobte,គ្រប់តែ,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-grobathmenhchhau,គ្របធ្មេញឈើ,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-gompel,ចំពេល,1,km,unclassified,approved,
-ghompel,ចំពេល,1,km,unclassified,approved,
-grobothmenhchhau,គ្របធ្មេញឈើ,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-gromor,គ្រមរ,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-gromol,គ្រមល់,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-gromeak,គ្រមាក,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-gromeang,គ្រមាំង,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-gromeanh,គ្រមាញ,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-gromeam,គ្រមាម,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-gromingkromeang,គ្រមិងគ្រមាំង,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-gromaum,គ្រមើម,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-grolong,គ្រលង់,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-grolor,គ្រលរ,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-grolos,គ្រលស,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-grolit,គ្រលីត,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-groluk,គ្រលុក,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-groluong,គ្រលួង,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-groluoch,គ្រលួច,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-groliev,គ្រលៀវ,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-grolies,គ្រលៀស,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-grolengkroloung,គ្រលេងគ្រលោង,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-grolev,គ្រលេវ,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-groleaeng,គ្រលែង,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-groleaengveaek,គ្រលែងវែក,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-groveat,គ្រវាត់,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-groveas,គ្រវាស,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-grovi,គ្រវី,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-grovis,គ្រវីស,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-groviech,គ្រវៀច,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-grovien,គ្រវៀន,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-groveaeng,គ្រវែង,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-groseaet,គ្រស៊ែត,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-grohar,គ្រហរ,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-grohor,គ្រហរ,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-grohasthar,គ្រហស្ថ,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-grohosthor,គ្រហស្ថ,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-grohanh,គ្រហាញ,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-grohekkrohok,គ្រហិកគ្រហុក,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-groheit,គ្រហីត,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-grohoem,គ្រហឹម,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-grohoch,គ្រហុច,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-grohob,គ្រហុប,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-grohou,គ្រហូ,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-grohuong,គ្រហួង,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-grohuoch,គ្រហួច,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-grohuob,គ្រហួប,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-grohaeu,គ្រហើ,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-grohaet,គ្រហែត,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-grohaem,គ្រហែម,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-grea,គ្រា,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-groam,គ្រាំ,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-greaeah,គ្រាះ,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-greak,គ្រាក,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-greak,គ្រាក់,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-greak,គ្រាក់ៗ,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-groamrea,គ្រាំគ្រា,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-greang,គ្រាង,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-greang,គ្រាំងៗ,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-grorn,គ្រាន់,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-greankrob,គ្រាន់គ្រប់,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-greantae,គ្រាន់តែ,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-greanber,គ្រាន់បើ,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-grorb,គ្រាប់,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-grobbeak,គ្រាប់បែក,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-gream,គ្រាម,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-greamnei,គ្រាមណី,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-greampheasa,គ្រាមភាសា,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-greamphouchok,គ្រាមភោជក,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-greamomuk,គ្រាមមុខ,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-greames,គ្រាមេស,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-greav,គ្រាវ,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-greas,គ្រាស,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-greah,គ្រាហ៍,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-grich,គ្រិចៗ,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-gristsakareach,គ្រិស្តសករាជ,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-gristsokoreach,គ្រិស្តសករាជ,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-gritkreat,គ្រីតគ្រាត,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-grib,គ្រីប,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-grueeah,គ្រឹះ,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-grers,គ្រឹះ,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-gres,គ្រឹះ,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-gruek,គ្រឹកៗ,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-grueb,គ្រឹប,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-gruem,គ្រឹមៗ,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-grueeahsthan,គ្រឹះស្ថាន,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-grueha,គ្រឹហា,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-gruehaveas,គ្រឹហាវាស,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-grueut,គ្រឺតៗ,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-gruum,គ្រុំ,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-gruh,គ្រុះ,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-gruk,គ្រុកៗ,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-grud,គ្រុឌ,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-grun,គ្រុន,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-grunkdau,គ្រុនក្ដៅ,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-grub,គ្រុប,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-grum,គ្រុម,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-gruy,គ្រុយ,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-gru,គ្រូ,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-ghu,គ្រូ,1,km,unclassified,approved,
-gruk,គ្រូក,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-gruta,គ្រូតា,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-gruthum,គ្រូធំ,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-grubongkoul,គ្រូបង្គោល,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-grubongrean,គ្រូបង្រៀន,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-grubongvuek,គ្រូបង្វឹក,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-grubangverk,គ្រូបង្វឹក,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-grubathyeay,គ្រូបាធ្យាយ,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-grupet,គ្រូពេទ្យ,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-gruo,គ្រួ,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-gruob,គ្រួបៗ,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-grousa,គ្រួសារ,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-grusa,គ្រួសារ,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-graum,គ្រើម,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-graul,គ្រើល,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-grerng,គ្រឿង,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-groeangnhien,គ្រឿងញៀន,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-groean,គ្រឿន,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-girisu,គីរីសួគ៌,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-griev,គ្រៀវ,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-gries,គ្រៀស,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-greng,គ្រេង,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-grech,គ្រេច,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-greae,គ្រែ,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-greaeng,គ្រែង,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-grous,គ្រោះ,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-grouh,គ្រោះ,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-grong,គ្រោង,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-gruoh,គ្រោះជា,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-grout,គ្រោត,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-grosthnak,គ្រោះថ្នាក់,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-gveam,គ្វាម,1,km,unclassified,disabled,duplicate runtime key from initial split; review before re-enabling
-khoronei,ឃរណី,1,km,unclassified,approved,
-khoromul,ឃរមូល,1,km,unclassified,approved,
-khoreaveas,ឃរាវាស,1,km,unclassified,approved,
-kheang,ឃាង,1,km,unclassified,approved,
-kheang,ឃាំង,1,km,unclassified,approved,
-kheat,ឃាត,1,km,unclassified,approved,
-khort,ឃាត់,1,km,unclassified,approved,
-kheatakak,ឃាតកៈ,1,km,unclassified,approved,
-kheatokak,ឃាតកៈ,1,km,unclassified,approved,
-kheatkamm,ឃាតកម្ម,1,km,unclassified,approved,
-kheatkomm,ឃាតកម្ម,1,km,unclassified,approved,
-khinchhay,ឃិនឆាយ,1,km,unclassified,approved,
-khuek,ឃឹកៗ,1,km,unclassified,approved,
-khuem,ឃឹម,1,km,unclassified,approved,
-khum,ឃុំ,1,km,unclassified,approved,
-khun,ឃុន,1,km,unclassified,approved,
-khuyochhay,ឃុយឆាយ,1,km,unclassified,approved,
-khur,ឃូរៗ,1,km,unclassified,approved,
-khus,ឃូសៗ,1,km,unclassified,approved,
-kheaet,ឃែត,1,km,unclassified,approved,
-khour,ឃោរ,1,km,unclassified,approved,
-khoukhov,ឃោរឃៅ,1,km,unclassified,approved,
-khous,ឃោស,1,km,unclassified,approved,
-khousana,ឃោសនា,1,km,unclassified,approved,
-khousona,ឃោសនា,1,km,unclassified,approved,
-khousnakar,ឃោសនាការ,1,km,unclassified,approved,
-khousakhousvimutt,ឃោសាឃោសវិមុត្ត,1,km,unclassified,approved,
-khousna,ឃោស្នា,1,km,unclassified,approved,
-khnhauch,ឃ្ញើច,1,km,unclassified,approved,
-khnong,ឃ្នង,1,km,unclassified,approved,
-khneang,ឃ្នាង,1,km,unclassified,approved,
-khneab,ឃ្នាប,1,km,unclassified,approved,
-khnus,ឃ្នូស,1,km,unclassified,approved,
-khnaus,ឃ្នើស,1,km,unclassified,approved,
-khnauskhnong,ឃ្នើសឃ្នង,1,km,unclassified,approved,
-khmong,ឃ្មង់,1,km,unclassified,approved,
-khmot,ឃ្មត់,1,km,unclassified,approved,
-khmom,ឃ្មមៗ,1,km,unclassified,approved,
-khmeatkhmei,ឃ្មាតខ្មី,1,km,unclassified,approved,
-khmeam,ឃ្មាមៗ,1,km,unclassified,approved,
-khmuek,ឃ្មឹក,1,km,unclassified,approved,
-khmuel,ឃ្មឹល,1,km,unclassified,approved,
-kmum,ឃ្មុំ,1,km,unclassified,approved,
-khmum,ឃ្មុំ,1,km,unclassified,approved,
-khmuoh,ឃ្មោះ,1,km,unclassified,approved,
-khlong,ឃ្លង់,1,km,unclassified,approved,
-khlea,ឃ្លា,1,km,unclassified,approved,
-khloam,ឃ្លាំ,1,km,unclassified,approved,
-khleang,ឃ្លាំង,1,km,unclassified,approved,
-khleat,ឃ្លាត,1,km,unclassified,approved,
-khleatkhlea,ឃ្លាតឃ្លា,1,km,unclassified,approved,
-khleatkhley,ឃ្លាតឃ្លៃ,1,km,unclassified,approved,
-khleatchak,ឃ្លាតចាក,1,km,unclassified,approved,
-khleatjak,ឃ្លាតចាក,1,km,unclassified,approved,
-khlean,ឃ្លាន,1,km,unclassified,approved,
-klean,ឃ្លាន,1,km,unclassified,approved,
-khleaybat,ឃ្លាយបាត,1,km,unclassified,approved,
-khlib,ឃ្លិប,1,km,unclassified,approved,
-khluum,ឃ្លុំ,1,km,unclassified,approved,
-khluk,ឃ្លុកៗ,1,km,unclassified,approved,
-khlub,ឃ្លុប,1,km,unclassified,approved,
-khluob,ឃ្លួប,1,km,unclassified,approved,
-khlieng,ឃ្លៀង,1,km,unclassified,approved,
-khliengkhleat,ឃ្លៀងឃ្លាត,1,km,unclassified,approved,
-khliech,ឃ្លៀច,1,km,unclassified,approved,
-khle,ឃ្លេ,1,km,unclassified,approved,
-khlengkhloung,ឃ្លេងឃ្លោង,1,km,unclassified,approved,
-khley,ឃ្លៃ,1,km,unclassified,approved,
-khlouk,ឃ្លោក,1,km,unclassified,approved,
-khloung,ឃ្លោង,1,km,unclassified,approved,
-khveang,ឃ្វាង,1,km,unclassified,approved,
-khveach,ឃ្វាចៗ,1,km,unclassified,approved,
-khveam,ឃ្វាម,1,km,unclassified,approved,
-khveay,ឃ្វាយៗ,1,km,unclassified,approved,
-khveal,ឃ្វាល,1,km,unclassified,approved,
-khvich,ឃ្វិច,1,km,unclassified,approved,
-khvaung,ឃ្វើង,1,km,unclassified,approved,
-khvauch,ឃ្វើចៗ,1,km,unclassified,approved,
+gompel,ចំពេល,88,km,unclassified,approved,
+ghompel,ចំពេល,88,km,unclassified,approved,
+ghu,គ្រូ,3300,km,unclassified,approved,
+glean,ឃ្លាន,238,km,unclassified,approved,
 ngok,ង៉ក់,1,km,unclassified,approved,
 ngoam,ង៉ាំ,1,km,unclassified,approved,
-ngang,ង៉ាង,1,km,unclassified,approved,
+ngang,ង៉ាង,3,km,unclassified,approved,
 ngang,ង៉ាំង,1,km,unclassified,approved,
 ngang,ង៉ាងៗ,1,km,unclassified,approved,
 nganh,ង៉ាញ់ៗ,1,km,unclassified,approved,
