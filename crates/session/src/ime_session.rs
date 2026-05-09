@@ -554,7 +554,11 @@ impl ImeSession {
     fn maybe_reflow_segmented_session(&self, session: SegmentedSession) -> SegmentedSession {
         let transliterator = &self.transliterator;
         let suggest = |input: &str, history: &HashMap<String, usize>| -> Vec<String> {
-            normalize_visible_suggestions(transliterator.suggest(input, history))
+            exact_matches_first(
+                transliterator,
+                input,
+                normalize_visible_suggestions(transliterator.suggest(input, history)),
+            )
         };
         reflow_segmented_session_from_selection(
             &session,
@@ -587,8 +591,11 @@ impl ImeSession {
             return;
         }
 
-        self.candidates =
-            normalize_visible_suggestions(self.transliterator.suggest(&self.composition_raw, &self.history));
+        self.candidates = exact_matches_first(
+            &self.transliterator,
+            &self.composition_raw,
+            normalize_visible_suggestions(self.transliterator.suggest(&self.composition_raw, &self.history)),
+        );
         self.selected_index = 0;
 
         let observation = self
@@ -597,9 +604,36 @@ impl ImeSession {
         let transliterator = &self.transliterator;
         self.segmented_session =
             build_segmented_session(&observation, &self.composition_raw, &self.history, &|input, history| {
-                normalize_visible_suggestions(transliterator.suggest(input, history))
+                exact_matches_first(
+                    transliterator,
+                    input,
+                    normalize_visible_suggestions(transliterator.suggest(input, history)),
+                )
             });
     }
+}
+
+fn exact_matches_first(transliterator: &Transliterator, input: &str, candidates: Vec<String>) -> Vec<String> {
+    let exact_keys = transliterator
+        .exact_match_targets(input)
+        .into_iter()
+        .map(|item| normalized_suggestion_key(&item))
+        .collect::<HashSet<_>>();
+    if exact_keys.is_empty() {
+        return candidates;
+    }
+
+    let mut exact = Vec::new();
+    let mut fallback = Vec::new();
+    for candidate in candidates {
+        if exact_keys.contains(&normalized_suggestion_key(&candidate)) {
+            exact.push(candidate);
+        } else {
+            fallback.push(candidate);
+        }
+    }
+    exact.extend(fallback);
+    exact
 }
 
 fn is_modifier_only(state: u32) -> bool {
@@ -709,6 +743,34 @@ mod tests {
         assert!(recommended
             .iter()
             .any(|entry| entry.roman_hints.iter().any(|hint| hint == "jea")));
+    }
+
+    #[test]
+    fn exact_match_candidates_stay_first_before_history_fuzzy_matches() {
+        let transliterator = Transliterator::from_default_data_with_config(DecoderConfig::shadow_interactive())
+            .expect("default data must load");
+        let mut history = HashMap::new();
+        history.insert("ដោយ".to_owned(), 99);
+        let mut session = ImeSession::new(transliterator, history);
+        session.focus_in();
+
+        type_ascii(&mut session, "oy");
+
+        let snapshot = session.snapshot();
+        assert_eq!(snapshot.candidates.first().map(String::as_str), Some("ឲ្យ"));
+        assert!(
+            snapshot
+                .candidate_display
+                .first()
+                .map(|entry| entry.recommended)
+                .unwrap_or(false),
+            "top IBus candidate should be an exact roman match"
+        );
+        assert!(snapshot
+            .candidates
+            .iter()
+            .position(|candidate| candidate == "ដោយ")
+            .is_some_and(|index| index > 0));
     }
 
     #[test]
