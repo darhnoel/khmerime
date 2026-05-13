@@ -136,26 +136,46 @@ pub type ImeSessionUpdate = SessionResult;
 
 pub struct ImeSession {
     transliterator: Transliterator,
+    commit_refiner: Option<Transliterator>,
     history: HashMap<String, usize>,
     enabled: bool,
     focused: bool,
     composition_raw: String,
     candidates: Vec<String>,
     selected_index: usize,
+    selection_touched: bool,
     segmented_session: Option<SegmentedSession>,
     cursor_location: CursorLocation,
 }
 
 impl ImeSession {
     pub fn new(transliterator: Transliterator, history: HashMap<String, usize>) -> Self {
+        Self::new_with_optional_commit_refiner(transliterator, None, history)
+    }
+
+    pub fn new_with_commit_refiner(
+        transliterator: Transliterator,
+        commit_refiner: Transliterator,
+        history: HashMap<String, usize>,
+    ) -> Self {
+        Self::new_with_optional_commit_refiner(transliterator, Some(commit_refiner), history)
+    }
+
+    fn new_with_optional_commit_refiner(
+        transliterator: Transliterator,
+        commit_refiner: Option<Transliterator>,
+        history: HashMap<String, usize>,
+    ) -> Self {
         Self {
             transliterator,
+            commit_refiner,
             history,
             enabled: true,
             focused: false,
             composition_raw: String::new(),
             candidates: Vec::new(),
             selected_index: 0,
+            selection_touched: false,
             segmented_session: None,
             cursor_location: CursorLocation::default(),
         }
@@ -192,6 +212,7 @@ impl ImeSession {
         self.composition_raw.clear();
         self.candidates.clear();
         self.selected_index = 0;
+        self.selection_touched = false;
         self.segmented_session = None;
     }
 
@@ -348,6 +369,28 @@ impl ImeSession {
         }
     }
 
+    pub fn apply_refined_candidate(&mut self, raw_preedit: &str) -> Option<String> {
+        if raw_preedit.is_empty()
+            || raw_preedit != self.composition_raw
+            || self.segmented_session.is_some()
+            || self.selection_touched
+        {
+            return None;
+        }
+
+        let refined = self.refined_phrase_for(raw_preedit)?;
+        if refined == raw_preedit {
+            return None;
+        }
+
+        let refined_key = normalized_suggestion_key(&refined);
+        self.candidates
+            .retain(|candidate| normalized_suggestion_key(candidate) != refined_key);
+        self.candidates.insert(0, refined.clone());
+        self.selected_index = 0;
+        Some(refined)
+    }
+
     fn handle_printable(&mut self, ch: char) -> SessionResult {
         let normalized = if ch.is_ascii_alphabetic() {
             ch.to_ascii_lowercase()
@@ -425,6 +468,7 @@ impl ImeSession {
             }
             let next_index = offset_index(segment.selected, segment.candidates.len(), delta);
             self.select_focused_segment_candidate(next_index);
+            self.selection_touched = true;
             return SessionResult {
                 consumed: true,
                 ..SessionResult::default()
@@ -436,6 +480,7 @@ impl ImeSession {
         }
 
         self.selected_index = offset_index(self.selected_index, self.candidates.len(), delta);
+        self.selection_touched = true;
         SessionResult {
             consumed: true,
             ..SessionResult::default()
@@ -479,6 +524,7 @@ impl ImeSession {
             };
             if index < segment.candidates.len() {
                 self.select_focused_segment_candidate(index);
+                self.selection_touched = true;
             }
             return SessionResult {
                 consumed: true,
@@ -495,6 +541,7 @@ impl ImeSession {
 
         if index < self.candidates.len() {
             self.selected_index = index;
+            self.selection_touched = true;
         }
         SessionResult {
             consumed: true,
@@ -514,6 +561,9 @@ impl ImeSession {
             } else {
                 composed
             }
+        } else if self.selected_index == 0 && !self.selection_touched {
+            self.refined_commit_phrase()
+                .unwrap_or_else(|| self.selected_or_raw_fallback())
         } else {
             self.selected_or_raw_fallback()
         };
@@ -536,6 +586,34 @@ impl ImeSession {
             .unwrap_or_else(|| self.composition_raw.clone())
     }
 
+    fn refined_commit_phrase(&self) -> Option<String> {
+        self.refined_phrase_for(&self.composition_raw)
+    }
+
+    fn refined_phrase_for(&self, raw_input: &str) -> Option<String> {
+        let refiner = self.commit_refiner.as_ref()?;
+        let observation = refiner.shadow_observation(raw_input, &self.history);
+        if observation.wfst_failure.is_some() || observation.wfst_top_segment_details.len() < 2 {
+            return None;
+        }
+
+        let recovered_input = observation
+            .wfst_top_segment_details
+            .iter()
+            .map(|segment| segment.input.as_str())
+            .collect::<String>();
+        if recovered_input != raw_input {
+            return None;
+        }
+
+        let refined = observation
+            .wfst_top_segment_details
+            .iter()
+            .map(|segment| segment.output.as_str())
+            .collect::<String>();
+        (!refined.is_empty()).then_some(refined)
+    }
+
     fn select_focused_segment_candidate(&mut self, index: usize) {
         let Some(mut session) = self.segmented_session.clone() else {
             return;
@@ -554,7 +632,11 @@ impl ImeSession {
     fn maybe_reflow_segmented_session(&self, session: SegmentedSession) -> SegmentedSession {
         let transliterator = &self.transliterator;
         let suggest = |input: &str, history: &HashMap<String, usize>| -> Vec<String> {
-            normalize_visible_suggestions(transliterator.suggest(input, history))
+            exact_matches_first(
+                transliterator,
+                input,
+                normalize_visible_suggestions(transliterator.suggest(input, history)),
+            )
         };
         reflow_segmented_session_from_selection(
             &session,
@@ -583,13 +665,18 @@ impl ImeSession {
         if self.composition_raw.is_empty() {
             self.candidates.clear();
             self.selected_index = 0;
+            self.selection_touched = false;
             self.segmented_session = None;
             return;
         }
 
-        self.candidates =
-            normalize_visible_suggestions(self.transliterator.suggest(&self.composition_raw, &self.history));
+        self.candidates = exact_matches_first(
+            &self.transliterator,
+            &self.composition_raw,
+            normalize_visible_suggestions(self.transliterator.suggest(&self.composition_raw, &self.history)),
+        );
         self.selected_index = 0;
+        self.selection_touched = false;
 
         let observation = self
             .transliterator
@@ -597,9 +684,36 @@ impl ImeSession {
         let transliterator = &self.transliterator;
         self.segmented_session =
             build_segmented_session(&observation, &self.composition_raw, &self.history, &|input, history| {
-                normalize_visible_suggestions(transliterator.suggest(input, history))
+                exact_matches_first(
+                    transliterator,
+                    input,
+                    normalize_visible_suggestions(transliterator.suggest(input, history)),
+                )
             });
     }
+}
+
+fn exact_matches_first(transliterator: &Transliterator, input: &str, candidates: Vec<String>) -> Vec<String> {
+    let exact_keys = transliterator
+        .exact_match_targets(input)
+        .into_iter()
+        .map(|item| normalized_suggestion_key(&item))
+        .collect::<HashSet<_>>();
+    if exact_keys.is_empty() {
+        return candidates;
+    }
+
+    let mut exact = Vec::new();
+    let mut fallback = Vec::new();
+    for candidate in candidates {
+        if exact_keys.contains(&normalized_suggestion_key(&candidate)) {
+            exact.push(candidate);
+        } else {
+            fallback.push(candidate);
+        }
+    }
+    exact.extend(fallback);
+    exact
 }
 
 fn is_modifier_only(state: u32) -> bool {
@@ -642,7 +756,7 @@ fn is_single_keycap_char(ch: char) -> bool {
 #[cfg(test)]
 mod tests {
     use super::{CursorLocation, ImeSession, NativeKeyEvent, SessionCommand};
-    use khmerime_core::{DecoderConfig, Transliterator};
+    use khmerime_core::{DecoderConfig, DecoderMode, Transliterator};
     use std::collections::HashMap;
 
     fn session() -> ImeSession {
@@ -658,6 +772,20 @@ mod tests {
         for ch in text.chars() {
             session.process_key_event(ch as u32, 0, 0);
         }
+    }
+
+    fn default_session_with_commit_refiner() -> ImeSession {
+        let transliterator = Transliterator::from_default_data_with_config(DecoderConfig::shadow_interactive())
+            .expect("default data must load");
+        let commit_refiner = Transliterator::from_default_data_with_config(
+            DecoderConfig::default()
+                .with_mode(DecoderMode::Hybrid)
+                .with_shadow_log(false),
+        )
+        .expect("default data must load");
+        let mut session = ImeSession::new_with_commit_refiner(transliterator, commit_refiner, HashMap::new());
+        session.focus_in();
+        session
     }
 
     #[test]
@@ -699,6 +827,8 @@ mod tests {
         type_ascii(&mut session, "jea");
         let snapshot = session.snapshot();
         assert!(!snapshot.candidate_display.is_empty());
+        assert_eq!(snapshot.raw_preedit, "jea");
+        assert_eq!(snapshot.preedit, "jea");
 
         let recommended = snapshot
             .candidate_display
@@ -712,6 +842,34 @@ mod tests {
     }
 
     #[test]
+    fn exact_match_candidates_stay_first_before_history_fuzzy_matches() {
+        let transliterator = Transliterator::from_default_data_with_config(DecoderConfig::shadow_interactive())
+            .expect("default data must load");
+        let mut history = HashMap::new();
+        history.insert("ដោយ".to_owned(), 99);
+        let mut session = ImeSession::new(transliterator, history);
+        session.focus_in();
+
+        type_ascii(&mut session, "oy");
+
+        let snapshot = session.snapshot();
+        assert_eq!(snapshot.candidates.first().map(String::as_str), Some("ឲ្យ"));
+        assert!(
+            snapshot
+                .candidate_display
+                .first()
+                .map(|entry| entry.recommended)
+                .unwrap_or(false),
+            "top IBus candidate should be an exact roman match"
+        );
+        assert!(snapshot
+            .candidates
+            .iter()
+            .position(|candidate| candidate == "ដោយ")
+            .is_some_and(|index| index > 0));
+    }
+
+    #[test]
     fn enter_commits_selected_candidate() {
         let mut session = session();
         type_ascii(&mut session, "jea");
@@ -719,6 +877,93 @@ mod tests {
         assert_eq!(update.commit_text.as_deref(), Some("ជា"));
         assert!(update.history_changed);
         assert!(session.snapshot().preedit.is_empty());
+    }
+
+    #[test]
+    fn enter_refines_long_flat_default_candidate_commit() {
+        let mut session = default_session_with_commit_refiner();
+        type_ascii(&mut session, "nihjeasnadaiborkbrae");
+
+        let update = session.process_key_event(0xFF0D, 0, 0);
+
+        assert_eq!(update.commit_text.as_deref(), Some("នេះជាស្នាដៃបកប្រែ"));
+        assert!(update.history_changed);
+        assert!(session.snapshot().preedit.is_empty());
+    }
+
+    #[test]
+    fn visible_refinement_prepends_long_flat_default_candidate() {
+        let mut session = default_session_with_commit_refiner();
+        type_ascii(&mut session, "nihjeasnadaiborkbrae");
+        assert_ne!(
+            session.snapshot().candidates.first().map(String::as_str),
+            Some("នេះជាស្នាដៃបកប្រែ")
+        );
+
+        let refined = session.apply_refined_candidate("nihjeasnadaiborkbrae");
+
+        assert_eq!(refined.as_deref(), Some("នេះជាស្នាដៃបកប្រែ"));
+        let snapshot = session.snapshot();
+        assert_eq!(snapshot.candidates.first().map(String::as_str), Some("នេះជាស្នាដៃបកប្រែ"));
+        assert_eq!(snapshot.raw_preedit, "nihjeasnadaiborkbrae");
+        assert_eq!(snapshot.preedit, "nihjeasnadaiborkbrae");
+        assert_eq!(snapshot.selected_index, Some(0));
+    }
+
+    #[test]
+    fn visible_refinement_ignores_stale_raw_preedit() {
+        let mut session = default_session_with_commit_refiner();
+        type_ascii(&mut session, "nihjeasnadaiborkbrae");
+
+        let refined = session.apply_refined_candidate("nihjeasnadai");
+
+        assert!(refined.is_none());
+        assert_ne!(
+            session.snapshot().candidates.first().map(String::as_str),
+            Some("នេះជាស្នាដៃបកប្រែ")
+        );
+    }
+
+    #[test]
+    fn visible_refinement_preserves_explicit_non_default_selection() {
+        let mut session = default_session_with_commit_refiner();
+        type_ascii(&mut session, "nihjeasnadaiborkbrae");
+        let before = session.snapshot();
+        assert!(
+            before.candidates.len() >= 2,
+            "test needs a non-default candidate to verify explicit selection"
+        );
+        let expected = before.candidates[1].clone();
+
+        let down = session.process_key_event(0xFF54, 0, 0);
+        assert!(down.consumed);
+        assert_eq!(session.snapshot().selected_index, Some(1));
+        let refined = session.apply_refined_candidate("nihjeasnadaiborkbrae");
+
+        assert!(refined.is_none());
+        let snapshot = session.snapshot();
+        assert_eq!(snapshot.selected_index, Some(1));
+        assert_eq!(snapshot.candidates.get(1).map(String::as_str), Some(expected.as_str()));
+    }
+
+    #[test]
+    fn explicit_non_default_flat_selection_bypasses_commit_refinement() {
+        let mut session = default_session_with_commit_refiner();
+        type_ascii(&mut session, "nihjeasnadaiborkbrae");
+        let before = session.snapshot();
+        assert!(
+            before.candidates.len() >= 2,
+            "test needs a non-default candidate to verify explicit selection"
+        );
+        let expected = before.candidates[1].clone();
+
+        let down = session.process_key_event(0xFF54, 0, 0);
+        assert!(down.consumed);
+        assert_eq!(session.snapshot().selected_index, Some(1));
+        let update = session.process_key_event(0xFF0D, 0, 0);
+
+        assert_eq!(update.commit_text.as_deref(), Some(expected.as_str()));
+        assert_ne!(update.commit_text.as_deref(), Some("នេះជាស្នាដៃបកប្រែ"));
     }
 
     #[test]

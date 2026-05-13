@@ -13,6 +13,7 @@ import os
 import signal
 import subprocess
 import sys
+import threading
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
@@ -45,6 +46,8 @@ SEGMENT_PREVIEW_FOCUSED_FOREGROUND = 0xFFFFFF
 SEGMENT_PREVIEW_FOCUSED_BACKGROUND = 0x005FCC
 RECOMMENDED_MARK = "✓"
 DERIVED_MARK = "≈"
+REFINE_MIN_RAW_PREEDIT_LEN = 10
+REFINE_DEBOUNCE_MS = 400
 
 
 def log_line(message: str) -> None:
@@ -85,7 +88,7 @@ class BridgeClient:
         if not line:
             stderr = ""
             if self._proc.stderr is not None:
-                stderr = self._proc.stderr.read().strip()
+                stderr = self._proc.stderr.read(4096).strip()
             raise RuntimeError(f"bridge terminated unexpectedly: {stderr}")
         data = json.loads(line)
         return BridgeResponse(
@@ -113,8 +116,12 @@ class KhmerIMEEngine(IBus.Engine):
     def __init__(self, connection: Any, object_path: str, bridge_path: Path):
         super().__init__(connection=connection, object_path=object_path)
         self._bridge = BridgeClient(bridge_path)
+        self._bridge_lock = threading.Lock()
         self._table = IBus.LookupTable.new(9, 0, True, True)
         self._last_preedit = ""
+        self._last_raw_preedit = ""
+        self._refine_timeout_id = 0
+        self._refine_generation = 0
         self._focus_events = 0
         self._reset_events = 0
         self._last_enter_focus_events = 0
@@ -125,15 +132,17 @@ class KhmerIMEEngine(IBus.Engine):
         self._surrounding_text = ""
         self._surrounding_cursor_pos = 0
         self._surrounding_anchor_pos = 0
-        self._apply_snapshot(self._bridge.call({"cmd": "snapshot"}))
+        self._apply_snapshot(self._call_bridge_raw({"cmd": "snapshot"}))
         log_line(f"engine init object_path={object_path} bridge={bridge_path}")
+
+    def _call_bridge_raw(self, payload: Dict[str, Any]) -> BridgeResponse:
+        with self._bridge_lock:
+            return self._bridge.call(payload)
 
     def _bridge_call(self, payload: Dict[str, Any]) -> BridgeResponse:
         preedit_before = self._last_preedit
-        response = self._bridge.call(payload)
-        if response.commit_text:
-            self.commit_text(IBus.Text.new_from_string(response.commit_text))
-        self._apply_snapshot(response)
+        response = self._call_bridge_raw(payload)
+        self._apply_response(response)
 
         if payload.get("cmd") == "process_key_event":
             keyval = int(payload.get("keyval", 0))
@@ -172,12 +181,27 @@ class KhmerIMEEngine(IBus.Engine):
             log_line(f"bridge error payload={payload.get('cmd')} error={response.error}")
         return response
 
+    def _apply_response(self, response: BridgeResponse) -> None:
+        if not response.ok:
+            return
+        if response.commit_text:
+            self._clear_composition_ui_for_commit(response)
+            self.commit_text(IBus.Text.new_from_string(response.commit_text))
+            return
+        self._apply_snapshot(response)
+
     def _apply_snapshot(self, response: BridgeResponse) -> None:
         snapshot = response.snapshot or {}
-        preedit = str(snapshot.get("preedit", ""))
-        self._last_preedit = preedit
-        preedit_visible = bool(preedit)
-        self.update_preedit_text(IBus.Text.new_from_string(preedit), len(preedit), preedit_visible)
+        raw_preedit = str(snapshot.get("raw_preedit", ""))
+        render_preedit = raw_preedit or str(snapshot.get("preedit", ""))
+        self._last_preedit = render_preedit
+        self._last_raw_preedit = raw_preedit
+        preedit_visible = bool(render_preedit)
+        self.update_preedit_text(
+            IBus.Text.new_from_string(render_preedit),
+            len(render_preedit),
+            preedit_visible,
+        )
 
         candidates = snapshot.get("candidates") or []
         candidate_display = snapshot.get("candidate_display") or []
@@ -187,8 +211,8 @@ class KhmerIMEEngine(IBus.Engine):
             self._table.append_candidate(IBus.Text.new_from_string(str(candidate)))
 
         selected = snapshot.get("selected_index")
-        if isinstance(selected, int):
-            self._table.set_cursor_pos(selected)
+        if isinstance(selected, int) and candidate_rows:
+            self._table.set_cursor_pos(min(selected, len(candidate_rows) - 1))
 
         self.update_lookup_table(self._table, bool(candidate_rows))
 
@@ -242,6 +266,15 @@ class KhmerIMEEngine(IBus.Engine):
                 return
         self.hide_auxiliary_text()
 
+    def _clear_composition_ui_for_commit(self, response: BridgeResponse) -> None:
+        snapshot = response.snapshot or {}
+        self._last_preedit = ""
+        self._last_raw_preedit = str(snapshot.get("raw_preedit", ""))
+        self.update_preedit_text(IBus.Text.new_from_string(""), 0, False)
+        self._table.clear()
+        self.update_lookup_table(self._table, False)
+        self.hide_auxiliary_text()
+
     @staticmethod
     def _candidate_rows(candidates: Any, candidate_display: Any) -> list[str]:
         if not isinstance(candidates, list):
@@ -252,15 +285,19 @@ class KhmerIMEEngine(IBus.Engine):
         for index, candidate in enumerate(candidates):
             text = str(candidate)
             if not use_display:
-                rendered.append(text)
+                if not text.isascii():
+                    rendered.append(text)
                 continue
 
             entry = candidate_display[index]
             if not isinstance(entry, dict):
-                rendered.append(text)
+                if not text.isascii():
+                    rendered.append(text)
                 continue
 
             output = str(entry.get("output", "")).strip() or text
+            if output.isascii():
+                continue
             recommended = bool(entry.get("recommended", False))
             hints = [str(hint).strip() for hint in (entry.get("roman_hints") or []) if str(hint).strip()]
             label = output
@@ -272,6 +309,67 @@ class KhmerIMEEngine(IBus.Engine):
                 label = f"{label} ({' / '.join(hints[:3])})"
             rendered.append(label)
         return rendered
+
+    def _cancel_pending_refinement(self) -> None:
+        self._refine_generation += 1
+        if self._refine_timeout_id:
+            GLib.source_remove(self._refine_timeout_id)
+            self._refine_timeout_id = 0
+
+    def _schedule_refinement(self, raw_preedit: str) -> None:
+        if len(raw_preedit) < REFINE_MIN_RAW_PREEDIT_LEN:
+            return
+        generation = self._refine_generation
+        self._refine_timeout_id = GLib.timeout_add(
+            REFINE_DEBOUNCE_MS,
+            self._start_refinement,
+            generation,
+            raw_preedit,
+        )
+
+    def _start_refinement(self, generation: int, raw_preedit: str) -> bool:
+        self._refine_timeout_id = 0
+        threading.Thread(
+            target=self._run_refinement,
+            args=(generation, raw_preedit),
+            daemon=True,
+        ).start()
+        return False
+
+    def _run_refinement(self, generation: int, raw_preedit: str) -> None:
+        try:
+            response = self._call_bridge_raw(
+                {
+                    "cmd": "refine_composition",
+                    "raw_preedit": raw_preedit,
+                }
+            )
+        except Exception as err:
+            log_line(f"refine_composition failed raw_len={len(raw_preedit)} err={err}")
+            return
+        GLib.idle_add(self._finish_refinement, generation, raw_preedit, response)
+
+    def _finish_refinement(self, generation: int, raw_preedit: str, response: BridgeResponse) -> bool:
+        if generation != self._refine_generation or raw_preedit != self._last_raw_preedit:
+            log_line(
+                "refine_composition stale raw_len=%s current_len=%s"
+                % (len(raw_preedit), len(self._last_raw_preedit))
+            )
+            return False
+        self._apply_response(response)
+        if response.error:
+            log_line(f"bridge error payload=refine_composition error={response.error}")
+        else:
+            log_line(
+                "refine_composition applied raw_len=%s cand=%s"
+                % (len(raw_preedit), len(response.snapshot.get("candidates", []) or []))
+            )
+        return False
+
+    @staticmethod
+    def _is_refinement_trigger_key(keyval: int) -> bool:
+        ch = chr(keyval) if 0 <= keyval <= sys.maxunicode else ""
+        return bool(ch) and ch.isascii() and ch.isgraph()
 
     @staticmethod
     def _build_styled_auxiliary_text(
@@ -325,15 +423,21 @@ class KhmerIMEEngine(IBus.Engine):
         return padded_start, padded_end
 
     def do_process_key_event(self, keyval: int, keycode: int, state: int) -> bool:
+        self._cancel_pending_refinement()
+        if int(keyval) in (KEY_RETURN, KEY_KP_ENTER) and self._last_preedit:
+            self._last_preedit = ""
+            self.update_preedit_text(IBus.Text.new_from_string(""), 0, False)
+        consumed = False
         try:
-            response = self._bridge_call(
-                {
-                    "cmd": "process_key_event",
-                    "keyval": int(keyval),
-                    "keycode": int(keycode),
-                    "state": int(state),
-                }
-            )
+            payload = {
+                "cmd": "process_key_event",
+                "keyval": int(keyval),
+                "keycode": int(keycode),
+                "state": int(state),
+            }
+            response = self._call_bridge_raw(payload)
+            consumed = response.consumed
+            self._apply_response(response)
             log_line(
                 "key_event keyval=%s keycode=%s state=%s consumed=%s preedit=%r cand=%s"
                 % (
@@ -345,10 +449,47 @@ class KhmerIMEEngine(IBus.Engine):
                     len(response.snapshot.get("candidates", []) or []),
                 )
             )
+            if int(keyval) in (KEY_RETURN, KEY_KP_ENTER):
+                preedit_after = self._last_preedit
+                focus_delta = self._focus_events - self._last_enter_focus_events
+                reset_delta = self._reset_events - self._last_enter_reset_events
+                self._last_enter_focus_events = self._focus_events
+                self._last_enter_reset_events = self._reset_events
+                log_line(
+                    "enter_path keyval=%s keycode=%s state=%s consumed=%s commit_len=%s "
+                    "preedit_before=0 preedit_after=%s focus_events=%s reset_events=%s "
+                    "focus_delta=%s reset_delta=%s capabilities=%s purpose=%s hints=%s "
+                    "surrounding_len=%s surrounding_cursor=%s surrounding_anchor=%s"
+                    % (
+                        keyval,
+                        keycode,
+                        state,
+                        response.consumed,
+                        len(response.commit_text or ""),
+                        len(preedit_after),
+                        self._focus_events,
+                        self._reset_events,
+                        focus_delta,
+                        reset_delta,
+                        self._capabilities,
+                        self._content_purpose,
+                        self._content_hints,
+                        len(self._surrounding_text),
+                        self._surrounding_cursor_pos,
+                        self._surrounding_anchor_pos,
+                    )
+                )
+            raw_preedit = str(response.snapshot.get("raw_preedit", ""))
+            if (
+                response.consumed
+                and response.commit_text is None
+                and self._is_refinement_trigger_key(int(keyval))
+            ):
+                self._schedule_refinement(raw_preedit)
             return response.consumed
         except Exception as err:
             log_line(f"process_key_event failed keyval={keyval} keycode={keycode} state={state} err={err}")
-            return False
+            return consumed
 
     def do_focus_in(self) -> None:
         self._focus_events += 1
@@ -360,6 +501,7 @@ class KhmerIMEEngine(IBus.Engine):
         self.do_focus_in()
 
     def do_focus_out(self) -> None:
+        self._cancel_pending_refinement()
         self._focus_events += 1
         log_line(f"focus_out count={self._focus_events}")
         self._bridge_call({"cmd": "focus_out"})
@@ -369,6 +511,7 @@ class KhmerIMEEngine(IBus.Engine):
         self.do_focus_out()
 
     def do_reset(self) -> None:
+        self._cancel_pending_refinement()
         self._reset_events += 1
         log_line(f"reset count={self._reset_events}")
         self._bridge_call({"cmd": "reset"})
@@ -376,9 +519,9 @@ class KhmerIMEEngine(IBus.Engine):
     def do_enable(self) -> None:
         log_line("enable")
         self._bridge_call({"cmd": "enable"})
-        self.do_focus_in()
 
     def do_disable(self) -> None:
+        self._cancel_pending_refinement()
         log_line("disable")
         self._bridge_call({"cmd": "disable"})
 
@@ -417,7 +560,9 @@ class KhmerIMEEngine(IBus.Engine):
         )
 
     def do_destroy(self) -> None:
-        self._bridge.shutdown()
+        self._cancel_pending_refinement()
+        with self._bridge_lock:
+            self._bridge.shutdown()
         super().do_destroy()
 
 
@@ -476,8 +621,8 @@ def register_component(bus: IBus.Bus, exec_path: Path) -> None:
         "MIT",
         "KhmerIME contributors",
         "https://github.com/darhnoel/khmerime",
-        "khmerime",
         str(exec_path),
+        "khmerime",
     )
     engine = IBus.EngineDesc.new(
         ENGINE_NAME,
@@ -524,6 +669,10 @@ def main() -> int:
 
     IBus.init()
     bus = IBus.Bus()
+    if not bus.is_connected():
+        log_line("startup failed: IBus daemon is not running")
+        print("error: IBus daemon is not running", file=sys.stderr)
+        return 1
     bridge_path = resolve_bridge_path(args.bridge_path)
     log_line(f"startup ibus={args.ibus} bridge={bridge_path}")
     factory = KhmerIMEFactory(bus, bridge_path)

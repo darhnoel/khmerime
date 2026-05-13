@@ -36,6 +36,19 @@ fn shutdown_and_assert_ok(mut child: Child, stdin: &mut ChildStdin, stdout: &mut
     assert!(status.success());
 }
 
+fn send_ascii_text(stdin: &mut impl Write, stdout: &mut BufReader<impl std::io::Read>, text: &str) {
+    for ch in text.chars() {
+        send_command(
+            stdin,
+            &format!(
+                r#"{{"cmd":"process_key_event","keyval":{},"keycode":0,"state":0}}"#,
+                ch as u32
+            ),
+        );
+        let _ = read_response(stdout);
+    }
+}
+
 #[test]
 fn bridge_commits_raw_roman_when_no_candidate() {
     let (child, mut stdin, mut stdout) = spawn_bridge();
@@ -174,6 +187,181 @@ fn bridge_supports_segment_focus_and_full_phrase_commit() {
         .expect("commit text should be present");
     assert!(!commit_text.is_empty());
     assert_ne!(commit_text, "khnhomtov");
+
+    shutdown_and_assert_ok(child, &mut stdin, &mut stdout);
+}
+
+#[test]
+fn bridge_refines_long_flat_default_candidate_on_enter() {
+    let (child, mut stdin, mut stdout) = spawn_bridge();
+
+    send_command(&mut stdin, r#"{"cmd":"focus_in"}"#);
+    let _ = read_response(&mut stdout);
+    send_ascii_text(&mut stdin, &mut stdout, "nihjeasnadaiborkbrae");
+
+    send_command(
+        &mut stdin,
+        r#"{"cmd":"process_key_event","keyval":65293,"keycode":0,"state":0}"#,
+    );
+    let committed = read_response(&mut stdout);
+    assert_eq!(committed["commit_text"], Value::String("នេះជាស្នាដៃបកប្រែ".to_owned()));
+    assert_eq!(committed["consumed"], Value::Bool(true));
+
+    shutdown_and_assert_ok(child, &mut stdin, &mut stdout);
+}
+
+#[test]
+fn bridge_refines_long_flat_candidate_for_visible_suggestions() {
+    let (child, mut stdin, mut stdout) = spawn_bridge();
+
+    send_command(&mut stdin, r#"{"cmd":"focus_in"}"#);
+    let _ = read_response(&mut stdout);
+    send_ascii_text(&mut stdin, &mut stdout, "nihjeasnadaiborkbrae");
+
+    send_command(&mut stdin, r#"{"cmd":"snapshot"}"#);
+    let live = read_response(&mut stdout);
+    assert_ne!(
+        live["snapshot"]["candidates"]
+            .as_array()
+            .and_then(|items| items.first()),
+        Some(&Value::String("នេះជាស្នាដៃបកប្រែ".to_owned()))
+    );
+
+    send_command(
+        &mut stdin,
+        r#"{"cmd":"refine_composition","raw_preedit":"nihjeasnadaiborkbrae"}"#,
+    );
+    let refined = read_response(&mut stdout);
+    assert_eq!(
+        refined["snapshot"]["candidates"]
+            .as_array()
+            .and_then(|items| items.first()),
+        Some(&Value::String("នេះជាស្នាដៃបកប្រែ".to_owned()))
+    );
+    assert_eq!(
+        refined["snapshot"]["raw_preedit"],
+        Value::String("nihjeasnadaiborkbrae".to_owned())
+    );
+    assert_eq!(
+        refined["snapshot"]["preedit"],
+        Value::String("nihjeasnadaiborkbrae".to_owned())
+    );
+    assert_eq!(refined["snapshot"]["selected_index"], Value::from(0));
+
+    send_command(
+        &mut stdin,
+        r#"{"cmd":"process_key_event","keyval":65293,"keycode":0,"state":0}"#,
+    );
+    let committed = read_response(&mut stdout);
+    assert_eq!(committed["commit_text"], Value::String("នេះជាស្នាដៃបកប្រែ".to_owned()));
+
+    shutdown_and_assert_ok(child, &mut stdin, &mut stdout);
+}
+
+#[test]
+fn bridge_ignores_stale_visible_refinement_request() {
+    let (child, mut stdin, mut stdout) = spawn_bridge();
+
+    send_command(&mut stdin, r#"{"cmd":"focus_in"}"#);
+    let _ = read_response(&mut stdout);
+    send_ascii_text(&mut stdin, &mut stdout, "nihjeasnadaiborkbrae");
+
+    send_command(
+        &mut stdin,
+        r#"{"cmd":"refine_composition","raw_preedit":"nihjeasnadai"}"#,
+    );
+    let stale = read_response(&mut stdout);
+    assert_ne!(
+        stale["snapshot"]["candidates"]
+            .as_array()
+            .and_then(|items| items.first()),
+        Some(&Value::String("នេះជាស្នាដៃបកប្រែ".to_owned()))
+    );
+    assert_eq!(
+        stale["snapshot"]["raw_preedit"],
+        Value::String("nihjeasnadaiborkbrae".to_owned())
+    );
+
+    shutdown_and_assert_ok(child, &mut stdin, &mut stdout);
+}
+
+#[test]
+fn bridge_visible_refinement_respects_explicit_non_default_selection() {
+    let (child, mut stdin, mut stdout) = spawn_bridge();
+
+    send_command(&mut stdin, r#"{"cmd":"focus_in"}"#);
+    let _ = read_response(&mut stdout);
+    send_ascii_text(&mut stdin, &mut stdout, "nihjeasnadaiborkbrae");
+
+    send_command(&mut stdin, r#"{"cmd":"snapshot"}"#);
+    let snapshot = read_response(&mut stdout);
+    let candidates = snapshot["snapshot"]["candidates"]
+        .as_array()
+        .expect("candidates should be an array");
+    assert!(
+        candidates.len() >= 2,
+        "test needs a non-default candidate to verify explicit selection"
+    );
+    let expected = candidates[1].clone();
+
+    send_command(
+        &mut stdin,
+        r#"{"cmd":"process_key_event","keyval":65364,"keycode":0,"state":0}"#,
+    );
+    let moved = read_response(&mut stdout);
+    assert_eq!(moved["snapshot"]["selected_index"], Value::from(1));
+
+    send_command(
+        &mut stdin,
+        r#"{"cmd":"refine_composition","raw_preedit":"nihjeasnadaiborkbrae"}"#,
+    );
+    let refined = read_response(&mut stdout);
+    assert_eq!(refined["snapshot"]["selected_index"], Value::from(1));
+    assert_eq!(refined["snapshot"]["candidates"][1], expected);
+    assert_ne!(
+        refined["snapshot"]["candidates"]
+            .as_array()
+            .and_then(|items| items.first()),
+        Some(&Value::String("នេះជាស្នាដៃបកប្រែ".to_owned()))
+    );
+
+    shutdown_and_assert_ok(child, &mut stdin, &mut stdout);
+}
+
+#[test]
+fn bridge_respects_explicit_non_default_candidate_on_enter() {
+    let (child, mut stdin, mut stdout) = spawn_bridge();
+
+    send_command(&mut stdin, r#"{"cmd":"focus_in"}"#);
+    let _ = read_response(&mut stdout);
+    send_ascii_text(&mut stdin, &mut stdout, "nihjeasnadaiborkbrae");
+
+    send_command(&mut stdin, r#"{"cmd":"snapshot"}"#);
+    let snapshot = read_response(&mut stdout);
+    let candidates = snapshot["snapshot"]["candidates"]
+        .as_array()
+        .expect("candidates should be an array");
+    assert!(
+        candidates.len() >= 2,
+        "test needs a non-default candidate to verify explicit selection"
+    );
+    let expected = candidates[1].clone();
+
+    send_command(
+        &mut stdin,
+        r#"{"cmd":"process_key_event","keyval":65364,"keycode":0,"state":0}"#,
+    );
+    let moved = read_response(&mut stdout);
+    assert_eq!(moved["consumed"], Value::Bool(true));
+    assert_eq!(moved["snapshot"]["selected_index"], Value::from(1));
+
+    send_command(
+        &mut stdin,
+        r#"{"cmd":"process_key_event","keyval":65293,"keycode":0,"state":0}"#,
+    );
+    let committed = read_response(&mut stdout);
+    assert_eq!(committed["commit_text"], expected);
+    assert_ne!(committed["commit_text"], Value::String("នេះជាស្នាដៃបកប្រែ".to_owned()));
 
     shutdown_and_assert_ok(child, &mut stdin, &mut stdout);
 }

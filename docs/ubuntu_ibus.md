@@ -232,13 +232,26 @@ Example: the user has switched to KhmerIME and presses `j`.
 
 The same loop repeats for `e`, `a`, arrows, `Space`, `Enter`, and candidate number keys.
 
+For long joined roman phrases, the adapter keeps this keypress loop fast and
+schedules a separate refinement after the user pauses. If the active raw preedit
+is still the same after the debounce, Python sends:
+
+```text
+{"cmd":"refine_composition","raw_preedit":"nihjeasnadaiborkbrae"}
+```
+
+The Rust bridge asks `ImeSession` to run its full Hybrid refiner for that stable
+raw input. If the weighted-span result covers the complete input, the refined
+phrase is prepended to the lookup candidates. Stale requests and requests made
+after the user explicitly moved candidate selection are ignored.
+
 ## Preedit, Candidates, And Commit
 
 Three IME terms matter here.
 
 `preedit` is temporary text.
 
-For `jea`, the preedit may show the roman text or the currently composed phrase before it is committed. The focused application has not permanently received it yet.
+For `jea`, the visible IBus preedit stays as the roman composition text, such as `jea`. Khmer output candidates, such as `ជា`, stay in the IBus lookup table until the user commits one.
 
 `candidates` are possible outputs.
 

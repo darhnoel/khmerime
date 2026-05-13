@@ -195,6 +195,7 @@ impl WeightedSpanDecoder {
                 beam = self.extend_beam(beam, &candidate, request);
             }
             beam.scores.segmentation += 24_000;
+            beam.scores.segmentation += exact_anchor_path_bonus(request);
             beam.scores.history += final_history_score(request.history, &beam.final_text());
             return vec![beam];
         }
@@ -896,6 +897,23 @@ fn composer_alignment_delta(composer: &crate::composer::ComposerAnalysis, start:
     score
 }
 
+fn exact_anchor_path_bonus(request: &DecodeRequest<'_>) -> i32 {
+    let chunks = request.composer.weighted_span_phrase_chunks();
+    if chunks.len() < 2
+        || !chunks
+            .iter()
+            .all(|chunk| chunk.kind == crate::composer::ComposerChunkKind::Exact)
+    {
+        return 0;
+    }
+
+    chunks
+        .iter()
+        .filter(|chunk| chunk.end.saturating_sub(chunk.start) >= 4)
+        .count() as i32
+        * 8_000
+}
+
 fn incremental_history_score(history: &HashMap<String, usize>, word: &str) -> i32 {
     history.get(word).copied().unwrap_or(0).min(8) as i32 * 80
 }
@@ -1114,6 +1132,21 @@ mod tests {
                 .first()
                 .map(String::as_str),
             Some("សែនស្រណោះ")
+        );
+    }
+
+    #[test]
+    fn prefers_exact_phrase_chunks_over_fuzzy_fragmentation() {
+        let transliterator =
+            Transliterator::from_default_data_with_config(DecoderConfig::default().with_mode(DecoderMode::Wfst))
+                .unwrap();
+
+        assert_eq!(
+            transliterator
+                .suggest("sakampheapttenglay", &HashMap::new())
+                .first()
+                .map(String::as_str),
+            Some("សកម្មភាពទាំងឡាយ")
         );
     }
 
