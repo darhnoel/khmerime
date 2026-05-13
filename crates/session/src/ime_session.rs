@@ -774,9 +774,9 @@ mod tests {
         }
     }
 
-    fn default_session_with_commit_refiner() -> ImeSession {
-        let transliterator = Transliterator::from_default_data_with_config(DecoderConfig::shadow_interactive())
-            .expect("default data must load");
+    fn flat_default_session_with_commit_refiner() -> ImeSession {
+        let transliterator =
+            Transliterator::from_default_data_with_config(DecoderConfig::legacy()).expect("default data must load");
         let commit_refiner = Transliterator::from_default_data_with_config(
             DecoderConfig::default()
                 .with_mode(DecoderMode::Hybrid)
@@ -881,7 +881,7 @@ mod tests {
 
     #[test]
     fn enter_refines_long_flat_default_candidate_commit() {
-        let mut session = default_session_with_commit_refiner();
+        let mut session = flat_default_session_with_commit_refiner();
         type_ascii(&mut session, "nihjeasnadaiborkbrae");
 
         let update = session.process_key_event(0xFF0D, 0, 0);
@@ -893,7 +893,7 @@ mod tests {
 
     #[test]
     fn visible_refinement_prepends_long_flat_default_candidate() {
-        let mut session = default_session_with_commit_refiner();
+        let mut session = flat_default_session_with_commit_refiner();
         type_ascii(&mut session, "nihjeasnadaiborkbrae");
         assert_ne!(
             session.snapshot().candidates.first().map(String::as_str),
@@ -912,7 +912,7 @@ mod tests {
 
     #[test]
     fn visible_refinement_ignores_stale_raw_preedit() {
-        let mut session = default_session_with_commit_refiner();
+        let mut session = flat_default_session_with_commit_refiner();
         type_ascii(&mut session, "nihjeasnadaiborkbrae");
 
         let refined = session.apply_refined_candidate("nihjeasnadai");
@@ -926,7 +926,7 @@ mod tests {
 
     #[test]
     fn visible_refinement_preserves_explicit_non_default_selection() {
-        let mut session = default_session_with_commit_refiner();
+        let mut session = flat_default_session_with_commit_refiner();
         type_ascii(&mut session, "nihjeasnadaiborkbrae");
         let before = session.snapshot();
         assert!(
@@ -948,7 +948,7 @@ mod tests {
 
     #[test]
     fn explicit_non_default_flat_selection_bypasses_commit_refinement() {
-        let mut session = default_session_with_commit_refiner();
+        let mut session = flat_default_session_with_commit_refiner();
         type_ascii(&mut session, "nihjeasnadaiborkbrae");
         let before = session.snapshot();
         assert!(
