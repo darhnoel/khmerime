@@ -51,6 +51,15 @@ impl ComposerAnalysis {
     }
 
     fn primary_weighted_span_phrase_chunks(&self) -> Vec<ComposerChunk> {
+        if self.fully_segmented
+            && self.chunks.len() > 1
+            && self
+                .chunks
+                .iter()
+                .all(|chunk| chunk.kind == ComposerChunkKind::Exact && chunk.end.saturating_sub(chunk.start) >= 3)
+        {
+            return self.chunks.clone();
+        }
         if self.is_multi_chunk() {
             return self.chunks.clone();
         }
@@ -551,7 +560,7 @@ impl ComposerTable {
 fn compare_weighted_span_chunk_paths(left: &[ComposerChunk], right: &[ComposerChunk]) -> std::cmp::Ordering {
     weighted_span_chunk_path_priority(left)
         .cmp(&weighted_span_chunk_path_priority(right))
-        .then_with(|| right.len().cmp(&left.len()))
+        .then_with(|| left.len().cmp(&right.len()))
 }
 
 fn weighted_span_chunk_path_priority(path: &[ComposerChunk]) -> (usize, usize, usize) {
@@ -619,6 +628,27 @@ mod tests {
             vec!["khnhom", "tov"]
         );
         assert_eq!(hints.last().map(|chunk| chunk.kind), Some(ComposerChunkKind::Exact));
+    }
+
+    #[test]
+    fn prefers_fewer_exact_chunks_for_weighted_span_paths() {
+        let transliterator = Transliterator::from_default_data().unwrap();
+        let table = ComposerTable::from_entries(transliterator.entries());
+        let analysis = table.analyze("sakampheapttenglay");
+        let hints = analysis.weighted_span_phrase_chunks();
+
+        assert_eq!(
+            analysis
+                .chunks
+                .iter()
+                .map(|chunk| chunk.normalized.as_str())
+                .collect::<Vec<_>>(),
+            vec!["sakampheap", "tteng", "lay"]
+        );
+        assert_eq!(
+            hints.iter().map(|chunk| chunk.normalized.as_str()).collect::<Vec<_>>(),
+            vec!["sakampheap", "tteng", "lay"]
+        );
     }
 
     #[test]

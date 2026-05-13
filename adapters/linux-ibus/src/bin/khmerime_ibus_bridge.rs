@@ -1,6 +1,6 @@
 use std::io::{self, BufRead, Write};
 
-use khmerime_core::{DecoderConfig, Result as KhmerResult, Transliterator};
+use khmerime_core::{DecoderConfig, DecoderMode, Result as KhmerResult, Transliterator};
 use khmerime_linux_ibus::{fallback_empty_snapshot_json, BridgeCommand, BridgeResponse, DesktopHistoryStore};
 use khmerime_session::{HistoryStore, ImeSession, ImeSessionSnapshot, ImeSessionUpdate};
 
@@ -29,8 +29,17 @@ fn error_response(session: &ImeSession, message: impl Into<String>) -> BridgeRes
 fn bootstrap_session() -> KhmerResult<ImeSession> {
     let store = DesktopHistoryStore;
     let transliterator = Transliterator::from_default_data_with_config(DecoderConfig::shadow_interactive())?;
+    let commit_refiner = Transliterator::from_default_data_with_config(
+        DecoderConfig::default()
+            .with_mode(DecoderMode::Hybrid)
+            .with_shadow_log(false),
+    )?;
     let history = store.load().unwrap_or_default();
-    Ok(ImeSession::new(transliterator, history))
+    Ok(ImeSession::new_with_commit_refiner(
+        transliterator,
+        commit_refiner,
+        history,
+    ))
 }
 
 fn flush_history_if_changed(session: &ImeSession, update: &ImeSessionUpdate) -> Option<String> {
@@ -51,6 +60,10 @@ fn apply_command(session: &mut ImeSession, command: BridgeCommand) -> (BridgeRes
             let mut response = build_response(session, update.clone());
             response.error = flush_history_if_changed(session, &update);
             (response, false)
+        }
+        BridgeCommand::RefineComposition { raw_preedit } => {
+            session.apply_refined_candidate(&raw_preedit);
+            (build_response(session, ImeSessionUpdate::default()), false)
         }
         BridgeCommand::FocusIn => {
             session.focus_in();

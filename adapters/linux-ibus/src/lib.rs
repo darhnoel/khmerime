@@ -15,6 +15,7 @@ pub use history_store::{desktop_history_path, load_desktop_history, save_desktop
 #[serde(tag = "cmd", rename_all = "snake_case")]
 pub enum BridgeCommand {
     ProcessKeyEvent { keyval: u32, keycode: u32, state: u32 },
+    RefineComposition { raw_preedit: String },
     FocusIn,
     FocusOut,
     Reset,
