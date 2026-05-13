@@ -827,6 +827,8 @@ akse,អក្សិ,1,km
 aksomea,អក្សមា,1,km
 aksonak,អក្សណៈ,1,km
 aksor,អក្សរ,194,km
+aksorsel,អក្សរសិល្ប៍,194,km
+aksorsil,អក្សរសិល្ប៍,194,km
 akteakvetti,អកតវេទី,1,km
 akteakvettini,អកតវេទិនី,1,km
 akteakvettita,អកតវេទិតា,1,km
@@ -960,11 +962,11 @@ amitayus,អមិតាយុស,1,km
 amitt,អមិត្ត,1,km
 amlong,អំឡុង,1507,km
 amlung,អំលុង,2,km
+amma,អម្មា,1,km
 ammaok,អមោក្ស,1,km
 ammaoksa,អមោក្សា,1,km
 ammchas,អម្ចាស់,21,km
 ammchott,អម្ចត់,1,km
-ammea,អម្មា,1,km
 amminh,អំមិញ,1,km
 amnach,អំណាច,133,km
 amnaoy,អំណោយ,338,km
@@ -1945,6 +1947,7 @@ asaang,អះអាង,435,km
 asaapheas,អាសអាភាស,1,km
 asabboris,អសប្បុរិស,1,km
 asabboros,អសប្បុរស,1,km
+asaithan,អាសយដ្ឋាន,18,km
 asaklyotthaveachak,អសាកល្យត្ថវាចក,1,km
 asaklyotthoveachok,អសាកល្យត្ថវាចក,1,km
 asalouk,អស់លោក,1,km
@@ -1978,6 +1981,8 @@ asatisatean,អសទិសទាន,1,km
 asatthomm,អសទ្ធម្ម,1,km
 asatyar,អសត្យ,1,km
 asav,អាសវ,1,km
+asayathan,អាសយដ្ឋាន,18,km
+asayodthan,អាសយដ្ឋាន,18,km
 asda,អស្ដា,1,km
 asdangkomon,អស្ដង្គមន៍,1,km
 asdangkot,អស្ដង្គត,2,km
@@ -2064,7 +2069,6 @@ asvatthaprueksa,អស្វត្ថព្រឹក្ស,1,km
 asvayuj,អស្វយុជ,1,km
 asven,អស្វិន,1,km
 asyatik,អាស្យាទិគ,1,km
-asyodthan,អាសយដ្ឋាន,18,km
 atabba,អតប្បា,1,km
 atabbba,អតប្បា,1,km
 atabpa,អតប្បា,1,km
@@ -12730,7 +12734,7 @@ khchabkhchuon,ខ្ជាប់ខ្ជួន,1,km
 khchaeng,ខ្ជែង,1,km
 khchaeuch,ខ្ចើច,1,km
 khchaeuch,ខ្ជើច,1,km
-khchahkhchay,ខ្ជះខ្ជាយ,1,km
+khchahkhcheay,ខ្ជះខ្ជាយ,1,km
 khchak,ខ្ជាក,1,km
 khchak,ខ្ជាក់,8,km
 khcham,ខ្ជាំ,1,km
@@ -12750,6 +12754,7 @@ khchatkjay,ខ្ចាត់ខ្ចាយ,1,km
 khchau,ខ្ចៅ,28,km
 khchay,ខ្ចាយ,16,km
 khchay,ខ្ជាយ,59,km
+khcheahkhcheay,ខ្ជះខ្ជាយ,1,km
 khchei,ខ្ចី,1120,km
 khcheikhcha,ខ្ជីខ្ជា,1,km
 khchel,ខ្ជិល,45,km
@@ -12802,7 +12807,7 @@ khjabkhchuon,ខ្ជាប់ខ្ជួន,1,km
 khjabkjoun,ខ្ជាប់ខ្ជួន,1,km
 khjaeng,ខ្ជែង,1,km
 khjaeuch,ខ្ជើច,1,km
-khjahkhchay,ខ្ជះខ្ជាយ,1,km
+khjahkhcheay,ខ្ជះខ្ជាយ,1,km
 khjak,ខ្ជាក,1,km
 khjak,ខ្ជាក់,8,km
 khjam,ខ្ជាំ,1,km
@@ -12814,6 +12819,7 @@ khjaokkhchak,ខ្ជោកខ្ជាក,1,km
 khjaol,ខ្ជោល,1,km
 khjatkjay,ខ្ចាត់ខ្ចាយ,1,km
 khjay,ខ្ជាយ,59,km
+khjeahkhcheay,ខ្ជះខ្ជាយ,1,km
 khjeikhcha,ខ្ជីខ្ជា,1,km
 khjel,ខ្ជិល,45,km
 khjenh,ខ្ជេញ,1,km
@@ -17876,7 +17882,6 @@ omchas,អម្ចាស់,21,km
 omitayus,អមិតាយុស,1,km
 omlong,អំឡុង,1507,km
 omlung,អំលុង,2,km
-ommea,អម្មា,1,km
 omminh,អំមិញ,1,km
 omnaoy,អំណោយ,338,km
 omnenh,អម្នេញ,1,km
@@ -22509,7 +22514,6 @@ rrok,រ៉ក,21,km
 rros,រ៉ស់,5,km
 rroykaev,រ៉យកែវ,1,km
 rroyokaev,រ៉យកែវ,1,km
-rrrr,អរ,1298,km
 rrul,រ៉ុល,34,km
 rrung,រ៉ូង,1,km
 rrunh,រ៉ុញ,1,km
@@ -22809,7 +22813,7 @@ s_aeumkokraum,ស៊ើមគគ្រើម,1,km
 s_aeungomaung,ស៊ើងមើង,1,km
 s_aeungtraung,ស៊ើងទ្រើង,1,km
 s_aeuskromaus,ស៊ើសគ្រមើស,1,km
-s_akasiet,ស៊កសៀត,1,km
+s_aksiet,ស៊កសៀត,1,km
 s_am,ស៊ាំ,373,km
 s_amsan,ស៊ាំស៊ន,1,km
 s_amson,ស៊ាំស៊ន,1,km
@@ -22847,7 +22851,7 @@ s_obtrub,ស៊ុបទ្រុប,1,km
 s_oeng,ស៊ឹង,6,km
 s_ok,ស៊ក,8,km
 s_okkroluk,ស៊ុកគ្រលុក,1,km
-s_okosiet,ស៊កសៀត,1,km
+s_oksiet,ស៊កសៀត,1,km
 s_olkokhul,ស៊ុលគឃុល,1,km
 s_om,ស៊ុម,28,km
 s_omkroluum,ស៊ុមគ្រលុំ,1,km
@@ -23040,7 +23044,7 @@ sak,សាក,2217,km
 sak,សាក់,325,km
 sak,ស៊ក,8,km
 sak,ស័ក,41,km
-sakaaampov,សកអំពៅ,1,km
+sakaampov,សកអំពៅ,1,km
 sakabaeu,សាក់បើ,1,km
 sakadameakea,សកដមាគ៌ា,1,km
 sakadamokk,សកដមគ្គ,1,km
@@ -23049,7 +23053,6 @@ sakak,សាកៈ,1,km
 sakakal,សកកាល,1,km
 sakakantuy,សក់កន្ទុយ,1,km
 sakakoantor,សក់ក័ន្ត,1,km
-sakalak,សក់ឡក់,1,km
 sakalolouk,សកលលោក,2,km
 sakamm,សកម្ម,336,km
 sakammeakmmokeriyea,សកម្មាកម្មកិរិយា,1,km
@@ -23064,10 +23067,8 @@ sakareach,សករាជ,8,km
 sakaroneiy,សករណីយ,1,km
 sakaroneiyea,សករណីយា,1,km
 sakasap,សាកសព,341,km
-sakaseh,សក់សេះ,1,km
 sakasiet,ស៊កសៀត,1,km
 sakasuor,សាកសួរ,3,km
-sakasvay,សក់ស្វាយ,1,km
 sakateakeami,សកទាគាមិ,1,km
 sakateakeami,សកទាគាមី,1,km
 sakateakeamini,សកទាគាមិនី,1,km
@@ -23102,6 +23103,7 @@ sakkara,សក្ការ,8,km
 sakkarasamman,សក្ការសម្មាន,1,km
 sakkhara,សក្ខរា,1,km
 sakkhei,សក្ខី,24,km
+saklak,សក់ឡក់,1,km
 saklat,សក្លាត,1,km
 saklborng,សាកល្បង,1,km
 sakmai,សម័យ,1594,km
@@ -23124,11 +23126,13 @@ sakrakphonhnh,សរភញ្ញ,1,km
 sakreak,សគ៌ៈ,1,km
 sakrovityea,សាគរវិទ្យា,1,km
 saksam,សក្ដិសម,36,km
+sakseh,សក់សេះ,1,km
 saksei,សាក្សី,111,km
 saksom,សក្ដិសម,36,km
 saksom,ស័ក្តិសម,1,km
 saksorm,ស័ក្តិសម,1,km
 saksum,ស័ក្តិសម,1,km
+saksvay,សក់ស្វាយ,1,km
 saktrak,សាកត្រាក,1,km
 saku,សាគូ,1,km
 sakun,សគុណ,1,km
@@ -25125,6 +25129,7 @@ sok,សុក្រ,573,km
 sok,សុខ,5224,km
 sok,សោក,926,km
 sok,ស៊ក,8,km
+sokaampov,សកអំពៅ,1,km
 sokar,សុករ,1,km
 sokaynirutte,សកាយនិរុត្តិ,1,km
 sokaytidthe,សកាយទិដ្ឋិ,1,km
@@ -25155,8 +25160,8 @@ sokkhora,សក្ខរា,1,km
 sokkodopheasa,សក្កដភាសា,1,km
 sokkroluk,ស៊ុកគ្រលុក,1,km
 soklat,សក្លាត,1,km
+soklok,សក់ឡក់,1,km
 sokmomok,សុកមម៉ុក,1,km
-sokoaampov,សកអំពៅ,1,km
 sokoantor,សុក័ន្ត,1,km
 sokodomeakea,សកដមាគ៌ា,1,km
 sokodomokk,សកដមគ្គ,1,km
@@ -25164,7 +25169,6 @@ sokodthanneasekocheak,សកដ្ឋាននាសិកជៈ,1,km
 sokokal,សកកាល,1,km
 sokokoantor,សក់ក័ន្ត,1,km
 sokokontuy,សក់កន្ទុយ,1,km
-sokolok,សក់ឡក់,1,km
 sokololouk,សកលលោក,2,km
 sokomear,សុកុមារ,1,km
 sokomeari,សុកុមារី,1,km
@@ -25183,9 +25187,7 @@ sokor,សុករ,1,km
 sokoreach,សករាជ,8,km
 sokoroneiy,សករណីយ,1,km
 sokoroneiyea,សករណីយា,1,km
-sokoseh,សក់សេះ,1,km
 sokosiet,ស៊កសៀត,1,km
-sokosvay,សក់ស្វាយ,1,km
 sokot,សុគត,1,km
 sokote,សុគតិ,1,km
 sokoteakeami,សកទាគាមិ,1,km
@@ -25202,6 +25204,8 @@ sokreak,សគ៌ៈ,1,km
 sokrip,សុគ្រីព,1,km
 sokroet,សុក្រឹត,14,km
 soksabay,សុខសប្បាយ,1,km
+sokseh,សក់សេះ,1,km
+soksvay,សក់ស្វាយ,1,km
 soktephop,សុគតិភព,16,km
 sokun,សគុណ,1,km
 sokyor,សក្យ,1,km
@@ -28752,8 +28756,17 @@ ttomngun,ទម្ងន់,1311,km
 ttomnorng,ទំនង,3212,km
 ttomnotpreahnet,ទំនតព្រះនេត្រ,1,km
 ttomnuk,ទំនុក,475,km
+ttompea,ទំពា,23,km
+ttompeaek,ទំពែក,29,km
+ttompeang,ទំពាំង,120,km
+ttompeangju,ទំពាំងជូរ,1,km
+ttompear,ទំពារ,33,km
 ttompheap,ទមភាព,1,km
 ttompor,ទំព័រ,522,km
+ttompun,ទំពុន,20,km
+ttompung,ទំពូង,26,km
+ttompuoh,ទំពោះ,1,km
+ttompuon,ទំពួន,2,km
 ttomraus,ទម្រើស,1,km
 ttomrel,ទម្រេល,1,km
 ttomret,ទម្រេត,4,km
