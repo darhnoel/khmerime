@@ -3320,7 +3320,6 @@ bareangsaes,បារាំងសែស,1,km
 barei,បារី,301,km
 barichchak,បរិច្ចាគ,430,km
 barien,បារៀន,1,km
-bariman,បរិមាណ,359,km
 barimndal,បរិមណ្ឌល,1,km
 baripear,បរិពារ,1,km
 baripheas,បរិភាស,1,km
@@ -3330,7 +3329,6 @@ baripheaseka,បរិភាសិកា,1,km
 bariphouk,បរិភោគ,438,km
 bariphoukboann,បរិភោគប័ណ្ណ,1,km
 bariphoukda,បរិភោក្ដា,1,km
-bariroksar,បរិរក្ស,1,km
 barivchchhanodthan,បរិវច្ឆនដ្ឋាន,1,km
 barivear,បរិវារ,2,km
 barivearsamboat,បរិវារសម្ប័ទ,1,km
@@ -3339,9 +3337,6 @@ bariveas,បរិវាស,2,km
 bariveaskamm,បរិវាសកម្ម,1,km
 bariven,បរិវេណ,198,km
 barivitakk,បរិវិតក្ក,1,km
-bariyeakas,បរិយាកាស,39,km
-bariyeay,បរិយាយ,23,km
-bariyousan,បរិយោសាន,1,km
 bariytte,បរិយត្តិ,1,km
 barku,បារគូ,1,km
 barn,បាន,167444,km
@@ -3711,9 +3706,14 @@ bbarichchhet,បរិច្ឆេទ,144,km
 bbarichon,បរិជន,1,km
 bbarikamm,បរិកម្ម,1,km
 bbarikkhar,បរិក្ខារ,99,km
+bbariman,បរិមាណ,359,km
 bbarineayuok,បរិនាយក,1,km
 bbarinhnhabat,បរិញ្ញាបត្រ,4,km
+bbariroksar,បរិរក្ស,1,km
 bbaritt,បរិត្ត,1,km
+bbariyakas,បរិយាកាស,39,km
+bbariyay,បរិយាយ,23,km
+bbariyousan,បរិយោសាន,1,km
 bbarn,ប៉ុន្មាន,4338,km
 bbarouhet,បរោហិត,1,km
 bbaruot,ប៉រួត,1,km
@@ -3907,6 +3907,10 @@ bborch,ប៉ច,1,km
 bboreamukh,បរាមុខ,1,km
 bboreaphop,បរាភព,1,km
 bborikomm,បរិកម្ម,1,km
+bboriman,បរិមាណ,359,km
+bboriroksor,បរិរក្ស,1,km
+bboriyay,បរិយាយ,23,km
+bboriyousan,បរិយោសាន,1,km
 bborng,ប៉ង,139,km
 bboruot,ប៉រួត,1,km
 bbossasa,បស្សាសៈ,1,km
@@ -5255,7 +5259,6 @@ boribo,បរិបូរ,1,km
 boribo,បរិបូរណ៍,8,km
 borihar,បរិហារ,5,km
 borijak,បរិច្ចាគ,430,km
-boriman,បរិមាណ,359,km
 borimndol,បរិមណ្ឌល,1,km
 borin,បុរិន្ទ,1,km
 boripear,បរិពារ,1,km
@@ -5268,7 +5271,6 @@ boriphouk,បរិភោគ,438,km
 boriphoukboann,បរិភោគប័ណ្ណ,1,km
 boriphoukda,បរិភោក្ដា,1,km
 borirak,បុរីរក្ស,1,km
-boriroksor,បរិរក្ស,1,km
 borirom,បុរីរម្យ,1,km
 borisa,បុរិសៈ,1,km
 borisat,បរិស័ទ,30,km
@@ -5284,9 +5286,6 @@ borivearsomboat,បរិវារសម្ប័ទ,1,km
 boriveas,បរិវាស,2,km
 boriveaskomm,បរិវាសកម្ម,1,km
 boriven,បរិវេណ,198,km
-boriyeakas,បរិយាកាស,39,km
-boriyeay,បរិយាយ,23,km
-boriyousan,បរិយោសាន,1,km
 boriytte,បរិយត្តិ,1,km
 bork,បក,898,km
 bork,បោក,636,km
@@ -17447,7 +17446,7 @@ nhusnhong,ញុះញង់,1,km
 nibat,និបាត,1,km
 nibatsap,និបាតសព្ទ,1,km
 nibatsop,និបាតសព្ទ,1,km
-nibbriyeay,និប្បរិយាយ,1,km
+nibbriyay,និប្បរិយាយ,1,km
 Nicaragua,នីការ៉ាហ្គា,1,km
 nicaragua,នីការ៉ាហ្គា,1,km
 niev,នៀវ,1,km
@@ -21685,6 +21684,7 @@ roleh,រលេះ,1,km
 rolehrolah,រឡេះរឡះ,1,km
 rolehrolaoh,រឡេះរឡោះ,1,km
 rolei,រលៃ,1,km
+rolek,រលឹក,120,km
 rolekrolak,រឡិករឡក់,1,km
 rolekrolak,រឡិករឡាក់,1,km
 rolekrolok,រឡិករឡក់,1,km
@@ -21697,6 +21697,7 @@ rolenh,រលេញ,1,km
 roler,រលើ,1,km
 rolerb,រលើប,2,km
 rolerng,រលើង,5,km
+roleuk,រលឹក,120,km
 roleum,រឡឺម,1,km
 roleur,រលឿ,1,km
 roley,រលៃ,1,km
@@ -21712,6 +21713,7 @@ rolimroleam,រលីមរលាម,1,km
 roling,រលីង,26,km
 rolingochhuk,រលីងឈូក,1,km
 rolingroloung,រលីងរលោង,1,km
+rolirk,រលឹក,120,km
 rolis,រលិស,1,km
 roliv,រលីវ,1,km
 rolo,រឡូ,1,km
@@ -23033,7 +23035,6 @@ saiyea,សៃយា,1,km
 saiyeasan,សៃយាសន៍,1,km
 saiyeason,សៃយាសន៍,1,km
 saiyeun,សៃយ៉ឺន,1,km
-sajerk,សមាជិក,3108,km
 saji,សជី,1,km
 sajip,សជីព,1,km
 sajjheaynokamm,សជ្ឈាយនកម្ម,1,km
@@ -23186,6 +23187,7 @@ samaek,សំអេក,1,km
 samael,សម្អែល,1,km
 samaet,សំអិត,1,km
 samai,សម័យ,1594,km
+samajek,សមាជិក,3108,km
 samajerk,សមាជិក,3108,km
 samakki,សាមគ្គី,1,km
 samakom,សមាគម,138,km
@@ -29935,8 +29937,13 @@ vibat,វិបត្តិ,467,km
 vibath,វិបត្តិ,467,km
 vibbakar,វិប្បការ,1,km
 vibbaleab,វិប្បលាប,1,km
+vibbariyas,វិបរិយាស,1,km
+vibbariyay,វិបរិយាយ,1,km
 vibbassana,វិបស្សនា,1,km
+vibbassanabbanhnha,វិបស្សនាបញ្ញា,1,km
+vibbasseni,វិបស្សិនី,1,km
 vibbassona,វិបស្សនា,1,km
+vibbassonabbanhnha,វិបស្សនាបញ្ញា,1,km
 vibbaveas,វិប្បវាស,1,km
 vibbayouk,វិប្បយោគ,1,km
 vibbdesara,វិប្បដិសារៈ,1,km
@@ -29949,7 +29956,7 @@ vibbokar,វិប្បការ,1,km
 vibboleab,វិប្បលាប,1,km
 vibboveas,វិប្បវាស,1,km
 vibboyouk,វិប្បយោគ,1,km
-viblleas,វិបល្លាស,1,km
+vibllas,វិបល្លាស,1,km
 viboat,វិប័ទ,1,km
 vibokkhor,វិបក្ខ,1,km
 vibol,វិបុល,58,km
@@ -29962,8 +29969,6 @@ vibrayouk,វិប្រយោគ,1,km
 vibrchchhann,វិប្រច្ឆន្ន,1,km
 vibrchchhonn,វិប្រច្ឆន្ន,1,km
 vibrinamothor,វិបរិណាមធម៌,1,km
-vibriyeas,វិបរិយាស,1,km
-vibriyeay,វិបរិយាយ,1,km
 vibrkroete,វិប្រក្រឹតិ,1,km
 vibrokar,វិប្រការ,1,km
 vibroleab,វិប្រលាប,1,km
@@ -29973,9 +29978,6 @@ vibrtebtte,វិប្រតិបត្តិ,1,km
 vibrtekar,វិប្រតិការ,1,km
 vibrtesara,វិប្រតិសារៈ,1,km
 vibschet,វិបស្ចិត,1,km
-vibssaneabnhnhea,វិបស្សនាបញ្ញា,1,km
-vibsseni,វិបស្សិនី,1,km
-vibssoneabnhnhea,វិបស្សនាបញ្ញា,1,km
 vibyreas,វិបយ៌ាស,1,km
 vibyreay,វិបយ៌ាយ,1,km
 vich,វិច,41,km
