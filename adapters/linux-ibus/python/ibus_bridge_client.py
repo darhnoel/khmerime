@@ -19,9 +19,9 @@ class BridgeResponse:
 
 
 class BridgeClient:
-    def __init__(self, bridge_path: Path):
+    def __init__(self, bridge_path: Path, *, initial_input_mode: str = "roman"):
         self._proc = subprocess.Popen(
-            [str(bridge_path)],
+            [str(bridge_path), "--initial-input-mode", initial_input_mode],
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,

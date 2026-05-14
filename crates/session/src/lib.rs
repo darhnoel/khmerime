@@ -7,8 +7,9 @@
 //! romanization or ranking logic.
 
 mod ime_session;
+mod nida_keymap;
 
 pub use crate::ime_session::{
-    CandidateDisplayEntry, CursorLocation, HistoryStore, ImeSession, ImeSessionSnapshot, ImeSessionUpdate,
+    CandidateDisplayEntry, CursorLocation, HistoryStore, ImeSession, ImeSessionSnapshot, ImeSessionUpdate, InputMode,
     NativeKeyEvent, SegmentPreviewEntry, SessionCommand, SessionResult, SessionSnapshot,
 };

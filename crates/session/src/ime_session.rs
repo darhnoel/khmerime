@@ -1,10 +1,11 @@
 use std::collections::{HashMap, HashSet};
 
+use crate::nida_keymap::{lookup_nida_output, NidaModifiers};
 use khmerime_core::{
     build_segmented_session, move_session_focus, normalize_visible_suggestions, normalized_suggestion_key,
     reflow_segmented_session_from_selection, SegmentedSession, Transliterator,
 };
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 const KEY_BACKSPACE: u32 = 0xFF08;
 const KEY_ESCAPE: u32 = 0xFF1B;
@@ -15,9 +16,12 @@ const KEY_DOWN: u32 = 0xFF54;
 const KEY_RETURN: u32 = 0xFF0D;
 const KEY_KP_ENTER: u32 = 0xFF8D;
 const KEY_SPACE: u32 = 0x20;
+const KEY_CAPS_LOCK: u32 = 0xFFE5;
 
+const STATE_SHIFT_MASK: u32 = 1;
 const STATE_CONTROL_MASK: u32 = 1 << 2;
 const STATE_MOD1_MASK: u32 = 1 << 3;
+const STATE_MOD5_MASK: u32 = 1 << 7;
 const STATE_SUPER_MASK: u32 = 1 << 26;
 const STATE_HYPER_MASK: u32 = 1 << 27;
 const STATE_META_MASK: u32 = 1 << 28;
@@ -62,6 +66,19 @@ pub struct NativeKeyEvent {
     pub state: u32,
 }
 
+/// Shared input mode for native IME sessions.
+///
+/// `Roman` is the existing decoder-backed KhmerIME flow. `Nida` is reserved for
+/// direct Khmer keymap input, where mapped printable keys commit immediately and
+/// decoder composition stays inactive.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum InputMode {
+    #[default]
+    Roman,
+    Nida,
+}
+
 /// Adapter-facing command model for native IME integrations.
 ///
 /// All platform callbacks should be reduced to this enum before they affect
@@ -70,6 +87,8 @@ pub struct NativeKeyEvent {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum SessionCommand {
     ProcessKeyEvent(NativeKeyEvent),
+    SetInputMode(InputMode),
+    ToggleInputMode,
     FocusIn,
     FocusOut,
     Reset,
@@ -97,6 +116,7 @@ pub struct SegmentPreviewEntry {
 pub struct SessionSnapshot {
     pub enabled: bool,
     pub focused: bool,
+    pub input_mode: InputMode,
     pub preedit: String,
     pub raw_preedit: String,
     pub candidates: Vec<String>,
@@ -146,11 +166,22 @@ pub struct ImeSession {
     selection_touched: bool,
     segmented_session: Option<SegmentedSession>,
     cursor_location: CursorLocation,
+    input_mode: InputMode,
 }
 
 impl ImeSession {
     pub fn new(transliterator: Transliterator, history: HashMap<String, usize>) -> Self {
         Self::new_with_optional_commit_refiner(transliterator, None, history)
+    }
+
+    pub fn new_with_input_mode(
+        transliterator: Transliterator,
+        history: HashMap<String, usize>,
+        input_mode: InputMode,
+    ) -> Self {
+        let mut session = Self::new_with_optional_commit_refiner(transliterator, None, history);
+        session.input_mode = input_mode;
+        session
     }
 
     pub fn new_with_commit_refiner(
@@ -159,6 +190,17 @@ impl ImeSession {
         history: HashMap<String, usize>,
     ) -> Self {
         Self::new_with_optional_commit_refiner(transliterator, Some(commit_refiner), history)
+    }
+
+    pub fn new_with_commit_refiner_and_input_mode(
+        transliterator: Transliterator,
+        commit_refiner: Transliterator,
+        history: HashMap<String, usize>,
+        input_mode: InputMode,
+    ) -> Self {
+        let mut session = Self::new_with_optional_commit_refiner(transliterator, Some(commit_refiner), history);
+        session.input_mode = input_mode;
+        session
     }
 
     fn new_with_optional_commit_refiner(
@@ -178,6 +220,7 @@ impl ImeSession {
             selection_touched: false,
             segmented_session: None,
             cursor_location: CursorLocation::default(),
+            input_mode: InputMode::Roman,
         }
     }
 
@@ -218,6 +261,26 @@ impl ImeSession {
 
     pub fn set_cursor_location(&mut self, x: i32, y: i32, width: i32, height: i32) {
         self.cursor_location = CursorLocation { x, y, width, height };
+    }
+
+    pub fn input_mode(&self) -> InputMode {
+        self.input_mode
+    }
+
+    pub fn set_input_mode(&mut self, input_mode: InputMode) {
+        if self.input_mode == input_mode {
+            return;
+        }
+        self.input_mode = input_mode;
+        self.reset();
+    }
+
+    pub fn toggle_input_mode(&mut self) {
+        let next = match self.input_mode {
+            InputMode::Roman => InputMode::Nida,
+            InputMode::Nida => InputMode::Roman,
+        };
+        self.set_input_mode(next);
     }
 
     pub fn history(&self) -> &HashMap<String, usize> {
@@ -290,6 +353,7 @@ impl ImeSession {
         SessionSnapshot {
             enabled: self.enabled,
             focused: self.focused,
+            input_mode: self.input_mode,
             preedit,
             raw_preedit: self.composition_raw.clone(),
             candidates,
@@ -305,6 +369,17 @@ impl ImeSession {
     pub fn process_command(&mut self, command: SessionCommand) -> SessionResult {
         match command {
             SessionCommand::ProcessKeyEvent(event) => self.process_native_key_event(event),
+            SessionCommand::SetInputMode(input_mode) => {
+                self.set_input_mode(input_mode);
+                SessionResult::default()
+            }
+            SessionCommand::ToggleInputMode => {
+                self.toggle_input_mode();
+                SessionResult {
+                    consumed: true,
+                    ..SessionResult::default()
+                }
+            }
             SessionCommand::FocusIn => {
                 self.focus_in();
                 SessionResult::default()
@@ -336,7 +411,7 @@ impl ImeSession {
         self.process_key_event(event.keyval, event.keycode, event.state)
     }
 
-    pub fn process_key_event(&mut self, keyval: u32, _keycode: u32, state: u32) -> SessionResult {
+    pub fn process_key_event(&mut self, keyval: u32, keycode: u32, state: u32) -> SessionResult {
         if !self.enabled {
             return SessionResult::default();
         }
@@ -346,6 +421,18 @@ impl ImeSession {
 
         if is_modifier_only(state) || is_key_release(state) {
             return SessionResult::default();
+        }
+
+        if keyval == KEY_CAPS_LOCK {
+            self.toggle_input_mode();
+            return SessionResult {
+                consumed: true,
+                ..SessionResult::default()
+            };
+        }
+
+        if self.input_mode == InputMode::Nida {
+            return self.process_nida_key_event(keyval, keycode, state);
         }
 
         match keyval {
@@ -370,7 +457,8 @@ impl ImeSession {
     }
 
     pub fn apply_refined_candidate(&mut self, raw_preedit: &str) -> Option<String> {
-        if raw_preedit.is_empty()
+        if self.input_mode != InputMode::Roman
+            || raw_preedit.is_empty()
             || raw_preedit != self.composition_raw
             || self.segmented_session.is_some()
             || self.selection_touched
@@ -411,6 +499,24 @@ impl ImeSession {
         SessionResult {
             consumed: true,
             ..SessionResult::default()
+        }
+    }
+
+    fn process_nida_key_event(&mut self, keyval: u32, keycode: u32, state: u32) -> SessionResult {
+        let modifiers = if state & STATE_MOD5_MASK != 0 {
+            NidaModifiers::AltGr
+        } else if state & STATE_SHIFT_MASK != 0 {
+            NidaModifiers::Shift
+        } else {
+            NidaModifiers::Base
+        };
+        let Some(output) = lookup_nida_output(keyval, keycode, modifiers) else {
+            return SessionResult::default();
+        };
+        SessionResult {
+            consumed: true,
+            commit_text: Some(output.to_owned()),
+            history_changed: false,
         }
     }
 
@@ -755,7 +861,7 @@ fn is_single_keycap_char(ch: char) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use super::{CursorLocation, ImeSession, NativeKeyEvent, SessionCommand};
+    use super::{CursorLocation, ImeSession, InputMode, NativeKeyEvent, SessionCommand};
     use khmerime_core::{DecoderConfig, DecoderMode, Transliterator};
     use std::collections::HashMap;
 
@@ -798,6 +904,100 @@ mod tests {
         }));
         assert!(update.consumed);
         assert_eq!(session.snapshot().raw_preedit, "j");
+    }
+
+    #[test]
+    fn session_defaults_to_roman_input_mode() {
+        let session = session();
+
+        assert_eq!(session.input_mode(), InputMode::Roman);
+        assert_eq!(session.snapshot().input_mode, InputMode::Roman);
+    }
+
+    #[test]
+    fn set_input_mode_clears_active_composition() {
+        let mut session = session();
+        type_ascii(&mut session, "jea");
+        assert_eq!(session.snapshot().raw_preedit, "jea");
+
+        let update = session.process_command(SessionCommand::SetInputMode(InputMode::Nida));
+
+        assert_eq!(update, Default::default());
+        let snapshot = session.snapshot();
+        assert_eq!(snapshot.input_mode, InputMode::Nida);
+        assert!(snapshot.raw_preedit.is_empty());
+        assert!(snapshot.candidates.is_empty());
+        assert!(!snapshot.segmented_active);
+    }
+
+    #[test]
+    fn caps_lock_toggles_input_mode_and_consumes_key() {
+        let mut session = session();
+        type_ascii(&mut session, "jea");
+
+        let update = session.process_key_event(0xFFE5, 0, 0);
+
+        assert!(update.consumed);
+        let snapshot = session.snapshot();
+        assert_eq!(snapshot.input_mode, InputMode::Nida);
+        assert!(snapshot.raw_preedit.is_empty());
+    }
+
+    #[test]
+    fn nida_mode_commits_mapped_key_without_preedit() {
+        let mut session = session();
+        session.set_input_mode(InputMode::Nida);
+
+        let update = session.process_key_event('k' as u32, 37, 0);
+
+        assert!(update.consumed);
+        assert_eq!(update.commit_text.as_deref(), Some("ក"));
+        assert!(!update.history_changed);
+        assert!(session.snapshot().raw_preedit.is_empty());
+    }
+
+    #[test]
+    fn nida_mode_uses_shift_state_for_shifted_output() {
+        let mut session = session();
+        session.set_input_mode(InputMode::Nida);
+
+        let update = session.process_key_event('K' as u32, 37, 1);
+
+        assert!(update.consumed);
+        assert_eq!(update.commit_text.as_deref(), Some("គ"));
+    }
+
+    #[test]
+    fn nida_mode_ignores_caps_uppercase_for_base_output() {
+        let mut session = session();
+        session.set_input_mode(InputMode::Nida);
+
+        let update = session.process_key_event('A' as u32, 30, 0);
+
+        assert!(update.consumed);
+        assert_eq!(update.commit_text.as_deref(), Some("ា"));
+    }
+
+    #[test]
+    fn nida_mode_uses_altgr_rows_when_mod5_is_set() {
+        let mut session = session();
+        session.set_input_mode(InputMode::Nida);
+
+        let update = session.process_key_event(' ' as u32, 57, 1 << 7);
+
+        assert!(update.consumed);
+        assert_eq!(update.commit_text.as_deref(), Some("\u{00a0}"));
+    }
+
+    #[test]
+    fn nida_mode_shift_space_matches_nida_xml() {
+        let mut session = session();
+        session.set_input_mode(InputMode::Nida);
+
+        let update = session.process_key_event(' ' as u32, 57, 1);
+
+        assert!(update.consumed);
+        assert_eq!(update.commit_text.as_deref(), Some(" "));
     }
 
     #[test]

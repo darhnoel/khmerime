@@ -93,8 +93,22 @@ cat > "${TMP_COMPONENT_XML}" <<EOF
             <author>KhmerIME contributors</author>
             <icon></icon>
             <layout>us</layout>
+            <icon_prop_key>InputMode</icon_prop_key>
             <symbol>ខ</symbol>
             <rank>80</rank>
+        </engine>
+        <engine>
+            <name>khmerime-nida</name>
+            <longname>KhmerIME NIDA</longname>
+            <description>KhmerIME direct NIDA input mode</description>
+            <language>km</language>
+            <license>MIT</license>
+            <author>KhmerIME contributors</author>
+            <icon></icon>
+            <layout>us</layout>
+            <icon_prop_key>InputMode</icon_prop_key>
+            <symbol>ខ</symbol>
+            <rank>79</rank>
         </engine>
     </engines>
 </component>

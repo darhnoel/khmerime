@@ -8,7 +8,13 @@ fn bridge_path() -> &'static str {
 }
 
 fn spawn_bridge() -> (Child, ChildStdin, BufReader<std::process::ChildStdout>) {
-    let mut child = Command::new(bridge_path())
+    spawn_bridge_with_args(&[])
+}
+
+fn spawn_bridge_with_args(args: &[&str]) -> (Child, ChildStdin, BufReader<std::process::ChildStdout>) {
+    let mut command = Command::new(bridge_path());
+    command.args(args);
+    let mut child = command
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .spawn()
@@ -47,6 +53,144 @@ fn send_ascii_text(stdin: &mut impl Write, stdout: &mut BufReader<impl std::io::
         );
         let _ = read_response(stdout);
     }
+}
+
+#[test]
+fn bridge_defaults_to_roman_input_mode() {
+    let (child, mut stdin, mut stdout) = spawn_bridge();
+
+    send_command(&mut stdin, r#"{"cmd":"snapshot"}"#);
+    let response = read_response(&mut stdout);
+    assert_eq!(response["snapshot"]["input_mode"], Value::String("roman".to_owned()));
+
+    shutdown_and_assert_ok(child, &mut stdin, &mut stdout);
+}
+
+#[test]
+fn bridge_can_start_in_nida_input_mode() {
+    let (child, mut stdin, mut stdout) = spawn_bridge_with_args(&["--initial-input-mode", "nida"]);
+
+    send_command(&mut stdin, r#"{"cmd":"snapshot"}"#);
+    let response = read_response(&mut stdout);
+    assert_eq!(response["snapshot"]["input_mode"], Value::String("nida".to_owned()));
+
+    shutdown_and_assert_ok(child, &mut stdin, &mut stdout);
+}
+
+#[test]
+fn bridge_toggle_input_mode_clears_composition() {
+    let (child, mut stdin, mut stdout) = spawn_bridge();
+
+    send_command(&mut stdin, r#"{"cmd":"focus_in"}"#);
+    let _ = read_response(&mut stdout);
+    send_ascii_text(&mut stdin, &mut stdout, "jea");
+
+    send_command(&mut stdin, r#"{"cmd":"toggle_input_mode"}"#);
+    let response = read_response(&mut stdout);
+    assert_eq!(response["consumed"], Value::Bool(true));
+    assert_eq!(response["snapshot"]["input_mode"], Value::String("nida".to_owned()));
+    assert_eq!(response["snapshot"]["raw_preedit"], Value::String(String::new()));
+    assert_eq!(response["snapshot"]["candidates"], Value::Array(Vec::<Value>::new()));
+
+    shutdown_and_assert_ok(child, &mut stdin, &mut stdout);
+}
+
+#[test]
+fn bridge_nida_mode_commits_direct_khmer_key() {
+    let (child, mut stdin, mut stdout) = spawn_bridge_with_args(&["--initial-input-mode", "nida"]);
+
+    send_command(
+        &mut stdin,
+        r#"{"cmd":"process_key_event","keyval":107,"keycode":37,"state":0}"#,
+    );
+    let response = read_response(&mut stdout);
+    assert_eq!(response["consumed"], Value::Bool(true));
+    assert_eq!(response["commit_text"], Value::String("ក".to_owned()));
+    assert_eq!(response["snapshot"]["raw_preedit"], Value::String(String::new()));
+
+    shutdown_and_assert_ok(child, &mut stdin, &mut stdout);
+}
+
+#[test]
+fn bridge_nida_mode_does_not_treat_caps_uppercase_as_shift() {
+    let (child, mut stdin, mut stdout) = spawn_bridge_with_args(&["--initial-input-mode", "nida"]);
+
+    send_command(
+        &mut stdin,
+        r#"{"cmd":"process_key_event","keyval":65,"keycode":30,"state":0}"#,
+    );
+    let response = read_response(&mut stdout);
+    assert_eq!(response["consumed"], Value::Bool(true));
+    assert_eq!(response["commit_text"], Value::String("ា".to_owned()));
+
+    shutdown_and_assert_ok(child, &mut stdin, &mut stdout);
+}
+
+#[test]
+fn bridge_nida_mode_uses_nida_xml_shift_space_mapping() {
+    let (child, mut stdin, mut stdout) = spawn_bridge_with_args(&["--initial-input-mode", "nida"]);
+
+    send_command(
+        &mut stdin,
+        r#"{"cmd":"process_key_event","keyval":32,"keycode":57,"state":1}"#,
+    );
+    let response = read_response(&mut stdout);
+    assert_eq!(response["consumed"], Value::Bool(true));
+    assert_eq!(response["commit_text"], Value::String(" ".to_owned()));
+
+    shutdown_and_assert_ok(child, &mut stdin, &mut stdout);
+}
+
+#[test]
+fn bridge_nida_mode_uses_evdev_top_letter_row() {
+    let (child, mut stdin, mut stdout) = spawn_bridge_with_args(&["--initial-input-mode", "nida"]);
+    let keys = [
+        (113, 16, "ឆ"),
+        (119, 17, "ឹ"),
+        (101, 18, "េ"),
+        (114, 19, "រ"),
+        (116, 20, "ត"),
+        (121, 21, "យ"),
+        (117, 22, "ុ"),
+        (105, 23, "ិ"),
+        (111, 24, "ោ"),
+        (112, 25, "ផ"),
+    ];
+
+    for (keyval, keycode, expected) in keys {
+        send_command(
+            &mut stdin,
+            &format!(r#"{{"cmd":"process_key_event","keyval":{keyval},"keycode":{keycode},"state":0}}"#),
+        );
+        let response = read_response(&mut stdout);
+        assert_eq!(response["consumed"], Value::Bool(true));
+        assert_eq!(response["commit_text"], Value::String(expected.to_owned()));
+    }
+
+    shutdown_and_assert_ok(child, &mut stdin, &mut stdout);
+}
+
+#[test]
+fn bridge_nida_mode_does_not_map_backspace_or_enter_evdev_keycodes() {
+    let (child, mut stdin, mut stdout) = spawn_bridge_with_args(&["--initial-input-mode", "nida"]);
+
+    send_command(
+        &mut stdin,
+        r#"{"cmd":"process_key_event","keyval":65288,"keycode":14,"state":0}"#,
+    );
+    let backspace = read_response(&mut stdout);
+    assert_eq!(backspace["consumed"], Value::Bool(false));
+    assert_eq!(backspace["commit_text"], Value::Null);
+
+    send_command(
+        &mut stdin,
+        r#"{"cmd":"process_key_event","keyval":65293,"keycode":28,"state":0}"#,
+    );
+    let enter = read_response(&mut stdout);
+    assert_eq!(enter["consumed"], Value::Bool(false));
+    assert_eq!(enter["commit_text"], Value::Null);
+
+    shutdown_and_assert_ok(child, &mut stdin, &mut stdout);
 }
 
 #[test]

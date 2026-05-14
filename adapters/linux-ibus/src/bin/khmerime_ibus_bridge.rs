@@ -2,7 +2,7 @@ use std::io::{self, BufRead, Write};
 
 use khmerime_core::{DecoderConfig, DecoderMode, Result as KhmerResult, Transliterator};
 use khmerime_linux_ibus::{fallback_empty_snapshot_json, BridgeCommand, BridgeResponse, DesktopHistoryStore};
-use khmerime_session::{HistoryStore, ImeSession, ImeSessionSnapshot, ImeSessionUpdate};
+use khmerime_session::{HistoryStore, ImeSession, ImeSessionSnapshot, ImeSessionUpdate, InputMode};
 
 fn build_response(session: &ImeSession, update: ImeSessionUpdate) -> BridgeResponse<ImeSessionSnapshot> {
     BridgeResponse {
@@ -26,7 +26,7 @@ fn error_response(session: &ImeSession, message: impl Into<String>) -> BridgeRes
     }
 }
 
-fn bootstrap_session() -> KhmerResult<ImeSession> {
+fn bootstrap_session(input_mode: InputMode) -> KhmerResult<ImeSession> {
     let store = DesktopHistoryStore;
     let transliterator = Transliterator::from_default_data_with_config(DecoderConfig::shadow_interactive())?;
     let commit_refiner = Transliterator::from_default_data_with_config(
@@ -35,10 +35,11 @@ fn bootstrap_session() -> KhmerResult<ImeSession> {
             .with_shadow_log(false),
     )?;
     let history = store.load().unwrap_or_default();
-    Ok(ImeSession::new_with_commit_refiner(
+    Ok(ImeSession::new_with_commit_refiner_and_input_mode(
         transliterator,
         commit_refiner,
         history,
+        input_mode,
     ))
 }
 
@@ -64,6 +65,19 @@ fn apply_command(session: &mut ImeSession, command: BridgeCommand) -> (BridgeRes
         BridgeCommand::RefineComposition { raw_preedit } => {
             session.apply_refined_candidate(&raw_preedit);
             (build_response(session, ImeSessionUpdate::default()), false)
+        }
+        BridgeCommand::SetInputMode { input_mode } => {
+            session.set_input_mode(input_mode);
+            (build_response(session, ImeSessionUpdate::default()), false)
+        }
+        BridgeCommand::ToggleInputMode => {
+            session.toggle_input_mode();
+            let update = ImeSessionUpdate {
+                consumed: true,
+                commit_text: None,
+                history_changed: false,
+            };
+            (build_response(session, update), false)
         }
         BridgeCommand::FocusIn => {
             session.focus_in();
@@ -106,8 +120,38 @@ fn apply_command(session: &mut ImeSession, command: BridgeCommand) -> (BridgeRes
     }
 }
 
+fn parse_initial_input_mode() -> Result<InputMode, String> {
+    let mut args = std::env::args().skip(1);
+    while let Some(arg) = args.next() {
+        let raw_value = if let Some(value) = arg.strip_prefix("--initial-input-mode=") {
+            Some(value.to_owned())
+        } else if arg == "--initial-input-mode" {
+            args.next()
+        } else {
+            None
+        };
+
+        let Some(value) = raw_value else {
+            continue;
+        };
+        return match value.as_str() {
+            "roman" => Ok(InputMode::Roman),
+            "nida" => Ok(InputMode::Nida),
+            other => Err(format!("invalid --initial-input-mode value: {other}")),
+        };
+    }
+    Ok(InputMode::Roman)
+}
+
 fn main() {
-    let mut session = match bootstrap_session() {
+    let initial_input_mode = match parse_initial_input_mode() {
+        Ok(input_mode) => input_mode,
+        Err(err) => {
+            eprintln!("{err}");
+            std::process::exit(2);
+        }
+    };
+    let mut session = match bootstrap_session(initial_input_mode) {
         Ok(mut session) => {
             session.set_cursor_location(0, 0, 0, 0);
             session
