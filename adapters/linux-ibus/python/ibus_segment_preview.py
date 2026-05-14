@@ -58,3 +58,38 @@ def build_segment_preview_fallback(entries: Iterable[Any]) -> str:
     """Plain-text preview used when styled rendering is unavailable."""
     text, _, _ = build_segment_preview(entries)
     return text
+
+
+def focused_raw_input_span(
+    raw_preedit: str, entries: Iterable[Any], focused_index: Optional[int]
+) -> Optional[tuple[int, int]]:
+    """Return the focused segment's raw roman preedit range, if it is exact."""
+    if not isinstance(raw_preedit, str) or not raw_preedit:
+        return None
+    if type(focused_index) is not int or focused_index < 0:
+        return None
+
+    try:
+        entry_list = list(entries)
+    except TypeError:
+        return None
+    if focused_index >= len(entry_list):
+        return None
+
+    inputs: list[str] = []
+    for entry in entry_list:
+        if not isinstance(entry, dict):
+            return None
+        inputs.append(str(entry.get("input", "")).strip())
+
+    focused_input = inputs[focused_index]
+    if not focused_input:
+        return None
+    if "".join(inputs) != raw_preedit:
+        return None
+
+    start = sum(len(value) for value in inputs[:focused_index])
+    end = start + len(focused_input)
+    if start == end:
+        return None
+    return start, end

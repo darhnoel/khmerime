@@ -43,6 +43,10 @@ fi
 
 echo "[khmerime] removing IBus engine files..."
 run_rm rm -f "${INSTALL_LIBEXEC_DIR}/khmerime-ibus-engine"
+run_rm rm -f "${INSTALL_LIBEXEC_DIR}/ibus_bridge_client.py"
+run_rm rm -f "${INSTALL_LIBEXEC_DIR}/ibus_candidate_render.py"
+run_rm rm -f "${INSTALL_LIBEXEC_DIR}/ibus_component.py"
+run_rm rm -f "${INSTALL_LIBEXEC_DIR}/ibus_refinement.py"
 run_rm rm -f "${INSTALL_LIBEXEC_DIR}/ibus_segment_preview.py"
 run_rm rm -f "${INSTALL_LIBEXEC_DIR}/khmerime-ibus-bridge"
 run_rm rmdir "${INSTALL_LIBEXEC_DIR}" 2>/dev/null || true
@@ -50,6 +54,10 @@ run_rm rm -f "${INSTALL_COMPONENT_PATH}"
 
 rm -f "${LEGACY_USER_COMPONENT_PATH}"
 rm -f "${LEGACY_USER_LIBEXEC_DIR}/khmerime-ibus-engine"
+rm -f "${LEGACY_USER_LIBEXEC_DIR}/ibus_bridge_client.py"
+rm -f "${LEGACY_USER_LIBEXEC_DIR}/ibus_candidate_render.py"
+rm -f "${LEGACY_USER_LIBEXEC_DIR}/ibus_component.py"
+rm -f "${LEGACY_USER_LIBEXEC_DIR}/ibus_refinement.py"
 rm -f "${LEGACY_USER_LIBEXEC_DIR}/ibus_segment_preview.py"
 rm -f "${LEGACY_USER_LIBEXEC_DIR}/khmerime-ibus-bridge"
 rmdir "${LEGACY_USER_LIBEXEC_DIR}" 2>/dev/null || true

@@ -8,16 +8,13 @@ khmerime_ibus_bridge Rust binary through a JSON line protocol.
 from __future__ import annotations
 
 import argparse
-import json
 import os
 import signal
-import subprocess
 import sys
 import threading
-from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, Dict, Optional
 
 import gi
 
@@ -25,29 +22,24 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 if str(SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPT_DIR))
 
-from ibus_segment_preview import FOCUSED_MARKER_MODE, SegmentSpan, build_segment_preview
+from ibus_bridge_client import BridgeClient, BridgeResponse
+from ibus_candidate_render import candidate_rows
+from ibus_component import ENGINE_NAME, SERVICE_NAME, component_xml, register_component
+from ibus_refinement import RefinementScheduler
+from ibus_segment_preview import (
+    FOCUSED_MARKER_MODE,
+    SegmentSpan,
+    build_segment_preview,
+    focused_raw_input_span,
+)
 
 gi.require_version("IBus", "1.0")
 from gi.repository import GLib, IBus  # noqa: E402
 
 
-SERVICE_NAME = "org.freedesktop.IBus.KhmerIME"
-ENGINE_NAME = "khmerime"
-ENGINE_LONGNAME = "KhmerIME"
-ENGINE_DESCRIPTION = "Khmer romanization IME powered by KhmerIME"
-ENGINE_LANGUAGE = "km"
-ENGINE_LAYOUT = "us"
-ENGINE_SYMBOL = "ខ"
 KEY_RETURN = 0xFF0D
 KEY_KP_ENTER = 0xFF8D
 LOG_PATH = Path(os.environ.get("KHMERIME_IBUS_LOG", "~/.cache/khmerime/ibus_engine.log")).expanduser()
-SEGMENT_PREVIEW_ALT_FOREGROUNDS = (0x2E6FD9, 0x0A8A5B)
-SEGMENT_PREVIEW_FOCUSED_FOREGROUND = 0xFFFFFF
-SEGMENT_PREVIEW_FOCUSED_BACKGROUND = 0x005FCC
-RECOMMENDED_MARK = "✓"
-DERIVED_MARK = "≈"
-REFINE_MIN_RAW_PREEDIT_LEN = 10
-REFINE_DEBOUNCE_MS = 400
 
 
 def log_line(message: str) -> None:
@@ -59,59 +51,6 @@ def log_line(message: str) -> None:
         pass
 
 
-@dataclass
-class BridgeResponse:
-    ok: bool
-    consumed: bool
-    commit_text: Optional[str]
-    snapshot: Dict[str, Any]
-    error: Optional[str]
-
-
-class BridgeClient:
-    def __init__(self, bridge_path: Path):
-        self._proc = subprocess.Popen(
-            [str(bridge_path)],
-            stdin=subprocess.PIPE,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
-            bufsize=1,
-        )
-
-    def call(self, payload: Dict[str, Any]) -> BridgeResponse:
-        if self._proc.stdin is None or self._proc.stdout is None:
-            raise RuntimeError("bridge pipe is unavailable")
-        self._proc.stdin.write(json.dumps(payload, ensure_ascii=False) + "\n")
-        self._proc.stdin.flush()
-        line = self._proc.stdout.readline()
-        if not line:
-            stderr = ""
-            if self._proc.stderr is not None:
-                stderr = self._proc.stderr.read(4096).strip()
-            raise RuntimeError(f"bridge terminated unexpectedly: {stderr}")
-        data = json.loads(line)
-        return BridgeResponse(
-            ok=bool(data.get("ok", False)),
-            consumed=bool(data.get("consumed", False)),
-            commit_text=data.get("commit_text"),
-            snapshot=data.get("snapshot", {}),
-            error=data.get("error"),
-        )
-
-    def shutdown(self) -> None:
-        try:
-            self.call({"cmd": "shutdown"})
-        except Exception:
-            pass
-        if self._proc.poll() is None:
-            self._proc.terminate()
-            try:
-                self._proc.wait(timeout=1.0)
-            except subprocess.TimeoutExpired:
-                self._proc.kill()
-
-
 class KhmerIMEEngine(IBus.Engine):
     def __init__(self, connection: Any, object_path: str, bridge_path: Path):
         super().__init__(connection=connection, object_path=object_path)
@@ -120,8 +59,6 @@ class KhmerIMEEngine(IBus.Engine):
         self._table = IBus.LookupTable.new(9, 0, True, True)
         self._last_preedit = ""
         self._last_raw_preedit = ""
-        self._refine_timeout_id = 0
-        self._refine_generation = 0
         self._focus_events = 0
         self._reset_events = 0
         self._last_enter_focus_events = 0
@@ -132,6 +69,15 @@ class KhmerIMEEngine(IBus.Engine):
         self._surrounding_text = ""
         self._surrounding_cursor_pos = 0
         self._surrounding_anchor_pos = 0
+        self._refinement = RefinementScheduler(
+            call_refine=self._call_bridge_raw,
+            apply_response=self._apply_response,
+            current_raw_preedit=lambda: self._last_raw_preedit,
+            log=log_line,
+            timeout_add=GLib.timeout_add,
+            source_remove=GLib.source_remove,
+            idle_add=GLib.idle_add,
+        )
         self._apply_snapshot(self._call_bridge_raw({"cmd": "snapshot"}))
         log_line(f"engine init object_path={object_path} bridge={bridge_path}")
 
@@ -197,61 +143,58 @@ class KhmerIMEEngine(IBus.Engine):
         self._last_preedit = render_preedit
         self._last_raw_preedit = raw_preedit
         preedit_visible = bool(render_preedit)
+        segment_preview = snapshot.get("segment_preview") or []
+        segmented_active = bool(snapshot.get("segmented_active", False))
+        preedit_text = IBus.Text.new_from_string(render_preedit)
+        if segmented_active:
+            focused_raw_span = focused_raw_input_span(
+                raw_preedit,
+                segment_preview,
+                snapshot.get("focused_segment_index"),
+            )
+            if focused_raw_span is not None:
+                start, end = focused_raw_span
+                attrs = IBus.AttrList.new()
+                attrs.append(IBus.attr_underline_new(IBus.AttrUnderline.SINGLE, start, end))
+                preedit_text.set_attributes(attrs)
         self.update_preedit_text(
-            IBus.Text.new_from_string(render_preedit),
+            preedit_text,
             len(render_preedit),
             preedit_visible,
         )
 
         candidates = snapshot.get("candidates") or []
         candidate_display = snapshot.get("candidate_display") or []
-        candidate_rows = self._candidate_rows(candidates, candidate_display)
+        rendered_candidates = candidate_rows(candidates, candidate_display)
         self._table.clear()
-        for candidate in candidate_rows:
+        for candidate in rendered_candidates:
             self._table.append_candidate(IBus.Text.new_from_string(str(candidate)))
 
         selected = snapshot.get("selected_index")
-        if isinstance(selected, int) and candidate_rows:
-            self._table.set_cursor_pos(min(selected, len(candidate_rows) - 1))
+        if isinstance(selected, int) and rendered_candidates:
+            self._table.set_cursor_pos(min(selected, len(rendered_candidates) - 1))
 
-        self.update_lookup_table(self._table, bool(candidate_rows))
+        self.update_lookup_table(self._table, bool(rendered_candidates))
 
-        segment_preview = snapshot.get("segment_preview") or []
-        segmented_active = bool(snapshot.get("segmented_active", False))
         if segmented_active and segment_preview:
             auxiliary_text, chunk_spans, focused_chunk_index = build_segment_preview(segment_preview)
             if auxiliary_text:
                 focused_span = self._resolve_focused_chunk_span(chunk_spans, focused_chunk_index)
                 focused_span_label = "none"
-                focused_style_span_label = "none"
                 if focused_span is not None:
                     focused_span_label = f"{focused_span.start}:{focused_span.end}"
-                    padded_start, padded_end = self._focus_span_with_padding(
-                        auxiliary_text, focused_span.start, focused_span.end
-                    )
-                    focused_style_span_label = f"{padded_start}:{padded_end}"
-                render_mode = "styled"
-                try:
-                    auxiliary_render = self._build_styled_auxiliary_text(
-                        auxiliary_text, chunk_spans, focused_chunk_index
-                    )
-                except Exception as err:
-                    render_mode = "fallback"
-                    auxiliary_render = IBus.Text.new_from_string(auxiliary_text)
-                    log_line(f"segment_preview style_failed err={err}")
+                auxiliary_render = IBus.Text.new_from_string(auxiliary_text)
                 self.update_auxiliary_text(auxiliary_render, True)
                 self.show_auxiliary_text()
                 log_line(
                     "segment_preview segmented_active=%s chunks=%s focused_chunk=%s focused_span=%s "
-                    "focus_style_span=%s marker_mode=%s render=%s text_len=%s recommended=%s derived=%s"
+                    "marker_mode=%s render=marker text_len=%s recommended=%s derived=%s"
                     % (
                         segmented_active,
                         len(chunk_spans),
                         focused_chunk_index,
                         focused_span_label,
-                        focused_style_span_label,
                         FOCUSED_MARKER_MODE,
-                        render_mode,
                         len(auxiliary_text),
                         sum(1 for row in candidate_display if isinstance(row, dict) and bool(row.get("recommended"))),
                         sum(
@@ -275,131 +218,16 @@ class KhmerIMEEngine(IBus.Engine):
         self.update_lookup_table(self._table, False)
         self.hide_auxiliary_text()
 
-    @staticmethod
-    def _candidate_rows(candidates: Any, candidate_display: Any) -> list[str]:
-        if not isinstance(candidates, list):
-            return []
-
-        rendered = []
-        use_display = isinstance(candidate_display, list) and len(candidate_display) == len(candidates)
-        for index, candidate in enumerate(candidates):
-            text = str(candidate)
-            if not use_display:
-                if not text.isascii():
-                    rendered.append(text)
-                continue
-
-            entry = candidate_display[index]
-            if not isinstance(entry, dict):
-                if not text.isascii():
-                    rendered.append(text)
-                continue
-
-            output = str(entry.get("output", "")).strip() or text
-            if output.isascii():
-                continue
-            recommended = bool(entry.get("recommended", False))
-            hints = [str(hint).strip() for hint in (entry.get("roman_hints") or []) if str(hint).strip()]
-            label = output
-            if recommended:
-                label = f"{RECOMMENDED_MARK} {label}"
-            elif not hints:
-                label = f"{DERIVED_MARK} {label}"
-            if hints:
-                label = f"{label} ({' / '.join(hints[:3])})"
-            rendered.append(label)
-        return rendered
-
     def _cancel_pending_refinement(self) -> None:
-        self._refine_generation += 1
-        if self._refine_timeout_id:
-            GLib.source_remove(self._refine_timeout_id)
-            self._refine_timeout_id = 0
+        self._refinement.cancel()
 
     def _schedule_refinement(self, raw_preedit: str) -> None:
-        if len(raw_preedit) < REFINE_MIN_RAW_PREEDIT_LEN:
-            return
-        generation = self._refine_generation
-        self._refine_timeout_id = GLib.timeout_add(
-            REFINE_DEBOUNCE_MS,
-            self._start_refinement,
-            generation,
-            raw_preedit,
-        )
-
-    def _start_refinement(self, generation: int, raw_preedit: str) -> bool:
-        self._refine_timeout_id = 0
-        threading.Thread(
-            target=self._run_refinement,
-            args=(generation, raw_preedit),
-            daemon=True,
-        ).start()
-        return False
-
-    def _run_refinement(self, generation: int, raw_preedit: str) -> None:
-        try:
-            response = self._call_bridge_raw(
-                {
-                    "cmd": "refine_composition",
-                    "raw_preedit": raw_preedit,
-                }
-            )
-        except Exception as err:
-            log_line(f"refine_composition failed raw_len={len(raw_preedit)} err={err}")
-            return
-        GLib.idle_add(self._finish_refinement, generation, raw_preedit, response)
-
-    def _finish_refinement(self, generation: int, raw_preedit: str, response: BridgeResponse) -> bool:
-        if generation != self._refine_generation or raw_preedit != self._last_raw_preedit:
-            log_line(
-                "refine_composition stale raw_len=%s current_len=%s"
-                % (len(raw_preedit), len(self._last_raw_preedit))
-            )
-            return False
-        self._apply_response(response)
-        if response.error:
-            log_line(f"bridge error payload=refine_composition error={response.error}")
-        else:
-            log_line(
-                "refine_composition applied raw_len=%s cand=%s"
-                % (len(raw_preedit), len(response.snapshot.get("candidates", []) or []))
-            )
-        return False
+        self._refinement.schedule(raw_preedit)
 
     @staticmethod
     def _is_refinement_trigger_key(keyval: int) -> bool:
         ch = chr(keyval) if 0 <= keyval <= sys.maxunicode else ""
-        return bool(ch) and ch.isascii() and ch.isgraph()
-
-    @staticmethod
-    def _build_styled_auxiliary_text(
-        text: str, chunk_spans: list[SegmentSpan], focused_chunk_index: Optional[int]
-    ) -> IBus.Text:
-        rendered = IBus.Text.new_from_string(text)
-        attrs = IBus.AttrList.new()
-        for index, chunk in enumerate(chunk_spans):
-            if chunk.end <= chunk.start:
-                continue
-            is_focused = chunk.focused or (focused_chunk_index is not None and index == focused_chunk_index)
-            if is_focused:
-                styled_start, styled_end = KhmerIMEEngine._focus_span_with_padding(text, chunk.start, chunk.end)
-                attrs.append(
-                    IBus.attr_foreground_new(SEGMENT_PREVIEW_FOCUSED_FOREGROUND, styled_start, styled_end)
-                )
-                attrs.append(
-                    IBus.attr_background_new(SEGMENT_PREVIEW_FOCUSED_BACKGROUND, styled_start, styled_end)
-                )
-                attrs.append(IBus.attr_underline_new(IBus.AttrUnderline.DOUBLE, styled_start, styled_end))
-            else:
-                attrs.append(
-                    IBus.attr_foreground_new(
-                        SEGMENT_PREVIEW_ALT_FOREGROUNDS[index % len(SEGMENT_PREVIEW_ALT_FOREGROUNDS)],
-                        chunk.start,
-                        chunk.end,
-                    )
-                )
-        rendered.set_attributes(attrs)
-        return rendered
+        return bool(ch) and ch.isascii() and ch.isprintable() and not ch.isspace()
 
     @staticmethod
     def _resolve_focused_chunk_span(
@@ -411,16 +239,6 @@ class KhmerIMEEngine(IBus.Engine):
             if chunk.focused:
                 return chunk
         return None
-
-    @staticmethod
-    def _focus_span_with_padding(text: str, start: int, end: int) -> Tuple[int, int]:
-        padded_start = start
-        padded_end = end
-        if padded_start > 0 and text[padded_start - 1].isspace():
-            padded_start -= 1
-        if padded_end < len(text) and text[padded_end].isspace():
-            padded_end += 1
-        return padded_start, padded_end
 
     def do_process_key_event(self, keyval: int, keycode: int, state: int) -> bool:
         self._cancel_pending_refinement()
@@ -586,58 +404,6 @@ class KhmerIMEFactory(IBus.Factory):
         )
 
 
-def component_xml(exec_path: Path) -> str:
-    exec_cmd = f"{exec_path} --ibus"
-    return f"""<component>
-    <name>{SERVICE_NAME}</name>
-    <description>KhmerIME input method engine</description>
-    <version>0.1.0</version>
-    <license>MIT</license>
-    <author>KhmerIME contributors</author>
-    <homepage>https://github.com/darhnoel/khmerime</homepage>
-    <textdomain>khmerime</textdomain>
-    <exec>{exec_cmd}</exec>
-    <engines>
-        <engine>
-            <name>{ENGINE_NAME}</name>
-            <longname>{ENGINE_LONGNAME}</longname>
-            <description>{ENGINE_DESCRIPTION}</description>
-            <language>{ENGINE_LANGUAGE}</language>
-            <license>MIT</license>
-            <author>KhmerIME contributors</author>
-            <icon></icon>
-            <layout>{ENGINE_LAYOUT}</layout>
-            <symbol>{ENGINE_SYMBOL}</symbol>
-        </engine>
-    </engines>
-</component>"""
-
-
-def register_component(bus: IBus.Bus, exec_path: Path) -> None:
-    component = IBus.Component.new(
-        SERVICE_NAME,
-        "KhmerIME input method engine",
-        "0.1.0",
-        "MIT",
-        "KhmerIME contributors",
-        "https://github.com/darhnoel/khmerime",
-        str(exec_path),
-        "khmerime",
-    )
-    engine = IBus.EngineDesc.new(
-        ENGINE_NAME,
-        ENGINE_LONGNAME,
-        ENGINE_DESCRIPTION,
-        ENGINE_LANGUAGE,
-        "MIT",
-        "KhmerIME contributors",
-        "",
-        ENGINE_LAYOUT,
-    )
-    component.add_engine(engine)
-    bus.register_component(component)
-
-
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="KhmerIME IBus adapter")
     parser.add_argument("--ibus", action="store_true", help="Run as IBus-launched engine")
@@ -688,7 +454,7 @@ def main() -> int:
         bus.request_name(SERVICE_NAME, 0)
         log_line(f"requested name {SERVICE_NAME}")
     else:
-        register_component(bus, exec_path)
+        register_component(IBus, bus, exec_path)
         log_line("registered component for non-ibus launch")
 
     signal.signal(signal.SIGTERM, lambda *_: loop.quit())

@@ -5,9 +5,14 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../../.." && pwd)"
 INSTALL_LIBEXEC_DIR="${KHMERIME_IBUS_LIBEXEC_DIR:-/usr/libexec/khmerime}"
 INSTALL_COMPONENT_DIR="${KHMERIME_IBUS_COMPONENT_DIR:-/usr/share/ibus/component}"
 ENGINE_SCRIPT_SRC="${ROOT_DIR}/adapters/linux-ibus/python/khmerime_ibus_engine.py"
-ENGINE_HELPER_SRC="${ROOT_DIR}/adapters/linux-ibus/python/ibus_segment_preview.py"
+ENGINE_HELPER_SRCS=(
+  "${ROOT_DIR}/adapters/linux-ibus/python/ibus_bridge_client.py"
+  "${ROOT_DIR}/adapters/linux-ibus/python/ibus_candidate_render.py"
+  "${ROOT_DIR}/adapters/linux-ibus/python/ibus_component.py"
+  "${ROOT_DIR}/adapters/linux-ibus/python/ibus_refinement.py"
+  "${ROOT_DIR}/adapters/linux-ibus/python/ibus_segment_preview.py"
+)
 ENGINE_SCRIPT_DST="${INSTALL_LIBEXEC_DIR}/khmerime-ibus-engine"
-ENGINE_HELPER_DST="${INSTALL_LIBEXEC_DIR}/ibus_segment_preview.py"
 BRIDGE_BINARY_DST="${INSTALL_LIBEXEC_DIR}/khmerime-ibus-bridge"
 COMPONENT_XML_PATH="${INSTALL_COMPONENT_DIR}/khmerime.xml"
 LEGACY_USER_COMPONENT_PATH="${HOME}/.local/share/ibus/component/khmerime.xml"
@@ -61,10 +66,13 @@ run_install install -d "${INSTALL_LIBEXEC_DIR}" "${INSTALL_COMPONENT_DIR}"
 echo "[khmerime] installing bridge + ibus adapter..."
 run_install install -m 0755 "${ROOT_DIR}/target/release/khmerime_ibus_bridge" "${BRIDGE_BINARY_DST}"
 run_install install -m 0755 "${ENGINE_SCRIPT_SRC}" "${ENGINE_SCRIPT_DST}"
-run_install install -m 0644 "${ENGINE_HELPER_SRC}" "${ENGINE_HELPER_DST}"
+for helper_src in "${ENGINE_HELPER_SRCS[@]}"; do
+  run_install install -m 0644 "${helper_src}" "${INSTALL_LIBEXEC_DIR}/$(basename "${helper_src}")"
+done
 
 echo "[khmerime] writing IBus component XML..."
 TMP_COMPONENT_XML="$(mktemp)"
+ENGINE_EXEC="${ENGINE_SCRIPT_DST} --ibus --bridge-path ${BRIDGE_BINARY_DST}"
 cat > "${TMP_COMPONENT_XML}" <<EOF
 <component>
     <name>org.freedesktop.IBus.KhmerIME</name>
@@ -74,7 +82,7 @@ cat > "${TMP_COMPONENT_XML}" <<EOF
     <author>KhmerIME contributors</author>
     <homepage>https://github.com/darhnoel/khmerime</homepage>
     <textdomain>khmerime</textdomain>
-    <exec>${ENGINE_SCRIPT_DST} --ibus --bridge-path ${BRIDGE_BINARY_DST}</exec>
+    <exec>${ENGINE_EXEC}</exec>
     <engines>
         <engine>
             <name>khmerime</name>

@@ -9,6 +9,7 @@ from ibus_segment_preview import (  # noqa: E402
     SEGMENT_SEPARATOR,
     build_segment_preview,
     build_segment_preview_fallback,
+    focused_raw_input_span,
 )
 
 
@@ -55,3 +56,47 @@ def test_segment_preview_fallback_text_ignores_invalid_entries():
     assert fallback_text == "⟦រៀន(rien)⟧"
     assert fallback_text.startswith(FOCUSED_MARKER_OPEN)
     assert fallback_text.endswith(FOCUSED_MARKER_CLOSE)
+
+
+def test_focused_raw_input_span_returns_ordered_focused_range():
+    entries = [
+        {"output": "នេះ", "input": "nih", "focused": False},
+        {"output": "ជា", "input": "jea", "focused": True},
+        {"output": "ស្នាដៃ", "input": "snadai", "focused": False},
+    ]
+
+    assert focused_raw_input_span("nihjeasnadai", entries, 1) == (3, 6)
+
+
+def test_focused_raw_input_span_uses_ordered_offsets_for_repeated_inputs():
+    entries = [
+        {"output": "រ", "input": "ro", "focused": False},
+        {"output": "រ", "input": "ro", "focused": True},
+        {"output": "រ", "input": "ro", "focused": False},
+    ]
+
+    assert focused_raw_input_span("rororo", entries, 1) == (2, 4)
+
+
+def test_focused_raw_input_span_rejects_empty_focused_input():
+    entries = [
+        {"output": "នេះ", "input": "nih", "focused": False},
+        {"output": "ជា", "input": "", "focused": True},
+    ]
+
+    assert focused_raw_input_span("nih", entries, 1) is None
+
+
+def test_focused_raw_input_span_requires_strict_full_match():
+    entries = [
+        {"output": "នេះ", "input": "nih", "focused": False},
+        {"output": "ជា", "input": "jea", "focused": True},
+    ]
+
+    assert focused_raw_input_span("nihjeaextra", entries, 1) is None
+
+
+def test_focused_raw_input_span_rejects_invalid_focused_index():
+    entries = [{"output": "នេះ", "input": "nih", "focused": True}]
+
+    assert focused_raw_input_span("nih", entries, 9) is None

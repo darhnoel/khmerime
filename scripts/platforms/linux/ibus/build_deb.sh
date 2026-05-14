@@ -16,7 +16,13 @@ CONTROL_TEMPLATE="${ROOT_DIR}/packaging/linux/deb/control.in"
 POSTINST_SRC="${ROOT_DIR}/packaging/linux/deb/postinst"
 POSTRM_SRC="${ROOT_DIR}/packaging/linux/deb/postrm"
 ENGINE_SCRIPT_SRC="${ROOT_DIR}/adapters/linux-ibus/python/khmerime_ibus_engine.py"
-ENGINE_HELPER_SRC="${ROOT_DIR}/adapters/linux-ibus/python/ibus_segment_preview.py"
+ENGINE_HELPER_SRCS=(
+  "${ROOT_DIR}/adapters/linux-ibus/python/ibus_bridge_client.py"
+  "${ROOT_DIR}/adapters/linux-ibus/python/ibus_candidate_render.py"
+  "${ROOT_DIR}/adapters/linux-ibus/python/ibus_component.py"
+  "${ROOT_DIR}/adapters/linux-ibus/python/ibus_refinement.py"
+  "${ROOT_DIR}/adapters/linux-ibus/python/ibus_segment_preview.py"
+)
 BRIDGE_SRC="${ROOT_DIR}/target/release/khmerime_ibus_bridge"
 
 if ! command -v dpkg-deb >/dev/null 2>&1; then
@@ -34,10 +40,16 @@ if [[ ! -f "${POSTINST_SRC}" || ! -f "${POSTRM_SRC}" ]]; then
   exit 2
 fi
 
-if [[ ! -f "${ENGINE_SCRIPT_SRC}" || ! -f "${ENGINE_HELPER_SRC}" ]]; then
+if [[ ! -f "${ENGINE_SCRIPT_SRC}" ]]; then
   echo "Missing Linux IBus Python adapter files" >&2
   exit 2
 fi
+for helper_src in "${ENGINE_HELPER_SRCS[@]}"; do
+  if [[ ! -f "${helper_src}" ]]; then
+    echo "Missing Linux IBus Python adapter helper: ${helper_src}" >&2
+    exit 2
+  fi
+done
 
 echo "[khmerime] building khmerime_ibus_bridge (release)..."
 cargo build --release --bin khmerime_ibus_bridge >/dev/null
@@ -54,7 +66,9 @@ install -m 0755 "${POSTRM_SRC}" "${DEBIAN_DIR}/postrm"
 
 install -m 0755 "${BRIDGE_SRC}" "${LIBEXEC_DIR}/khmerime-ibus-bridge"
 install -m 0755 "${ENGINE_SCRIPT_SRC}" "${LIBEXEC_DIR}/khmerime-ibus-engine"
-install -m 0644 "${ENGINE_HELPER_SRC}" "${LIBEXEC_DIR}/ibus_segment_preview.py"
+for helper_src in "${ENGINE_HELPER_SRCS[@]}"; do
+  install -m 0644 "${helper_src}" "${LIBEXEC_DIR}/$(basename "${helper_src}")"
+done
 
 cat > "${COMPONENT_DIR}/khmerime.xml" <<XML
 <component>
