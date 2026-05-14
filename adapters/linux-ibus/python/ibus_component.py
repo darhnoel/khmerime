@@ -7,8 +7,11 @@ from typing import Any
 
 SERVICE_NAME = "org.freedesktop.IBus.KhmerIME"
 ENGINE_NAME = "khmerime"
+ENGINE_NIDA_NAME = "khmerime-nida"
 ENGINE_LONGNAME = "KhmerIME"
+ENGINE_NIDA_LONGNAME = "KhmerIME NIDA"
 ENGINE_DESCRIPTION = "Khmer romanization IME powered by KhmerIME"
+ENGINE_NIDA_DESCRIPTION = "KhmerIME direct NIDA input mode"
 ENGINE_LANGUAGE = "km"
 ENGINE_LAYOUT = "us"
 ENGINE_SYMBOL = "ខ"
@@ -35,6 +38,19 @@ def component_xml(exec_path: Path) -> str:
             <author>KhmerIME contributors</author>
             <icon></icon>
             <layout>{ENGINE_LAYOUT}</layout>
+            <icon_prop_key>InputMode</icon_prop_key>
+            <symbol>{ENGINE_SYMBOL}</symbol>
+        </engine>
+        <engine>
+            <name>{ENGINE_NIDA_NAME}</name>
+            <longname>{ENGINE_NIDA_LONGNAME}</longname>
+            <description>{ENGINE_NIDA_DESCRIPTION}</description>
+            <language>{ENGINE_LANGUAGE}</language>
+            <license>MIT</license>
+            <author>KhmerIME contributors</author>
+            <icon></icon>
+            <layout>{ENGINE_LAYOUT}</layout>
+            <icon_prop_key>InputMode</icon_prop_key>
             <symbol>{ENGINE_SYMBOL}</symbol>
         </engine>
     </engines>
@@ -52,15 +68,19 @@ def register_component(ibus: Any, bus: Any, exec_path: Path) -> None:
         str(exec_path),
         "khmerime",
     )
-    engine = ibus.EngineDesc.new(
-        ENGINE_NAME,
-        ENGINE_LONGNAME,
-        ENGINE_DESCRIPTION,
-        ENGINE_LANGUAGE,
-        "MIT",
-        "KhmerIME contributors",
-        "",
-        ENGINE_LAYOUT,
-    )
-    component.add_engine(engine)
+    for name, longname, description in (
+        (ENGINE_NAME, ENGINE_LONGNAME, ENGINE_DESCRIPTION),
+        (ENGINE_NIDA_NAME, ENGINE_NIDA_LONGNAME, ENGINE_NIDA_DESCRIPTION),
+    ):
+        engine = ibus.EngineDesc.new(
+            name,
+            longname,
+            description,
+            ENGINE_LANGUAGE,
+            "MIT",
+            "KhmerIME contributors",
+            "",
+            ENGINE_LAYOUT,
+        )
+        component.add_engine(engine)
     bus.register_component(component)

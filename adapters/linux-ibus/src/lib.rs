@@ -4,7 +4,7 @@
 //! desktop callbacks, and a Rust bridge process that owns `khmerime_session`.
 //! This crate defines the JSON command/response boundary between them.
 
-use khmerime_session::CursorLocation;
+use khmerime_session::{CursorLocation, InputMode};
 use serde::{Deserialize, Serialize};
 
 pub mod history_store;
@@ -16,6 +16,8 @@ pub use history_store::{desktop_history_path, load_desktop_history, save_desktop
 pub enum BridgeCommand {
     ProcessKeyEvent { keyval: u32, keycode: u32, state: u32 },
     RefineComposition { raw_preedit: String },
+    SetInputMode { input_mode: InputMode },
+    ToggleInputMode,
     FocusIn,
     FocusOut,
     Reset,
@@ -49,6 +51,7 @@ pub fn fallback_empty_snapshot_json(error: impl Into<String>) -> serde_json::Val
         "snapshot": {
             "enabled": false,
             "focused": false,
+            "input_mode": "roman",
             "preedit": "",
             "raw_preedit": "",
             "candidates": [],

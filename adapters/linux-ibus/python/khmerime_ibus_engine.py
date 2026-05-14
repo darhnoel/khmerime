@@ -24,7 +24,7 @@ if str(SCRIPT_DIR) not in sys.path:
 
 from ibus_bridge_client import BridgeClient, BridgeResponse
 from ibus_candidate_render import candidate_rows
-from ibus_component import ENGINE_NAME, SERVICE_NAME, component_xml, register_component
+from ibus_component import ENGINE_NAME, ENGINE_NIDA_NAME, SERVICE_NAME, component_xml, register_component
 from ibus_refinement import RefinementScheduler
 from ibus_segment_preview import (
     FOCUSED_MARKER_MODE,
@@ -33,12 +33,29 @@ from ibus_segment_preview import (
     focused_raw_input_span,
 )
 
+try:
+    gi.require_version("Gdk", "3.0")
+    from gi.repository import Gdk  # type: ignore[attr-defined]
+except Exception:
+    Gdk = None  # type: ignore[assignment]
+
 gi.require_version("IBus", "1.0")
 from gi.repository import GLib, IBus  # noqa: E402
 
 
 KEY_RETURN = 0xFF0D
 KEY_KP_ENTER = 0xFF8D
+KEY_CAPS_LOCK = 0xFFE5
+STATE_LOCK_MASK = int(IBus.ModifierType.LOCK_MASK)
+STATE_RELEASE_MASK = int(IBus.ModifierType.RELEASE_MASK)
+MODE_PROPERTY_KEY = "InputMode"
+MODE_PROPERTY_ROMAN_KEY = "InputMode.Roman"
+MODE_PROPERTY_NIDA_KEY = "InputMode.NIDA"
+MODE_ROMAN_SYMBOL = "R"
+MODE_NIDA_SYMBOL = "ខ"
+MODE_ROMAN_LABEL = "Roman"
+MODE_NIDA_LABEL = "NIDA"
+MODE_TOOLTIP = "Toggle KhmerIME Roman/NIDA mode"
 LOG_PATH = Path(os.environ.get("KHMERIME_IBUS_LOG", "~/.cache/khmerime/ibus_engine.log")).expanduser()
 
 
@@ -52,9 +69,9 @@ def log_line(message: str) -> None:
 
 
 class KhmerIMEEngine(IBus.Engine):
-    def __init__(self, connection: Any, object_path: str, bridge_path: Path):
+    def __init__(self, connection: Any, object_path: str, bridge_path: Path, initial_input_mode: str = "roman"):
         super().__init__(connection=connection, object_path=object_path)
-        self._bridge = BridgeClient(bridge_path)
+        self._bridge = BridgeClient(bridge_path, initial_input_mode=initial_input_mode)
         self._bridge_lock = threading.Lock()
         self._table = IBus.LookupTable.new(9, 0, True, True)
         self._last_preedit = ""
@@ -69,6 +86,12 @@ class KhmerIMEEngine(IBus.Engine):
         self._surrounding_text = ""
         self._surrounding_cursor_pos = 0
         self._surrounding_anchor_pos = 0
+        self._mode_property_registered = False
+        self._mode_main_prop: Optional[IBus.Property] = None
+        self._mode_sub_props: Dict[str, IBus.Property] = {}
+        self._mode_main_prop_list: Optional[IBus.PropList] = None
+        self._current_input_mode = "roman"
+        self._pending_caps_input_mode: Optional[str] = None
         self._refinement = RefinementScheduler(
             call_refine=self._call_bridge_raw,
             apply_response=self._apply_response,
@@ -78,8 +101,10 @@ class KhmerIMEEngine(IBus.Engine):
             source_remove=GLib.source_remove,
             idle_add=GLib.idle_add,
         )
+        self._current_input_mode = "nida" if initial_input_mode == "nida" else "roman"
+        self._register_mode_property(self._current_input_mode)
         self._apply_snapshot(self._call_bridge_raw({"cmd": "snapshot"}))
-        log_line(f"engine init object_path={object_path} bridge={bridge_path}")
+        log_line(f"engine init object_path={object_path} bridge={bridge_path} input_mode={initial_input_mode}")
 
     def _call_bridge_raw(self, payload: Dict[str, Any]) -> BridgeResponse:
         with self._bridge_lock:
@@ -138,6 +163,7 @@ class KhmerIMEEngine(IBus.Engine):
 
     def _apply_snapshot(self, response: BridgeResponse) -> None:
         snapshot = response.snapshot or {}
+        self._update_mode_property(str(snapshot.get("input_mode", "roman")))
         raw_preedit = str(snapshot.get("raw_preedit", ""))
         render_preedit = raw_preedit or str(snapshot.get("preedit", ""))
         self._last_preedit = render_preedit
@@ -209,6 +235,163 @@ class KhmerIMEEngine(IBus.Engine):
                 return
         self.hide_auxiliary_text()
 
+    @staticmethod
+    def _normalize_mode(mode: str) -> str:
+        return "nida" if mode == "nida" else "roman"
+
+    def _build_mode_property(self, mode: str) -> IBus.Property:
+        normalized = self._normalize_mode(mode)
+        active_label = MODE_NIDA_LABEL if normalized == "nida" else MODE_ROMAN_LABEL
+        active_symbol = MODE_NIDA_SYMBOL if normalized == "nida" else MODE_ROMAN_SYMBOL
+
+        sub_props = IBus.PropList.new()
+        roman_sub = IBus.Property.new(
+            MODE_PROPERTY_ROMAN_KEY,
+            IBus.PropType.RADIO,
+            IBus.Text.new_from_string(MODE_ROMAN_LABEL),
+            "",
+            IBus.Text.new_from_string("KhmerIME romanization input"),
+            True,
+            True,
+            IBus.PropState.CHECKED if normalized == "roman" else IBus.PropState.UNCHECKED,
+            None,
+        )
+        roman_sub.set_symbol(IBus.Text.new_from_string(MODE_ROMAN_SYMBOL))
+        nida_sub = IBus.Property.new(
+            MODE_PROPERTY_NIDA_KEY,
+            IBus.PropType.RADIO,
+            IBus.Text.new_from_string(MODE_NIDA_LABEL),
+            "",
+            IBus.Text.new_from_string("KhmerIME direct NIDA input"),
+            True,
+            True,
+            IBus.PropState.CHECKED if normalized == "nida" else IBus.PropState.UNCHECKED,
+            None,
+        )
+        nida_sub.set_symbol(IBus.Text.new_from_string(MODE_NIDA_SYMBOL))
+        sub_props.append(roman_sub)
+        sub_props.append(nida_sub)
+        self._mode_sub_props = {
+            MODE_PROPERTY_ROMAN_KEY: roman_sub,
+            MODE_PROPERTY_NIDA_KEY: nida_sub,
+        }
+
+        main_prop = IBus.Property.new(
+            MODE_PROPERTY_KEY,
+            IBus.PropType.MENU,
+            IBus.Text.new_from_string(active_label),
+            "",
+            IBus.Text.new_from_string(MODE_TOOLTIP),
+            True,
+            True,
+            IBus.PropState.UNCHECKED,
+            sub_props,
+        )
+        main_prop.set_symbol(IBus.Text.new_from_string(active_symbol))
+        return main_prop
+
+    def _register_mode_property(self, mode: str) -> None:
+        normalized = self._normalize_mode(mode)
+        self._mode_main_prop = self._build_mode_property(normalized)
+        prop_list = IBus.PropList.new()
+        prop_list.append(self._mode_main_prop)
+        self._mode_main_prop_list = prop_list
+        self.register_properties(prop_list)
+        self._current_input_mode = normalized
+        self._mode_property_registered = True
+
+    def _update_mode_property(self, mode: str) -> None:
+        normalized = self._normalize_mode(mode)
+        if not self._mode_property_registered or self._mode_main_prop is None:
+            self._register_mode_property(normalized)
+            return
+
+        active_label = MODE_NIDA_LABEL if normalized == "nida" else MODE_ROMAN_LABEL
+        active_symbol = MODE_NIDA_SYMBOL if normalized == "nida" else MODE_ROMAN_SYMBOL
+
+        main_prop = self._mode_main_prop
+        main_prop.set_label(IBus.Text.new_from_string(active_label))
+        main_prop.set_symbol(IBus.Text.new_from_string(active_symbol))
+        main_prop.set_tooltip(IBus.Text.new_from_string(MODE_TOOLTIP))
+        main_prop.set_state(IBus.PropState.UNCHECKED)
+
+        roman_sub = self._mode_sub_props.get(MODE_PROPERTY_ROMAN_KEY)
+        nida_sub = self._mode_sub_props.get(MODE_PROPERTY_NIDA_KEY)
+        if roman_sub is not None:
+            roman_sub.set_state(
+                IBus.PropState.CHECKED if normalized == "roman" else IBus.PropState.UNCHECKED
+            )
+        if nida_sub is not None:
+            nida_sub.set_state(
+                IBus.PropState.CHECKED if normalized == "nida" else IBus.PropState.UNCHECKED
+            )
+
+        mode_changed = normalized != self._current_input_mode
+        self._current_input_mode = normalized
+
+        self.update_property(main_prop)
+        if roman_sub is not None:
+            self.update_property(roman_sub)
+        if nida_sub is not None:
+            self.update_property(nida_sub)
+
+        if mode_changed and self._mode_main_prop_list is not None:
+            self.register_properties(self._mode_main_prop_list)
+
+    @staticmethod
+    def _caps_lock_state() -> Optional[bool]:
+        if Gdk is None:
+            return None
+        try:
+            keymap = Gdk.Keymap.get_default()
+            if keymap is None:
+                return None
+            return bool(keymap.get_caps_lock_state())
+        except Exception as err:
+            log_line(f"caps_lock_state unavailable err={err}")
+            return None
+
+    def _sync_mode_from_caps_lock_indicator(self) -> bool:
+        caps_on = self._caps_lock_state()
+        if caps_on is None:
+            input_mode = self._pending_caps_input_mode
+            if input_mode is None:
+                log_line("caps_lock sync skipped: no indicator state or pending target")
+                return False
+            log_line(
+                "caps_lock sync skipped indicator unavailable pending_input_mode=%s"
+                % input_mode
+            )
+            return False
+        input_mode = "nida" if caps_on else "roman"
+        self._pending_caps_input_mode = input_mode
+        response = self._bridge_call({"cmd": "set_input_mode", "input_mode": input_mode})
+        log_line(
+            "caps_lock sync caps_on=%s input_mode=%s"
+            % (caps_on, str((response.snapshot or {}).get("input_mode", "unknown")))
+        )
+        return False
+
+    def _set_input_mode_from_caps_target(self, input_mode: str, source: str) -> None:
+        self._pending_caps_input_mode = input_mode
+        response = self._bridge_call({"cmd": "set_input_mode", "input_mode": input_mode})
+        log_line(
+            "caps_lock %s target=%s snapshot_input_mode=%s"
+            % (source, input_mode, str((response.snapshot or {}).get("input_mode", "unknown")))
+        )
+
+    def _handle_caps_lock_key(self, state: int) -> bool:
+        self._cancel_pending_refinement()
+        if int(state) & STATE_RELEASE_MASK:
+            log_line(f"caps_lock release ignored state={state}")
+            return False
+        caps_was_on = bool(int(state) & STATE_LOCK_MASK)
+        predicted_mode = "roman" if caps_was_on else "nida"
+        self._set_input_mode_from_caps_target(predicted_mode, "predicted")
+        GLib.timeout_add(40, self._sync_mode_from_caps_lock_indicator)
+        GLib.timeout_add(160, self._sync_mode_from_caps_lock_indicator)
+        return False
+
     def _clear_composition_ui_for_commit(self, response: BridgeResponse) -> None:
         snapshot = response.snapshot or {}
         self._last_preedit = ""
@@ -241,6 +424,8 @@ class KhmerIMEEngine(IBus.Engine):
         return None
 
     def do_process_key_event(self, keyval: int, keycode: int, state: int) -> bool:
+        if int(keyval) == KEY_CAPS_LOCK:
+            return self._handle_caps_lock_key(int(state))
         self._cancel_pending_refinement()
         if int(keyval) in (KEY_RETURN, KEY_KP_ENTER) and self._last_preedit:
             self._last_preedit = ""
@@ -312,6 +497,8 @@ class KhmerIMEEngine(IBus.Engine):
     def do_focus_in(self) -> None:
         self._focus_events += 1
         log_line(f"focus_in count={self._focus_events}")
+        if self._mode_main_prop_list is not None:
+            self.register_properties(self._mode_main_prop_list)
         self._bridge_call({"cmd": "focus_in"})
 
     def do_focus_in_id(self, object_path: str, client: str) -> None:
@@ -336,6 +523,8 @@ class KhmerIMEEngine(IBus.Engine):
 
     def do_enable(self) -> None:
         log_line("enable")
+        if self._mode_main_prop_list is not None:
+            self.register_properties(self._mode_main_prop_list)
         self._bridge_call({"cmd": "enable"})
 
     def do_disable(self) -> None:
@@ -377,6 +566,21 @@ class KhmerIMEEngine(IBus.Engine):
             % (len(self._surrounding_text), self._surrounding_cursor_pos, self._surrounding_anchor_pos)
         )
 
+    def do_property_activate(self, prop_name: str, prop_state: int) -> None:
+        if prop_name == MODE_PROPERTY_KEY:
+            log_line(f"mode property activate state={prop_state}")
+            self._bridge_call({"cmd": "toggle_input_mode"})
+            return
+        if prop_name == MODE_PROPERTY_ROMAN_KEY:
+            log_line(f"mode sub-property activate roman state={prop_state}")
+            self._bridge_call({"cmd": "set_input_mode", "input_mode": "roman"})
+            return
+        if prop_name == MODE_PROPERTY_NIDA_KEY:
+            log_line(f"mode sub-property activate nida state={prop_state}")
+            self._bridge_call({"cmd": "set_input_mode", "input_mode": "nida"})
+            return
+        super().do_property_activate(prop_name, prop_state)
+
     def do_destroy(self) -> None:
         self._cancel_pending_refinement()
         with self._bridge_lock:
@@ -391,16 +595,21 @@ class KhmerIMEFactory(IBus.Factory):
         self._engine_id = 0
 
     def do_create_engine(self, engine_name: str) -> IBus.Engine:
-        if engine_name != ENGINE_NAME:
+        initial_input_mode = {
+            ENGINE_NAME: "roman",
+            ENGINE_NIDA_NAME: "nida",
+        }.get(engine_name)
+        if initial_input_mode is None:
             log_line(f"create_engine unexpected engine_name={engine_name}")
             raise RuntimeError(f"unexpected engine name: {engine_name}")
         object_path = f"/org/freedesktop/IBus/KhmerIME/Engine/{self._engine_id}"
         self._engine_id += 1
-        log_line(f"create_engine engine_name={engine_name} object_path={object_path}")
+        log_line(f"create_engine engine_name={engine_name} object_path={object_path} input_mode={initial_input_mode}")
         return KhmerIMEEngine(
             connection=self.get_connection(),
             object_path=object_path,
             bridge_path=self._bridge_path,
+            initial_input_mode=initial_input_mode,
         )
 
 
