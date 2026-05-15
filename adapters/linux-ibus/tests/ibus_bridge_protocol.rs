@@ -24,6 +24,14 @@ fn spawn_bridge_with_args(args: &[&str]) -> (Child, ChildStdin, BufReader<std::p
     (child, stdin, BufReader::new(stdout))
 }
 
+fn spawn_full_bridge() -> (Child, ChildStdin, BufReader<std::process::ChildStdout>) {
+    spawn_bridge_with_args(&["--synchronous-full-startup"])
+}
+
+fn spawn_full_bridge_deferred_preview() -> (Child, ChildStdin, BufReader<std::process::ChildStdout>) {
+    spawn_bridge_with_args(&["--synchronous-full-startup", "--deferred-segmented-preview"])
+}
+
 fn send_command(stdin: &mut impl Write, command: &str) {
     writeln!(stdin, "{command}").expect("write command");
     stdin.flush().expect("flush command");
@@ -62,6 +70,43 @@ fn bridge_defaults_to_roman_input_mode() {
     send_command(&mut stdin, r#"{"cmd":"snapshot"}"#);
     let response = read_response(&mut stdout);
     assert_eq!(response["snapshot"]["input_mode"], Value::String("roman".to_owned()));
+
+    shutdown_and_assert_ok(child, &mut stdin, &mut stdout);
+}
+
+#[test]
+fn bridge_phase_a_snapshot_is_available_without_full_warmup() {
+    let (child, mut stdin, mut stdout) = spawn_bridge_with_args(&["--disable-full-warmup"]);
+
+    send_command(&mut stdin, r#"{"cmd":"snapshot"}"#);
+    let response = read_response(&mut stdout);
+    assert_eq!(response["readiness"], Value::String("phase_a".to_owned()));
+    assert_eq!(response["snapshot"]["input_mode"], Value::String("roman".to_owned()));
+
+    shutdown_and_assert_ok(child, &mut stdin, &mut stdout);
+}
+
+#[test]
+fn bridge_phase_a_candidates_do_not_enable_segmented_preview() {
+    let (child, mut stdin, mut stdout) = spawn_bridge_with_args(&["--disable-full-warmup"]);
+
+    send_command(&mut stdin, r#"{"cmd":"focus_in"}"#);
+    let _ = read_response(&mut stdout);
+    send_ascii_text(&mut stdin, &mut stdout, "nihjeasnadaiborkbrae");
+
+    send_command(&mut stdin, r#"{"cmd":"snapshot"}"#);
+    let response = read_response(&mut stdout);
+    assert_eq!(response["readiness"], Value::String("phase_a".to_owned()));
+    assert_eq!(
+        response["snapshot"]["raw_preedit"],
+        Value::String("nihjeasnadaiborkbrae".to_owned())
+    );
+    assert!(response["snapshot"]["candidates"]
+        .as_array()
+        .map(|items| !items.is_empty())
+        .unwrap_or(false));
+    assert_eq!(response["snapshot"]["segmented_active"], Value::Bool(false));
+    assert_eq!(response["snapshot"]["segment_preview"], Value::Array(Vec::new()));
 
     shutdown_and_assert_ok(child, &mut stdin, &mut stdout);
 }
@@ -287,7 +332,7 @@ fn bridge_exposes_candidate_display_metadata() {
 
 #[test]
 fn bridge_supports_segment_focus_and_full_phrase_commit() {
-    let (child, mut stdin, mut stdout) = spawn_bridge();
+    let (child, mut stdin, mut stdout) = spawn_full_bridge();
 
     send_command(&mut stdin, r#"{"cmd":"focus_in"}"#);
     let _ = read_response(&mut stdout);
@@ -336,8 +381,8 @@ fn bridge_supports_segment_focus_and_full_phrase_commit() {
 }
 
 #[test]
-fn bridge_refines_long_flat_default_candidate_on_enter() {
-    let (child, mut stdin, mut stdout) = spawn_bridge();
+fn bridge_refines_long_phrase_on_enter() {
+    let (child, mut stdin, mut stdout) = spawn_full_bridge();
 
     send_command(&mut stdin, r#"{"cmd":"focus_in"}"#);
     let _ = read_response(&mut stdout);
@@ -356,7 +401,7 @@ fn bridge_refines_long_flat_default_candidate_on_enter() {
 
 #[test]
 fn bridge_refinement_keeps_live_segmented_long_phrase_state() {
-    let (child, mut stdin, mut stdout) = spawn_bridge();
+    let (child, mut stdin, mut stdout) = spawn_full_bridge();
 
     send_command(&mut stdin, r#"{"cmd":"focus_in"}"#);
     let _ = read_response(&mut stdout);
@@ -402,7 +447,7 @@ fn bridge_refinement_keeps_live_segmented_long_phrase_state() {
 
 #[test]
 fn bridge_ignores_stale_visible_refinement_request() {
-    let (child, mut stdin, mut stdout) = spawn_bridge();
+    let (child, mut stdin, mut stdout) = spawn_full_bridge();
 
     send_command(&mut stdin, r#"{"cmd":"focus_in"}"#);
     let _ = read_response(&mut stdout);
@@ -429,7 +474,7 @@ fn bridge_ignores_stale_visible_refinement_request() {
 
 #[test]
 fn bridge_refinement_preserves_segment_focus() {
-    let (child, mut stdin, mut stdout) = spawn_bridge();
+    let (child, mut stdin, mut stdout) = spawn_full_bridge();
 
     send_command(&mut stdin, r#"{"cmd":"focus_in"}"#);
     let _ = read_response(&mut stdout);
@@ -462,7 +507,7 @@ fn bridge_refinement_preserves_segment_focus() {
 
 #[test]
 fn bridge_commits_live_segmented_long_phrase_on_enter() {
-    let (child, mut stdin, mut stdout) = spawn_bridge();
+    let (child, mut stdin, mut stdout) = spawn_full_bridge();
 
     send_command(&mut stdin, r#"{"cmd":"focus_in"}"#);
     let _ = read_response(&mut stdout);
@@ -484,7 +529,7 @@ fn bridge_commits_live_segmented_long_phrase_on_enter() {
 
 #[test]
 fn bridge_consumes_up_down_during_segmented_selection() {
-    let (child, mut stdin, mut stdout) = spawn_bridge();
+    let (child, mut stdin, mut stdout) = spawn_full_bridge();
 
     send_command(&mut stdin, r#"{"cmd":"focus_in"}"#);
     let _ = read_response(&mut stdout);

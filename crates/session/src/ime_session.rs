@@ -154,6 +154,19 @@ pub struct SessionResult {
 pub type ImeSessionSnapshot = SessionSnapshot;
 pub type ImeSessionUpdate = SessionResult;
 
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum SegmentedPreviewMode {
+    Disabled,
+    Deferred,
+    #[default]
+    Enabled,
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct ImeSessionOptions {
+    pub segmented_preview: SegmentedPreviewMode,
+}
+
 pub struct ImeSession {
     transliterator: Transliterator,
     commit_refiner: Option<Transliterator>,
@@ -167,6 +180,7 @@ pub struct ImeSession {
     segmented_session: Option<SegmentedSession>,
     cursor_location: CursorLocation,
     input_mode: InputMode,
+    options: ImeSessionOptions,
 }
 
 impl ImeSession {
@@ -181,6 +195,18 @@ impl ImeSession {
     ) -> Self {
         let mut session = Self::new_with_optional_commit_refiner(transliterator, None, history);
         session.input_mode = input_mode;
+        session
+    }
+
+    pub fn new_with_input_mode_and_options(
+        transliterator: Transliterator,
+        history: HashMap<String, usize>,
+        input_mode: InputMode,
+        options: ImeSessionOptions,
+    ) -> Self {
+        let mut session = Self::new_with_optional_commit_refiner(transliterator, None, history);
+        session.input_mode = input_mode;
+        session.options = options;
         session
     }
 
@@ -203,6 +229,19 @@ impl ImeSession {
         session
     }
 
+    pub fn new_with_commit_refiner_input_mode_and_options(
+        transliterator: Transliterator,
+        commit_refiner: Transliterator,
+        history: HashMap<String, usize>,
+        input_mode: InputMode,
+        options: ImeSessionOptions,
+    ) -> Self {
+        let mut session = Self::new_with_optional_commit_refiner(transliterator, Some(commit_refiner), history);
+        session.input_mode = input_mode;
+        session.options = options;
+        session
+    }
+
     fn new_with_optional_commit_refiner(
         transliterator: Transliterator,
         commit_refiner: Option<Transliterator>,
@@ -221,6 +260,7 @@ impl ImeSession {
             segmented_session: None,
             cursor_location: CursorLocation::default(),
             input_mode: InputMode::Roman,
+            options: ImeSessionOptions::default(),
         }
     }
 
@@ -231,6 +271,48 @@ impl ImeSession {
 
     pub fn save_history<S: HistoryStore>(&self, store: &S) -> Result<(), S::Error> {
         store.save(&self.history)
+    }
+
+    pub fn composition_is_empty(&self) -> bool {
+        self.composition_raw.is_empty()
+    }
+
+    pub fn composition_raw(&self) -> &str {
+        &self.composition_raw
+    }
+
+    pub fn segmented_preview_active(&self) -> bool {
+        self.segmented_session.is_some()
+    }
+
+    pub fn set_commit_refiner(&mut self, commit_refiner: Transliterator) {
+        self.commit_refiner = Some(commit_refiner);
+    }
+
+    pub fn replace_engines(
+        &mut self,
+        transliterator: Transliterator,
+        commit_refiner: Option<Transliterator>,
+        segmented_preview: SegmentedPreviewMode,
+    ) {
+        self.transliterator = transliterator;
+        self.commit_refiner = commit_refiner;
+        self.options.segmented_preview = segmented_preview;
+        if self.options.segmented_preview == SegmentedPreviewMode::Disabled {
+            self.segmented_session = None;
+        }
+    }
+
+    pub fn replace_live_transliterator(
+        &mut self,
+        transliterator: Transliterator,
+        segmented_preview: SegmentedPreviewMode,
+    ) {
+        self.transliterator = transliterator;
+        self.options.segmented_preview = segmented_preview;
+        if self.options.segmented_preview == SegmentedPreviewMode::Disabled {
+            self.segmented_session = None;
+        }
     }
 
     pub fn focus_in(&mut self) {
@@ -784,6 +866,30 @@ impl ImeSession {
         self.selected_index = 0;
         self.selection_touched = false;
 
+        if self.options.segmented_preview != SegmentedPreviewMode::Enabled {
+            self.segmented_session = None;
+            return;
+        }
+
+        self.rebuild_segmented_session_from_observation();
+    }
+
+    pub fn refresh_segmented_preview(&mut self, raw_preedit: &str) -> bool {
+        if self.options.segmented_preview == SegmentedPreviewMode::Disabled {
+            self.segmented_session = None;
+            return false;
+        }
+        if self.composition_raw.is_empty() || self.composition_raw != raw_preedit {
+            return false;
+        }
+        if self.segmented_session.is_some() && self.selection_touched {
+            return true;
+        }
+        self.rebuild_segmented_session_from_observation();
+        self.segmented_session.is_some()
+    }
+
+    fn rebuild_segmented_session_from_observation(&mut self) {
         let observation = self
             .transliterator
             .shadow_observation(&self.composition_raw, &self.history);
@@ -861,7 +967,9 @@ fn is_single_keycap_char(ch: char) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use super::{CursorLocation, ImeSession, InputMode, NativeKeyEvent, SessionCommand};
+    use super::{
+        CursorLocation, ImeSession, ImeSessionOptions, InputMode, NativeKeyEvent, SegmentedPreviewMode, SessionCommand,
+    };
     use khmerime_core::{DecoderConfig, DecoderMode, Transliterator};
     use std::collections::HashMap;
 
@@ -894,6 +1002,21 @@ mod tests {
         session
     }
 
+    fn phase_a_session_without_segmented_preview() -> ImeSession {
+        let transliterator =
+            Transliterator::from_default_phase_a_data(DecoderConfig::legacy()).expect("phase-A data must load");
+        let mut session = ImeSession::new_with_input_mode_and_options(
+            transliterator,
+            HashMap::new(),
+            InputMode::Roman,
+            ImeSessionOptions {
+                segmented_preview: SegmentedPreviewMode::Disabled,
+            },
+        );
+        session.focus_in();
+        session
+    }
+
     #[test]
     fn command_surface_accepts_native_key_event() {
         let mut session = session();
@@ -904,6 +1027,19 @@ mod tests {
         }));
         assert!(update.consumed);
         assert_eq!(session.snapshot().raw_preedit, "j");
+    }
+
+    #[test]
+    fn segmented_preview_can_be_disabled_for_phase_a_sessions() {
+        let mut session = phase_a_session_without_segmented_preview();
+
+        type_ascii(&mut session, "nihjeasnadaiborkbrae");
+
+        let snapshot = session.snapshot();
+        assert_eq!(snapshot.raw_preedit, "nihjeasnadaiborkbrae");
+        assert!(!snapshot.candidates.is_empty());
+        assert!(!snapshot.segmented_active);
+        assert!(snapshot.segment_preview.is_empty());
     }
 
     #[test]

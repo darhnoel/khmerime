@@ -1,28 +1,33 @@
-"""Debounced long-composition refinement for the KhmerIME IBus adapter."""
+"""Debounced segmented-preview refresh for the KhmerIME IBus adapter.
+
+The segmented preview is built from a WFST shadow observation, which is the
+single most expensive operation on the per-keystroke path. Build it after the
+user stops typing for a short window rather than on every key.
+"""
 
 from __future__ import annotations
 
 import threading
 from typing import Any, Callable, Dict
 
-REFINE_MIN_RAW_PREEDIT_LEN = 10
-REFINE_DEBOUNCE_MS = 400
+SEGMENTED_PREVIEW_MIN_RAW_PREEDIT_LEN = 4
+SEGMENTED_PREVIEW_DEBOUNCE_MS = 220
 
 
-class RefinementScheduler:
+class SegmentedPreviewScheduler:
     def __init__(
         self,
-        call_refine: Callable[[Dict[str, Any]], Any],
+        call_bridge: Callable[[Dict[str, Any]], Any],
         apply_response: Callable[[Any], None],
         current_raw_preedit: Callable[[], str],
         log: Callable[[str], None],
         timeout_add: Callable[..., int],
         source_remove: Callable[[int], None],
         idle_add: Callable[..., Any],
-        min_raw_preedit_len: int = REFINE_MIN_RAW_PREEDIT_LEN,
-        debounce_ms: int = REFINE_DEBOUNCE_MS,
+        min_raw_preedit_len: int = SEGMENTED_PREVIEW_MIN_RAW_PREEDIT_LEN,
+        debounce_ms: int = SEGMENTED_PREVIEW_DEBOUNCE_MS,
     ):
-        self._call_refine = call_refine
+        self._call_bridge = call_bridge
         self._apply_response = apply_response
         self._current_raw_preedit = current_raw_preedit
         self._log = log
@@ -62,38 +67,25 @@ class RefinementScheduler:
 
     def _run(self, generation: int, raw_preedit: str) -> None:
         try:
-            response = self._call_refine(
+            response = self._call_bridge(
                 {
-                    "cmd": "refine_composition",
+                    "cmd": "refresh_segmented_preview",
                     "raw_preedit": raw_preedit,
                 }
             )
         except Exception as err:
-            self._log(f"refine_composition failed raw_len={len(raw_preedit)} err={err}")
+            self._log(
+                f"refresh_segmented_preview failed raw_len={len(raw_preedit)} err={err}"
+            )
             return
         self._idle_add(self._finish, generation, raw_preedit, response)
 
     def _finish(self, generation: int, raw_preedit: str, response: Any) -> bool:
-        current_raw = self._current_raw_preedit()
-        if generation != self._generation or raw_preedit != current_raw:
-            self._log(
-                "refine_composition stale raw_len=%s current_len=%s"
-                % (len(raw_preedit), len(current_raw))
-            )
+        if generation != self._generation:
+            return False
+        if raw_preedit != self._current_raw_preedit():
+            return False
+        if not getattr(response, "ok", False):
             return False
         self._apply_response(response)
-        if response.error:
-            self._log(f"bridge error payload=refine_composition error={response.error}")
-        else:
-            self._log(
-                "refine_composition applied raw_len=%s cand=%s"
-                % (len(raw_preedit), len(response.snapshot.get("candidates", []) or []))
-            )
-        readiness = getattr(response, "readiness", "unknown")
-        if readiness == "phase_a" and raw_preedit == self._current_raw_preedit():
-            self._log(
-                "refine_composition retry readiness=%s raw_len=%s"
-                % (readiness, len(raw_preedit))
-            )
-            self.schedule(raw_preedit)
         return False

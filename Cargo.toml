@@ -38,7 +38,7 @@ khmerime_core = { path = "crates/core" }
 khmerime_session = { path = "crates/session" }
 
 [profile.release]
-opt-level = "z"
+opt-level = 3
 lto = "fat"
 codegen-units = 1
 strip = true

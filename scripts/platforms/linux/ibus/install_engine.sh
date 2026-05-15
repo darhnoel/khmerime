@@ -11,6 +11,7 @@ ENGINE_HELPER_SRCS=(
   "${ROOT_DIR}/adapters/linux-ibus/python/ibus_component.py"
   "${ROOT_DIR}/adapters/linux-ibus/python/ibus_refinement.py"
   "${ROOT_DIR}/adapters/linux-ibus/python/ibus_segment_preview.py"
+  "${ROOT_DIR}/adapters/linux-ibus/python/ibus_segmented_preview.py"
 )
 ENGINE_SCRIPT_DST="${INSTALL_LIBEXEC_DIR}/khmerime-ibus-engine"
 BRIDGE_BINARY_DST="${INSTALL_LIBEXEC_DIR}/khmerime-ibus-bridge"

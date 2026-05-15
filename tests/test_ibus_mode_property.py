@@ -278,12 +278,20 @@ class _FakeBridgeResponse:
     consumed: bool = False
     commit_text: Optional[str] = None
     snapshot: Dict[str, Any] = field(default_factory=dict)
+    readiness: str = "full"
     error: Optional[str] = None
 
 
 class _FakeBridgeClient:
-    def __init__(self, _path: Path, *, initial_input_mode: str = "roman") -> None:
+    def __init__(
+        self,
+        _path: Path,
+        *,
+        initial_input_mode: str = "roman",
+        deferred_segmented_preview: bool = False,
+    ) -> None:
         self.initial_input_mode = initial_input_mode
+        self.deferred_segmented_preview = deferred_segmented_preview
         self.calls: List[Dict[str, Any]] = []
         self._current_mode = initial_input_mode
 
@@ -497,3 +505,70 @@ def test_apply_snapshot_updates_symbol_to_match_input_mode() -> None:
 
     eng._apply_snapshot(_FakeBridgeResponse(snapshot={"input_mode": "roman"}))
     assert prop.symbol.get_text() == "R"
+
+
+def test_key_release_does_not_cancel_pending_refinement() -> None:
+    eng = _make_engine("roman")
+    cancelled = 0
+
+    def cancel() -> None:
+        nonlocal cancelled
+        cancelled += 1
+
+    def fail_call(_payload: Dict[str, Any]) -> _FakeBridgeResponse:
+        raise AssertionError("release events should not call the bridge")
+
+    eng._cancel_pending_refinement = cancel  # type: ignore[method-assign]
+    eng._call_bridge_raw = fail_call  # type: ignore[method-assign]
+
+    consumed = eng.do_process_key_event(ord("a"), 30, engine_mod.STATE_RELEASE_MASK)
+
+    assert consumed is False
+    assert cancelled == 0
+
+
+def test_enter_does_not_clear_preedit_before_bridge_commit() -> None:
+    eng = _make_engine("roman")
+    eng._last_preedit = "nihjeasnadaiborkbrae"
+    eng._last_raw_preedit = "nihjeasnadaiborkbrae"
+    eng.preedit_updates.clear()
+
+    def commit_response(_payload: Dict[str, Any]) -> _FakeBridgeResponse:
+        assert eng.preedit_updates == []
+        return _FakeBridgeResponse(
+            consumed=True,
+            commit_text="នេះជាស្នាដៃបកប្រែ",
+            snapshot={"input_mode": "roman", "raw_preedit": "", "preedit": ""},
+        )
+
+    eng._call_bridge_raw = commit_response  # type: ignore[method-assign]
+
+    consumed = eng.do_process_key_event(engine_mod.KEY_RETURN, 28, 0)
+
+    assert consumed is True
+    assert eng.committed_text == ["នេះជាស្នាដៃបកប្រែ"]
+    assert eng.preedit_updates[-1] == ("", 0, False)
+
+
+def test_enter_empty_commit_preserves_active_preedit() -> None:
+    eng = _make_engine("roman")
+    eng._last_preedit = "nihjeasnadaiborkbrae"
+    eng._last_raw_preedit = "nihjeasnadaiborkbrae"
+    eng.preedit_updates.clear()
+
+    def empty_commit_response(_payload: Dict[str, Any]) -> _FakeBridgeResponse:
+        return _FakeBridgeResponse(
+            consumed=True,
+            commit_text=None,
+            snapshot={"input_mode": "roman", "raw_preedit": "", "preedit": ""},
+        )
+
+    eng._call_bridge_raw = empty_commit_response  # type: ignore[method-assign]
+
+    consumed = eng.do_process_key_event(engine_mod.KEY_RETURN, 28, 0)
+
+    assert consumed is True
+    assert eng.committed_text == []
+    assert eng.preedit_updates == []
+    assert eng._last_preedit == "nihjeasnadaiborkbrae"
+    assert eng._last_raw_preedit == "nihjeasnadaiborkbrae"
