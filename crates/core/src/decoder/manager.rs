@@ -37,9 +37,17 @@ impl DecoderManager {
             composer: &composer,
         };
         let legacy = self.legacy.decode(&request);
-        let weighted_span = self.decode_weighted_span(&request);
-        let observation = build_shadow_observation(self.config.mode, input, &composer, &legacy, weighted_span.as_ref());
-        if self.config.mode != DecoderMode::Legacy && self.should_sample_shadow(input) {
+        let needs_wfst_for_visible = self.weighted_span_needed_for_visible();
+        let needs_wfst_for_logging =
+            self.config.shadow_log && self.config.mode != DecoderMode::Legacy && self.should_sample_shadow(input);
+        let weighted_span = if needs_wfst_for_visible || needs_wfst_for_logging {
+            self.decode_weighted_span(&request)
+        } else {
+            None
+        };
+        if needs_wfst_for_logging {
+            let observation =
+                build_shadow_observation(self.config.mode, input, &composer, &legacy, weighted_span.as_ref());
             self.log_shadow_report(&observation);
         }
 
@@ -48,6 +56,10 @@ impl DecoderManager {
         let mut suggestions = visible.visible_strings();
         append_raw_query_fallback_tail(&mut suggestions, input, &legacy, self.config.max_candidates);
         suggestions
+    }
+
+    fn weighted_span_needed_for_visible(&self) -> bool {
+        matches!(self.config.mode, DecoderMode::Wfst | DecoderMode::Hybrid)
     }
 
     pub(crate) fn shadow_observation(&self, input: &str, history: &HashMap<String, usize>) -> ShadowObservation {
