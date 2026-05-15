@@ -750,8 +750,7 @@ impl ImeSession {
                 composed
             }
         } else if self.selected_index == 0 && !self.selection_touched {
-            self.refined_commit_phrase()
-                .unwrap_or_else(|| self.selected_or_raw_fallback())
+            self.default_flat_commit_text()
         } else {
             self.selected_or_raw_fallback()
         };
@@ -776,6 +775,25 @@ impl ImeSession {
 
     fn refined_commit_phrase(&self) -> Option<String> {
         self.refined_phrase_for(&self.composition_raw)
+    }
+
+    fn default_flat_commit_text(&self) -> String {
+        let Some(refined) = self.refined_commit_phrase() else {
+            return self.selected_or_raw_fallback();
+        };
+        if self.candidates.is_empty() {
+            return refined;
+        }
+        let refined_key = normalized_suggestion_key(&refined);
+        let visible_default_key = self
+            .candidates
+            .first()
+            .map(|candidate| normalized_suggestion_key(candidate));
+        if visible_default_key.as_deref() == Some(refined_key.as_str()) {
+            refined
+        } else {
+            self.selected_or_raw_fallback()
+        }
     }
 
     fn refined_phrase_for(&self, raw_input: &str) -> Option<String> {
@@ -1219,12 +1237,49 @@ mod tests {
     fn enter_refines_long_flat_default_candidate_commit() {
         let mut session = flat_default_session_with_commit_refiner();
         type_ascii(&mut session, "nihjeasnadaiborkbrae");
+        let refined = session.apply_refined_candidate("nihjeasnadaiborkbrae");
+        assert_eq!(refined.as_deref(), Some("នេះជាស្នាដៃបកប្រែ"));
 
         let update = session.process_key_event(0xFF0D, 0, 0);
 
         assert_eq!(update.commit_text.as_deref(), Some("នេះជាស្នាដៃបកប្រែ"));
         assert!(update.history_changed);
         assert!(session.snapshot().preedit.is_empty());
+    }
+
+    #[test]
+    fn hidden_commit_refinement_does_not_override_visible_default_candidate() {
+        let mut session = flat_default_session_with_commit_refiner();
+        type_ascii(&mut session, "kasanmot");
+        let snapshot = session.snapshot();
+        assert_eq!(snapshot.candidates.first().map(String::as_str), Some("ការសន្មត"));
+
+        let update = session.process_key_event(0xFF0D, 0, 0);
+
+        assert_eq!(update.commit_text.as_deref(), Some("ការសន្មត"));
+        assert_ne!(update.commit_text.as_deref(), Some("កសាងម៉ូត"));
+    }
+
+    #[test]
+    fn short_exact_chunk_anchors_compound_phrase_refinement() {
+        let mut session = flat_default_session_with_commit_refiner();
+        type_ascii(&mut session, "gettengos");
+        let refined = session.apply_refined_candidate("gettengos");
+        assert_eq!(refined.as_deref(), Some("គេទាំងអស់"));
+
+        let update = session.process_key_event(0xFF0D, 0, 0);
+        assert_eq!(update.commit_text.as_deref(), Some("គេទាំងអស់"));
+    }
+
+    #[test]
+    fn short_exact_chunk_anchors_compound_phrase_with_long_prefix() {
+        let mut session = flat_default_session_with_commit_refiner();
+        type_ascii(&mut session, "jeanggettengos");
+        let refined = session.apply_refined_candidate("jeanggettengos");
+        assert_eq!(refined.as_deref(), Some("ជាងគេទាំងអស់"));
+
+        let update = session.process_key_event(0xFF0D, 0, 0);
+        assert_eq!(update.commit_text.as_deref(), Some("ជាងគេទាំងអស់"));
     }
 
     #[test]

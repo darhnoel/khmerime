@@ -400,6 +400,92 @@ fn bridge_refines_long_phrase_on_enter() {
 }
 
 #[test]
+fn bridge_deferred_preview_builds_synchronously_for_digit_selection() {
+    let (child, mut stdin, mut stdout) = spawn_full_bridge_deferred_preview();
+
+    send_command(&mut stdin, r#"{"cmd":"focus_in"}"#);
+    let _ = read_response(&mut stdout);
+    send_ascii_text(&mut stdin, &mut stdout, "sophamongkul");
+
+    send_command(&mut stdin, r#"{"cmd":"snapshot"}"#);
+    let pre_digit = read_response(&mut stdout);
+    assert_eq!(pre_digit["snapshot"]["segmented_active"], Value::Bool(false));
+
+    send_command(
+        &mut stdin,
+        r#"{"cmd":"process_key_event","keyval":50,"keycode":0,"state":0}"#,
+    );
+    let after_digit = read_response(&mut stdout);
+    assert_eq!(after_digit["snapshot"]["segmented_active"], Value::Bool(true));
+    assert_eq!(after_digit["snapshot"]["preedit"], Value::String("សុភមង្គល".to_owned()));
+    assert_eq!(
+        after_digit["snapshot"]["segment_preview"][0]["output"],
+        Value::String("សុភ".to_owned())
+    );
+
+    shutdown_and_assert_ok(child, &mut stdin, &mut stdout);
+}
+
+#[test]
+fn bridge_deferred_preview_does_not_revert_user_segment_selection_on_refresh() {
+    let (child, mut stdin, mut stdout) = spawn_full_bridge_deferred_preview();
+
+    send_command(&mut stdin, r#"{"cmd":"focus_in"}"#);
+    let _ = read_response(&mut stdout);
+    send_ascii_text(&mut stdin, &mut stdout, "sophamongkul");
+
+    send_command(
+        &mut stdin,
+        r#"{"cmd":"process_key_event","keyval":50,"keycode":0,"state":0}"#,
+    );
+    let after_digit = read_response(&mut stdout);
+    assert_eq!(
+        after_digit["snapshot"]["segment_preview"][0]["output"],
+        Value::String("សុភ".to_owned())
+    );
+
+    send_command(
+        &mut stdin,
+        r#"{"cmd":"refresh_segmented_preview","raw_preedit":"sophamongkul"}"#,
+    );
+    let _ = read_response(&mut stdout);
+
+    send_command(&mut stdin, r#"{"cmd":"snapshot"}"#);
+    let after_refresh = read_response(&mut stdout);
+    assert_eq!(
+        after_refresh["snapshot"]["segment_preview"][0]["output"],
+        Value::String("សុភ".to_owned()),
+        "stale debounced refresh must not overwrite a touched segment selection"
+    );
+    assert_eq!(after_refresh["snapshot"]["preedit"], Value::String("សុភមង្គល".to_owned()));
+
+    shutdown_and_assert_ok(child, &mut stdin, &mut stdout);
+}
+
+#[test]
+fn bridge_enter_commits_visible_default_when_hidden_refinement_disagrees() {
+    let (child, mut stdin, mut stdout) = spawn_full_bridge();
+
+    send_command(&mut stdin, r#"{"cmd":"focus_in"}"#);
+    let _ = read_response(&mut stdout);
+    send_ascii_text(&mut stdin, &mut stdout, "kasanmot");
+
+    send_command(&mut stdin, r#"{"cmd":"snapshot"}"#);
+    let snapshot = read_response(&mut stdout);
+    assert_eq!(snapshot["snapshot"]["preedit"], Value::String("ការសន្មត".to_owned()));
+
+    send_command(
+        &mut stdin,
+        r#"{"cmd":"process_key_event","keyval":65293,"keycode":0,"state":0}"#,
+    );
+    let committed = read_response(&mut stdout);
+    assert_eq!(committed["commit_text"], Value::String("ការសន្មត".to_owned()));
+    assert_ne!(committed["commit_text"], Value::String("កសាងម៉ូត".to_owned()));
+
+    shutdown_and_assert_ok(child, &mut stdin, &mut stdout);
+}
+
+#[test]
 fn bridge_refinement_keeps_live_segmented_long_phrase_state() {
     let (child, mut stdin, mut stdout) = spawn_full_bridge();
 
