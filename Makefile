@@ -1,4 +1,4 @@
-.PHONY: help web web-release web-phone desktop stats suggest suggest-wfst suggest-shadow shadow-eval data-split data-build data-check visualize-lexicon visualize-lexicon-streamlit fmt test test-golden test-ui platform-check platform-check-linux platform-check-android platform-check-ios platform-check-macos platform-check-windows platform-build-windows platform-install-windows platform-uninstall-windows platform-reinstall-windows platform-smoke-windows-notepad platform-smoke-windows-notepad-python windows-package linux-package ibus-install ibus-uninstall ibus-smoke paper-current paper-current-clean
+.PHONY: help web web-release web-phone desktop stats suggest suggest-wfst suggest-shadow shadow-eval data-split data-build data-check lexicon-editor visualize-lexicon visualize-lexicon-streamlit fmt test test-golden test-ui platform-check platform-check-linux platform-check-android platform-check-ios platform-check-macos platform-check-windows platform-build-windows platform-install-windows platform-uninstall-windows platform-reinstall-windows platform-smoke-windows-notepad platform-smoke-windows-notepad-python windows-package linux-package ibus-install ibus-uninstall ibus-smoke paper-current paper-current-clean
 
 DX ?= dx
 APP_DIR := apps/dioxus-app
@@ -12,7 +12,7 @@ PAPER_CURRENT_TEX := khmerime_current_implementation_paper.tex
 WINDOWS_TSF_TARGET ?= x86_64-pc-windows-msvc
 WINDOWS_TSF_TARGET_DIR ?= target/windows-tsf
 WINDOWS_TSF_DEV_TARGET_DIR ?= target/windows-tsf-dev
-WINDOWS_TSF_REINSTALL_STAMP := $(or $(WINDOWS_TSF_REINSTALL_STAMP),$(shell powershell -NoProfile -Command Get-Date -Format yyyyMMddHHmmss))
+WINDOWS_TSF_REINSTALL_STAMP ?= $(shell date +%Y%m%d%H%M%S)
 WINDOWS_TSF_DEPLOY_DIR ?= target/windows-tsf-deploy/$(WINDOWS_TSF_REINSTALL_STAMP)
 WINDOWS_TSF_DLL := $(WINDOWS_TSF_TARGET_DIR)/$(WINDOWS_TSF_TARGET)/debug/khmerime_windows_tsf.dll
 WINDOWS_TSF_DEV_DLL := $(WINDOWS_TSF_DEV_TARGET_DIR)/$(WINDOWS_TSF_TARGET)/debug/khmerime_windows_tsf.dll
@@ -40,6 +40,7 @@ help:
 	"  make data-split                  Split data/roman_lookup.csv into reviewable chunk CSVs" \
 	"  make data-build                  Generate data/roman_lookup.csv from chunk CSVs" \
 	"  make data-check                  Validate lexicon chunks and generated runtime data" \
+	"  make lexicon-editor              Run the local lexicon chunk editor" \
 	"  make visualize-lexicon           Generate lightweight lexicon relationship views under dist/" \
 	"  make visualize-lexicon-streamlit Launch the optional Streamlit explorer for the generated views" \
 	"  make fmt                         Run cargo fmt" \
@@ -107,6 +108,9 @@ data-build:
 
 data-check:
 	python3 scripts/data/lexicon/manage_lexicon_chunks.py check
+
+lexicon-editor:
+	python3 tools/lexicon-editor/server.py
 
 visualize-lexicon:
 	python3 scripts/data/lexicon/visualize_roman_lookup.py

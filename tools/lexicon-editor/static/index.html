@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>KhmerIME Lexicon Editor</title>
+    <link rel="stylesheet" href="/vendor/tabulator/tabulator.min.css">
+    <link rel="stylesheet" href="/style.css">
+  </head>
+  <body>
+    <header class="app-header">
+      <div>
+        <h1>KhmerIME Lexicon Editor</h1>
+        <p id="status-line">Loading...</p>
+      </div>
+      <div class="primary-actions">
+        <button id="reload-button" type="button">Reload</button>
+        <button id="save-button" type="button" class="primary">Save Build Check</button>
+      </div>
+    </header>
+
+    <section class="toolbar" aria-label="Filters">
+      <label>Search <input id="query-input" type="search" autocomplete="off"></label>
+      <label>Chunk <select id="chunk-filter"></select></label>
+      <label>Status <select id="status-filter"></select></label>
+      <label>Category <select id="category-filter"></select></label>
+      <label>Rows <select id="page-size"><option>50</option><option selected>100</option><option>250</option></select></label>
+    </section>
+
+    <nav class="tabs" aria-label="Views">
+      <button class="tab active" data-tab="grid-panel" type="button">Editor</button>
+      <button class="tab" data-tab="problems-panel" type="button">Problem Queue</button>
+      <button class="tab" data-tab="dirty-panel" type="button">Dirty Changes</button>
+      <button class="tab" data-tab="diff-panel" type="button">Diff</button>
+    </nav>
+
+    <main>
+      <section id="grid-panel" class="panel active">
+        <div class="grid-actions">
+          <button id="add-row-button" type="button">Add Row</button>
+          <button id="revert-row-button" type="button">Revert Row</button>
+          <button id="soft-remove-button" type="button">Soft Remove</button>
+          <button id="move-up-button" type="button">Move Up</button>
+          <button id="move-down-button" type="button">Move Down</button>
+          <button id="move-top-button" type="button">Move Top</button>
+          <button id="move-bottom-button" type="button">Move Bottom</button>
+          <span class="bulk-group">
+            <select id="bulk-column">
+              <option value="category">category</option>
+              <option value="status">status</option>
+              <option value="freq_lang">freq_lang</option>
+            </select>
+            <select id="bulk-value"></select>
+            <button id="bulk-apply-button" type="button">Apply to Selected/Active</button>
+          </span>
+          <button id="undo-button" type="button">Undo</button>
+          <button id="redo-button" type="button">Redo</button>
+        </div>
+        <div id="grid"></div>
+        <div class="pager">
+          <button id="prev-page" type="button">Prev</button>
+          <span id="page-label">Page 1 / 1</span>
+          <button id="next-page" type="button">Next</button>
+          <span id="total-label"></span>
+        </div>
+      </section>
+
+      <section id="problems-panel" class="panel">
+        <div class="panel-actions">
+          <button id="refresh-problems-button" type="button">Refresh Problems</button>
+          <span id="problems-count"></span>
+        </div>
+        <div id="problems-list" class="list"></div>
+      </section>
+
+      <section id="dirty-panel" class="panel">
+        <div class="panel-actions">
+          <button id="discard-button" type="button">Discard Draft</button>
+        </div>
+        <pre id="dirty-output"></pre>
+      </section>
+
+      <section id="diff-panel" class="panel">
+        <div class="panel-actions">
+          <button id="refresh-diff-button" type="button">Refresh Diff</button>
+        </div>
+        <pre id="diff-output"></pre>
+      </section>
+    </main>
+
+    <div id="message" role="status" aria-live="polite"></div>
+
+    <script src="/vendor/tabulator/tabulator.min.js"></script>
+    <script src="/app.js"></script>
+  </body>
+</html>

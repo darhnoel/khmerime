@@ -14,14 +14,24 @@ class BridgeResponse:
     ok: bool
     consumed: bool
     commit_text: Optional[str]
+    readiness: str
     snapshot: Dict[str, Any]
     error: Optional[str]
 
 
 class BridgeClient:
-    def __init__(self, bridge_path: Path, *, initial_input_mode: str = "roman"):
+    def __init__(
+        self,
+        bridge_path: Path,
+        *,
+        initial_input_mode: str = "roman",
+        deferred_segmented_preview: bool = False,
+    ):
+        args = [str(bridge_path), "--initial-input-mode", initial_input_mode]
+        if deferred_segmented_preview:
+            args.append("--deferred-segmented-preview")
         self._proc = subprocess.Popen(
-            [str(bridge_path), "--initial-input-mode", initial_input_mode],
+            args,
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
@@ -45,6 +55,7 @@ class BridgeClient:
             ok=bool(data.get("ok", False)),
             consumed=bool(data.get("consumed", False)),
             commit_text=data.get("commit_text"),
+            readiness=str(data.get("readiness", "unknown")),
             snapshot=data.get("snapshot", {}),
             error=data.get("error"),
         )

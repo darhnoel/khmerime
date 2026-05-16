@@ -68,6 +68,11 @@ impl Transliterator {
     }
 
     #[cfg(not(all(target_arch = "wasm32", feature = "fetch-data")))]
+    pub fn from_default_phase_a_data(config: DecoderConfig) -> Result<Self> {
+        Self::from_phase_a_bytes(DEFAULT_COMPILED_DATA, config)
+    }
+
+    #[cfg(not(all(target_arch = "wasm32", feature = "fetch-data")))]
     pub fn from_tsv_path_with_config(path: impl AsRef<Path>, config: DecoderConfig) -> Result<Self> {
         let source = fs::read_to_string(path)?;
         Self::from_tsv_str_with_config(&source, config)

@@ -10,6 +10,7 @@ mod ime_session;
 mod nida_keymap;
 
 pub use crate::ime_session::{
-    CandidateDisplayEntry, CursorLocation, HistoryStore, ImeSession, ImeSessionSnapshot, ImeSessionUpdate, InputMode,
-    NativeKeyEvent, SegmentPreviewEntry, SessionCommand, SessionResult, SessionSnapshot,
+    CandidateDisplayEntry, CursorLocation, HistoryStore, ImeSession, ImeSessionOptions, ImeSessionSnapshot,
+    ImeSessionUpdate, InputMode, NativeKeyEvent, SegmentPreviewEntry, SegmentedPreviewMode, SessionCommand,
+    SessionResult, SessionSnapshot,
 };

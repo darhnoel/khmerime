@@ -5,6 +5,7 @@
 
 # Local tooling
 .venv/
+.lexicon-editor/
 
 # Python caches
 __pycache__/
@@ -19,6 +20,9 @@ assets/data/
 
 # Dioxus/Linux
 vendor/
+!tools/lexicon-editor/static/vendor/
+!tools/lexicon-editor/static/vendor/tabulator/
+!tools/lexicon-editor/static/vendor/tabulator/**
 
 # Editor and OS noise
 .DS_Store

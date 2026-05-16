@@ -32,6 +32,7 @@ from ibus_segment_preview import (
     build_segment_preview,
     focused_raw_input_span,
 )
+from ibus_segmented_preview import SegmentedPreviewScheduler
 
 try:
     gi.require_version("Gdk", "3.0")
@@ -71,11 +72,16 @@ def log_line(message: str) -> None:
 class KhmerIMEEngine(IBus.Engine):
     def __init__(self, connection: Any, object_path: str, bridge_path: Path, initial_input_mode: str = "roman"):
         super().__init__(connection=connection, object_path=object_path)
-        self._bridge = BridgeClient(bridge_path, initial_input_mode=initial_input_mode)
+        self._bridge = BridgeClient(
+            bridge_path,
+            initial_input_mode=initial_input_mode,
+            deferred_segmented_preview=True,
+        )
         self._bridge_lock = threading.Lock()
         self._table = IBus.LookupTable.new(9, 0, True, True)
         self._last_preedit = ""
         self._last_raw_preedit = ""
+        self._last_readiness = "unknown"
         self._focus_events = 0
         self._reset_events = 0
         self._last_enter_focus_events = 0
@@ -101,10 +107,23 @@ class KhmerIMEEngine(IBus.Engine):
             source_remove=GLib.source_remove,
             idle_add=GLib.idle_add,
         )
+        self._segmented_preview = SegmentedPreviewScheduler(
+            call_bridge=self._call_bridge_raw,
+            apply_response=self._apply_response,
+            current_raw_preedit=lambda: self._last_raw_preedit,
+            log=log_line,
+            timeout_add=GLib.timeout_add,
+            source_remove=GLib.source_remove,
+            idle_add=GLib.idle_add,
+        )
         self._current_input_mode = "nida" if initial_input_mode == "nida" else "roman"
         self._register_mode_property(self._current_input_mode)
-        self._apply_snapshot(self._call_bridge_raw({"cmd": "snapshot"}))
-        log_line(f"engine init object_path={object_path} bridge={bridge_path} input_mode={initial_input_mode}")
+        initial_snapshot = self._call_bridge_raw({"cmd": "snapshot"})
+        self._apply_snapshot(initial_snapshot)
+        log_line(
+            "engine init object_path=%s bridge=%s input_mode=%s readiness=%s"
+            % (object_path, bridge_path, initial_input_mode, initial_snapshot.readiness)
+        )
 
     def _call_bridge_raw(self, payload: Dict[str, Any]) -> BridgeResponse:
         with self._bridge_lock:
@@ -155,6 +174,7 @@ class KhmerIMEEngine(IBus.Engine):
     def _apply_response(self, response: BridgeResponse) -> None:
         if not response.ok:
             return
+        self._last_readiness = response.readiness
         if response.commit_text:
             self._clear_composition_ui_for_commit(response)
             self.commit_text(IBus.Text.new_from_string(response.commit_text))
@@ -426,10 +446,11 @@ class KhmerIMEEngine(IBus.Engine):
     def do_process_key_event(self, keyval: int, keycode: int, state: int) -> bool:
         if int(keyval) == KEY_CAPS_LOCK:
             return self._handle_caps_lock_key(int(state))
+        if int(state) & STATE_RELEASE_MASK:
+            return False
         self._cancel_pending_refinement()
-        if int(keyval) in (KEY_RETURN, KEY_KP_ENTER) and self._last_preedit:
-            self._last_preedit = ""
-            self.update_preedit_text(IBus.Text.new_from_string(""), 0, False)
+        self._segmented_preview.cancel()
+        preedit_before = self._last_preedit
         consumed = False
         try:
             payload = {
@@ -440,14 +461,28 @@ class KhmerIMEEngine(IBus.Engine):
             }
             response = self._call_bridge_raw(payload)
             consumed = response.consumed
-            self._apply_response(response)
+            if (
+                int(keyval) in (KEY_RETURN, KEY_KP_ENTER)
+                and preedit_before
+                and not response.commit_text
+                and not str((response.snapshot or {}).get("raw_preedit", ""))
+                and not str((response.snapshot or {}).get("preedit", ""))
+            ):
+                log_line(
+                    "enter_path preserving preedit because bridge returned empty commit "
+                    "preedit_before=%s consumed=%s readiness=%s"
+                    % (len(preedit_before), response.consumed, response.readiness)
+                )
+            else:
+                self._apply_response(response)
             log_line(
-                "key_event keyval=%s keycode=%s state=%s consumed=%s preedit=%r cand=%s"
+                "key_event keyval=%s keycode=%s state=%s consumed=%s readiness=%s preedit=%r cand=%s"
                 % (
                     keyval,
                     keycode,
                     state,
                     response.consumed,
+                    response.readiness,
                     str(response.snapshot.get("preedit", "")),
                     len(response.snapshot.get("candidates", []) or []),
                 )
@@ -460,7 +495,7 @@ class KhmerIMEEngine(IBus.Engine):
                 self._last_enter_reset_events = self._reset_events
                 log_line(
                     "enter_path keyval=%s keycode=%s state=%s consumed=%s commit_len=%s "
-                    "preedit_before=0 preedit_after=%s focus_events=%s reset_events=%s "
+                    "preedit_before=%s preedit_after=%s focus_events=%s reset_events=%s "
                     "focus_delta=%s reset_delta=%s capabilities=%s purpose=%s hints=%s "
                     "surrounding_len=%s surrounding_cursor=%s surrounding_anchor=%s"
                     % (
@@ -469,6 +504,7 @@ class KhmerIMEEngine(IBus.Engine):
                         state,
                         response.consumed,
                         len(response.commit_text or ""),
+                        len(preedit_before),
                         len(preedit_after),
                         self._focus_events,
                         self._reset_events,
@@ -489,6 +525,8 @@ class KhmerIMEEngine(IBus.Engine):
                 and self._is_refinement_trigger_key(int(keyval))
             ):
                 self._schedule_refinement(raw_preedit)
+                if raw_preedit:
+                    self._segmented_preview.schedule(raw_preedit)
             return response.consumed
         except Exception as err:
             log_line(f"process_key_event failed keyval={keyval} keycode={keycode} state={state} err={err}")

@@ -16,6 +16,7 @@ pub use history_store::{desktop_history_path, load_desktop_history, save_desktop
 pub enum BridgeCommand {
     ProcessKeyEvent { keyval: u32, keycode: u32, state: u32 },
     RefineComposition { raw_preedit: String },
+    RefreshSegmentedPreview { raw_preedit: String },
     SetInputMode { input_mode: InputMode },
     ToggleInputMode,
     FocusIn,
@@ -28,6 +29,15 @@ pub enum BridgeCommand {
     Shutdown,
 }
 
+#[derive(Clone, Copy, Debug, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum BridgeReadiness {
+    PhaseA,
+    FullPending,
+    Full,
+    Failed,
+}
+
 /// JSON response returned by the Rust bridge after every command.
 ///
 /// Python should render `snapshot`, commit `commit_text` once, and use
@@ -38,6 +48,7 @@ pub struct BridgeResponse<S> {
     pub consumed: bool,
     pub commit_text: Option<String>,
     pub history_changed: bool,
+    pub readiness: BridgeReadiness,
     pub snapshot: S,
     pub error: Option<String>,
 }
@@ -48,6 +59,7 @@ pub fn fallback_empty_snapshot_json(error: impl Into<String>) -> serde_json::Val
         "consumed": false,
         "commit_text": serde_json::Value::Null,
         "history_changed": false,
+        "readiness": "failed",
         "snapshot": {
             "enabled": false,
             "focused": false,

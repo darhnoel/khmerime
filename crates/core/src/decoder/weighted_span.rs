@@ -9,6 +9,7 @@ use super::{
 };
 
 const MIN_SPAN_LEN: usize = 3;
+const MIN_EXACT_ANCHOR_LEN: usize = 2;
 const CHUNK_EDIT_FLOOR: f64 = 0.46;
 const SEGMENT_LIMIT_PER_START: usize = 12;
 
@@ -276,27 +277,40 @@ impl WeightedSpanDecoder {
     ) -> Option<Vec<Vec<SpanCandidate>>> {
         let mut per_start = vec![Vec::<SpanCandidate>::new(); chars.len()];
         let preferred_ends = self.preferred_lattice_ends(request, chars.len());
+        let short_exact_ends = self.short_exact_ends_by_start(request);
         for start in 0..chars.len() {
             if self.over_budget(started_at) {
                 return None;
             }
             let remaining = chars.len().saturating_sub(start);
-            if remaining < MIN_SPAN_LEN {
+            let preferred = preferred_ends.get(&start);
+            let short_exact = short_exact_ends.get(&start);
+            if remaining < MIN_SPAN_LEN && preferred.is_none() && short_exact.is_none() {
                 continue;
             }
             let mut best_by_signature = HashMap::<(usize, String), SpanCandidate>::new();
-            let lengths = if let Some(ends) = preferred_ends.get(&start) {
+            let mut lengths: Vec<usize> = if let Some(ends) = preferred {
                 ends.iter()
                     .copied()
                     .filter(|end| *end > start)
                     .map(|end| end - start)
-                    .collect::<Vec<_>>()
+                    .collect()
             } else {
                 let max_len = self.config.beam_max_span_len.min(remaining);
                 let mut lengths = (MIN_SPAN_LEN..=max_len).rev().collect::<Vec<_>>();
                 lengths.truncate(self.config.beam_lengths_per_start.max(1));
                 lengths
             };
+            if let Some(ends) = short_exact {
+                for end in ends {
+                    if *end > start {
+                        let len = end - start;
+                        if !lengths.contains(&len) {
+                            lengths.push(len);
+                        }
+                    }
+                }
+            }
 
             for len in lengths {
                 let end = start + len;
@@ -564,7 +578,7 @@ impl WeightedSpanDecoder {
             .all_weighted_span_phrase_chunks()
             .iter()
             .flatten()
-            .any(|chunk| chunk.end.saturating_sub(chunk.start) >= MIN_SPAN_LEN)
+            .any(|chunk| chunk.end.saturating_sub(chunk.start) >= chunk_min_anchor_len(chunk))
     }
 
     fn over_budget(&self, started_at: super::DecodeTimer) -> bool {
@@ -586,7 +600,8 @@ impl WeightedSpanDecoder {
                     .iter()
                     .filter_map(|chunk| {
                         let len = chunk.end.saturating_sub(chunk.start);
-                        (len >= MIN_SPAN_LEN).then_some((chunk.start, chunk.end))
+                        let floor = chunk_min_anchor_len(chunk);
+                        (len >= floor).then_some((chunk.start, chunk.end))
                     })
                     .collect::<Vec<_>>();
 
@@ -607,7 +622,8 @@ impl WeightedSpanDecoder {
 
                 let covered = ranges.last().map(|(_, end)| *end).unwrap_or_default() == total_len
                     && ranges.first().map(|(start, _)| *start).unwrap_or_default() == 0;
-                covered.then_some(ranges)
+                let contiguous = ranges.windows(2).all(|pair| pair[0].1 == pair[1].0);
+                (covered && contiguous).then_some(ranges)
             })
     }
 
@@ -620,7 +636,7 @@ impl WeightedSpanDecoder {
         for path in request.composer.all_weighted_span_phrase_chunks() {
             for chunk in path {
                 let len = chunk.end.saturating_sub(chunk.start);
-                if len < MIN_SPAN_LEN {
+                if len < chunk_min_anchor_len(chunk) {
                     continue;
                 }
                 by_start.entry(chunk.start).or_default().insert(chunk.end);
@@ -635,6 +651,28 @@ impl WeightedSpanDecoder {
             }
         }
 
+        by_start
+            .into_iter()
+            .map(|(start, ends)| {
+                let mut ends = ends.into_iter().collect::<Vec<_>>();
+                ends.sort_unstable();
+                (start, ends)
+            })
+            .collect()
+    }
+
+    fn short_exact_ends_by_start(&self, request: &DecodeRequest<'_>) -> HashMap<usize, Vec<usize>> {
+        let mut by_start = HashMap::<usize, HashSet<usize>>::new();
+        for chunk in &request.composer.chunks {
+            if chunk.kind != crate::composer::ComposerChunkKind::Exact {
+                continue;
+            }
+            let len = chunk.end.saturating_sub(chunk.start);
+            if !(MIN_EXACT_ANCHOR_LEN..MIN_SPAN_LEN).contains(&len) {
+                continue;
+            }
+            by_start.entry(chunk.start).or_default().insert(chunk.end);
+        }
         by_start
             .into_iter()
             .map(|(start, ends)| {
@@ -860,12 +898,19 @@ fn pos_delta(lexicon: &RankedLexicon, previous: Option<&str>, current: Option<&s
     }
 }
 
+fn chunk_min_anchor_len(chunk: &crate::composer::ComposerChunk) -> usize {
+    if chunk.kind == crate::composer::ComposerChunkKind::Exact {
+        MIN_EXACT_ANCHOR_LEN
+    } else {
+        MIN_SPAN_LEN
+    }
+}
+
 fn composer_alignment_delta(composer: &crate::composer::ComposerAnalysis, start: usize, end: usize) -> i32 {
-    if composer
-        .chunks
-        .iter()
-        .any(|chunk| chunk.end.saturating_sub(chunk.start) < 3)
-    {
+    if composer.chunks.iter().any(|chunk| {
+        let len = chunk.end.saturating_sub(chunk.start);
+        len < chunk_min_anchor_len(chunk)
+    }) {
         return 0;
     }
 
@@ -907,11 +952,18 @@ fn exact_anchor_path_bonus(request: &DecodeRequest<'_>) -> i32 {
         return 0;
     }
 
-    chunks
+    let long_exact = chunks
         .iter()
         .filter(|chunk| chunk.end.saturating_sub(chunk.start) >= 4)
-        .count() as i32
-        * 8_000
+        .count() as i32;
+    let short_exact = chunks
+        .iter()
+        .filter(|chunk| {
+            let len = chunk.end.saturating_sub(chunk.start);
+            (MIN_EXACT_ANCHOR_LEN..4).contains(&len)
+        })
+        .count() as i32;
+    long_exact * 8_000 + short_exact * 4_000
 }
 
 fn incremental_history_score(history: &HashMap<String, usize>, word: &str) -> i32 {

@@ -1,0 +1,266 @@
+:root {
+  color-scheme: light;
+  --bg: #f6f7f9;
+  --panel: #ffffff;
+  --line: #d7dce2;
+  --text: #1f2933;
+  --muted: #667085;
+  --primary: #1463ff;
+  --danger: #b42318;
+  --warn: #8a5a00;
+  --dirty: #0f766e;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: 14px/1.35 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+button,
+input,
+select {
+  font: inherit;
+}
+
+button {
+  border: 1px solid var(--line);
+  background: #fff;
+  border-radius: 6px;
+  padding: 7px 10px;
+  cursor: pointer;
+}
+
+button:hover {
+  border-color: #98a2b3;
+}
+
+button.primary {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: #fff;
+}
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.app-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 18px;
+  background: var(--panel);
+  border-bottom: 1px solid var(--line);
+}
+
+h1 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 700;
+}
+
+#status-line {
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.primary-actions,
+.toolbar,
+.grid-actions,
+.panel-actions,
+.pager {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.toolbar {
+  padding: 10px 18px;
+  background: #fff;
+  border-bottom: 1px solid var(--line);
+}
+
+.toolbar label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--muted);
+}
+
+.toolbar input,
+.toolbar select,
+.grid-actions select {
+  min-height: 34px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: #fff;
+  padding: 5px 8px;
+}
+
+#query-input {
+  width: min(420px, 36vw);
+}
+
+.tabs {
+  display: flex;
+  gap: 4px;
+  padding: 8px 18px 0;
+}
+
+.tab {
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
+.tab.active {
+  background: var(--panel);
+  border-bottom-color: var(--panel);
+  font-weight: 700;
+}
+
+main {
+  padding: 0 18px 18px;
+}
+
+.panel {
+  display: none;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  padding: 12px;
+}
+
+.panel.active {
+  display: block;
+}
+
+.grid-actions,
+.panel-actions {
+  margin-bottom: 10px;
+}
+
+#grid {
+  border: 1px solid var(--line);
+}
+
+.pager {
+  justify-content: flex-end;
+  padding-top: 10px;
+  color: var(--muted);
+}
+
+.tabulator-row.row-invalid {
+  background: #fff1f0 !important;
+}
+
+.tabulator-row.row-warning {
+  background: #fff8e6 !important;
+}
+
+.tabulator-row.row-dirty {
+  box-shadow: inset 3px 0 0 var(--dirty);
+}
+
+.tabulator-row.row-active {
+  outline: 2px solid rgba(20, 99, 255, 0.45);
+  outline-offset: -2px;
+}
+
+.tabulator-row.row-selected {
+  background: #eaf1ff !important;
+}
+
+.cell-list {
+  display: block;
+  color: var(--danger);
+  font-size: 12px;
+  white-space: normal;
+}
+
+.runtime-included {
+  color: #166534;
+  font-weight: 700;
+}
+
+.runtime-excluded {
+  color: #6b7280;
+}
+
+.list {
+  display: grid;
+  gap: 8px;
+}
+
+.problem-item {
+  display: grid;
+  grid-template-columns: 220px 1fr auto;
+  gap: 10px;
+  align-items: center;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 8px 10px;
+}
+
+.problem-type {
+  color: var(--warn);
+  font-weight: 700;
+}
+
+pre {
+  min-height: 260px;
+  max-height: 62vh;
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: #101828;
+  color: #e5e7eb;
+  padding: 12px;
+  white-space: pre-wrap;
+}
+
+#dirty-output {
+  background: #fff;
+  color: var(--text);
+}
+
+#message {
+  position: fixed;
+  right: 18px;
+  bottom: 18px;
+  max-width: min(560px, calc(100vw - 36px));
+  background: #111827;
+  color: #fff;
+  border-radius: 8px;
+  padding: 10px 12px;
+  display: none;
+  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.25);
+  white-space: pre-wrap;
+}
+
+#message.visible {
+  display: block;
+}
+
+@media (max-width: 760px) {
+  .app-header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  #query-input {
+    width: 100%;
+  }
+
+  .problem-item {
+    grid-template-columns: 1fr;
+  }
+}

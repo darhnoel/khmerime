@@ -60,6 +60,15 @@ impl ComposerAnalysis {
         {
             return self.chunks.clone();
         }
+        if self.fully_segmented
+            && self.chunks.len() > 1
+            && self
+                .chunks
+                .iter()
+                .all(|chunk| chunk.kind == ComposerChunkKind::Exact && chunk.end.saturating_sub(chunk.start) >= 2)
+        {
+            return self.chunks.clone();
+        }
         if self.is_multi_chunk() {
             return self.chunks.clone();
         }
@@ -473,8 +482,7 @@ impl ComposerTable {
         if chars.is_empty() {
             return Vec::new();
         }
-        if let Some(mut exact) = self.full_segmentation_from_chars(chars, global_start) {
-            exact.retain(|chunk| chunk.end.saturating_sub(chunk.start) >= 3);
+        if let Some(exact) = self.full_segmentation_from_chars(chars, global_start) {
             return exact;
         }
 
@@ -563,20 +571,36 @@ fn compare_weighted_span_chunk_paths(left: &[ComposerChunk], right: &[ComposerCh
         .then_with(|| left.len().cmp(&right.len()))
 }
 
-fn weighted_span_chunk_path_priority(path: &[ComposerChunk]) -> (usize, usize, usize) {
-    let weak_chunks = path
+fn weighted_span_chunk_path_priority(path: &[ComposerChunk]) -> (usize, usize, usize, usize) {
+    let weak_non_exact_chunks = path
         .iter()
-        .filter(|chunk| chunk.end.saturating_sub(chunk.start) < 3)
+        .filter(|chunk| {
+            let len = chunk.end.saturating_sub(chunk.start);
+            len < 3 && chunk.kind != ComposerChunkKind::Exact
+        })
         .count();
     let hint_chunks = path
         .iter()
         .filter(|chunk| chunk.kind == ComposerChunkKind::Hint)
         .count();
+    let squared_len_sum = path
+        .iter()
+        .map(|chunk| {
+            let len = chunk.end.saturating_sub(chunk.start);
+            len.saturating_mul(len)
+        })
+        .sum::<usize>();
     let total_len = path
         .iter()
         .map(|chunk| chunk.end.saturating_sub(chunk.start))
         .sum::<usize>();
-    (weak_chunks, hint_chunks, usize::MAX - total_len)
+    let _ = total_len;
+    (
+        weak_non_exact_chunks,
+        hint_chunks,
+        path.len(),
+        usize::MAX - squared_len_sum,
+    )
 }
 
 #[cfg(test)]
