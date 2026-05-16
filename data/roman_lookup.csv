@@ -1596,10 +1596,9 @@ ao,អោ៎,1,km
 ao,ឱ,1,km
 aoah,ឱះ,1,km
 aob,ឱប,249,km
-aobabatek,ឱបបាតិក,1,km
 aobakkamikapeath,ឱបក្កមិកាពាធ,1,km
 aobammosamsantonea,ឱបម្មសំសន្ទនា,1,km
-aobobatek,ឱបបាតិក,1,km
+aobbabbateka,ឱបបាតិក,1,km
 aobokkomikapeath,ឱបក្កមិកាពាធ,1,km
 aobommosamsontonea,ឱបម្មសំសន្ទនា,1,km
 aobonnokobbodebotea,អបណ្ណកប្បដិបទា,1,km
@@ -1625,12 +1624,13 @@ aokhous,អឃោស,1,km
 aokoas,ឱក័ស,1,km
 aokror,អគ្រ,1,km
 aokyeakear,អគ្យាគារ,1,km
+aolarek,ឱឡារិក,15,km
+aolarik,ឱឡារិក,15,km
 aoleareuk,ឱឡារិក,15,km
 aolekoll,ឱឡិគល្ល,1,km
 aoligoal,ឱឡិគល្ល,1,km
 aom,ឱម,1,km
-aomosatt,ឱមសត្ត,1,km
-aomosott,ឱមសត្ត,1,km
+aomasat,ឱមសត្ត,1,km
 aon,ឱន,69,km
 aongkea,ឱង្កា,1,km
 aongkeae,អង្គែ,9,km
@@ -2291,7 +2291,7 @@ atto,អត្តុ,1,km
 attohureagott,អទុរាគត,1,km
 attoureagata,អទុរាគតា,1,km
 attoureageakta,អទុរាគតា,1,km
-Attra,អត្រា,1,km
+attra,អត្រា,1,km
 attrabrak,អត្រាប្រាក់,1,km
 attraprak,អត្រាប្រាក់,1,km
 attthagou,អទ្ធគូ,1,km
@@ -4031,7 +4031,6 @@ bert,បង្កើត,2554,km
 bert,បឺត,92,km
 bes,បេះ,1954,km
 besakachon,បេសកជន,1,km
-Besdong,បេះដូង,1,km
 besdong,បេះដូង,1,km
 beskakamm,បេសកកម្ម,19,km
 beskokomm,បេសកកម្ម,19,km
@@ -6356,7 +6355,6 @@ brorpoon,ប្រពូន,1,km
 brorpun,ប្រពូន,1,km
 brors,ប្រស,96,km
 brors,ប្រស់,3,km
-Brorsirn,ប្រសិន,1,km
 brorsirn,ប្រសិន,1,km
 brortab,ប្រតប់,27,km
 brortabbronhal,ប្រតាប់ប្រញាល់,1,km
@@ -8592,6 +8590,9 @@ ganoneyy,គណនេយ្យ,5,km
 ganoneyyokor,គណនេយ្យករ,1,km
 ganoniydthan,គណនីយដ្ឋាន,1,km
 ganthei,គណ្ឋី,1,km
+garu,គរុ,1,km
+garukaosal,គរុកោសល្យ,1,km
+garukaosol,គរុកោសល្យ,1,km
 gatasanhnha,គតសញ្ញា,1,km
 gate,គតិ,14,km
 gatebandet,គតិបណ្ឌិត,1,km
@@ -9119,6 +9120,7 @@ groean,គ្រឿន,6,km
 groeangnhien,គ្រឿងញៀន,67,km
 groengnhien,គ្រឿងញៀន,67,km
 groeun,គ្រឿន,6,km
+groeungnhean,គ្រឿងញៀន,67,km
 grohaem,គ្រហែម,1,km
 grohaet,គ្រហែត,1,km
 grohaeu,គ្រហើ,1,km
@@ -12198,6 +12200,7 @@ kaor,កោរ,78,km
 kaorsak,កោរសក់,28,km
 kaorsok,កោរសក់,28,km
 kaos,កោស,164,km
+kaosal,កោសល្យ,1,km
 kaosey,កោសិយ,1,km
 kaosey,កោសេយ្យ,1,km
 kaoseyvobbakam,កោសេយ្យវប្បកម្ម,1,km
@@ -12206,6 +12209,7 @@ kaoseyvobbokom,កោសេយ្យវប្បកម្ម,1,km
 kaoseyvobbokor,កោសេយ្យវប្បករ,1,km
 kaosla,កោសល្ល,1,km
 kaoslo,កោសល្ល,1,km
+kaosol,កោសល្យ,1,km
 kaosom,កោសុម,1,km
 kaosros,កោសរូស,1,km
 kaosrus,កោសរូស,1,km
@@ -12444,6 +12448,7 @@ kauey,កៅអី,1,km
 kauhay,កៅហាយ,1,km
 kaulak,កៅឡាក់,1,km
 kaulau,កៅឡៅ,1,km
+kaunkli,កូនគ្លី,1,km
 kauot,ក្អួត,150,km
 kauov,កៅអូវ,1,km
 kauseb,កៅសិប,1,km
@@ -13513,6 +13518,7 @@ kolyanei,កល្យាណី,1,km
 kom,កម,10,km
 kom,កុំ,2848,km
 koma,កុមារ,1197,km
+komara,កុមារា,1197,km
 komaranoukrus,កុមារានុគ្រោះ,1,km
 komaranukrus,កុមារានុគ្រោះ,1,km
 komarapheap,កុមារភាព,14,km
@@ -13994,7 +14000,6 @@ konkomprea,កូនកំព្រា,1,km
 konkondol,កូនកណ្ដុរ,1,km
 konkoul,កូនគោល,1,km
 konkrab,កូនក្រាប់,1,km
-konkrak,កូនក្រក,1,km
 konkranh,កូនក្រាញ់,1,km
 konkrok,កូនក្រក,1,km
 konlaeng,កន្លែង,5259,km
@@ -14238,6 +14243,7 @@ korochokay,ករជកាយ,1,km
 koroneiykech,ករណីយកិច្ច,1,km
 korononeam,ករណនាម,1,km
 korovik,ករវិក,1,km
+korsol,កោសល្យ,1,km
 kort,កោត,557,km
 koruna,ករុណា,144,km
 korunavises,ករុណាវិសេស,1,km
@@ -16968,7 +16974,6 @@ nah,ណាស់,7518,km
 nah,ណ៎ះ,1,km
 nah,ហ្ន៎ះ,1,km
 nak,នាក់,12112,km
-Nak,អ្នក,52630,km
 nak,អ្នក,52630,km
 nakacham,អ្នកចាំ,2,km
 nakamday,អ្នកម្ដាយ,298,km
@@ -17610,7 +17615,6 @@ niyouchok,និយោជក,40,km
 niytamichchhatidthe,និយតមិច្ឆាទិដ្ឋិ,1,km
 niytomichchhatidthe,និយតមិច្ឆាទិដ្ឋិ,1,km
 niyum,និយម,626,km
-Niyumney,និយមន័យ,1,km
 niyumney,និយមន័យ,1,km
 niyyeanikathor,និយ្យានិកធម៌,1,km
 niyyeanikothor,និយ្យានិកធម៌,1,km
@@ -17883,6 +17887,7 @@ okolok,អុកឡុក,2,km
 okun,អរគុណ,327,km
 ol,អុល,8,km
 olaal,អ៊ុលអាល់,1,km
+olarek,ឱឡារិក,15,km
 olarik,ឱឡារិក,15,km
 om,អុំ,198,km
 om,អ៊ំ,57,km
@@ -20945,6 +20950,7 @@ rada,រ៉ាដា,9,km
 raeng,រ៉ែងៗ,1,km
 raet,រ៉ែត,4,km
 rai,រ៉ៃ,180,km
+raksaphibal,រក្សាភិបាល,1,km
 raleak,រលាក,438,km
 ramrai,រ៉ាំរ៉ៃ,1,km
 rang,រ៉ាង,10,km
@@ -21648,7 +21654,6 @@ rokong,រគង,1,km
 rokot,រកូត,1,km
 rokotae,រកតែ,1,km
 rokout,រកូត,1,km
-roksaphibal,រក្សាភិបាល,1,km
 roksapreahaangkor,រក្សាព្រះអង្គ,1,km
 roksapreahaongkor,រក្សាព្រះអង្គ,1,km
 roksar,រក្ស,30,km
@@ -23209,6 +23214,7 @@ samaoh,សំអុះ,1,km
 samaok,សំអក,1,km
 samaoy,សំអុយ,1,km
 samapheap,សមភាព,21,km
+samaphihar,សមភិហារ,1,km
 samaromphor,សមារម្ភ,1,km
 samas,សមាស,202,km
 samatean,សមាទាន,1,km
@@ -23475,7 +23481,6 @@ samonottes,សមណុទ្ទេស,1,km
 samonottmeaphisek,សមណុត្តមាភិសេក,1,km
 samonthokar,សមន្ធការ,1,km
 samopheap,សមភាព,21,km
-samophihar,សមភិហារ,1,km
 samopromot,សមព្រមត់,1,km
 samor,សមរ,45,km
 samoreatrei,សមរាត្រី,7,km
@@ -24047,10 +24052,13 @@ sarachar,សារាចរ,23,km
 sarachor,សារាចរ,23,km
 saraneiy,សារាណីយ,1,km
 sarani,សារាណីយ,1,km
+sarapech,សារពេជ្ញ,1,km
 sarapersot,សារពើសូត្រ,1,km
 sarapheab,សារភាព,536,km
 saraphonhnh,សរភញ្ញ,1,km
+sarapormean,សារព័ត៌មាន,642,km
 sarasamkhan,សារសំខាន់,3,km
+saratheat,សារធាតុ,616,km
 saravoatrar,សារវ័ត្រ,1,km
 saravoatror,សារវ័ត្រ,1,km
 saray,សារាយ,19,km
@@ -24086,6 +24094,7 @@ saropechnhor,សរពេជ្ញ,1,km
 saropoan,សារព័ន,1,km
 sarosan,សរសន់,1,km
 saroteak,សរទៈ,2,km
+sarotheat,សារធាតុ,616,km
 sarothei,សារថី,1,km
 sarotik,សារទិក,1,km
 sarotokal,សរទកាល,1,km
@@ -24093,8 +24102,7 @@ sarouch,សរោជ,1,km
 sarouch,សារោជ,1,km
 sarpausout,សារពើសូត្រ,1,km
 sarpauyutt,សារពើយុត្ត,1,km
-sarpeangkor,សារពាង្គ,12,km
-sarpechnhor,សារពេជ្ញ,1,km
+sarpeang,សារពាង្គ,12,km
 sarpheap,សារភាព,536,km
 sarpreah,សរព្រះ,1,km
 sarrapersot,សារពើសូត្រ,1,km
@@ -24102,7 +24110,6 @@ sarsai,សរសៃ,421,km
 sarsvoat,សរស្វ័ត,1,km
 sart,ស្អាត,8820,km
 sartbat,ស្អាតបាត,1,km
-sartheat,សារធាតុ,616,km
 sartra,សារត្រា,1,km
 saru,សារូ,1,km
 sarub,សរុប,1647,km
@@ -24271,7 +24278,7 @@ savea,សាវា,1,km
 savika,សាវិកា,1,km
 savinhnheanakak,សវិញ្ញាណកៈ,1,km
 savmang,សៅហ្មង,1,km
-savmeav,សាវម៉ាវ,1,km
+savmav,សាវម៉ាវ,1,km
 savmong,សៅហ្មង,1,km
 savnameas,សាវណមាស,1,km
 savnomeas,សាវណមាស,1,km
@@ -24293,23 +24300,22 @@ savtthei,សាវត្ថី,1,km
 say,សយ,9,km
 say,សាយ,595,km
 say,ស៊យ,45,km
+saybat,សាយបាត,1,km
+saydiev,សាយដៀវ,1,km
 sayealu,សយាលុ,1,km
-saynhak,សាយណ្ហៈ,1,km
-sayobat,សាយបាត,1,km
-sayodiev,សាយដៀវ,1,km
-sayomeas,សាយមាស,1,km
+saymeas,សាយមាស,1,km
 sayomphu,សយម្ភូ,1,km
 sayomporea,សយម្ពរា,1,km
 sayon,សយន,1,km
+sayon,សាយណ្ហ,1,km
 sayoneak,សយនៈ,1,km
-sayonhar,សាយណ្ហ,1,km
-sayonhor,សាយណ្ហ,1,km
-sayoyut,សាយយុត,1,km
+sayonha,សាយណ្ហៈ,1,km
 sayphouchon,សាយភោជន,1,km
 sayueun,សាយឺន,1,km
 sayuv,សយូវ,1,km
 sayyea,សយ្យា,1,km
 sayyeasan,សយ្យាសន៍,1,km
+sayyut,សាយយុត,1,km
 sbae,ស្បែ,43,km
 sbaeb,ស្បែប,1,km
 sbaek,ស្បែក,3303,km
@@ -25446,7 +25452,6 @@ somonottes,សមណុទ្ទេស,1,km
 somonottmeaphisek,សមណុត្តមាភិសេក,1,km
 somonthokar,សមន្ធការ,1,km
 somopheap,សមភាព,21,km
-somophihar,សមភិហារ,1,km
 somopromot,សមព្រមត់,1,km
 somor,សមរ,45,km
 somor,សម៉,1,km
@@ -25840,8 +25845,7 @@ sopheap,សុភាព,293,km
 sopheaset,សុភាសិត,6,km
 sopheatoleakar,សុភាតុលាការ,1,km
 sophek,សុភ,943,km
-sophikkhar,សុភិក្ខ,1,km
-sophikkhor,សុភិក្ខ,1,km
+sophikkha,សុភិក្ខ,1,km
 sophoak,សុភ័គ,1,km
 sophol,សុផល,27,km
 sophor,សុភរ,1,km
@@ -26131,12 +26135,12 @@ spak,ស្ពក,1,km
 spang,ស្ពង់,1,km
 spat,ស្ប៉ត,5,km
 spau,ស្ពៅ,1,km
-spayochhieng,ស្ពាយឆៀង,1,km
 spean,ស្ពាន,535,km
 speanmetrei,ស្ពានមេត្រី,1,km
 speap,សភាព,697,km
 speay,ស្ពាយ,87,km
-speayolieng,ស្ពាយលៀង,1,km
+speaychhieng,ស្ពាយឆៀង,1,km
+speaylieng,ស្ពាយលៀង,1,km
 spechspil,ស្រពេចស្រពិល,1,km
 speh,ស្ពេះ,1,km
 spei,ស្ពៃ,124,km
@@ -29984,6 +29988,10 @@ vibakkhar,វិបក្ខ,1,km
 vibarit,វិបរិត,1,km
 vibat,វិបត្តិ,467,km
 vibath,វិបត្តិ,467,km
+vibbadesara,វិប្បដិសារៈ,1,km
+vibbadesarei,វិប្បដិសារី,12,km
+vibbadesari,វិប្បដិសារី,12,km
+vibbadesarini,វិប្បដិសារិនី,1,km
 vibbakar,វិប្បការ,1,km
 vibbaleab,វិប្បលាប,1,km
 vibbariyas,វិបរិយាស,1,km
@@ -29995,10 +30003,6 @@ vibbassona,វិបស្សនា,1,km
 vibbassonabbanhnha,វិបស្សនាបញ្ញា,1,km
 vibbaveas,វិប្បវាស,1,km
 vibbayouk,វិប្បយោគ,1,km
-vibbdesara,វិប្បដិសារៈ,1,km
-vibbdesarei,វិប្បដិសារី,12,km
-vibbdesari,វិប្បដិសារី,12,km
-vibbdesarini,វិប្បដិសារិនី,1,km
 vibbkennapheap,វិប្បកិណ្ណភាព,1,km
 vibbkennopheap,វិប្បកិណ្ណភាព,1,km
 vibbokar,វិប្បការ,1,km
@@ -30021,11 +30025,11 @@ vibrinamothor,វិបរិណាមធម៌,1,km
 vibrkroete,វិប្រក្រឹតិ,1,km
 vibrokar,វិប្រការ,1,km
 vibroleab,វិប្រលាប,1,km
+vibrotesara,វិប្រតិសារៈ,1,km
 vibroveas,វិប្រវាស,1,km
 vibroyouk,វិប្រយោគ,1,km
 vibrtebtte,វិប្រតិបត្តិ,1,km
 vibrtekar,វិប្រតិការ,1,km
-vibrtesara,វិប្រតិសារៈ,1,km
 vibschet,វិបស្ចិត,1,km
 vibyreas,វិបយ៌ាស,1,km
 vibyreay,វិបយ៌ាយ,1,km
@@ -30165,7 +30169,6 @@ vilebaneak,វិលេបនៈ,1,km
 vileboneak,វិលេបនៈ,1,km
 vilibta,វិលិប្តា,1,km
 vilintheato,វិលីនធាតុ,1,km
-Villa,វីឡា,1,km
 villa,វីឡា,1,km
 vilomukh,វិលមុខ,12,km
 viloukaneak,វិលោកនៈ,1,km
@@ -30281,7 +30284,7 @@ visamapheap,វិសមភាព,1,km
 visamonhnh,វិសាមញ្ញ,1,km
 visaothon,វិសោធន,18,km
 visapheak,វិសភាគ,1,km
-visarot,វិសារទ,1,km
+visarata,វិសារទ,1,km
 visatis,វិសទិស,1,km
 visatis,វិសាទិស,1,km
 visay,វិសយ,1,km
