@@ -400,6 +400,46 @@ fn bridge_refines_long_phrase_on_enter() {
 }
 
 #[test]
+fn bridge_deferred_visible_refinement_updates_long_phrase_candidate() {
+    let (child, mut stdin, mut stdout) = spawn_full_bridge_deferred_preview();
+
+    send_command(&mut stdin, r#"{"cmd":"focus_in"}"#);
+    let _ = read_response(&mut stdout);
+    send_ascii_text(&mut stdin, &mut stdout, "nihjeasnadaiborkbrae");
+
+    send_command(&mut stdin, r#"{"cmd":"snapshot"}"#);
+    let live = read_response(&mut stdout);
+    assert_eq!(live["snapshot"]["segmented_active"], Value::Bool(false));
+    assert_ne!(
+        live["snapshot"]["candidates"]
+            .as_array()
+            .and_then(|items| items.first()),
+        Some(&Value::String("នេះជាស្នាដៃបកប្រែ".to_owned()))
+    );
+
+    send_command(
+        &mut stdin,
+        r#"{"cmd":"refine_composition","raw_preedit":"nihjeasnadaiborkbrae"}"#,
+    );
+    let refined = read_response(&mut stdout);
+    assert_eq!(
+        refined["snapshot"]["candidates"]
+            .as_array()
+            .and_then(|items| items.first()),
+        Some(&Value::String("នេះជាស្នាដៃបកប្រែ".to_owned()))
+    );
+
+    send_command(
+        &mut stdin,
+        r#"{"cmd":"process_key_event","keyval":65293,"keycode":0,"state":0}"#,
+    );
+    let committed = read_response(&mut stdout);
+    assert_eq!(committed["commit_text"], Value::String("នេះជាស្នាដៃបកប្រែ".to_owned()));
+
+    shutdown_and_assert_ok(child, &mut stdin, &mut stdout);
+}
+
+#[test]
 fn bridge_deferred_preview_builds_synchronously_for_digit_selection() {
     let (child, mut stdin, mut stdout) = spawn_full_bridge_deferred_preview();
 

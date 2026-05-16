@@ -169,6 +169,7 @@ pub struct ImeSessionOptions {
 
 pub struct ImeSession {
     transliterator: Transliterator,
+    visible_refiner: Option<Transliterator>,
     commit_refiner: Option<Transliterator>,
     history: HashMap<String, usize>,
     enabled: bool,
@@ -185,7 +186,7 @@ pub struct ImeSession {
 
 impl ImeSession {
     pub fn new(transliterator: Transliterator, history: HashMap<String, usize>) -> Self {
-        Self::new_with_optional_commit_refiner(transliterator, None, history)
+        Self::new_with_optional_refiners(transliterator, None, None, history)
     }
 
     pub fn new_with_input_mode(
@@ -193,7 +194,7 @@ impl ImeSession {
         history: HashMap<String, usize>,
         input_mode: InputMode,
     ) -> Self {
-        let mut session = Self::new_with_optional_commit_refiner(transliterator, None, history);
+        let mut session = Self::new_with_optional_refiners(transliterator, None, None, history);
         session.input_mode = input_mode;
         session
     }
@@ -204,7 +205,7 @@ impl ImeSession {
         input_mode: InputMode,
         options: ImeSessionOptions,
     ) -> Self {
-        let mut session = Self::new_with_optional_commit_refiner(transliterator, None, history);
+        let mut session = Self::new_with_optional_refiners(transliterator, None, None, history);
         session.input_mode = input_mode;
         session.options = options;
         session
@@ -215,7 +216,7 @@ impl ImeSession {
         commit_refiner: Transliterator,
         history: HashMap<String, usize>,
     ) -> Self {
-        Self::new_with_optional_commit_refiner(transliterator, Some(commit_refiner), history)
+        Self::new_with_optional_refiners(transliterator, None, Some(commit_refiner), history)
     }
 
     pub fn new_with_commit_refiner_and_input_mode(
@@ -224,7 +225,7 @@ impl ImeSession {
         history: HashMap<String, usize>,
         input_mode: InputMode,
     ) -> Self {
-        let mut session = Self::new_with_optional_commit_refiner(transliterator, Some(commit_refiner), history);
+        let mut session = Self::new_with_optional_refiners(transliterator, None, Some(commit_refiner), history);
         session.input_mode = input_mode;
         session
     }
@@ -236,19 +237,45 @@ impl ImeSession {
         input_mode: InputMode,
         options: ImeSessionOptions,
     ) -> Self {
-        let mut session = Self::new_with_optional_commit_refiner(transliterator, Some(commit_refiner), history);
+        let mut session = Self::new_with_optional_refiners(transliterator, None, Some(commit_refiner), history);
         session.input_mode = input_mode;
         session.options = options;
         session
     }
 
-    fn new_with_optional_commit_refiner(
+    pub fn new_with_visible_and_commit_refiners(
         transliterator: Transliterator,
+        visible_refiner: Transliterator,
+        commit_refiner: Transliterator,
+        history: HashMap<String, usize>,
+    ) -> Self {
+        Self::new_with_optional_refiners(transliterator, Some(visible_refiner), Some(commit_refiner), history)
+    }
+
+    pub fn new_with_visible_and_commit_refiners_input_mode_and_options(
+        transliterator: Transliterator,
+        visible_refiner: Transliterator,
+        commit_refiner: Transliterator,
+        history: HashMap<String, usize>,
+        input_mode: InputMode,
+        options: ImeSessionOptions,
+    ) -> Self {
+        let mut session =
+            Self::new_with_optional_refiners(transliterator, Some(visible_refiner), Some(commit_refiner), history);
+        session.input_mode = input_mode;
+        session.options = options;
+        session
+    }
+
+    fn new_with_optional_refiners(
+        transliterator: Transliterator,
+        visible_refiner: Option<Transliterator>,
         commit_refiner: Option<Transliterator>,
         history: HashMap<String, usize>,
     ) -> Self {
         Self {
             transliterator,
+            visible_refiner,
             commit_refiner,
             history,
             enabled: true,
@@ -289,6 +316,10 @@ impl ImeSession {
         self.commit_refiner = Some(commit_refiner);
     }
 
+    pub fn set_visible_refiner(&mut self, visible_refiner: Transliterator) {
+        self.visible_refiner = Some(visible_refiner);
+    }
+
     pub fn replace_engines(
         &mut self,
         transliterator: Transliterator,
@@ -296,6 +327,23 @@ impl ImeSession {
         segmented_preview: SegmentedPreviewMode,
     ) {
         self.transliterator = transliterator;
+        self.visible_refiner = None;
+        self.commit_refiner = commit_refiner;
+        self.options.segmented_preview = segmented_preview;
+        if self.options.segmented_preview == SegmentedPreviewMode::Disabled {
+            self.segmented_session = None;
+        }
+    }
+
+    pub fn replace_engines_with_refiners(
+        &mut self,
+        transliterator: Transliterator,
+        visible_refiner: Option<Transliterator>,
+        commit_refiner: Option<Transliterator>,
+        segmented_preview: SegmentedPreviewMode,
+    ) {
+        self.transliterator = transliterator;
+        self.visible_refiner = visible_refiner;
         self.commit_refiner = commit_refiner;
         self.options.segmented_preview = segmented_preview;
         if self.options.segmented_preview == SegmentedPreviewMode::Disabled {
@@ -548,7 +596,7 @@ impl ImeSession {
             return None;
         }
 
-        let refined = self.refined_phrase_for(raw_preedit)?;
+        let refined = self.visible_refined_phrase_for(raw_preedit)?;
         if refined == raw_preedit {
             return None;
         }
@@ -774,7 +822,8 @@ impl ImeSession {
     }
 
     fn refined_commit_phrase(&self) -> Option<String> {
-        self.refined_phrase_for(&self.composition_raw)
+        let refiner = self.commit_refiner.as_ref()?;
+        self.refined_phrase_for(refiner, &self.composition_raw)
     }
 
     fn default_flat_commit_text(&self) -> String {
@@ -796,8 +845,12 @@ impl ImeSession {
         }
     }
 
-    fn refined_phrase_for(&self, raw_input: &str) -> Option<String> {
-        let refiner = self.commit_refiner.as_ref()?;
+    fn visible_refined_phrase_for(&self, raw_input: &str) -> Option<String> {
+        let refiner = self.visible_refiner.as_ref().or(self.commit_refiner.as_ref())?;
+        self.refined_phrase_for(refiner, raw_input)
+    }
+
+    fn refined_phrase_for(&self, refiner: &Transliterator, raw_input: &str) -> Option<String> {
         let observation = refiner.shadow_observation(raw_input, &self.history);
         if observation.wfst_failure.is_some() || observation.wfst_top_segment_details.len() < 2 {
             return None;
@@ -1016,6 +1069,29 @@ mod tests {
         )
         .expect("default data must load");
         let mut session = ImeSession::new_with_commit_refiner(transliterator, commit_refiner, HashMap::new());
+        session.focus_in();
+        session
+    }
+
+    fn flat_default_session_with_split_refiners() -> ImeSession {
+        let transliterator =
+            Transliterator::from_default_data_with_config(DecoderConfig::legacy()).expect("default data must load");
+        let mut visible_config = DecoderConfig::shadow_interactive().with_mode(DecoderMode::Hybrid);
+        visible_config.wfst_max_latency_ms = 75;
+        let visible_refiner =
+            Transliterator::from_default_data_with_config(visible_config).expect("default data must load");
+        let commit_refiner = Transliterator::from_default_data_with_config(
+            DecoderConfig::default()
+                .with_mode(DecoderMode::Hybrid)
+                .with_shadow_log(false),
+        )
+        .expect("default data must load");
+        let mut session = ImeSession::new_with_visible_and_commit_refiners(
+            transliterator,
+            visible_refiner,
+            commit_refiner,
+            HashMap::new(),
+        );
         session.focus_in();
         session
     }
@@ -1299,6 +1375,20 @@ mod tests {
         assert_eq!(snapshot.raw_preedit, "nihjeasnadaiborkbrae");
         assert_eq!(snapshot.preedit, "nihjeasnadaiborkbrae");
         assert_eq!(snapshot.selected_index, Some(0));
+    }
+
+    #[test]
+    fn visible_refinement_uses_bounded_visible_refiner() {
+        let mut session = flat_default_session_with_split_refiners();
+        type_ascii(&mut session, "nihjeasnadaiborkbrae");
+
+        let refined = session.apply_refined_candidate("nihjeasnadaiborkbrae");
+
+        assert_eq!(refined.as_deref(), Some("នេះជាស្នាដៃបកប្រែ"));
+        assert_eq!(
+            session.snapshot().candidates.first().map(String::as_str),
+            Some("នេះជាស្នាដៃបកប្រែ")
+        );
     }
 
     #[test]

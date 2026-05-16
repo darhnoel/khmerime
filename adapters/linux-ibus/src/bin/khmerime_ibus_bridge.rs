@@ -15,6 +15,7 @@ const ENTER_REFINER_WAIT: Duration = Duration::from_millis(500);
 
 struct FullEngines {
     live: Transliterator,
+    visible_refiner: Transliterator,
     commit_refiner: Transliterator,
 }
 
@@ -64,8 +65,9 @@ impl BridgeRuntime {
         let store = DesktopHistoryStore;
         let engines = build_full_engines()?;
         let history = store.load().unwrap_or_default();
-        let mut session = ImeSession::new_with_commit_refiner_input_mode_and_options(
+        let mut session = ImeSession::new_with_visible_and_commit_refiners_input_mode_and_options(
             engines.live,
+            engines.visible_refiner,
             engines.commit_refiner,
             history,
             input_mode,
@@ -136,8 +138,9 @@ impl BridgeRuntime {
 
     fn install_full_engines(&mut self, engines: FullEngines) {
         if self.session.composition_is_empty() {
-            self.session.replace_engines(
+            self.session.replace_engines_with_refiners(
                 engines.live,
+                Some(engines.visible_refiner),
                 Some(engines.commit_refiner),
                 self.full_segmented_preview_mode,
             );
@@ -146,6 +149,7 @@ impl BridgeRuntime {
             return;
         }
 
+        self.session.set_visible_refiner(engines.visible_refiner);
         self.session.set_commit_refiner(engines.commit_refiner);
         self.pending_live = Some(engines.live);
         self.readiness = BridgeReadiness::FullPending;
@@ -200,6 +204,8 @@ fn error_response(
 
 fn build_full_engines() -> KhmerResult<FullEngines> {
     let transliterator = Transliterator::from_default_data_with_config(DecoderConfig::shadow_interactive())?;
+    let visible_refiner =
+        Transliterator::from_default_data_with_config(visible_refiner_config().with_mode(DecoderMode::Hybrid))?;
     let commit_refiner = Transliterator::from_default_data_with_config(
         DecoderConfig::default()
             .with_mode(DecoderMode::Hybrid)
@@ -207,8 +213,15 @@ fn build_full_engines() -> KhmerResult<FullEngines> {
     )?;
     Ok(FullEngines {
         live: transliterator,
+        visible_refiner,
         commit_refiner,
     })
+}
+
+fn visible_refiner_config() -> DecoderConfig {
+    let mut config = DecoderConfig::shadow_interactive();
+    config.wfst_max_latency_ms = 75;
+    config
 }
 
 fn start_full_warmup(disabled: bool) -> Option<Receiver<Result<FullEngines, String>>> {
