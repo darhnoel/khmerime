@@ -31,6 +31,7 @@ make suggest QUERY=tver
 make suggest-wfst QUERY=tver
 make suggest-shadow QUERY=tver
 make shadow-eval QUERIES=path/to/queries.txt
+make lexicon-editor
 make test
 make test-golden
 make test-ui
@@ -71,6 +72,10 @@ make suggest-shadow QUERY=tver
 
 make shadow-eval QUERIES=path/to/queries.txt [MODE=shadow|weighted-span|wfst|hybrid] [OUTPUT=report.txt]
   Run decoder comparison on a query file.
+
+make lexicon-editor
+  Run the local spreadsheet editor for `data/lexicon/chunks/*.csv`.
+  The server prints a localhost URL and does not open a browser automatically.
 
 make test
   Run the Rust test suite.
@@ -134,6 +139,7 @@ cargo run -p khmerime_lookup_cli --bin lookup_cli -- stats
 cargo run -p khmerime_lookup_cli --bin lookup_cli -- suggest tver
 cargo run -p khmerime_lookup_cli --bin lookup_cli -- --decoder-mode weighted-span suggest tver
 cargo run -p khmerime_lookup_cli --bin lookup_cli -- --decoder-mode shadow shadow-eval path/to/queries.txt
+python3 tools/lexicon-editor/server.py
 cargo test
 cargo test --test decoder_golden
 python3 -m pytest tests/test_web_ui.py
