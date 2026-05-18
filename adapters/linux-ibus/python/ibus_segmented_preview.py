@@ -7,8 +7,11 @@ user stops typing for a short window rather than on every key.
 
 from __future__ import annotations
 
-import threading
 from typing import Any, Callable, Dict
+
+from ibus_debounced_bridge_work import DebouncedBridgeWork
+
+SEGMENTED_PREVIEW_SLOW_LOG_MS = 30.0
 
 SEGMENTED_PREVIEW_MIN_RAW_PREEDIT_LEN = 4
 SEGMENTED_PREVIEW_DEBOUNCE_MS = 220
@@ -27,65 +30,27 @@ class SegmentedPreviewScheduler:
         min_raw_preedit_len: int = SEGMENTED_PREVIEW_MIN_RAW_PREEDIT_LEN,
         debounce_ms: int = SEGMENTED_PREVIEW_DEBOUNCE_MS,
     ):
-        self._call_bridge = call_bridge
-        self._apply_response = apply_response
-        self._current_raw_preedit = current_raw_preedit
-        self._log = log
-        self._timeout_add = timeout_add
-        self._source_remove = source_remove
-        self._idle_add = idle_add
-        self._min_raw_preedit_len = min_raw_preedit_len
-        self._debounce_ms = debounce_ms
-        self._timeout_id = 0
-        self._generation = 0
-
-    def cancel(self) -> None:
-        self._generation += 1
-        if self._timeout_id:
-            self._source_remove(self._timeout_id)
-            self._timeout_id = 0
-
-    def schedule(self, raw_preedit: str) -> None:
-        if len(raw_preedit) < self._min_raw_preedit_len:
-            return
-        generation = self._generation
-        self._timeout_id = self._timeout_add(
-            self._debounce_ms,
-            self._start,
-            generation,
-            raw_preedit,
+        self._work = DebouncedBridgeWork(
+            name="refresh_segmented_preview",
+            call_bridge=call_bridge,
+            apply_response=apply_response,
+            current_raw_preedit=current_raw_preedit,
+            log=log,
+            timeout_add=timeout_add,
+            source_remove=source_remove,
+            idle_add=idle_add,
+            build_payload=lambda raw_preedit: {
+                "cmd": "refresh_segmented_preview",
+                "raw_preedit": raw_preedit,
+            },
+            min_raw_preedit_len=min_raw_preedit_len,
+            debounce_ms=debounce_ms,
+            slow_log_ms=SEGMENTED_PREVIEW_SLOW_LOG_MS,
+            should_apply=lambda response: bool(getattr(response, "ok", False)),
         )
 
-    def _start(self, generation: int, raw_preedit: str) -> bool:
-        self._timeout_id = 0
-        threading.Thread(
-            target=self._run,
-            args=(generation, raw_preedit),
-            daemon=True,
-        ).start()
-        return False
+    def cancel(self) -> None:
+        self._work.cancel()
 
-    def _run(self, generation: int, raw_preedit: str) -> None:
-        try:
-            response = self._call_bridge(
-                {
-                    "cmd": "refresh_segmented_preview",
-                    "raw_preedit": raw_preedit,
-                }
-            )
-        except Exception as err:
-            self._log(
-                f"refresh_segmented_preview failed raw_len={len(raw_preedit)} err={err}"
-            )
-            return
-        self._idle_add(self._finish, generation, raw_preedit, response)
-
-    def _finish(self, generation: int, raw_preedit: str, response: Any) -> bool:
-        if generation != self._generation:
-            return False
-        if raw_preedit != self._current_raw_preedit():
-            return False
-        if not getattr(response, "ok", False):
-            return False
-        self._apply_response(response)
-        return False
+    def schedule(self, raw_preedit: str) -> None:
+        self._work.schedule(raw_preedit)
