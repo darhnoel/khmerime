@@ -21,6 +21,8 @@ Do not duplicate material that already belongs in:
   Task-specific coding constraints or review rules.
 - `structure/`
   Durable repository structure and regression guidance.
+- `core/`
+  Durable contracts and plans for core transliteration internals.
 - `tools/`
   Durable contracts for repository maintenance tools.
 - `templates/`
@@ -30,6 +32,7 @@ Do not duplicate material that already belongs in:
 
 - `structure/module-boundaries.md`
 - `structure/verification-surfaces.md`
+- `core/symspell-search-index-plan.md`
 - `tools/lexicon-editor.md`
 
 ## When To Add A New Spec
