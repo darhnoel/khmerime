@@ -25,6 +25,9 @@ full suggestion quality can arrive shortly after.
 - Make Linux IBus first activation responsive quickly.
 - Keep Python IBus callback handling synchronous for this first fix.
 - Move full engine construction out of the blocking startup path.
+- Keep first usable typing under `200 ms` in release builds.
+- Keep release full warmup under `1 s` after phase-A startup where practical.
+- Avoid visible input jank while full warmup runs.
 - Provide basic roman preedit and dictionary candidates during phase-A.
 - Restore full live behavior after background warmup.
 - Preserve long-phrase quality when possible without making typing feel stuck.
@@ -65,11 +68,13 @@ Current behavior after this phase:
   - desktop history;
   - an `ImeSession` with segmented preview disabled.
 - Background full warmup builds:
+  - shared parsed/indexed full engine data;
   - live transliterator with `DecoderConfig::shadow_interactive()`;
+  - bounded Hybrid visible refiner;
   - Hybrid commit refiner.
 - If full warmup completes while composition is active, the bridge attaches the
-  commit refiner and defers full live transliterator replacement until the
-  composition is idle.
+  visible and commit refiners and defers full live transliterator replacement
+  until the composition is idle.
 - IBus visible long-composition refinement is debounced and stale checked in
   Python.
 - Python ignores key-release events before debounce cancellation so release
@@ -129,9 +134,18 @@ session.
 
 The background warmup should build:
 
+- shared parsed/indexed full engine data once;
 - full live transliterator using `DecoderConfig::shadow_interactive()`;
-- full commit refiner using Hybrid mode;
-- any full resources required by those transliterators.
+- full visible refiner using bounded Hybrid mode;
+- full commit refiner using Hybrid mode.
+
+The three full-engine roles stay distinct, but they should share the heavy
+full data structures so warmup does not parse embedded data or build lookup,
+ranking, fuzzy-search, and composer structures three times.
+
+Bridge/process lifetime reuse across IBus engine destruction is deferred. This
+phase reduces one bridge process's warmup cost without changing Python factory
+ownership or IBus activation semantics.
 
 When warmup finishes:
 
@@ -263,8 +277,13 @@ The goal is debugging and local validation, not a full telemetry framework.
 - During phase-A, typing roman input shows raw preedit and basic candidates.
 - During phase-A, segmented preview is not computed or shown.
 - Background full warmup starts immediately after phase-A startup.
-- Full live transliterator and Hybrid commit refiner are installed after
-  warmup, but only when composition is idle.
+- Full warmup builds shared parsed/indexed engine data once, then creates the
+  live, visible-refiner, and commit-refiner transliterators from that shared
+  data.
+- Full live transliterator and Hybrid refiners are installed after warmup, but
+  full live replacement happens only when composition is idle.
+- Release bridge timing targets are first usable phase-A typing under `200 ms`
+  and full warmup under `1 s`.
 - If warmup completes during active composition, full upgrade is deferred until
   the composition becomes idle.
 - Enter during phase-A waits at most `500 ms` for a full refiner, then falls back
@@ -276,7 +295,13 @@ The goal is debugging and local validation, not a full telemetry framework.
   response.
 - Explicit candidate selection is not overridden by refinement or upgrade.
 - Python IBus code remains synchronous in this phase.
-- Basic startup/warmup/timeout logs are written for debugging.
+- Durable startup/warmup/timeout logs are written under the `[ibus-startup]`
+  prefix. Warmup logs include per-stage elapsed times for shared data, live
+  engine, visible refiner, commit refiner, and total full warmup.
+- SymSpell-style delete-key fuzzy retrieval is deferred to a separate
+  experiment. It may replace the legacy fuzzy `SearchIndex` if measurements show
+  it preserves suggestion quality and removes the remaining search-index warmup
+  cost without changing weighted-span ranking unexpectedly.
 
 ## Validation
 

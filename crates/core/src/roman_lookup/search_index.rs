@@ -34,13 +34,12 @@ impl SearchIndex {
             return;
         }
         for size in self.gsize_l..=self.gsize_u {
-            self.add_with_size(item, size);
+            self.add_with_size(&normalized, size);
         }
         self.exact.insert(normalized, item.to_owned());
     }
 
-    fn add_with_size(&mut self, item: &str, size: usize) {
-        let normalized = normalize(item);
+    fn add_with_size(&mut self, normalized: &str, size: usize) {
         let grams = ngram_counts(&normalized, size);
         let rows = self.items.entry(size).or_insert_with(Vec::new);
         let row_index = rows.len();
@@ -52,7 +51,7 @@ impl SearchIndex {
             self.grams.entry(gram).or_insert_with(Vec::new).push((row_index, count));
         }
 
-        rows[row_index] = (magnitude.sqrt(), normalized);
+        rows[row_index] = (magnitude.sqrt(), normalized.to_owned());
     }
 
     pub(super) fn get(&self, query: &str, threshold: f64) -> Option<Vec<(f64, String)>> {
@@ -129,7 +128,7 @@ impl SearchIndex {
 }
 
 fn ngram_counts(input: &str, size: usize) -> Vec<(String, usize)> {
-    let mut padded = format!("-{}-", normalize(input));
+    let mut padded = format!("-{input}-");
     if padded.len() < size {
         padded.extend(std::iter::repeat('-').take(size - padded.len()));
     }

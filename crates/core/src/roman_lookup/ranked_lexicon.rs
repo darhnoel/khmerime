@@ -9,9 +9,26 @@ impl RankedLexiconEntry {
 }
 
 impl RankedLexicon {
-    pub(crate) fn from_entries(entries: &[Entry], corpus_stats: &CorpusStats) -> Self {
+    #[allow(dead_code)]
+    pub(crate) fn from_entries(entries: &[Entry], corpus_stats: CorpusStats) -> Self {
+        Self::from_entries_with_stage_logger(entries, corpus_stats, |_, _| {})
+    }
+
+    pub(crate) fn from_entries_with_stage_logger(
+        entries: &[Entry],
+        corpus_stats: CorpusStats,
+        mut log_stage: impl FnMut(&str, f64),
+    ) -> Self {
         let mut ranked = Self::default();
+        ranked.entries = Vec::with_capacity(entries.len());
+        ranked.exact_index = HashMap::with_capacity(entries.len());
+        ranked.alias_index = HashMap::with_capacity(entries.len().saturating_mul(2));
+        ranked.gram_index = HashMap::with_capacity(entries.len().saturating_mul(4));
+        ranked.word_unigrams = HashMap::with_capacity(entries.len());
+        ranked.word_bigrams = HashMap::with_capacity(entries.len() / 4);
         let mut target_frequency = HashMap::<(String, String), u32>::new();
+        let mut entry_frequencies = Vec::<u32>::with_capacity(entries.len());
+        let started = std::time::Instant::now();
         for entry in entries {
             let corpus_frequency = corpus_stats
                 .surface_unigrams
@@ -20,9 +37,10 @@ impl RankedLexicon {
                 .copied()
                 .unwrap_or(0);
             let effective_frequency = entry.frequency.max(corpus_frequency).max(1);
-            target_frequency
+            let frequency = *target_frequency
                 .entry((entry.target.clone(), entry.frequency_lang.clone()))
                 .or_insert(effective_frequency);
+            entry_frequencies.push(frequency);
             let words = entry.target.split_whitespace().collect::<Vec<_>>();
             for word in &words {
                 *ranked.word_unigrams.entry((*word).to_owned()).or_default() += 1;
@@ -34,14 +52,10 @@ impl RankedLexicon {
                     .or_default() += 1;
             }
         }
+        log_stage("entry_frequency", started.elapsed().as_secs_f64() * 1000.0);
 
-        ranked.corpus_word_unigrams = corpus_stats.word_unigrams.clone();
-        ranked.corpus_word_bigrams = corpus_stats.word_bigrams.clone();
-        ranked.corpus_surface_unigrams = corpus_stats.surface_unigrams.clone();
-        ranked.tag_unigrams = corpus_stats.tag_unigrams.clone();
-        ranked.tag_bigrams = corpus_stats.tag_bigrams.clone();
-
-        for entry in entries {
+        let started = std::time::Instant::now();
+        for (entry, frequency) in entries.iter().zip(entry_frequencies) {
             let normalized_key = normalize(&entry.roman);
             if normalized_key.is_empty() {
                 continue;
@@ -50,43 +64,55 @@ impl RankedLexicon {
                 .into_iter()
                 .filter(|key| key != &normalized_key)
                 .collect::<Vec<_>>();
-            let (first_tag, last_tag) = boundary_tags_for_target(&entry.target, corpus_stats);
+            let (first_tag, last_tag) = boundary_tags_for_target(&entry.target, &corpus_stats);
             let ranked_entry = RankedLexiconEntry {
                 target: entry.target.clone(),
                 canonical_roman: entry.roman.clone(),
                 normalized_key: normalized_key.clone(),
-                alias_keys: alias_keys.clone(),
-                frequency: target_frequency
-                    .get(&(entry.target.clone(), entry.frequency_lang.clone()))
-                    .copied()
-                    .unwrap_or(entry.frequency),
+                alias_keys,
+                frequency,
                 frequency_lang: entry.frequency_lang.clone(),
                 first_tag,
                 last_tag,
             };
             let entry_index = ranked.entries.len();
-            ranked.entries.push(ranked_entry);
             ranked
                 .exact_index
                 .entry(normalized_key.clone())
                 .or_default()
                 .push(entry_index);
 
-            let mut seen_aliases = HashSet::new();
-            for key in alias_keys {
-                if seen_aliases.insert(key.clone()) {
-                    ranked.alias_index.entry(key.clone()).or_default().push(entry_index);
-                    for gram in char_ngrams(&key, 2) {
-                        ranked.gram_index.entry(gram).or_default().push(entry_index);
-                    }
-                }
+            for key in &ranked_entry.alias_keys {
+                push_grams(&mut ranked.gram_index, &key, entry_index);
+                ranked.alias_index.entry(key.clone()).or_default().push(entry_index);
             }
-            for gram in char_ngrams(&normalized_key, 2) {
-                ranked.gram_index.entry(gram).or_default().push(entry_index);
-            }
+            push_grams(&mut ranked.gram_index, &normalized_key, entry_index);
+            ranked.entries.push(ranked_entry);
         }
+        log_stage("entry_indexes", started.elapsed().as_secs_f64() * 1000.0);
+
+        let started = std::time::Instant::now();
+        ranked.corpus_word_unigrams = corpus_stats.word_unigrams;
+        ranked.corpus_word_bigrams = corpus_stats.word_bigrams;
+        ranked.corpus_surface_unigrams = corpus_stats.surface_unigrams;
+        ranked.tag_unigrams = corpus_stats.tag_unigrams;
+        ranked.tag_bigrams = corpus_stats.tag_bigrams;
+        log_stage("move_corpus_stats", started.elapsed().as_secs_f64() * 1000.0);
 
         ranked
+    }
+}
+
+fn push_grams(index: &mut HashMap<String, Vec<usize>>, input: &str, entry_index: usize) {
+    let chars = input.chars().collect::<Vec<_>>();
+    if chars.len() < 2 {
+        return;
+    }
+    for start in 0..=chars.len() - 2 {
+        index
+            .entry(chars[start..start + 2].iter().collect())
+            .or_default()
+            .push(entry_index);
     }
 }
 

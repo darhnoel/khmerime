@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use std::fmt;
 use std::sync::Arc;
 
+use crate::composer::ComposerTable;
 use crate::decoder::DecoderManager;
 
 use super::search_index::SearchIndex;
@@ -214,6 +215,13 @@ pub(crate) struct LegacyData {
 pub struct Transliterator {
     pub(super) legacy: Arc<LegacyData>,
     pub(super) decoder: DecoderManager,
+}
+
+#[doc(hidden)]
+#[derive(Clone)]
+pub struct SharedTransliteratorData {
+    pub(super) legacy: Arc<LegacyData>,
+    pub(super) composer: Arc<ComposerTable>,
 }
 
 pub(super) struct LegacyLookupMaps {
