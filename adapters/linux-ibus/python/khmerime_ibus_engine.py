@@ -12,9 +12,10 @@ import os
 import signal
 import sys
 import threading
+import time
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Tuple
 
 import gi
 
@@ -57,16 +58,29 @@ MODE_NIDA_SYMBOL = "ខ"
 MODE_ROMAN_LABEL = "Roman"
 MODE_NIDA_LABEL = "NIDA"
 MODE_TOOLTIP = "Toggle KhmerIME Roman/NIDA mode"
-LOG_PATH = Path(os.environ.get("KHMERIME_IBUS_LOG", "~/.cache/khmerime/ibus_engine.log")).expanduser()
+DEBUG_LOGGING = os.environ.get("KHMERIME_IBUS_DEBUG", "").lower() in {"1", "true", "yes", "on"}
+LOG_TARGET = os.environ.get(
+    "KHMERIME_IBUS_LOG",
+    "~/.cache/khmerime/ibus_engine.log" if DEBUG_LOGGING else "off",
+)
+LOG_DISABLED = LOG_TARGET.lower() in {"", "0", "false", "off", "none"}
+LOG_PATH = Path(LOG_TARGET).expanduser()
 
 
 def log_line(message: str) -> None:
+    if LOG_DISABLED:
+        return
     try:
         LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
         with LOG_PATH.open("a", encoding="utf-8") as handle:
             handle.write(f"{datetime.now().isoformat()} {message}\n")
     except Exception:
         pass
+
+
+def debug_log_line(message: str) -> None:
+    if DEBUG_LOGGING:
+        log_line(message)
 
 
 class KhmerIMEEngine(IBus.Engine):
@@ -76,6 +90,7 @@ class KhmerIMEEngine(IBus.Engine):
             bridge_path,
             initial_input_mode=initial_input_mode,
             deferred_segmented_preview=True,
+            log=debug_log_line,
         )
         self._bridge_lock = threading.Lock()
         self._table = IBus.LookupTable.new(9, 0, True, True)
@@ -102,7 +117,7 @@ class KhmerIMEEngine(IBus.Engine):
             call_refine=self._call_bridge_raw,
             apply_response=self._apply_response,
             current_raw_preedit=lambda: self._last_raw_preedit,
-            log=log_line,
+            log=debug_log_line,
             timeout_add=GLib.timeout_add,
             source_remove=GLib.source_remove,
             idle_add=GLib.idle_add,
@@ -111,7 +126,7 @@ class KhmerIMEEngine(IBus.Engine):
             call_bridge=self._call_bridge_raw,
             apply_response=self._apply_response,
             current_raw_preedit=lambda: self._last_raw_preedit,
-            log=log_line,
+            log=debug_log_line,
             timeout_add=GLib.timeout_add,
             source_remove=GLib.source_remove,
             idle_add=GLib.idle_add,
@@ -128,6 +143,17 @@ class KhmerIMEEngine(IBus.Engine):
     def _call_bridge_raw(self, payload: Dict[str, Any]) -> BridgeResponse:
         with self._bridge_lock:
             return self._bridge.call(payload)
+
+    def _call_bridge_with_lock_timing(self, payload: Dict[str, Any]) -> Tuple[BridgeResponse, float]:
+        # Detect contention cheaply: if a background scheduler is mid-call,
+        # the lock is held. Reported value is "approximate ms lost to contention,"
+        # 0 when uncontended. _call_bridge_raw stays the single bridge entrypoint
+        # so test monkey-patches keep working.
+        contended_start = time.perf_counter() if self._bridge_lock.locked() else None
+        response = self._call_bridge_raw(payload)
+        if contended_start is None:
+            return response, 0.0
+        return response, (time.perf_counter() - contended_start) * 1000.0
 
     def _bridge_call(self, payload: Dict[str, Any]) -> BridgeResponse:
         preedit_before = self._last_preedit
@@ -444,6 +470,7 @@ class KhmerIMEEngine(IBus.Engine):
         return None
 
     def do_process_key_event(self, keyval: int, keycode: int, state: int) -> bool:
+        callback_started = time.perf_counter()
         if int(keyval) == KEY_CAPS_LOCK:
             return self._handle_caps_lock_key(int(state))
         if int(state) & STATE_RELEASE_MASK:
@@ -459,8 +486,11 @@ class KhmerIMEEngine(IBus.Engine):
                 "keycode": int(keycode),
                 "state": int(state),
             }
-            response = self._call_bridge_raw(payload)
+            bridge_started = time.perf_counter()
+            response, lock_wait_ms = self._call_bridge_with_lock_timing(payload)
+            bridge_ms = (time.perf_counter() - bridge_started) * 1000.0
             consumed = response.consumed
+            render_started = time.perf_counter()
             if (
                 int(keyval) in (KEY_RETURN, KEY_KP_ENTER)
                 and preedit_before
@@ -475,8 +505,38 @@ class KhmerIMEEngine(IBus.Engine):
                 )
             else:
                 self._apply_response(response)
+            render_ms = (time.perf_counter() - render_started) * 1000.0
+            total_ms = (time.perf_counter() - callback_started) * 1000.0
+            timings = response.timings or {}
+            br_total = float(timings.get("total_ms", 0.0))
+            br_wait = float(timings.get("wait_refiner_ms", 0.0))
+            br_seg = float(timings.get("sync_segpreview_ms", 0.0))
+            br_proc = float(timings.get("process_event_ms", 0.0))
+            br_hist = float(timings.get("history_save_ms", 0.0))
+            br_snap = float(timings.get("snapshot_ms", 0.0))
+            ipc_ms = max(0.0, bridge_ms - br_total)
+            # Probe how long until the GLib main loop runs an idle callback.
+            # Large values mean update_preedit_text returned fast but the loop
+            # (or D-Bus outbound) couldn't deliver it promptly.
+            idle_started = time.perf_counter()
+            keyval_for_probe = int(keyval)
+            preedit_for_probe = str(response.snapshot.get("preedit", ""))
+
+            def _idle_probe() -> bool:
+                idle_lag_ms = (time.perf_counter() - idle_started) * 1000.0
+                if idle_lag_ms >= 5.0:
+                    log_line(
+                        "idle_probe keyval=%s preedit=%r idle_lag_ms=%.2f"
+                        % (keyval_for_probe, preedit_for_probe, idle_lag_ms)
+                    )
+                return False
+
+            GLib.idle_add(_idle_probe)
+
             log_line(
-                "key_event keyval=%s keycode=%s state=%s consumed=%s readiness=%s preedit=%r cand=%s"
+                "key_event keyval=%s keycode=%s state=%s consumed=%s readiness=%s preedit=%r cand=%s "
+                "bridge_ms=%.2f render_ms=%.2f total_ms=%.2f "
+                "lock_ms=%.2f br_total_ms=%.2f wait_ms=%.2f seg_ms=%.2f proc_ms=%.2f hist_ms=%.2f snap_ms=%.2f ipc_ms=%.2f"
                 % (
                     keyval,
                     keycode,
@@ -485,6 +545,17 @@ class KhmerIMEEngine(IBus.Engine):
                     response.readiness,
                     str(response.snapshot.get("preedit", "")),
                     len(response.snapshot.get("candidates", []) or []),
+                    bridge_ms,
+                    render_ms,
+                    total_ms,
+                    lock_wait_ms,
+                    br_total,
+                    br_wait,
+                    br_seg,
+                    br_proc,
+                    br_hist,
+                    br_snap,
+                    ipc_ms,
                 )
             )
             if int(keyval) in (KEY_RETURN, KEY_KP_ENTER):
@@ -529,7 +600,11 @@ class KhmerIMEEngine(IBus.Engine):
                     self._segmented_preview.schedule(raw_preedit)
             return response.consumed
         except Exception as err:
-            log_line(f"process_key_event failed keyval={keyval} keycode={keycode} state={state} err={err}")
+            total_ms = (time.perf_counter() - callback_started) * 1000.0
+            log_line(
+                "process_key_event failed keyval=%s keycode=%s state=%s elapsed_ms=%.2f err=%s"
+                % (keyval, keycode, state, total_ms, err)
+            )
             return consumed
 
     def do_focus_in(self) -> None:
