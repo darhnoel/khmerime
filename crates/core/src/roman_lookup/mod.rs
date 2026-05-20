@@ -12,6 +12,8 @@ use crate::decoder::{
     DecoderConfig, DecoderManager, DecoderMode, LegacyDecoder, ShadowObservation, WeightedSpanDecoder,
 };
 
+#[cfg(not(target_arch = "wasm32"))]
+mod cache;
 mod compiled_io;
 mod legacy_data;
 mod normalization;

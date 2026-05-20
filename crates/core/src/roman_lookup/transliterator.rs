@@ -78,6 +78,21 @@ impl Transliterator {
     pub fn from_default_shared_data_with_stage_logger(
         mut log_stage: impl FnMut(&str, f64),
     ) -> Result<SharedTransliteratorData> {
+        #[cfg(not(target_arch = "wasm32"))]
+        let cache_key = (!super::cache::disabled()).then(super::cache::compute_key);
+        #[cfg(not(target_arch = "wasm32"))]
+        if let Some(key) = cache_key.as_deref() {
+            let started = std::time::Instant::now();
+            if let Some((legacy, composer)) = super::cache::try_load(key) {
+                log_stage("cache_hit", started.elapsed().as_secs_f64() * 1000.0);
+                return Ok(SharedTransliteratorData {
+                    legacy: Arc::new(legacy),
+                    composer: Arc::new(composer),
+                });
+            }
+            log_stage("cache_miss", started.elapsed().as_secs_f64() * 1000.0);
+        }
+
         let started = std::time::Instant::now();
         let entries = parse_compiled_lexicon(DEFAULT_COMPILED_DATA)?;
         log_stage("parse_lexicon", started.elapsed().as_secs_f64() * 1000.0);
@@ -90,12 +105,16 @@ impl Transliterator {
         let next_word = parse_compiled_next_word_stats(DEFAULT_COMPILED_NEXT_WORD_STATS)?;
         log_stage("parse_next_word", started.elapsed().as_secs_f64() * 1000.0);
 
-        Ok(Self::shared_data_from_entries_with_stage_logger(
-            entries,
-            corpus_stats,
-            next_word,
-            log_stage,
-        ))
+        let shared = Self::shared_data_from_entries_with_stage_logger(entries, corpus_stats, next_word, &mut log_stage);
+
+        #[cfg(not(target_arch = "wasm32"))]
+        if let Some(key) = cache_key.as_deref() {
+            let started = std::time::Instant::now();
+            super::cache::save(key, &shared.legacy, &shared.composer);
+            log_stage("cache_save", started.elapsed().as_secs_f64() * 1000.0);
+        }
+
+        Ok(shared)
     }
 
     #[cfg(not(all(target_arch = "wasm32", feature = "fetch-data")))]
