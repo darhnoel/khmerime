@@ -82,7 +82,7 @@ pub(super) fn save(key: &str, legacy: &LegacyData, composer: &ComposerTable) {
         }
     };
 
-    let tmp = path.with_extension("bin.tmp");
+    let tmp = temp_cache_file_path(&path);
     if let Err(error) = fs::write(&tmp, &bytes) {
         eprintln!(
             "[ibus-startup] shared_data_cache.write_failed path={} error={error}",
@@ -136,6 +136,18 @@ fn cache_dir() -> Option<PathBuf> {
 
 fn cache_file_path(key: &str) -> Option<PathBuf> {
     Some(cache_dir()?.join(format!("{CACHE_FILE_PREFIX}.{key}{CACHE_FILE_SUFFIX}")))
+}
+
+fn temp_cache_file_path(path: &Path) -> PathBuf {
+    let stamp = SystemTime::now()
+        .duration_since(SystemTime::UNIX_EPOCH)
+        .map(|duration| duration.as_nanos())
+        .unwrap_or_default();
+    let file_name = path
+        .file_name()
+        .and_then(|name| name.to_str())
+        .unwrap_or(CACHE_FILE_PREFIX);
+    path.with_file_name(format!("{file_name}.{}.{}.tmp", std::process::id(), stamp))
 }
 
 #[cfg(test)]
