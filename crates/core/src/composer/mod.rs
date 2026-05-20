@@ -1,5 +1,7 @@
 use std::collections::HashMap;
 
+use serde::{Deserialize, Serialize};
+
 use crate::roman_lookup::{normalize, Entry};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -156,7 +158,7 @@ impl ComposerAnalysis {
     }
 }
 
-#[derive(Default)]
+#[derive(Default, Clone, Debug, Serialize, Deserialize)]
 struct ComposerNode {
     children: HashMap<char, usize>,
     terminal: bool,
@@ -180,6 +182,7 @@ impl PathState {
     }
 }
 
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub(crate) struct ComposerTable {
     nodes: Vec<ComposerNode>,
 }

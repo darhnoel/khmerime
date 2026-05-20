@@ -190,6 +190,40 @@ Reject or defer if:
 - query quality requires duplicating weighted-span ranking logic;
 - it pushes the implementation toward a second parallel decoder.
 
+## Initial Runtime Experiment
+
+A first in-memory SymSpell implementation was tested behind
+`KHMERIME_SEARCH_INDEX=symspell`.
+
+Result on the local release IBus startup probe:
+
+- existing n-gram index: roughly `174-195 ms` for
+  `full_shared_data.build_legacy_data.search_index`;
+- naive SymSpell with cloned candidate strings in delete buckets: roughly
+  `1073 ms`;
+- ID-based SymSpell buckets: roughly `792 ms`.
+
+This did not reduce startup latency. The runtime delete-key table is much
+larger than the current n-gram table for this lexicon, so SymSpell should not
+become the default unless the index is precompiled/serialized or substantially
+bounded by query/key length.
+
+The follow-up release query benchmark, using a deterministic typo-heavy
+workload from `data/roman_lookup.csv`, showed the opposite tradeoff:
+
+```text
+items=27879 queries=4000
+ngram build_ms=145.42
+symspell build_ms=501.22
+ngram query total_ms=951.88 p50_us=162.91 p95_us=703.29 hits=182222
+symspell query total_ms=246.20 p50_us=46.35 p95_us=160.45 hits=422834
+```
+
+This makes SymSpell plausible as a post-startup realtime fuzzy-search index.
+The next implementation shape should keep n-gram as the startup/default index,
+build SymSpell lazily after the IME is usable, and switch only after the
+secondary index is ready.
+
 ## Follow-Up Questions
 
 - Should delete distance stay at `2`, or should long roman tokens use `3`?
