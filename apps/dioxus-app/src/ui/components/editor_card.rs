@@ -113,6 +113,39 @@ fn space_cycle_enabled(has_live_suggestions: bool, candidate_mode: CandidateMode
     has_live_suggestions && candidate_mode == CandidateMode::Transliteration
 }
 
+fn apply_shortcut_selection(
+    key: &str,
+    modifiers: Modifiers,
+    live_suggestion_len: usize,
+    mut state: EditorSignals,
+) -> bool {
+    if modifiers.contains(Modifiers::CONTROL)
+        || modifiers.contains(Modifiers::ALT)
+        || modifiers.contains(Modifiers::META)
+    {
+        return false;
+    }
+
+    let Some(offset) = shortcut_index(key) else {
+        return false;
+    };
+
+    let page_start = visible_page_start(state.selected(), live_suggestion_len);
+    let index = page_start + offset;
+    if index >= live_suggestion_len {
+        return false;
+    }
+
+    if state.segmented_refine_mode() && state.segmented_session().is_some() {
+        select_segment_candidate(index, state);
+    } else {
+        state.selected.set(index);
+        state.selection_started.set(true);
+    }
+    state.number_pick_mode.set(true);
+    true
+}
+
 #[component]
 pub(crate) fn EditorCard(state: EditorSignals, font_size: Signal<usize>) -> Element {
     let text_value = state.text();
@@ -432,20 +465,13 @@ pub(crate) fn EditorCard(state: EditorSignals, font_size: Signal<usize>) -> Elem
                                 event.prevent_default();
                                 spawn(commit_active_selection(false, state));
                             }
+                            key if has_live_suggestions
+                                && apply_shortcut_selection(key, modifiers, live_suggestion_len, state) =>
+                            {
+                                event.prevent_default();
+                            }
                             key if selection_lock_active && has_live_suggestions => {
-                                if let Some(offset) = shortcut_index(key) {
-                                    let page_start = visible_page_start(state.selected(), live_suggestion_len);
-                                    let index = page_start + offset;
-                                    if index < live_suggestion_len {
-                                        event.prevent_default();
-                                        if state.segmented_refine_mode() && state.segmented_session().is_some() {
-                                            select_segment_candidate(index, state);
-                                        } else {
-                                            state.selected.set(index);
-                                            state.selection_started.set(true);
-                                        }
-                                    }
-                                } else if should_exit_number_pick(key) {
+                                if should_exit_number_pick(key) {
                                     state.number_pick_mode.set(false);
                                     state.selection_started.set(false);
                                 } else if key.chars().count() == 1

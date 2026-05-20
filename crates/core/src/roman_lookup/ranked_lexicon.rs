@@ -28,7 +28,7 @@ impl RankedLexicon {
         ranked.word_bigrams = HashMap::with_capacity(entries.len() / 4);
         let mut target_frequency = HashMap::<(String, String), u32>::new();
         let mut entry_frequencies = Vec::<u32>::with_capacity(entries.len());
-        let started = std::time::Instant::now();
+        let started = start_stage_timer();
         for entry in entries {
             let corpus_frequency = corpus_stats
                 .surface_unigrams
@@ -52,9 +52,9 @@ impl RankedLexicon {
                     .or_default() += 1;
             }
         }
-        log_stage("entry_frequency", started.elapsed().as_secs_f64() * 1000.0);
+        log_stage("entry_frequency", elapsed_stage_ms(started));
 
-        let started = std::time::Instant::now();
+        let started = start_stage_timer();
         for (entry, frequency) in entries.iter().zip(entry_frequencies) {
             let normalized_key = normalize(&entry.roman);
             if normalized_key.is_empty() {
@@ -89,15 +89,15 @@ impl RankedLexicon {
             push_grams(&mut ranked.gram_index, &normalized_key, entry_index);
             ranked.entries.push(ranked_entry);
         }
-        log_stage("entry_indexes", started.elapsed().as_secs_f64() * 1000.0);
+        log_stage("entry_indexes", elapsed_stage_ms(started));
 
-        let started = std::time::Instant::now();
+        let started = start_stage_timer();
         ranked.corpus_word_unigrams = corpus_stats.word_unigrams;
         ranked.corpus_word_bigrams = corpus_stats.word_bigrams;
         ranked.corpus_surface_unigrams = corpus_stats.surface_unigrams;
         ranked.tag_unigrams = corpus_stats.tag_unigrams;
         ranked.tag_bigrams = corpus_stats.tag_bigrams;
-        log_stage("move_corpus_stats", started.elapsed().as_secs_f64() * 1000.0);
+        log_stage("move_corpus_stats", elapsed_stage_ms(started));
 
         ranked
     }

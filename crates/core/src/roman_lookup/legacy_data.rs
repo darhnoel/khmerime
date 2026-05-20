@@ -44,33 +44,33 @@ impl LegacyData {
         next_word: NextWordStats,
         mut log_stage: impl FnMut(&str, f64),
     ) -> Self {
-        let started = std::time::Instant::now();
+        let started = start_stage_timer();
         let mut maps = Self::build_lookup_maps(&entries);
-        log_stage("build_lookup_maps", started.elapsed().as_secs_f64() * 1000.0);
+        log_stage("build_lookup_maps", elapsed_stage_ms(started));
 
-        let started = std::time::Instant::now();
+        let started = start_stage_timer();
         let target_frequency = target_frequency_map(&entries, Some(&corpus_stats));
-        log_stage("target_frequency", started.elapsed().as_secs_f64() * 1000.0);
+        log_stage("target_frequency", elapsed_stage_ms(started));
 
-        let started = std::time::Instant::now();
+        let started = start_stage_timer();
         sort_lookup_maps_by_frequency(&mut maps, &target_frequency);
-        log_stage("sort_lookup_maps", started.elapsed().as_secs_f64() * 1000.0);
+        log_stage("sort_lookup_maps", elapsed_stage_ms(started));
 
-        let started = std::time::Instant::now();
+        let started = start_stage_timer();
         let next_word_max_context_chars = max_next_word_context_chars(&next_word);
-        log_stage("next_word_context", started.elapsed().as_secs_f64() * 1000.0);
+        log_stage("next_word_context", elapsed_stage_ms(started));
 
-        let started = std::time::Instant::now();
+        let started = start_stage_timer();
         let ranked = RankedLexicon::from_entries_with_stage_logger(&entries, corpus_stats, |stage, elapsed_ms| {
             log_stage(&format!("ranked_lexicon.{stage}"), elapsed_ms);
         });
-        log_stage("ranked_lexicon", started.elapsed().as_secs_f64() * 1000.0);
+        log_stage("ranked_lexicon", elapsed_stage_ms(started));
 
-        let started = std::time::Instant::now();
+        let started = start_stage_timer();
         let index = SearchIndex::new(&maps.roman_keys, true, 2, 3);
-        log_stage("search_index", started.elapsed().as_secs_f64() * 1000.0);
+        log_stage("search_index", elapsed_stage_ms(started));
 
-        let started = std::time::Instant::now();
+        let started = start_stage_timer();
         let data = Self {
             entries,
             by_roman: maps.by_roman,
@@ -84,7 +84,7 @@ impl LegacyData {
             next_word,
             next_word_max_context_chars,
         };
-        log_stage("assemble", started.elapsed().as_secs_f64() * 1000.0);
+        log_stage("assemble", elapsed_stage_ms(started));
         data
     }
 
