@@ -80,18 +80,43 @@ On `wasm32` + `fetch-data`, the app supports runtime startup profiles via query 
 
 Each startup run emits a single structured console report with per-stage timestamps.
 
-### khPOS Size Trimming Knobs
+### Data Build Config
 
-Build-time optional knobs for `khpos.stats.bin` experimentation:
+Build-time data paths and durable build knobs live in `config/data_paths.toml`.
+The `[data_build]` section controls `khpos.stats.bin` size:
 
-- `KHPOS_SURFACE_MIN_COUNT=<u32>`: drop low-frequency `surface_unigrams`.
-- `KHPOS_SURFACE_TOP_N=<usize>`: keep only top-N `surface_unigrams` by count.
+```toml
+[data_build]
+khpos_surface_min_count = 1
+khpos_surface_top_n = 0
+```
+
+Set `khpos_surface_top_n = 0` to keep all compiled khPOS surfaces. Lower
+positive values shrink `khpos.stats.bin`, but must be checked against decoder
+goldens before becoming default.
+
+Environment variables still override config for experiments:
+
+- `KHPOS_SURFACE_MIN_COUNT=<u32>`
+- `KHPOS_SURFACE_TOP_N=<usize>`
+- `KHMERIME_SEARCH_INDEX=ngram|symspell`
 
 Example:
 
 ```bash
-KHPOS_SURFACE_MIN_COUNT=2 KHPOS_SURFACE_TOP_N=120000 make web-release
+KHPOS_SURFACE_MIN_COUNT=2 KHPOS_SURFACE_TOP_N=120000 cargo build --release --bin khmerime_ibus_bridge
 ```
+
+The `[runtime]` section controls the embedded default for runtime-search
+experiments:
+
+```toml
+[runtime]
+legacy_fuzzy_index = "ngram" # or "symspell"
+```
+
+Keep `ngram` as the default unless SymSpell's slower build cost is acceptable
+for the target runtime, or the SymSpell index is built lazily after startup.
 
 ## Data Credits
 

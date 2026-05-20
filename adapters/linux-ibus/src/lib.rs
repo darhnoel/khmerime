@@ -38,6 +38,18 @@ pub enum BridgeReadiness {
     Failed,
 }
 
+/// Per-phase millisecond timings for a single `ProcessKeyEvent` command, so the
+/// Python adapter can attribute bridge-side cost without parsing stderr.
+#[derive(Clone, Copy, Debug, Default, Serialize)]
+pub struct BridgeTimings {
+    pub wait_refiner_ms: f64,
+    pub sync_segpreview_ms: f64,
+    pub process_event_ms: f64,
+    pub history_save_ms: f64,
+    pub snapshot_ms: f64,
+    pub total_ms: f64,
+}
+
 /// JSON response returned by the Rust bridge after every command.
 ///
 /// Python should render `snapshot`, commit `commit_text` once, and use
@@ -51,6 +63,8 @@ pub struct BridgeResponse<S> {
     pub readiness: BridgeReadiness,
     pub snapshot: S,
     pub error: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub timings: Option<BridgeTimings>,
 }
 
 pub fn fallback_empty_snapshot_json(error: impl Into<String>) -> serde_json::Value {

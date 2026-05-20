@@ -790,17 +790,11 @@ impl ImeSession {
             return SessionResult::default();
         }
 
-        let commit_text = if let Some(session) = &self.segmented_session {
-            let composed = session.composed_text();
-            if composed.is_empty() {
-                self.selected_or_raw_fallback()
-            } else {
-                composed
-            }
-        } else if self.selected_index == 0 && !self.selection_touched {
-            self.default_flat_commit_text()
+        let commit_text = if self.selection_touched {
+            self.segmented_or_fallback_text()
         } else {
-            self.selected_or_raw_fallback()
+            self.bounded_commit_refined_phrase()
+                .unwrap_or_else(|| self.segmented_or_fallback_text())
         };
         let history_changed = !commit_text.is_empty() && commit_text != self.composition_raw;
         if history_changed {
@@ -821,28 +815,27 @@ impl ImeSession {
             .unwrap_or_else(|| self.composition_raw.clone())
     }
 
-    fn refined_commit_phrase(&self) -> Option<String> {
-        let refiner = self.commit_refiner.as_ref()?;
-        self.refined_phrase_for(refiner, &self.composition_raw)
+    fn segmented_or_fallback_text(&self) -> String {
+        self.segmented_session
+            .as_ref()
+            .map(SegmentedSession::composed_text)
+            .filter(|text| !text.is_empty())
+            .unwrap_or_else(|| self.selected_or_raw_fallback())
     }
 
-    fn default_flat_commit_text(&self) -> String {
-        let Some(refined) = self.refined_commit_phrase() else {
-            return self.selected_or_raw_fallback();
-        };
-        if self.candidates.is_empty() {
-            return refined;
+    fn bounded_commit_refined_phrase(&self) -> Option<String> {
+        let visible_default = self.candidates.first()?;
+        // Skip the bounded WFST decode when the visible default is just the
+        // raw roman — the refiner's Khmer output can never confirm against a
+        // roman default key, so the work would be wasted.
+        if visible_default == &self.composition_raw {
+            return None;
         }
+        let refiner = self.commit_refiner.as_ref()?;
+        let refined = self.refined_phrase_for(refiner, &self.composition_raw)?;
         let refined_key = normalized_suggestion_key(&refined);
-        let visible_default_key = self
-            .candidates
-            .first()
-            .map(|candidate| normalized_suggestion_key(candidate));
-        if visible_default_key.as_deref() == Some(refined_key.as_str()) {
-            refined
-        } else {
-            self.selected_or_raw_fallback()
-        }
+        let visible_default_key = normalized_suggestion_key(visible_default);
+        (visible_default_key == refined_key).then_some(refined)
     }
 
     fn visible_refined_phrase_for(&self, raw_input: &str) -> Option<String> {

@@ -12,6 +12,8 @@ use crate::decoder::{
     DecoderConfig, DecoderManager, DecoderMode, LegacyDecoder, ShadowObservation, WeightedSpanDecoder,
 };
 
+#[cfg(not(target_arch = "wasm32"))]
+mod cache;
 mod compiled_io;
 mod legacy_data;
 mod normalization;
@@ -26,7 +28,7 @@ use compiled_io::{parse_csv, parse_tsv};
 use normalization::map_next_word_context_token;
 use types::*;
 
-pub use types::{AppliedSuggestion, Entry, LexiconError, Result, Transliterator};
+pub use types::{AppliedSuggestion, Entry, LexiconError, Result, SharedTransliteratorData, Transliterator};
 
 pub(crate) use normalization::{char_ngrams, normalize, roman_search_variants};
 pub(crate) use types::{LegacyData, RankedLexicon, RankedLexiconEntry};
@@ -178,7 +180,7 @@ mod tests {
                     frequency_lang: "km".to_owned(),
                 },
             ],
-            &stats,
+            stats.clone(),
         );
 
         let single = ranked.entries.iter().find(|entry| entry.target == "ខ្ញុំ").unwrap();
@@ -197,7 +199,7 @@ mod tests {
         assert_eq!(jea.first().map(String::as_str), Some("ជា"));
         assert_eq!(
             jea.iter().take(5).map(String::as_str).collect::<Vec<_>>(),
-            vec!["ជា", "ជះ", "ឈាម", "ជាវ", "ជាម"]
+            vec!["ជា", "ជះ", "ជាវ", "ជាម", "ជាយ"]
         );
         assert_eq!(jea.last().map(String::as_str), Some("jea"));
 
@@ -234,6 +236,15 @@ mod tests {
         let transliterator = Transliterator::from_tsv_str(fixture).unwrap();
         let suggestions = transliterator.suggest("leonhard", &HashMap::new());
         assert_eq!(suggestions.last().map(String::as_str), Some("leonhard"));
+    }
+
+    #[test]
+    fn period_suggestions_include_literal_period() {
+        let transliterator = Transliterator::from_default_data().unwrap();
+        assert_eq!(
+            transliterator.suggest(".", &HashMap::new()),
+            vec!["។".to_owned(), "៕".to_owned(), ".".to_owned()]
+        );
     }
 
     #[test]

@@ -5,3 +5,10 @@ khpos_train = "data/khPOS/corpus-draft-ver-1.0/data/after-replace/train.all"
 khpos_tag = "data/khPOS/corpus-draft-ver-1.0/data/after-replace/train.all.tag"
 mobile_keyboard_1gram = "data/khmerlang-mobile-keyboard-data/keyboard-data/extracted/mobile-keyboard-data-1gram.csv"
 mobile_keyboard_2gram = "data/khmerlang-mobile-keyboard-data/keyboard-data/extracted/mobile-keyboard-data-2gram.csv"
+
+[data_build]
+khpos_surface_min_count = 1
+khpos_surface_top_n = 50000
+
+[runtime]
+legacy_fuzzy_index = "ngram"

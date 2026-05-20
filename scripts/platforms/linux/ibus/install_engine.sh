@@ -9,6 +9,7 @@ ENGINE_HELPER_SRCS=(
   "${ROOT_DIR}/adapters/linux-ibus/python/ibus_bridge_client.py"
   "${ROOT_DIR}/adapters/linux-ibus/python/ibus_candidate_render.py"
   "${ROOT_DIR}/adapters/linux-ibus/python/ibus_component.py"
+  "${ROOT_DIR}/adapters/linux-ibus/python/ibus_debounced_bridge_work.py"
   "${ROOT_DIR}/adapters/linux-ibus/python/ibus_refinement.py"
   "${ROOT_DIR}/adapters/linux-ibus/python/ibus_segment_preview.py"
   "${ROOT_DIR}/adapters/linux-ibus/python/ibus_segmented_preview.py"
@@ -74,6 +75,19 @@ done
 echo "[khmerime] writing IBus component XML..."
 TMP_COMPONENT_XML="$(mktemp)"
 ENGINE_EXEC="${ENGINE_SCRIPT_DST} --ibus --bridge-path ${BRIDGE_BINARY_DST}"
+ENGINE_ENV=()
+if [[ -n "${KHMERIME_SEARCH_INDEX:-}" ]]; then
+  ENGINE_ENV+=("KHMERIME_SEARCH_INDEX=${KHMERIME_SEARCH_INDEX}")
+fi
+if [[ -n "${KHMERIME_IBUS_DEBUG:-}" ]]; then
+  ENGINE_ENV+=("KHMERIME_IBUS_DEBUG=${KHMERIME_IBUS_DEBUG}")
+fi
+if [[ -n "${KHMERIME_IBUS_LOG:-}" ]]; then
+  ENGINE_ENV+=("KHMERIME_IBUS_LOG=${KHMERIME_IBUS_LOG}")
+fi
+if [[ "${#ENGINE_ENV[@]}" -gt 0 ]]; then
+  ENGINE_EXEC="/usr/bin/env ${ENGINE_ENV[*]} ${ENGINE_EXEC}"
+fi
 cat > "${TMP_COMPONENT_XML}" <<EOF
 <component>
     <name>org.freedesktop.IBus.KhmerIME</name>
@@ -117,7 +131,7 @@ EOF
 run_install install -m 0644 "${TMP_COMPONENT_XML}" "${COMPONENT_XML_PATH}"
 rm -f "${TMP_COMPONENT_XML}"
 
-if [[ -f "${LEGACY_USER_COMPONENT_PATH}" ]]; then
+if [[ "${COMPONENT_XML_PATH}" != "${LEGACY_USER_COMPONENT_PATH}" && -f "${LEGACY_USER_COMPONENT_PATH}" ]]; then
   echo "[khmerime] removing legacy user component at ${LEGACY_USER_COMPONENT_PATH}"
   rm -f "${LEGACY_USER_COMPONENT_PATH}"
 fi

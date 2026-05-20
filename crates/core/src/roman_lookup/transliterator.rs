@@ -67,6 +67,56 @@ impl Transliterator {
         Self::from_entries_with_config(entries, corpus_stats, next_word, config)
     }
 
+    #[doc(hidden)]
+    #[cfg(not(all(target_arch = "wasm32", feature = "fetch-data")))]
+    pub fn from_default_shared_data() -> Result<SharedTransliteratorData> {
+        Self::from_default_shared_data_with_stage_logger(|_, _| {})
+    }
+
+    #[doc(hidden)]
+    #[cfg(not(all(target_arch = "wasm32", feature = "fetch-data")))]
+    pub fn from_default_shared_data_with_stage_logger(
+        mut log_stage: impl FnMut(&str, f64),
+    ) -> Result<SharedTransliteratorData> {
+        #[cfg(not(target_arch = "wasm32"))]
+        let cache_key = (!super::cache::disabled()).then(super::cache::compute_key);
+        #[cfg(not(target_arch = "wasm32"))]
+        if let Some(key) = cache_key.as_deref() {
+            let started = std::time::Instant::now();
+            if let Some((legacy, composer)) = super::cache::try_load(key) {
+                log_stage("cache_hit", started.elapsed().as_secs_f64() * 1000.0);
+                return Ok(SharedTransliteratorData {
+                    legacy: Arc::new(legacy),
+                    composer: Arc::new(composer),
+                });
+            }
+            log_stage("cache_miss", started.elapsed().as_secs_f64() * 1000.0);
+        }
+
+        let started = std::time::Instant::now();
+        let entries = parse_compiled_lexicon(DEFAULT_COMPILED_DATA)?;
+        log_stage("parse_lexicon", started.elapsed().as_secs_f64() * 1000.0);
+
+        let started = std::time::Instant::now();
+        let corpus_stats = parse_compiled_khpos_stats(DEFAULT_COMPILED_KHPOS_STATS)?;
+        log_stage("parse_khpos", started.elapsed().as_secs_f64() * 1000.0);
+
+        let started = std::time::Instant::now();
+        let next_word = parse_compiled_next_word_stats(DEFAULT_COMPILED_NEXT_WORD_STATS)?;
+        log_stage("parse_next_word", started.elapsed().as_secs_f64() * 1000.0);
+
+        let shared = Self::shared_data_from_entries_with_stage_logger(entries, corpus_stats, next_word, &mut log_stage);
+
+        #[cfg(not(target_arch = "wasm32"))]
+        if let Some(key) = cache_key.as_deref() {
+            let started = std::time::Instant::now();
+            super::cache::save(key, &shared.legacy, &shared.composer);
+            log_stage("cache_save", started.elapsed().as_secs_f64() * 1000.0);
+        }
+
+        Ok(shared)
+    }
+
     #[cfg(not(all(target_arch = "wasm32", feature = "fetch-data")))]
     pub fn from_default_phase_a_data(config: DecoderConfig) -> Result<Self> {
         Self::from_phase_a_bytes(DEFAULT_COMPILED_DATA, config)
@@ -128,13 +178,54 @@ impl Transliterator {
     ) -> Result<Self> {
         let legacy = Arc::new(LegacyData::from_entries_with_stats(entries, corpus_stats, next_word));
         let composer = ComposerTable::from_entries(legacy.entries());
-        let decoder = DecoderManager::new(
+        Ok(Self::from_shared_parts(legacy, Arc::new(composer), config))
+    }
+
+    fn shared_data_from_entries(
+        entries: Vec<Entry>,
+        corpus_stats: CorpusStats,
+        next_word: NextWordStats,
+    ) -> SharedTransliteratorData {
+        Self::shared_data_from_entries_with_stage_logger(entries, corpus_stats, next_word, |_, _| {})
+    }
+
+    fn shared_data_from_entries_with_stage_logger(
+        entries: Vec<Entry>,
+        corpus_stats: CorpusStats,
+        next_word: NextWordStats,
+        mut log_stage: impl FnMut(&str, f64),
+    ) -> SharedTransliteratorData {
+        let started = std::time::Instant::now();
+        let legacy = Arc::new(LegacyData::from_entries_with_stats_and_stage_logger(
+            entries,
+            corpus_stats,
+            next_word,
+            |stage, elapsed_ms| {
+                log_stage(&format!("build_legacy_data.{stage}"), elapsed_ms);
+            },
+        ));
+        log_stage("build_legacy_data", started.elapsed().as_secs_f64() * 1000.0);
+
+        let started = std::time::Instant::now();
+        let composer = Arc::new(ComposerTable::from_entries(legacy.entries()));
+        log_stage("build_composer", started.elapsed().as_secs_f64() * 1000.0);
+
+        SharedTransliteratorData { legacy, composer }
+    }
+
+    #[doc(hidden)]
+    pub fn from_shared_data_with_config(shared: &SharedTransliteratorData, config: DecoderConfig) -> Self {
+        Self::from_shared_parts(Arc::clone(&shared.legacy), Arc::clone(&shared.composer), config)
+    }
+
+    fn from_shared_parts(legacy: Arc<LegacyData>, composer: Arc<ComposerTable>, config: DecoderConfig) -> Self {
+        let decoder = DecoderManager::new_with_shared_composer(
             composer,
             LegacyDecoder::new(Arc::clone(&legacy)),
             (config.mode != DecoderMode::Legacy).then(|| WeightedSpanDecoder::new(Arc::clone(&legacy), config.clone())),
             config,
         );
-        Ok(Self { legacy, decoder })
+        Self { legacy, decoder }
     }
 
     /// Build a `Transliterator` from externally-provided compiled binary blobs.
@@ -145,20 +236,10 @@ impl Transliterator {
         let entries = parse_compiled_lexicon(lexicon)?;
         let corpus_stats = parse_compiled_khpos_stats(khpos)?;
         let next_word_stats = parse_compiled_next_word_stats(next_word)?;
-        let legacy = Arc::new(LegacyData::from_entries_with_stats(
-            entries,
-            corpus_stats,
-            next_word_stats,
-        ));
-        let composer = ComposerTable::from_entries(legacy.entries());
-        let decoder = DecoderManager::new(
-            composer,
-            LegacyDecoder::new(Arc::clone(&legacy)),
-            (config.mode != DecoderMode::Legacy).then(|| WeightedSpanDecoder::new(Arc::clone(&legacy), config.clone())),
-            config,
-        );
+        let shared = Self::shared_data_from_entries(entries, corpus_stats, next_word_stats);
+        let transliterator = Self::from_shared_data_with_config(&shared, config);
         startup_trace_log("Transliterator::from_compiled_bytes.end");
-        Ok(Self { legacy, decoder })
+        Ok(transliterator)
     }
 
     /// Build a minimal phase-A transliterator from compiled lexicon bytes.

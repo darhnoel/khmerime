@@ -16,7 +16,9 @@ pub use crate::decoder::{
     DecoderConfig, DecoderMode, ManualComposeCandidate, ManualComposeKind, ShadowMismatch, ShadowObservation,
     ShadowSummary,
 };
-pub use crate::roman_lookup::{AppliedSuggestion, Entry, LexiconError, Result, Transliterator};
+pub use crate::roman_lookup::{
+    AppliedSuggestion, Entry, LexiconError, Result, SharedTransliteratorData, Transliterator,
+};
 pub use crate::segment_refine::{
     build_segmented_session, connect_khmer_display, move_session_focus, normalize_visible_suggestions,
     normalized_suggestion_key, reflow_segmented_session_from_selection, SegmentedChoice, SegmentedSession,
