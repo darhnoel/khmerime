@@ -1203,6 +1203,17 @@ mod tests {
     }
 
     #[test]
+    fn trusts_common_short_exact_phrase_anchors() {
+        assert_eq!(
+            weighted_span()
+                .suggest("gettengos", &HashMap::new())
+                .first()
+                .map(String::as_str),
+            Some("គេទាំងអស់")
+        );
+    }
+
+    #[test]
     fn recovers_kit_alias_inside_long_phrase() {
         assert_eq!(
             weighted_span()
