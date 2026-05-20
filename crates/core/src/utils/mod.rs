@@ -333,8 +333,8 @@ mod tests {
 
     #[test]
     fn normalizes_coeng_da_to_ta() {
-        assert_eq!(khnormal("ក្ត", "km"), "ក្ត");
-        assert_eq!(khnormal("ក្ដ", "km"), "ក្ត");
+        assert_eq!(khnormal("ស្ត", "km"), "ស្ត");
+        assert_eq!(khnormal("ស្ដ", "km"), "ស្ត");
     }
 
     #[test]
