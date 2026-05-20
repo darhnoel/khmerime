@@ -82,36 +82,36 @@ impl Transliterator {
         let cache_key = (!super::cache::disabled()).then(super::cache::compute_key);
         #[cfg(not(target_arch = "wasm32"))]
         if let Some(key) = cache_key.as_deref() {
-            let started = std::time::Instant::now();
+            let started = start_stage_timer();
             if let Some((legacy, composer)) = super::cache::try_load(key) {
-                log_stage("cache_hit", started.elapsed().as_secs_f64() * 1000.0);
+                log_stage("cache_hit", elapsed_stage_ms(started));
                 return Ok(SharedTransliteratorData {
                     legacy: Arc::new(legacy),
                     composer: Arc::new(composer),
                 });
             }
-            log_stage("cache_miss", started.elapsed().as_secs_f64() * 1000.0);
+            log_stage("cache_miss", elapsed_stage_ms(started));
         }
 
-        let started = std::time::Instant::now();
+        let started = start_stage_timer();
         let entries = parse_compiled_lexicon(DEFAULT_COMPILED_DATA)?;
-        log_stage("parse_lexicon", started.elapsed().as_secs_f64() * 1000.0);
+        log_stage("parse_lexicon", elapsed_stage_ms(started));
 
-        let started = std::time::Instant::now();
+        let started = start_stage_timer();
         let corpus_stats = parse_compiled_khpos_stats(DEFAULT_COMPILED_KHPOS_STATS)?;
-        log_stage("parse_khpos", started.elapsed().as_secs_f64() * 1000.0);
+        log_stage("parse_khpos", elapsed_stage_ms(started));
 
-        let started = std::time::Instant::now();
+        let started = start_stage_timer();
         let next_word = parse_compiled_next_word_stats(DEFAULT_COMPILED_NEXT_WORD_STATS)?;
-        log_stage("parse_next_word", started.elapsed().as_secs_f64() * 1000.0);
+        log_stage("parse_next_word", elapsed_stage_ms(started));
 
         let shared = Self::shared_data_from_entries_with_stage_logger(entries, corpus_stats, next_word, &mut log_stage);
 
         #[cfg(not(target_arch = "wasm32"))]
         if let Some(key) = cache_key.as_deref() {
-            let started = std::time::Instant::now();
+            let started = start_stage_timer();
             super::cache::save(key, &shared.legacy, &shared.composer);
-            log_stage("cache_save", started.elapsed().as_secs_f64() * 1000.0);
+            log_stage("cache_save", elapsed_stage_ms(started));
         }
 
         Ok(shared)
@@ -195,7 +195,7 @@ impl Transliterator {
         next_word: NextWordStats,
         mut log_stage: impl FnMut(&str, f64),
     ) -> SharedTransliteratorData {
-        let started = std::time::Instant::now();
+        let started = start_stage_timer();
         let legacy = Arc::new(LegacyData::from_entries_with_stats_and_stage_logger(
             entries,
             corpus_stats,
@@ -204,11 +204,11 @@ impl Transliterator {
                 log_stage(&format!("build_legacy_data.{stage}"), elapsed_ms);
             },
         ));
-        log_stage("build_legacy_data", started.elapsed().as_secs_f64() * 1000.0);
+        log_stage("build_legacy_data", elapsed_stage_ms(started));
 
-        let started = std::time::Instant::now();
+        let started = start_stage_timer();
         let composer = Arc::new(ComposerTable::from_entries(legacy.entries()));
-        log_stage("build_composer", started.elapsed().as_secs_f64() * 1000.0);
+        log_stage("build_composer", elapsed_stage_ms(started));
 
         SharedTransliteratorData { legacy, composer }
     }

@@ -33,6 +33,32 @@ pub use types::{AppliedSuggestion, Entry, LexiconError, Result, SharedTransliter
 pub(crate) use normalization::{char_ngrams, normalize, roman_search_variants};
 pub(crate) use types::{LegacyData, RankedLexicon, RankedLexiconEntry};
 
+#[cfg(not(target_arch = "wasm32"))]
+pub(crate) type StageTimer = std::time::Instant;
+
+#[cfg(target_arch = "wasm32")]
+pub(crate) type StageTimer = f64;
+
+#[cfg(not(target_arch = "wasm32"))]
+pub(crate) fn start_stage_timer() -> StageTimer {
+    std::time::Instant::now()
+}
+
+#[cfg(target_arch = "wasm32")]
+pub(crate) fn start_stage_timer() -> StageTimer {
+    js_sys::Date::now()
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+pub(crate) fn elapsed_stage_ms(started_at: StageTimer) -> f64 {
+    started_at.elapsed().as_secs_f64() * 1000.0
+}
+
+#[cfg(target_arch = "wasm32")]
+pub(crate) fn elapsed_stage_ms(started_at: StageTimer) -> f64 {
+    (js_sys::Date::now() - started_at).max(0.0)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
