@@ -2,6 +2,9 @@ use std::collections::HashMap;
 use std::fmt;
 use std::sync::Arc;
 
+use serde::{Deserialize, Serialize};
+
+use crate::composer::ComposerTable;
 use crate::decoder::DecoderManager;
 
 use super::search_index::SearchIndex;
@@ -105,7 +108,7 @@ pub(super) const PRIORITY_SEEDS: [(&str, &str); 39] = [
     ("ngg", "ង៉"),
 ];
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Entry {
     pub roman: String,
     pub target: String,
@@ -144,7 +147,7 @@ impl From<std::io::Error> for LexiconError {
 
 pub type Result<T> = std::result::Result<T, LexiconError>;
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub(crate) struct RankedLexiconEntry {
     pub target: String,
     pub canonical_roman: String,
@@ -156,7 +159,7 @@ pub(crate) struct RankedLexiconEntry {
     pub last_tag: Option<String>,
 }
 
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub(crate) struct CorpusStats {
     #[allow(dead_code)]
     pub word_unigrams: HashMap<String, u32>,
@@ -168,21 +171,21 @@ pub(crate) struct CorpusStats {
     pub dominant_word_tags: HashMap<String, DominantTag>,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub(crate) struct DominantTag {
     pub tag: String,
     #[allow(dead_code)]
     pub support: u32,
 }
 
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub(crate) struct NextWordStats {
     pub unigrams: HashMap<String, u32>,
     pub bigrams: HashMap<String, Vec<(String, u32)>>,
     pub ranked_unigrams: Vec<(String, u32)>,
 }
 
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub(crate) struct RankedLexicon {
     pub entries: Vec<RankedLexiconEntry>,
     pub exact_index: HashMap<String, Vec<usize>>,
@@ -197,6 +200,7 @@ pub(crate) struct RankedLexicon {
     pub tag_bigrams: HashMap<(String, String), u32>,
 }
 
+#[derive(Serialize, Deserialize)]
 pub(crate) struct LegacyData {
     pub(super) entries: Vec<Entry>,
     pub(super) by_roman: HashMap<String, Vec<String>>,
@@ -214,6 +218,13 @@ pub(crate) struct LegacyData {
 pub struct Transliterator {
     pub(super) legacy: Arc<LegacyData>,
     pub(super) decoder: DecoderManager,
+}
+
+#[doc(hidden)]
+#[derive(Clone)]
+pub struct SharedTransliteratorData {
+    pub(super) legacy: Arc<LegacyData>,
+    pub(super) composer: Arc<ComposerTable>,
 }
 
 pub(super) struct LegacyLookupMaps {

@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::sync::Arc;
 
 use crate::composer::ComposerTable;
 
@@ -8,7 +9,7 @@ use super::{
 };
 
 pub(crate) struct DecoderManager {
-    composer: ComposerTable,
+    composer: Arc<ComposerTable>,
     legacy: LegacyDecoder,
     weighted_span: Option<WeightedSpanDecoder>,
     config: DecoderConfig,
@@ -17,6 +18,15 @@ pub(crate) struct DecoderManager {
 impl DecoderManager {
     pub(crate) fn new(
         composer: ComposerTable,
+        legacy: LegacyDecoder,
+        weighted_span: Option<WeightedSpanDecoder>,
+        config: DecoderConfig,
+    ) -> Self {
+        Self::new_with_shared_composer(Arc::new(composer), legacy, weighted_span, config)
+    }
+
+    pub(crate) fn new_with_shared_composer(
+        composer: Arc<ComposerTable>,
         legacy: LegacyDecoder,
         weighted_span: Option<WeightedSpanDecoder>,
         config: DecoderConfig,

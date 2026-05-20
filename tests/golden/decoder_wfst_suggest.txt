@@ -37,9 +37,9 @@ top_n: 6
 suggestions:
 1. ខ្ញុំទៅ
 2. ក្នុងហោមទៅ
-3. ខ្ញុំហោមទៅ
-4. ក្នុងហ៊ុមទៅ
-5. ខ្ញុំហ៊ុមទៅ
+3. ក្នុងហ៊ុមទៅ
+4. គ្នាហោមទៅ
+5. គ្នាហ៊ុមទៅ
 6. ក្នុងហ៊ុមទៅ៏
 
 [[case]]
@@ -61,4 +61,4 @@ name: beam_phrase_khomtaekitmnakaeng
 input: khomtaekitmnakaeng
 top_n: 1
 suggestions:
-1. ក្រោមតែកញ្ចប់ម្នាក់ឯង
+1. ខំតែគិតម្នាក់ឯង

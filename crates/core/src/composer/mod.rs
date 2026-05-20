@@ -1,5 +1,7 @@
 use std::collections::HashMap;
 
+use serde::{Deserialize, Serialize};
+
 use crate::roman_lookup::{normalize, Entry};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -156,15 +158,19 @@ impl ComposerAnalysis {
     }
 }
 
-#[derive(Default)]
+#[derive(Default, Clone, Debug, Serialize, Deserialize)]
 struct ComposerNode {
     children: HashMap<char, usize>,
     terminal: bool,
+    max_frequency: u32,
 }
+
+const TRUSTED_SHORT_CHUNK_MIN_FREQUENCY: u32 = 10_000;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 struct PathState {
     chunk_count: usize,
+    weak_chunk_count: usize,
     squared_len_sum: usize,
     previous: usize,
 }
@@ -172,10 +178,14 @@ struct PathState {
 impl PathState {
     fn better_than(self, other: Self) -> bool {
         self.chunk_count < other.chunk_count
-            || (self.chunk_count == other.chunk_count && self.squared_len_sum > other.squared_len_sum)
+            || (self.chunk_count == other.chunk_count && self.weak_chunk_count < other.weak_chunk_count)
+            || (self.chunk_count == other.chunk_count
+                && self.weak_chunk_count == other.weak_chunk_count
+                && self.squared_len_sum > other.squared_len_sum)
     }
 }
 
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub(crate) struct ComposerTable {
     nodes: Vec<ComposerNode>,
 }
@@ -195,7 +205,7 @@ impl ComposerTable {
             if normalized.is_empty() {
                 continue;
             }
-            table.insert(&normalized);
+            table.insert(&normalized, entry.frequency);
         }
 
         table
@@ -261,7 +271,7 @@ impl ComposerTable {
         }
     }
 
-    fn insert(&mut self, input: &str) {
+    fn insert(&mut self, input: &str, frequency: u32) {
         let mut node_index = 0usize;
         for ch in input.chars() {
             let next = if let Some(&child) = self.nodes[node_index].children.get(&ch) {
@@ -275,6 +285,7 @@ impl ComposerTable {
             node_index = next;
         }
         self.nodes[node_index].terminal = true;
+        self.nodes[node_index].max_frequency = self.nodes[node_index].max_frequency.max(frequency);
     }
 
     fn explicit_chunks(&self, normalized: &str) -> Vec<ComposerChunk> {
@@ -375,6 +386,7 @@ impl ComposerTable {
         let mut states = vec![None; chars.len() + 1];
         states[0] = Some(PathState {
             chunk_count: 0,
+            weak_chunk_count: 0,
             squared_len_sum: 0,
             previous: 0,
         });
@@ -394,8 +406,12 @@ impl ComposerTable {
                     continue;
                 }
                 let chunk_len = end + 1 - start;
+                let trusted_short_chunk =
+                    chunk_len < 3 && self.nodes[node_index].max_frequency >= TRUSTED_SHORT_CHUNK_MIN_FREQUENCY;
                 let next_state = PathState {
                     chunk_count: prefix_state.chunk_count + 1,
+                    weak_chunk_count: prefix_state.weak_chunk_count
+                        + usize::from(chunk_len < 3 && !trusted_short_chunk),
                     squared_len_sum: prefix_state.squared_len_sum + chunk_len * chunk_len,
                     previous: start,
                 };
@@ -638,6 +654,40 @@ mod tests {
                 .map(|chunk| chunk.normalized.as_str())
                 .collect::<Vec<_>>(),
             vec!["khnhom", "ttov"]
+        );
+    }
+
+    #[test]
+    fn prefers_segmentation_without_weak_chunks() {
+        let transliterator = Transliterator::from_default_data().unwrap();
+        let table = ComposerTable::from_entries(transliterator.entries());
+        let analysis = table.analyze("meannekbongtte");
+
+        assert!(analysis.fully_segmented);
+        assert_eq!(
+            analysis
+                .chunks
+                .iter()
+                .map(|chunk| chunk.normalized.as_str())
+                .collect::<Vec<_>>(),
+            vec!["mean", "nek", "bong", "tte"]
+        );
+    }
+
+    #[test]
+    fn trusts_high_frequency_short_exact_chunks() {
+        let transliterator = Transliterator::from_default_data().unwrap();
+        let table = ComposerTable::from_entries(transliterator.entries());
+        let analysis = table.analyze("gettengos");
+
+        assert!(analysis.fully_segmented);
+        assert_eq!(
+            analysis
+                .chunks
+                .iter()
+                .map(|chunk| chunk.normalized.as_str())
+                .collect::<Vec<_>>(),
+            vec!["ge", "tteng", "os"]
         );
     }
 

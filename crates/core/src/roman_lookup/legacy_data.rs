@@ -35,12 +35,43 @@ impl LegacyData {
         corpus_stats: CorpusStats,
         next_word: NextWordStats,
     ) -> Self {
+        Self::from_entries_with_stats_and_stage_logger(entries, corpus_stats, next_word, |_, _| {})
+    }
+
+    pub(crate) fn from_entries_with_stats_and_stage_logger(
+        entries: Vec<Entry>,
+        corpus_stats: CorpusStats,
+        next_word: NextWordStats,
+        mut log_stage: impl FnMut(&str, f64),
+    ) -> Self {
+        let started = std::time::Instant::now();
         let mut maps = Self::build_lookup_maps(&entries);
+        log_stage("build_lookup_maps", started.elapsed().as_secs_f64() * 1000.0);
+
+        let started = std::time::Instant::now();
         let target_frequency = target_frequency_map(&entries, Some(&corpus_stats));
+        log_stage("target_frequency", started.elapsed().as_secs_f64() * 1000.0);
+
+        let started = std::time::Instant::now();
         sort_lookup_maps_by_frequency(&mut maps, &target_frequency);
+        log_stage("sort_lookup_maps", started.elapsed().as_secs_f64() * 1000.0);
+
+        let started = std::time::Instant::now();
         let next_word_max_context_chars = max_next_word_context_chars(&next_word);
-        let ranked = RankedLexicon::from_entries(&entries, &corpus_stats);
-        Self {
+        log_stage("next_word_context", started.elapsed().as_secs_f64() * 1000.0);
+
+        let started = std::time::Instant::now();
+        let ranked = RankedLexicon::from_entries_with_stage_logger(&entries, corpus_stats, |stage, elapsed_ms| {
+            log_stage(&format!("ranked_lexicon.{stage}"), elapsed_ms);
+        });
+        log_stage("ranked_lexicon", started.elapsed().as_secs_f64() * 1000.0);
+
+        let started = std::time::Instant::now();
+        let index = SearchIndex::new(&maps.roman_keys, true, 2, 3);
+        log_stage("search_index", started.elapsed().as_secs_f64() * 1000.0);
+
+        let started = std::time::Instant::now();
+        let data = Self {
             entries,
             by_roman: maps.by_roman,
             by_normalized: maps.by_normalized,
@@ -48,11 +79,13 @@ impl LegacyData {
             target_frequency,
             roman_normalized: maps.roman_normalized,
             roman_prefix_index: maps.roman_prefix_index,
-            index: SearchIndex::new(&maps.roman_keys, true, 2, 3),
+            index,
             ranked,
             next_word,
             next_word_max_context_chars,
-        }
+        };
+        log_stage("assemble", started.elapsed().as_secs_f64() * 1000.0);
+        data
     }
 
     fn build_lookup_maps(entries: &[Entry]) -> LegacyLookupMaps {
@@ -201,7 +234,7 @@ impl LegacyData {
     pub(crate) fn suggest(&self, input: &str, history: &HashMap<String, usize>) -> Vec<String> {
         let query = input.strip_suffix(' ').unwrap_or(input);
         if query == "." {
-            return vec!["។".to_owned(), "៕".to_owned()];
+            return vec!["។".to_owned(), "៕".to_owned(), ".".to_owned()];
         }
         if query.chars().all(|ch| ch.is_ascii_digit()) && !query.is_empty() {
             let mapped = query.chars().filter_map(khmer_digit).collect::<String>();

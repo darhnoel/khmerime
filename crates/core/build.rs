@@ -52,6 +52,86 @@ impl BuildLexiconEntry {
 }
 
 #[derive(Clone, Debug)]
+struct BuildDataConfig {
+    paths: BuildDataPaths,
+    build: BuildDataBuildOptions,
+    runtime: BuildRuntimeOptions,
+}
+
+impl Default for BuildDataConfig {
+    fn default() -> Self {
+        Self {
+            paths: BuildDataPaths::default(),
+            build: BuildDataBuildOptions::default(),
+            runtime: BuildRuntimeOptions::default(),
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum LegacyFuzzyIndexKind {
+    Ngram,
+    SymSpell,
+}
+
+impl LegacyFuzzyIndexKind {
+    fn as_str(self) -> &'static str {
+        match self {
+            Self::Ngram => "ngram",
+            Self::SymSpell => "symspell",
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug)]
+struct BuildRuntimeOptions {
+    legacy_fuzzy_index: LegacyFuzzyIndexKind,
+}
+
+impl Default for BuildRuntimeOptions {
+    fn default() -> Self {
+        Self {
+            legacy_fuzzy_index: LegacyFuzzyIndexKind::Ngram,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug)]
+struct BuildDataBuildOptions {
+    khpos_surface_min_count: u32,
+    khpos_surface_top_n: Option<usize>,
+}
+
+impl Default for BuildDataBuildOptions {
+    fn default() -> Self {
+        Self {
+            khpos_surface_min_count: 1,
+            khpos_surface_top_n: None,
+        }
+    }
+}
+
+impl BuildDataBuildOptions {
+    fn with_env_overrides(mut self) -> Result<Self, String> {
+        if let Some(value) = env::var("KHPOS_SURFACE_MIN_COUNT")
+            .ok()
+            .filter(|value| !value.is_empty())
+        {
+            self.khpos_surface_min_count = value
+                .parse::<u32>()
+                .map_err(|_| format!("KHPOS_SURFACE_MIN_COUNT must be a u32, got '{value}'"))?;
+        }
+        if let Some(value) = env::var("KHPOS_SURFACE_TOP_N").ok().filter(|value| !value.is_empty()) {
+            let limit = value
+                .parse::<usize>()
+                .map_err(|_| format!("KHPOS_SURFACE_TOP_N must be a usize, got '{value}'"))?;
+            self.khpos_surface_top_n = (limit > 0).then_some(limit);
+        }
+        Ok(self)
+    }
+}
+
+#[derive(Clone, Debug)]
 struct BuildDataPaths {
     lexicon_csv: String,
     lexicon_tsv: String,
@@ -87,7 +167,12 @@ fn normalize_workspace_path(path: &str) -> String {
 }
 
 fn main() {
-    let mut data_paths = load_data_paths_from_config();
+    let data_config = load_data_config_from_config();
+    let mut data_paths = data_config.paths;
+    let khpos_build_options = data_config
+        .build
+        .with_env_overrides()
+        .expect("data build environment overrides must be valid");
     data_paths.lexicon_csv = normalize_workspace_path(&data_paths.lexicon_csv);
     data_paths.lexicon_tsv = normalize_workspace_path(&data_paths.lexicon_tsv);
     data_paths.khpos_train = normalize_workspace_path(&data_paths.khpos_train);
@@ -103,6 +188,8 @@ fn main() {
     println!("cargo:rerun-if-changed={}", data_paths.mobile_keyboard_1gram);
     println!("cargo:rerun-if-changed={}", data_paths.mobile_keyboard_2gram);
     println!("cargo:rerun-if-env-changed=KHMERIME_WARN_MISSING_OPTIONAL_DATA");
+    println!("cargo:rerun-if-env-changed=KHPOS_SURFACE_MIN_COUNT");
+    println!("cargo:rerun-if-env-changed=KHPOS_SURFACE_TOP_N");
 
     // The checked-in CSV is canonical, but the TSV fallback keeps older local
     // worktrees usable while data migrations are in flight.
@@ -122,8 +209,8 @@ fn main() {
         fs::read_to_string(&data_paths.khpos_train).expect("khPOS after-replace train corpus must be readable");
     let khpos_tags =
         fs::read_to_string(&data_paths.khpos_tag).expect("khPOS after-replace tag corpus must be readable");
-    let compiled_khpos =
-        compile_khpos_stats(&khpos_train, &khpos_tags).expect("khPOS after-replace corpus must compile");
+    let compiled_khpos = compile_khpos_stats(&khpos_train, &khpos_tags, khpos_build_options)
+        .expect("khPOS after-replace corpus must compile");
     // Mobile keyboard n-grams improve next-word scoring, but they are optional
     // for normal development. Set KHMERIME_WARN_MISSING_OPTIONAL_DATA=1 when
     // auditing data-path configuration and you want missing optional files to be
@@ -149,6 +236,12 @@ fn main() {
     fs::write(&khpos_output_path, compiled_khpos).expect("compiled khPOS stats must be written");
     let next_word_output_path = out_dir.join("next_word.stats.bin");
     fs::write(&next_word_output_path, compiled_next_word).expect("compiled next-word stats must be written");
+    let search_index_config_path = out_dir.join("search_index_config.rs");
+    fs::write(
+        &search_index_config_path,
+        search_index_config_source(data_config.runtime),
+    )
+    .expect("search index config must be written");
 
     // When building for wasm32 with the fetch-data feature, copy the compiled
     // binary blobs into assets/data/ so Dioxus serves them as static files.
@@ -166,16 +259,16 @@ fn main() {
     }
 }
 
-fn load_data_paths_from_config() -> BuildDataPaths {
+fn load_data_config_from_config() -> BuildDataConfig {
     println!("cargo:rerun-if-changed={DATA_PATHS_CONFIG_PATH}");
-    let mut paths = BuildDataPaths::default();
+    let mut config = BuildDataConfig::default();
     let Ok(source) = fs::read_to_string(DATA_PATHS_CONFIG_PATH) else {
-        return paths;
+        return config;
     };
-    if let Err(error) = apply_data_paths_config(&source, &mut paths) {
+    if let Err(error) = apply_data_config(&source, &mut config) {
         panic!("{DATA_PATHS_CONFIG_PATH} parse failed: {error}");
     }
-    paths
+    config
 }
 
 fn read_optional_source(path: &str, label: &str, warn_when_missing: bool) -> String {
@@ -192,19 +285,15 @@ fn read_optional_source(path: &str, label: &str, warn_when_missing: bool) -> Str
     }
 }
 
-fn apply_data_paths_config(source: &str, paths: &mut BuildDataPaths) -> Result<(), String> {
-    let mut in_data_paths_section = false;
+fn apply_data_config(source: &str, config: &mut BuildDataConfig) -> Result<(), String> {
+    let mut section = "";
     for (line_no, raw_line) in source.lines().enumerate() {
         let line = raw_line.split('#').next().unwrap_or("").trim();
         if line.is_empty() {
             continue;
         }
         if line.starts_with('[') && line.ends_with(']') {
-            let section = line[1..line.len() - 1].trim();
-            in_data_paths_section = section == "data_paths";
-            continue;
-        }
-        if !in_data_paths_section {
+            section = line[1..line.len() - 1].trim();
             continue;
         }
 
@@ -212,21 +301,82 @@ fn apply_data_paths_config(source: &str, paths: &mut BuildDataPaths) -> Result<(
             return Err(format!("invalid config format on line {}", line_no + 1));
         };
         let key = raw_key.trim();
-        let value = parse_data_path_value(raw_value.trim(), line_no + 1)?;
-        if value.is_empty() {
-            return Err(format!("empty value for '{}' on line {}", key, line_no + 1));
-        }
-        match key {
-            "lexicon_csv" => paths.lexicon_csv = value,
-            "lexicon_tsv" => paths.lexicon_tsv = value,
-            "khpos_train" => paths.khpos_train = value,
-            "khpos_tag" => paths.khpos_tag = value,
-            "mobile_keyboard_1gram" => paths.mobile_keyboard_1gram = value,
-            "mobile_keyboard_2gram" => paths.mobile_keyboard_2gram = value,
-            _ => return Err(format!("unknown key '{}' in [data_paths] on line {}", key, line_no + 1)),
+        match section {
+            "data_paths" => apply_data_paths_config_value(key, raw_value.trim(), line_no + 1, &mut config.paths)?,
+            "data_build" => apply_data_build_config_value(key, raw_value.trim(), line_no + 1, &mut config.build)?,
+            "runtime" => apply_runtime_config_value(key, raw_value.trim(), line_no + 1, &mut config.runtime)?,
+            _ => continue,
         }
     }
     Ok(())
+}
+
+fn apply_data_paths_config_value(
+    key: &str,
+    raw_value: &str,
+    line_no: usize,
+    paths: &mut BuildDataPaths,
+) -> Result<(), String> {
+    let value = parse_data_path_value(raw_value, line_no)?;
+    if value.is_empty() {
+        return Err(format!("empty value for '{}' on line {}", key, line_no));
+    }
+    match key {
+        "lexicon_csv" => paths.lexicon_csv = value,
+        "lexicon_tsv" => paths.lexicon_tsv = value,
+        "khpos_train" => paths.khpos_train = value,
+        "khpos_tag" => paths.khpos_tag = value,
+        "mobile_keyboard_1gram" => paths.mobile_keyboard_1gram = value,
+        "mobile_keyboard_2gram" => paths.mobile_keyboard_2gram = value,
+        _ => return Err(format!("unknown key '{}' in [data_paths] on line {}", key, line_no)),
+    }
+    Ok(())
+}
+
+fn apply_data_build_config_value(
+    key: &str,
+    raw_value: &str,
+    line_no: usize,
+    build: &mut BuildDataBuildOptions,
+) -> Result<(), String> {
+    match key {
+        "khpos_surface_min_count" => {
+            build.khpos_surface_min_count = parse_u32_config_value(raw_value, key, line_no)?;
+        }
+        "khpos_surface_top_n" => {
+            let limit = parse_usize_config_value(raw_value, key, line_no)?;
+            build.khpos_surface_top_n = (limit > 0).then_some(limit);
+        }
+        _ => return Err(format!("unknown key '{}' in [data_build] on line {}", key, line_no)),
+    }
+    Ok(())
+}
+
+fn apply_runtime_config_value(
+    key: &str,
+    raw_value: &str,
+    line_no: usize,
+    runtime: &mut BuildRuntimeOptions,
+) -> Result<(), String> {
+    match key {
+        "legacy_fuzzy_index" => {
+            runtime.legacy_fuzzy_index = parse_legacy_fuzzy_index(raw_value, line_no)?;
+        }
+        _ => return Err(format!("unknown key '{}' in [runtime] on line {}", key, line_no)),
+    }
+    Ok(())
+}
+
+fn parse_legacy_fuzzy_index(raw: &str, line_no: usize) -> Result<LegacyFuzzyIndexKind, String> {
+    let value = parse_data_path_value(raw, line_no)?;
+    match value.as_str() {
+        "ngram" => Ok(LegacyFuzzyIndexKind::Ngram),
+        "symspell" => Ok(LegacyFuzzyIndexKind::SymSpell),
+        _ => Err(format!(
+            "invalid legacy_fuzzy_index on line {}: '{}'; expected 'ngram' or 'symspell'",
+            line_no, value
+        )),
+    }
 }
 
 fn parse_data_path_value(raw: &str, line_no: usize) -> Result<String, String> {
@@ -238,6 +388,23 @@ fn parse_data_path_value(raw: &str, line_no: usize) -> Result<String, String> {
         return Ok(content.replace("\\\\", "\\").replace("\\\"", "\""));
     }
     Ok(raw.to_owned())
+}
+
+fn parse_u32_config_value(raw: &str, key: &str, line_no: usize) -> Result<u32, String> {
+    raw.parse::<u32>()
+        .map_err(|_| format!("invalid u32 for '{}' on line {}: '{}'", key, line_no, raw))
+}
+
+fn parse_usize_config_value(raw: &str, key: &str, line_no: usize) -> Result<usize, String> {
+    raw.parse::<usize>()
+        .map_err(|_| format!("invalid usize for '{}' on line {}: '{}'", key, line_no, raw))
+}
+
+fn search_index_config_source(runtime: BuildRuntimeOptions) -> String {
+    format!(
+        "pub(super) const DEFAULT_LEGACY_FUZZY_INDEX: &str = {:?};\n",
+        runtime.legacy_fuzzy_index.as_str()
+    )
 }
 
 fn compile_next_word_stats(unigram_source: &str, bigram_source: &str) -> Result<Vec<u8>, String> {
@@ -572,7 +739,11 @@ fn parse_csv_fields(line: &str, line_no: usize) -> Result<Vec<String>, String> {
     Ok(fields)
 }
 
-fn compile_khpos_stats(train_source: &str, tag_source: &str) -> Result<Vec<u8>, String> {
+fn compile_khpos_stats(
+    train_source: &str,
+    tag_source: &str,
+    options: BuildDataBuildOptions,
+) -> Result<Vec<u8>, String> {
     let train_lines = train_source
         .lines()
         .filter(|line| !line.trim().is_empty())
@@ -657,19 +828,11 @@ fn compile_khpos_stats(train_source: &str, tag_source: &str) -> Result<Vec<u8>, 
         }
     }
 
-    let surface_min_count = env::var("KHPOS_SURFACE_MIN_COUNT")
-        .ok()
-        .and_then(|value| value.parse::<u32>().ok())
-        .unwrap_or(1);
-    if surface_min_count > 1 {
-        surface_unigrams.retain(|_, count| *count >= surface_min_count);
+    if options.khpos_surface_min_count > 1 {
+        surface_unigrams.retain(|_, count| *count >= options.khpos_surface_min_count);
     }
 
-    if let Some(limit) = env::var("KHPOS_SURFACE_TOP_N")
-        .ok()
-        .and_then(|value| value.parse::<usize>().ok())
-        .filter(|limit| *limit > 0)
-    {
+    if let Some(limit) = options.khpos_surface_top_n {
         trim_map_to_top_n(&mut surface_unigrams, limit);
     }
 

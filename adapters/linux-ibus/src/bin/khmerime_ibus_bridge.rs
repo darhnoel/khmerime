@@ -5,13 +5,16 @@ use std::time::{Duration, Instant};
 
 use khmerime_core::{DecoderConfig, DecoderMode, Result as KhmerResult, Transliterator};
 use khmerime_linux_ibus::{
-    fallback_empty_snapshot_json, BridgeCommand, BridgeReadiness, BridgeResponse, DesktopHistoryStore,
+    fallback_empty_snapshot_json, BridgeCommand, BridgeReadiness, BridgeResponse, BridgeTimings, DesktopHistoryStore,
 };
 use khmerime_session::{
     HistoryStore, ImeSession, ImeSessionOptions, ImeSessionSnapshot, ImeSessionUpdate, InputMode, SegmentedPreviewMode,
 };
 
-const ENTER_REFINER_WAIT: Duration = Duration::from_millis(500);
+// Short grace, not a wait: full warmup measured at ~2.8s in release builds, so
+// blocking longer just freezes the UI without producing a better commit. 30ms
+// is enough to catch a refiner that's about to land, invisible to the user.
+const ENTER_REFINER_GRACE: Duration = Duration::from_millis(30);
 
 struct FullEngines {
     live: Transliterator,
@@ -171,7 +174,7 @@ impl BridgeRuntime {
 }
 
 fn build_response(
-    session: &ImeSession,
+    snapshot: ImeSessionSnapshot,
     readiness: BridgeReadiness,
     update: ImeSessionUpdate,
 ) -> BridgeResponse<ImeSessionSnapshot> {
@@ -181,8 +184,9 @@ fn build_response(
         commit_text: update.commit_text,
         history_changed: update.history_changed,
         readiness,
-        snapshot: session.snapshot(),
+        snapshot,
         error: None,
+        timings: None,
     }
 }
 
@@ -199,20 +203,43 @@ fn error_response(
         readiness,
         snapshot: session.snapshot(),
         error: Some(message.into()),
+        timings: None,
     }
 }
 
+fn log_startup_stage_end(stage: &str, started: Instant) {
+    eprintln!(
+        "[ibus-startup] {stage}.end elapsed_ms={:.2}",
+        started.elapsed().as_secs_f64() * 1000.0
+    );
+}
+
 fn build_full_engines() -> KhmerResult<FullEngines> {
-    let transliterator = Transliterator::from_default_data_with_config(DecoderConfig::shadow_interactive())?;
+    let started = Instant::now();
+    eprintln!("[ibus-startup] full_shared_data.start");
+    let shared = Transliterator::from_default_shared_data_with_stage_logger(|stage, elapsed_ms| {
+        eprintln!("[ibus-startup] full_shared_data.{stage}.end elapsed_ms={elapsed_ms:.2}");
+    })?;
+    log_startup_stage_end("full_shared_data", started);
+
+    let started = Instant::now();
+    eprintln!("[ibus-startup] full_live_engine.start");
+    let live = Transliterator::from_shared_data_with_config(&shared, DecoderConfig::shadow_interactive());
+    log_startup_stage_end("full_live_engine", started);
+
+    let started = Instant::now();
+    eprintln!("[ibus-startup] full_visible_refiner.start");
     let visible_refiner =
-        Transliterator::from_default_data_with_config(visible_refiner_config().with_mode(DecoderMode::Hybrid))?;
-    let commit_refiner = Transliterator::from_default_data_with_config(
-        DecoderConfig::default()
-            .with_mode(DecoderMode::Hybrid)
-            .with_shadow_log(false),
-    )?;
+        Transliterator::from_shared_data_with_config(&shared, visible_refiner_config().with_mode(DecoderMode::Hybrid));
+    log_startup_stage_end("full_visible_refiner", started);
+
+    let started = Instant::now();
+    eprintln!("[ibus-startup] full_commit_refiner.start");
+    let commit_refiner = Transliterator::from_shared_data_with_config(&shared, commit_refiner_config());
+    log_startup_stage_end("full_commit_refiner", started);
+
     Ok(FullEngines {
-        live: transliterator,
+        live,
         visible_refiner,
         commit_refiner,
     })
@@ -221,6 +248,14 @@ fn build_full_engines() -> KhmerResult<FullEngines> {
 fn visible_refiner_config() -> DecoderConfig {
     let mut config = DecoderConfig::shadow_interactive();
     config.wfst_max_latency_ms = 75;
+    config
+}
+
+fn commit_refiner_config() -> DecoderConfig {
+    let mut config = DecoderConfig::default()
+        .with_mode(DecoderMode::Hybrid)
+        .with_shadow_log(false);
+    config.wfst_max_latency_ms = 150;
     config
 }
 
@@ -246,8 +281,7 @@ fn start_full_warmup(disabled: bool) -> Option<Receiver<Result<FullEngines, Stri
 fn needs_segmented_preview_for_keyval(keyval: u32) -> bool {
     matches!(
         keyval,
-        0xFF0D | 0xFF8D                              // Return, KP_Enter
-            | 0x0020                                 // Space
+        0x0020                                       // Space
             | 0xFF51 | 0xFF52 | 0xFF53 | 0xFF54      // Left, Up, Right, Down
             | 0xFF89 | 0xFF96 | 0xFF98 | 0xFF99      // KP Tab/Left/Up/Right
             | 0x0031..=0x0039                        // '1'..='9' (top row digits)
@@ -267,6 +301,18 @@ fn flush_history_if_changed(session: &ImeSession, update: &ImeSessionUpdate) -> 
 }
 
 fn apply_command(runtime: &mut BridgeRuntime, command: BridgeCommand) -> (BridgeResponse<ImeSessionSnapshot>, bool) {
+    let cmd_started = Instant::now();
+    let emit_timings = matches!(
+        command,
+        BridgeCommand::ProcessKeyEvent { .. }
+            | BridgeCommand::RefineComposition { .. }
+            | BridgeCommand::RefreshSegmentedPreview { .. }
+    );
+    let mut t_wait = 0.0_f64;
+    let mut t_seg = 0.0_f64;
+    let mut t_proc = 0.0_f64;
+    let mut t_hist = 0.0_f64;
+
     runtime.poll_full_warmup();
 
     let is_enter = matches!(
@@ -277,7 +323,9 @@ fn apply_command(runtime: &mut BridgeRuntime, command: BridgeCommand) -> (Bridge
         }
     );
     if is_enter && runtime.readiness == BridgeReadiness::PhaseA {
-        runtime.wait_for_full_refiner(ENTER_REFINER_WAIT);
+        let started = Instant::now();
+        runtime.wait_for_full_refiner(ENTER_REFINER_GRACE);
+        t_wait = started.elapsed().as_secs_f64() * 1000.0;
     }
     let needs_sync_segmented_preview = matches!(
         command,
@@ -288,8 +336,10 @@ fn apply_command(runtime: &mut BridgeRuntime, command: BridgeCommand) -> (Bridge
         && !runtime.session.segmented_preview_active()
         && !runtime.session.composition_is_empty()
     {
+        let started = Instant::now();
         let raw = runtime.session.composition_raw().to_owned();
         runtime.session.refresh_segmented_preview(&raw);
+        t_seg = started.elapsed().as_secs_f64() * 1000.0;
     }
 
     let mut response_error = None;
@@ -297,16 +347,24 @@ fn apply_command(runtime: &mut BridgeRuntime, command: BridgeCommand) -> (Bridge
         let session = &mut runtime.session;
         match command {
             BridgeCommand::ProcessKeyEvent { keyval, keycode, state } => {
+                let started = Instant::now();
                 let update = session.process_key_event(keyval, keycode, state);
+                t_proc = started.elapsed().as_secs_f64() * 1000.0;
+                let hist_started = Instant::now();
                 response_error = flush_history_if_changed(session, &update);
+                t_hist = hist_started.elapsed().as_secs_f64() * 1000.0;
                 (update, false)
             }
             BridgeCommand::RefineComposition { raw_preedit } => {
+                let started = Instant::now();
                 session.apply_refined_candidate(&raw_preedit);
+                t_proc = started.elapsed().as_secs_f64() * 1000.0;
                 (ImeSessionUpdate::default(), false)
             }
             BridgeCommand::RefreshSegmentedPreview { raw_preedit } => {
+                let started = Instant::now();
                 session.refresh_segmented_preview(&raw_preedit);
+                t_proc = started.elapsed().as_secs_f64() * 1000.0;
                 (ImeSessionUpdate::default(), false)
             }
             BridgeCommand::SetInputMode { input_mode } => {
@@ -369,8 +427,22 @@ fn apply_command(runtime: &mut BridgeRuntime, command: BridgeCommand) -> (Bridge
 
     runtime.poll_full_warmup();
     runtime.maybe_complete_full_upgrade();
-    let mut response = build_response(&runtime.session, runtime.readiness, update);
+    let snap_started = Instant::now();
+    let snapshot = runtime.session.snapshot();
+    let t_snap = snap_started.elapsed().as_secs_f64() * 1000.0;
+    let mut response = build_response(snapshot, runtime.readiness, update);
     response.error = response_error;
+    if emit_timings {
+        let total = cmd_started.elapsed().as_secs_f64() * 1000.0;
+        response.timings = Some(BridgeTimings {
+            wait_refiner_ms: t_wait,
+            sync_segpreview_ms: t_seg,
+            process_event_ms: t_proc,
+            history_save_ms: t_hist,
+            snapshot_ms: t_snap,
+            total_ms: total,
+        });
+    }
     (response, should_exit)
 }
 

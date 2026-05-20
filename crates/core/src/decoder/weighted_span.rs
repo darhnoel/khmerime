@@ -1121,20 +1121,25 @@ fn is_soft_final(ch: char) -> bool {
 #[cfg(test)]
 mod tests {
     use std::collections::HashMap;
-    use std::sync::Arc;
+    use std::sync::{Arc, OnceLock};
 
     use super::{context_delta, pos_delta, WeightedSpanDecoder};
     use crate::decoder::{DecoderConfig, DecoderMode};
     use crate::roman_lookup::{LegacyData, RankedLexicon, Transliterator};
 
+    fn weighted_span() -> &'static Transliterator {
+        static TRANSLITERATOR: OnceLock<Transliterator> = OnceLock::new();
+        TRANSLITERATOR.get_or_init(|| {
+            let mut config = DecoderConfig::default().with_mode(DecoderMode::Wfst);
+            config.wfst_max_latency_ms = u64::MAX;
+            Transliterator::from_default_data_with_config(config).unwrap()
+        })
+    }
+
     #[test]
     fn returns_candidates_for_exact_entries() {
-        let transliterator =
-            Transliterator::from_default_data_with_config(DecoderConfig::default().with_mode(DecoderMode::Wfst))
-                .unwrap();
-
         assert_eq!(
-            transliterator
+            weighted_span()
                 .suggest("jea", &HashMap::new())
                 .first()
                 .map(String::as_str),
@@ -1144,12 +1149,8 @@ mod tests {
 
     #[test]
     fn composes_exact_chunk_phrases_without_spaces() {
-        let transliterator =
-            Transliterator::from_default_data_with_config(DecoderConfig::default().with_mode(DecoderMode::Wfst))
-                .unwrap();
-
         assert_eq!(
-            transliterator
+            weighted_span()
                 .suggest("khnhomttov", &HashMap::new())
                 .first()
                 .map(String::as_str),
@@ -1159,12 +1160,8 @@ mod tests {
 
     #[test]
     fn recovers_noisy_long_phrase_with_beam_search() {
-        let transliterator =
-            Transliterator::from_default_data_with_config(DecoderConfig::default().with_mode(DecoderMode::Wfst))
-                .unwrap();
-
         assert_eq!(
-            transliterator
+            weighted_span()
                 .suggest("knhhomttovsalarien", &HashMap::new())
                 .first()
                 .map(String::as_str),
@@ -1174,12 +1171,8 @@ mod tests {
 
     #[test]
     fn prefers_long_meaningful_span_over_fragmentation() {
-        let transliterator =
-            Transliterator::from_default_data_with_config(DecoderConfig::default().with_mode(DecoderMode::Wfst))
-                .unwrap();
-
         assert_eq!(
-            transliterator
+            weighted_span()
                 .suggest("saensronors", &HashMap::new())
                 .first()
                 .map(String::as_str),
@@ -1189,17 +1182,65 @@ mod tests {
 
     #[test]
     fn prefers_exact_phrase_chunks_over_fuzzy_fragmentation() {
-        let transliterator =
-            Transliterator::from_default_data_with_config(DecoderConfig::default().with_mode(DecoderMode::Wfst))
-                .unwrap();
-
         assert_eq!(
-            transliterator
+            weighted_span()
                 .suggest("sakampheapttenglay", &HashMap::new())
                 .first()
                 .map(String::as_str),
             Some("សកម្មភាពទាំងឡាយ")
         );
+    }
+
+    #[test]
+    fn avoids_english_name_fragmentation_inside_khmer_phrase() {
+        assert_eq!(
+            weighted_span()
+                .suggest("meannekbongtte", &HashMap::new())
+                .first()
+                .map(String::as_str),
+            Some("មាននឹកបងទេ")
+        );
+    }
+
+    #[test]
+    fn trusts_common_short_exact_phrase_anchors() {
+        assert_eq!(
+            weighted_span()
+                .suggest("gettengos", &HashMap::new())
+                .first()
+                .map(String::as_str),
+            Some("គេទាំងអស់")
+        );
+    }
+
+    #[test]
+    fn recovers_kit_alias_inside_long_phrase() {
+        assert_eq!(
+            weighted_span()
+                .suggest("khomtaekitmnakaeng", &HashMap::new())
+                .first()
+                .map(String::as_str),
+            Some("ខំតែគិតម្នាក់ឯង")
+        );
+    }
+
+    #[test]
+    fn recovers_invoice_aliases_inside_phrases() {
+        for (input, expected) in [
+            ("vikkaybat", "វិក្កយបត្រ"),
+            ("tvervikaibat", "ធ្វើវិក្កយបត្រ"),
+            ("tvervikkaybat", "ធ្វើវិក្កយបត្រ"),
+            ("ngaitvervikkaybat", "ថ្ងៃធ្វើវិក្កយបត្រ"),
+        ] {
+            assert_eq!(
+                weighted_span()
+                    .suggest(input, &HashMap::new())
+                    .first()
+                    .map(String::as_str),
+                Some(expected),
+                "{input}"
+            );
+        }
     }
 
     #[test]
@@ -1217,12 +1258,8 @@ mod tests {
 
     #[test]
     fn prefers_exact_single_span_match_for_sronos() {
-        let transliterator =
-            Transliterator::from_default_data_with_config(DecoderConfig::default().with_mode(DecoderMode::Wfst))
-                .unwrap();
-
         assert_eq!(
-            transliterator
+            weighted_span()
                 .suggest("sronos", &HashMap::new())
                 .first()
                 .map(String::as_str),

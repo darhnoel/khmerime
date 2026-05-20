@@ -289,9 +289,11 @@ class _FakeBridgeClient:
         *,
         initial_input_mode: str = "roman",
         deferred_segmented_preview: bool = False,
+        log: Optional[Any] = None,
     ) -> None:
         self.initial_input_mode = initial_input_mode
         self.deferred_segmented_preview = deferred_segmented_preview
+        self.log = log
         self.calls: List[Dict[str, Any]] = []
         self._current_mode = initial_input_mode
 
