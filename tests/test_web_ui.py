@@ -311,6 +311,27 @@ def test_web_ui_mobile_keyboard_offset_hook_docks_candidate_bar(web_server: str,
     expect(mobile_page.locator(".candidate-bar").last).to_be_visible(timeout=15_000)
 
 
+def test_web_ui_digit_shortcut_selects_candidate_without_commit(web_server: str, page) -> None:
+    _goto_app(page, web_server)
+
+    editor = page.locator("[data-testid='editor-input']").last
+    expect(editor).to_be_visible(timeout=20_000)
+    editor.click()
+    editor.type("jea")
+
+    popup = page.locator("[data-testid='suggestion-popup']").last
+    expect(popup).to_be_visible(timeout=15_000)
+
+    first_suggestion_text = popup.locator(".suggestion .suggestion-word").first.inner_text().strip()
+    assert first_suggestion_text
+
+    editor.press("1")
+
+    active_suggestion_text = popup.locator(".suggestion.active .suggestion-word").first
+    expect(active_suggestion_text).to_have_text(first_suggestion_text)
+    expect(editor).to_have_value("jea")
+
+
 def test_web_ui_mobile_initial_layout_keeps_candidate_strip_visible(web_server: str, mobile_page) -> None:
     _goto_app(mobile_page, web_server)
 
