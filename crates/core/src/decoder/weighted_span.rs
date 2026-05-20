@@ -1203,6 +1203,21 @@ mod tests {
     }
 
     #[test]
+    fn avoids_english_name_fragmentation_inside_khmer_phrase() {
+        let transliterator =
+            Transliterator::from_default_data_with_config(DecoderConfig::default().with_mode(DecoderMode::Wfst))
+                .unwrap();
+
+        assert_eq!(
+            transliterator
+                .suggest("meannekbongtte", &HashMap::new())
+                .first()
+                .map(String::as_str),
+            Some("មាននឹកបងទេ")
+        );
+    }
+
+    #[test]
     fn single_span_reranker_prefers_sronaoh_variant() {
         let transliterator = Transliterator::from_default_data().unwrap();
         let data = Arc::new(LegacyData::from_entries(transliterator.entries().to_vec()));
