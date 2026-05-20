@@ -235,12 +235,7 @@ fn build_full_engines() -> KhmerResult<FullEngines> {
 
     let started = Instant::now();
     eprintln!("[ibus-startup] full_commit_refiner.start");
-    let commit_refiner = Transliterator::from_shared_data_with_config(
-        &shared,
-        DecoderConfig::default()
-            .with_mode(DecoderMode::Hybrid)
-            .with_shadow_log(false),
-    );
+    let commit_refiner = Transliterator::from_shared_data_with_config(&shared, commit_refiner_config());
     log_startup_stage_end("full_commit_refiner", started);
 
     Ok(FullEngines {
@@ -253,6 +248,14 @@ fn build_full_engines() -> KhmerResult<FullEngines> {
 fn visible_refiner_config() -> DecoderConfig {
     let mut config = DecoderConfig::shadow_interactive();
     config.wfst_max_latency_ms = 75;
+    config
+}
+
+fn commit_refiner_config() -> DecoderConfig {
+    let mut config = DecoderConfig::default()
+        .with_mode(DecoderMode::Hybrid)
+        .with_shadow_log(false);
+    config.wfst_max_latency_ms = 150;
     config
 }
 
@@ -278,8 +281,7 @@ fn start_full_warmup(disabled: bool) -> Option<Receiver<Result<FullEngines, Stri
 fn needs_segmented_preview_for_keyval(keyval: u32) -> bool {
     matches!(
         keyval,
-        0xFF0D | 0xFF8D                              // Return, KP_Enter
-            | 0x0020                                 // Space
+        0x0020                                       // Space
             | 0xFF51 | 0xFF52 | 0xFF53 | 0xFF54      // Left, Up, Right, Down
             | 0xFF89 | 0xFF96 | 0xFF98 | 0xFF99      // KP Tab/Left/Up/Right
             | 0x0031..=0x0039                        // '1'..='9' (top row digits)
