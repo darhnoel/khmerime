@@ -6,4 +6,6 @@ make data-build
 make data-check
 make ibus-install
 
+rm /home/linak/.cache/khmerime/*.bin
+
 ibus restart
