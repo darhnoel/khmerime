@@ -12,9 +12,11 @@ use khmerime_session::{
 };
 
 // Short grace, not a wait: full warmup measured at ~2.8s in release builds, so
-// blocking longer just freezes the UI without producing a better commit. 30ms
-// is enough to catch a refiner that's about to land, invisible to the user.
-const ENTER_REFINER_GRACE: Duration = Duration::from_millis(30);
+// blocking longer just freezes the UI without producing a better commit.
+// Short words commit immediately from PhaseA; longer phrase commits get a tiny
+// chance to catch a full refiner that's already about to land.
+const LONG_ENTER_REFINER_GRACE: Duration = Duration::from_millis(5);
+const ENTER_REFINER_MIN_RAW_CHARS: usize = 12;
 
 struct FullEngines {
     live: Transliterator,
@@ -289,6 +291,10 @@ fn needs_segmented_preview_for_keyval(keyval: u32) -> bool {
     )
 }
 
+fn enter_refiner_grace(raw_preedit: &str) -> Option<Duration> {
+    (raw_preedit.chars().count() >= ENTER_REFINER_MIN_RAW_CHARS).then_some(LONG_ENTER_REFINER_GRACE)
+}
+
 fn flush_history_if_changed(session: &ImeSession, update: &ImeSessionUpdate) -> Option<String> {
     if !update.history_changed {
         return None;
@@ -324,7 +330,9 @@ fn apply_command(runtime: &mut BridgeRuntime, command: BridgeCommand) -> (Bridge
     );
     if is_enter && runtime.readiness == BridgeReadiness::PhaseA {
         let started = Instant::now();
-        runtime.wait_for_full_refiner(ENTER_REFINER_GRACE);
+        if let Some(grace) = enter_refiner_grace(runtime.session.composition_raw()) {
+            runtime.wait_for_full_refiner(grace);
+        }
         t_wait = started.elapsed().as_secs_f64() * 1000.0;
     }
     let needs_sync_segmented_preview = matches!(
@@ -569,5 +577,25 @@ fn main() {
         if should_exit {
             break;
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{enter_refiner_grace, LONG_ENTER_REFINER_GRACE};
+
+    #[test]
+    fn short_enter_commits_do_not_wait_for_full_refiner() {
+        assert_eq!(enter_refiner_grace("jea"), None);
+        assert_eq!(enter_refiner_grace("khnhomtov"), None);
+    }
+
+    #[test]
+    fn long_enter_commits_get_only_tiny_refiner_grace() {
+        assert_eq!(enter_refiner_grace("jeanggettengos"), Some(LONG_ENTER_REFINER_GRACE));
+        assert_eq!(
+            enter_refiner_grace("nihjeasnadaiborkbrae"),
+            Some(LONG_ENTER_REFINER_GRACE)
+        );
     }
 }

@@ -32,7 +32,7 @@ implementation guidance for future work.
 | Linux IBus bridge startup | `adapters/linux-ibus/src/bin/khmerime_ibus_bridge.rs` now creates a phase-A session first, reports bridge readiness, and warms the full live transliterator plus Hybrid commit refiner in the background. |
 | Linux IBus Python startup | `adapters/linux-ibus/python/khmerime_ibus_engine.py` creates `BridgeClient` in engine initialization and immediately requests a snapshot from the Rust bridge. |
 | Linux IBus key path | `do_process_key_event` calls the Rust bridge synchronously and then updates IBus preedit/candidates from the returned snapshot. |
-| Linux IBus refinement | Long-composition visible refinement is debounced in `adapters/linux-ibus/python/ibus_refinement.py` and runs in a background thread before applying the response on the GLib idle path. |
+| Linux IBus refinement | Long-composition visible refinement is debounced in `adapters/linux-ibus/python/ibus_refinement_scheduler.py` and runs in a background thread before applying the response on the GLib idle path. |
 | Linux IBus event hygiene | Key-release events must not cancel pending refinement debounce work, and Enter must not clear visible preedit before the bridge returns a non-empty commit. |
 | Native session recompute | `crates/session/src/ime_session.rs` recomputes suggestions and segmented state synchronously after printable input. |
 
