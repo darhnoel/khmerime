@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use khmerime_session::HistoryStore;
+use khmerime_session::{should_persist_history_word, HistoryStore};
 
 #[cfg(not(target_arch = "wasm32"))]
 use std::fs;
@@ -37,7 +37,7 @@ fn parse_history_rows(source: &str) -> HashMap<String, usize> {
         .filter_map(|line| {
             let (word, count) = line.split_once('\t')?;
             let word = word.trim();
-            if word.is_empty() {
+            if word.is_empty() || !should_persist_history_word(word) {
                 return None;
             }
             let parsed = count.trim().parse::<usize>().ok()?;
@@ -115,6 +115,17 @@ mod tests {
         let parsed = parse_history_rows("ខ្ញុំ\t3\n\t1\nbad\nទៅ\tnope\nទៅ\t4");
         assert_eq!(parsed.get("ខ្ញុំ"), Some(&3usize));
         assert_eq!(parsed.get("ទៅ"), Some(&4usize));
+        assert_eq!(parsed.len(), 2);
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    #[test]
+    fn parse_history_rows_skips_overlong_words() {
+        let parsed = parse_history_rows("abcdefghijklmnopqr\t1\nabcdefghijklmnopqrs\t2\nទៅ\t3");
+
+        assert_eq!(parsed.get("abcdefghijklmnopqr"), Some(&1usize));
+        assert_eq!(parsed.get("abcdefghijklmnopqrs"), None);
+        assert_eq!(parsed.get("ទៅ"), Some(&3usize));
         assert_eq!(parsed.len(), 2);
     }
 
