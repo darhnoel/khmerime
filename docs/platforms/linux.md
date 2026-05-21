@@ -74,7 +74,7 @@ The `.deb` installs:
 
 ```text
 /usr/libexec/khmerime/khmerime-ibus-engine
-/usr/libexec/khmerime/ibus_segment_preview.py
+/usr/libexec/khmerime/ibus_segmented_preview_renderer.py
 /usr/libexec/khmerime/khmerime-ibus-bridge
 /usr/share/ibus/component/khmerime.xml
 ```

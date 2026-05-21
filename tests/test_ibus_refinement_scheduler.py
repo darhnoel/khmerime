@@ -6,7 +6,7 @@ import time
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "adapters" / "linux-ibus" / "python"))
 
-from ibus_refinement import RefinementScheduler  # noqa: E402
+from ibus_refinement_scheduler import RefinementScheduler  # noqa: E402
 
 
 class TimerHarness:

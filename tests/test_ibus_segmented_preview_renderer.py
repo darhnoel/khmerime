@@ -3,7 +3,7 @@ import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "adapters" / "linux-ibus" / "python"))
 
-from ibus_segment_preview import (  # noqa: E402
+from ibus_segmented_preview_renderer import (  # noqa: E402
     FOCUSED_MARKER_CLOSE,
     FOCUSED_MARKER_OPEN,
     SEGMENT_SEPARATOR,

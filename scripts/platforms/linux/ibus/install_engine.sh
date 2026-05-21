@@ -7,12 +7,12 @@ INSTALL_COMPONENT_DIR="${KHMERIME_IBUS_COMPONENT_DIR:-/usr/share/ibus/component}
 ENGINE_SCRIPT_SRC="${ROOT_DIR}/adapters/linux-ibus/python/khmerime_ibus_engine.py"
 ENGINE_HELPER_SRCS=(
   "${ROOT_DIR}/adapters/linux-ibus/python/ibus_bridge_client.py"
-  "${ROOT_DIR}/adapters/linux-ibus/python/ibus_candidate_render.py"
+  "${ROOT_DIR}/adapters/linux-ibus/python/ibus_candidate_renderer.py"
   "${ROOT_DIR}/adapters/linux-ibus/python/ibus_component.py"
   "${ROOT_DIR}/adapters/linux-ibus/python/ibus_debounced_bridge_work.py"
-  "${ROOT_DIR}/adapters/linux-ibus/python/ibus_refinement.py"
-  "${ROOT_DIR}/adapters/linux-ibus/python/ibus_segment_preview.py"
-  "${ROOT_DIR}/adapters/linux-ibus/python/ibus_segmented_preview.py"
+  "${ROOT_DIR}/adapters/linux-ibus/python/ibus_refinement_scheduler.py"
+  "${ROOT_DIR}/adapters/linux-ibus/python/ibus_segmented_preview_renderer.py"
+  "${ROOT_DIR}/adapters/linux-ibus/python/ibus_segmented_preview_scheduler.py"
 )
 ENGINE_SCRIPT_DST="${INSTALL_LIBEXEC_DIR}/khmerime-ibus-engine"
 BRIDGE_BINARY_DST="${INSTALL_LIBEXEC_DIR}/khmerime-ibus-bridge"
