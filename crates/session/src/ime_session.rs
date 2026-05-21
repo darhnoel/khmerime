@@ -27,6 +27,16 @@ const STATE_HYPER_MASK: u32 = 1 << 27;
 const STATE_META_MASK: u32 = 1 << 28;
 const STATE_RELEASE_MASK: u32 = 1 << 30;
 
+/// Maximum candidate key length desktop history stores should reload.
+///
+/// Longer persisted keys are treated as legacy pollution from concatenated
+/// phrase commits rather than useful learned unigrams.
+pub const MAX_PERSISTED_HISTORY_WORD_CHARS: usize = 18;
+
+pub fn should_persist_history_word(word: &str) -> bool {
+    word.chars().count() <= MAX_PERSISTED_HISTORY_WORD_CHARS
+}
+
 /// Persistence boundary for learned candidate usage.
 ///
 /// Implementations should store the map as simple word/candidate keys to usage
@@ -179,6 +189,7 @@ pub struct ImeSession {
     selected_index: usize,
     selection_touched: bool,
     segmented_session: Option<SegmentedSession>,
+    visible_refined_segments: Option<Vec<String>>,
     cursor_location: CursorLocation,
     input_mode: InputMode,
     options: ImeSessionOptions,
@@ -285,6 +296,7 @@ impl ImeSession {
             selected_index: 0,
             selection_touched: false,
             segmented_session: None,
+            visible_refined_segments: None,
             cursor_location: CursorLocation::default(),
             input_mode: InputMode::Roman,
             options: ImeSessionOptions::default(),
@@ -387,6 +399,7 @@ impl ImeSession {
         self.selected_index = 0;
         self.selection_touched = false;
         self.segmented_session = None;
+        self.visible_refined_segments = None;
     }
 
     pub fn set_cursor_location(&mut self, x: i32, y: i32, width: i32, height: i32) {
@@ -596,7 +609,8 @@ impl ImeSession {
             return None;
         }
 
-        let refined = self.visible_refined_phrase_for(raw_preedit)?;
+        let refined_segments = self.visible_refined_phrase_segments_for(raw_preedit)?;
+        let refined = refined_segments.concat();
         if refined == raw_preedit {
             return None;
         }
@@ -606,6 +620,7 @@ impl ImeSession {
             .retain(|candidate| normalized_suggestion_key(candidate) != refined_key);
         self.candidates.insert(0, refined.clone());
         self.selected_index = 0;
+        self.visible_refined_segments = Some(refined_segments);
         Some(refined)
     }
 
@@ -790,15 +805,22 @@ impl ImeSession {
             return SessionResult::default();
         }
 
-        let commit_text = if self.selection_touched {
-            self.segmented_or_fallback_text()
+        let commit_segments = if let Some(outputs) = self.segmented_outputs() {
+            outputs
+        } else if self.selection_touched {
+            vec![self.selected_or_raw_fallback()]
+        } else if let Some(outputs) = self.visible_candidate_outputs() {
+            outputs
         } else {
-            self.bounded_commit_refined_phrase()
-                .unwrap_or_else(|| self.segmented_or_fallback_text())
+            self.hidden_commit_fallback()
+                .unwrap_or_else(|| vec![self.selected_or_raw_fallback()])
         };
+        let commit_text = commit_segments.concat();
         let history_changed = !commit_text.is_empty() && commit_text != self.composition_raw;
         if history_changed {
-            Transliterator::learn(&mut self.history, &commit_text);
+            for segment in commit_segments.iter().filter(|segment| !segment.is_empty()) {
+                Transliterator::learn(&mut self.history, segment);
+            }
         }
         self.reset();
         SessionResult {
@@ -815,35 +837,52 @@ impl ImeSession {
             .unwrap_or_else(|| self.composition_raw.clone())
     }
 
-    fn segmented_or_fallback_text(&self) -> String {
-        self.segmented_session
-            .as_ref()
-            .map(SegmentedSession::composed_text)
-            .filter(|text| !text.is_empty())
-            .unwrap_or_else(|| self.selected_or_raw_fallback())
+    fn segmented_outputs(&self) -> Option<Vec<String>> {
+        if let Some(session) = &self.segmented_session {
+            let outputs = session
+                .segments
+                .iter()
+                .map(|segment| segment.selected_text())
+                .collect::<Vec<_>>();
+            if outputs.iter().any(|output| !output.is_empty()) {
+                return Some(outputs);
+            }
+        }
+        None
     }
 
-    fn bounded_commit_refined_phrase(&self) -> Option<String> {
+    fn visible_candidate_outputs(&self) -> Option<Vec<String>> {
+        let visible = self.candidates.get(self.selected_index)?;
+        if visible.is_empty() || visible == &self.composition_raw {
+            return None;
+        }
+        if self.selected_index == 0 {
+            if let Some(refined_segments) = &self.visible_refined_segments {
+                if normalized_suggestion_key(&refined_segments.concat()) == normalized_suggestion_key(visible) {
+                    return Some(refined_segments.clone());
+                }
+            }
+        }
+        Some(vec![visible.clone()])
+    }
+
+    fn hidden_commit_fallback(&self) -> Option<Vec<String>> {
         let visible_default = self.candidates.first()?;
-        // Skip the bounded WFST decode when the visible default is just the
-        // raw roman — the refiner's Khmer output can never confirm against a
-        // roman default key, so the work would be wasted.
-        if visible_default == &self.composition_raw {
+        if !visible_default.is_empty() && visible_default != &self.composition_raw {
             return None;
         }
         let refiner = self.commit_refiner.as_ref()?;
-        let refined = self.refined_phrase_for(refiner, &self.composition_raw)?;
-        let refined_key = normalized_suggestion_key(&refined);
-        let visible_default_key = normalized_suggestion_key(visible_default);
-        (visible_default_key == refined_key).then_some(refined)
+        let refined = self.refined_phrase_segments_for(refiner, &self.composition_raw)?;
+        (normalized_suggestion_key(&refined.concat()) != normalized_suggestion_key(&self.composition_raw))
+            .then_some(refined)
     }
 
-    fn visible_refined_phrase_for(&self, raw_input: &str) -> Option<String> {
+    fn visible_refined_phrase_segments_for(&self, raw_input: &str) -> Option<Vec<String>> {
         let refiner = self.visible_refiner.as_ref().or(self.commit_refiner.as_ref())?;
-        self.refined_phrase_for(refiner, raw_input)
+        self.refined_phrase_segments_for(refiner, raw_input)
     }
 
-    fn refined_phrase_for(&self, refiner: &Transliterator, raw_input: &str) -> Option<String> {
+    fn refined_phrase_segments_for(&self, refiner: &Transliterator, raw_input: &str) -> Option<Vec<String>> {
         let observation = refiner.shadow_observation(raw_input, &self.history);
         if observation.wfst_failure.is_some() || observation.wfst_top_segment_details.len() < 2 {
             return None;
@@ -861,9 +900,9 @@ impl ImeSession {
         let refined = observation
             .wfst_top_segment_details
             .iter()
-            .map(|segment| segment.output.as_str())
-            .collect::<String>();
-        (!refined.is_empty()).then_some(refined)
+            .map(|segment| segment.output.clone())
+            .collect::<Vec<_>>();
+        refined.iter().any(|output| !output.is_empty()).then_some(refined)
     }
 
     fn select_focused_segment_candidate(&mut self, index: usize) {
@@ -919,6 +958,7 @@ impl ImeSession {
             self.selected_index = 0;
             self.selection_touched = false;
             self.segmented_session = None;
+            self.visible_refined_segments = None;
             return;
         }
 
@@ -929,6 +969,7 @@ impl ImeSession {
         );
         self.selected_index = 0;
         self.selection_touched = false;
+        self.visible_refined_segments = None;
 
         if self.options.segmented_preview != SegmentedPreviewMode::Enabled {
             self.segmented_session = None;
@@ -1317,6 +1358,23 @@ mod tests {
     }
 
     #[test]
+    fn bounded_refined_commit_learns_refined_segments_not_concatenated_phrase() {
+        let mut session = flat_default_session_with_commit_refiner();
+        type_ascii(&mut session, "nihjeasnadaiborkbrae");
+        let refined = session.apply_refined_candidate("nihjeasnadaiborkbrae");
+        assert_eq!(refined.as_deref(), Some("នេះជាស្នាដៃបកប្រែ"));
+
+        let update = session.process_key_event(0xFF0D, 0, 0);
+
+        assert_eq!(update.commit_text.as_deref(), Some("នេះជាស្នាដៃបកប្រែ"));
+        assert!(update.history_changed);
+        for segment in ["នេះ", "ជា", "ស្នាដៃ", "បក", "ប្រែ"] {
+            assert_eq!(session.history().get(segment), Some(&1));
+        }
+        assert_eq!(session.history().get("នេះជាស្នាដៃបកប្រែ"), None);
+    }
+
+    #[test]
     fn hidden_commit_refinement_does_not_override_visible_default_candidate() {
         let mut session = flat_default_session_with_commit_refiner();
         type_ascii(&mut session, "kasanmot");
@@ -1542,6 +1600,20 @@ mod tests {
         let commit_text = update.commit_text.expect("must commit text");
         assert!(!commit_text.is_empty());
         assert_ne!(commit_text, "khnhomtov");
+    }
+
+    #[test]
+    fn segmented_commit_learns_each_segment_not_concatenated_phrase() {
+        let mut session = session();
+        type_ascii(&mut session, "khnhomtov");
+
+        let update = session.process_key_event(0xFF0D, 0, 0);
+
+        assert_eq!(update.commit_text.as_deref(), Some("ខ្ញុំទៅ"));
+        assert!(update.history_changed);
+        assert_eq!(session.history().get("ខ្ញុំ"), Some(&1));
+        assert_eq!(session.history().get("ទៅ"), Some(&1));
+        assert_eq!(session.history().get("ខ្ញុំទៅ"), None);
     }
 
     #[test]

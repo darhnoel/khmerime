@@ -382,6 +382,33 @@ async function addRow() {
   showMessage("Added a draft row.");
 }
 
+async function duplicateRow() {
+  const rows = selectedData();
+  const rowId = rows.length ? rows[0].id : state.activeRowId;
+  if (!rowId) {
+    showMessage("Select or click a row to duplicate.");
+    return;
+  }
+  const payload = await api("/api/duplicate-row", { method: "POST", body: { row_id: rowId } });
+  if (payload.meta) {
+    state.meta = payload.meta;
+    renderDirty();
+  }
+  if (payload.row) {
+    state.activeRowId = payload.row.id;
+    state.selectedRowIds.clear();
+    state.selectedRowIds.add(payload.row.id);
+    $("chunk-filter").value = payload.row.chunk;
+    $("query-input").value = "";
+    $("status-filter").value = "";
+    $("category-filter").value = "";
+    state.page = Math.max(1, Math.ceil(Number(payload.row.row || 1) / state.pageSize));
+    state.gridScrollTop = 0;
+  }
+  await loadRows();
+  showMessage("Duplicated row.");
+}
+
 async function revertRows() {
   const ids = selectedOrActiveIds();
   if (!ids.length) return showMessage("Select rows or click a row first.");
@@ -514,6 +541,7 @@ function wireEvents() {
     loadRows().catch((error) => showMessage(error.message));
   });
   $("add-row-button").addEventListener("click", () => addRow().catch((error) => showMessage(error.message)));
+  $("duplicate-row-button").addEventListener("click", () => duplicateRow().catch((error) => showMessage(error.message)));
   $("revert-row-button").addEventListener("click", () => revertRows().catch((error) => showMessage(error.message)));
   $("soft-remove-button").addEventListener("click", () => softRemove().catch((error) => showMessage(error.message)));
   $("move-up-button").addEventListener("click", () => moveRows("up").catch((error) => showMessage(error.message)));

@@ -18,12 +18,12 @@ POSTRM_SRC="${ROOT_DIR}/packaging/linux/deb/postrm"
 ENGINE_SCRIPT_SRC="${ROOT_DIR}/adapters/linux-ibus/python/khmerime_ibus_engine.py"
 ENGINE_HELPER_SRCS=(
   "${ROOT_DIR}/adapters/linux-ibus/python/ibus_bridge_client.py"
-  "${ROOT_DIR}/adapters/linux-ibus/python/ibus_candidate_render.py"
+  "${ROOT_DIR}/adapters/linux-ibus/python/ibus_candidate_renderer.py"
   "${ROOT_DIR}/adapters/linux-ibus/python/ibus_component.py"
   "${ROOT_DIR}/adapters/linux-ibus/python/ibus_debounced_bridge_work.py"
-  "${ROOT_DIR}/adapters/linux-ibus/python/ibus_refinement.py"
-  "${ROOT_DIR}/adapters/linux-ibus/python/ibus_segment_preview.py"
-  "${ROOT_DIR}/adapters/linux-ibus/python/ibus_segmented_preview.py"
+  "${ROOT_DIR}/adapters/linux-ibus/python/ibus_refinement_scheduler.py"
+  "${ROOT_DIR}/adapters/linux-ibus/python/ibus_segmented_preview_renderer.py"
+  "${ROOT_DIR}/adapters/linux-ibus/python/ibus_segmented_preview_scheduler.py"
 )
 BRIDGE_SRC="${ROOT_DIR}/target/release/khmerime_ibus_bridge"
 

@@ -4,7 +4,7 @@ import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "adapters" / "linux-ibus" / "python"))
 
-from ibus_segmented_preview import SegmentedPreviewScheduler  # noqa: E402
+from ibus_segmented_preview_scheduler import SegmentedPreviewScheduler  # noqa: E402
 
 
 class TimerHarness:
