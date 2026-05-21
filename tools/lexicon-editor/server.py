@@ -346,6 +346,21 @@ class EditorState:
         self.mark_dirty(draft.name)
         return {"row": self.row_to_public(row, insert_index + 1), "meta": self.api_meta()}
 
+    def api_duplicate_row(self, payload: dict[str, object]) -> dict[str, object]:
+        row_id = str(payload.get("row_id", ""))
+        draft, index, row = self.find_row(row_id)
+        self.push_undo()
+        duplicate = self.make_row(
+            draft.name,
+            len(draft.rows) + 1,
+            {column: row.get(column, "") for column in chunks.CHUNK_COLUMNS},
+            None,
+        )
+        insert_index = index + 1
+        draft.rows.insert(insert_index, duplicate)
+        self.mark_dirty(draft.name)
+        return {"row": self.row_to_public(duplicate, insert_index + 1), "meta": self.api_meta()}
+
     def append_disable_note(self, notes: str) -> str:
         note = f"disabled in lexicon editor {date.today().isoformat()}"
         if note in notes:
@@ -670,6 +685,7 @@ class Handler(BaseHTTPRequestHandler):
                 routes = {
                     "/api/edit-cell": STATE.api_edit_cell,
                     "/api/add-row": STATE.api_add_row,
+                    "/api/duplicate-row": STATE.api_duplicate_row,
                     "/api/soft-remove": STATE.api_soft_remove,
                     "/api/move-rows": STATE.api_move_rows,
                     "/api/bulk-edit": STATE.api_bulk_edit,

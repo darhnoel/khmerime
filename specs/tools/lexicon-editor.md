@@ -146,6 +146,7 @@ Required controls:
 - category filter;
 - page size selector;
 - add row;
+- duplicate row;
 - soft remove selected rows;
 - row movement controls;
 - safe enum bulk edits;
@@ -213,6 +214,14 @@ status=approved
 notes=
 ```
 
+Duplicate row:
+
+- duplicates the currently selected or active row;
+- inserts the duplicate immediately below the source row in the same chunk;
+- copies every chunk column value;
+- creates a new draft row with no original line number;
+- duplicate warnings may appear until the maintainer edits the copied row.
+
 Soft remove:
 
 - selected rows are set to `status=disabled`;
@@ -241,6 +250,7 @@ Maintain a draft undo/redo stack for:
 
 - cell edit;
 - add row;
+- duplicate row;
 - soft remove;
 - row movement;
 - safe enum bulk edit;
@@ -308,6 +318,7 @@ GET  /api/meta
 GET  /api/rows?query=&chunk=&status=&category=&page=&page_size=
 POST /api/edit-cell
 POST /api/add-row
+POST /api/duplicate-row
 POST /api/soft-remove
 POST /api/move-rows
 POST /api/bulk-edit
