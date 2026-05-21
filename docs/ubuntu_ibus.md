@@ -78,8 +78,8 @@ target/release/khmerime_ibus_bridge
 adapters/linux-ibus/python/khmerime_ibus_engine.py
   -> /usr/libexec/khmerime/khmerime-ibus-engine
 
-adapters/linux-ibus/python/ibus_segment_preview.py
-  -> /usr/libexec/khmerime/ibus_segment_preview.py
+adapters/linux-ibus/python/ibus_segmented_preview_renderer.py
+  -> /usr/libexec/khmerime/ibus_segmented_preview_renderer.py
 
 component XML
   -> /usr/share/ibus/component/khmerime.xml

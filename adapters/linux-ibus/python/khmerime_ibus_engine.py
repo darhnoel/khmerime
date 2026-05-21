@@ -24,16 +24,16 @@ if str(SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPT_DIR))
 
 from ibus_bridge_client import BridgeClient, BridgeResponse
-from ibus_candidate_render import candidate_rows
+from ibus_candidate_renderer import candidate_rows
 from ibus_component import ENGINE_NAME, ENGINE_NIDA_NAME, SERVICE_NAME, component_xml, register_component
-from ibus_refinement import RefinementScheduler
-from ibus_segment_preview import (
+from ibus_refinement_scheduler import RefinementScheduler
+from ibus_segmented_preview_renderer import (
     FOCUSED_MARKER_MODE,
     SegmentSpan,
     build_segment_preview,
     focused_raw_input_span,
 )
-from ibus_segmented_preview import SegmentedPreviewScheduler
+from ibus_segmented_preview_scheduler import SegmentedPreviewScheduler
 
 try:
     gi.require_version("Gdk", "3.0")

@@ -3,7 +3,7 @@ import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "adapters" / "linux-ibus" / "python"))
 
-from ibus_candidate_render import candidate_rows  # noqa: E402
+from ibus_candidate_renderer import candidate_rows  # noqa: E402
 
 
 def test_candidate_rows_hide_ascii_raw_fallback_without_display_metadata():
