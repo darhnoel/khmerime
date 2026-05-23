@@ -164,7 +164,7 @@ impl WeightedSpanDecoder {
             return Vec::new();
         }
         let span = chars.iter().collect::<String>();
-        if !self.data.ranked().exact_index.contains_key(span.as_str()) {
+        if !self.data.has_ranked_exact_key(span.as_str()) {
             return Vec::new();
         }
 
@@ -377,10 +377,10 @@ impl WeightedSpanDecoder {
 
     fn retrieve_candidates(&self, search_keys: &[String], raw_key: &str) -> Vec<(usize, RetrievalSignals)> {
         let lexicon = self.data.ranked();
-        if let Some(ids) = lexicon.exact_index.get(raw_key) {
-            let mut ranked = ids
-                .iter()
-                .copied()
+        let raw_exact_ids = self.data.ranked_exact_entry_ids(raw_key);
+        if !raw_exact_ids.is_empty() {
+            let mut ranked = raw_exact_ids
+                .into_iter()
                 .map(|entry_index| {
                     (
                         entry_index,
@@ -401,32 +401,28 @@ impl WeightedSpanDecoder {
         let mut alias_only = HashMap::<usize, RetrievalSignals>::new();
 
         for key in search_keys {
-            if let Some(ids) = lexicon.exact_index.get(key) {
-                for &entry_index in ids {
-                    let signal = exact_signals.entry(entry_index).or_insert_with(|| RetrievalSignals {
+            for entry_index in self.data.ranked_exact_entry_ids(key) {
+                let signal = exact_signals.entry(entry_index).or_insert_with(|| RetrievalSignals {
+                    raw_exact_hit: false,
+                    exact_hit: false,
+                    alias_hit: false,
+                    gram_hits: 0,
+                });
+                if key == raw_key {
+                    signal.raw_exact_hit = true;
+                }
+                signal.exact_hit = true;
+            }
+            for entry_index in self.data.ranked_alias_entry_ids(key) {
+                alias_only
+                    .entry(entry_index)
+                    .or_insert_with(|| RetrievalSignals {
                         raw_exact_hit: false,
                         exact_hit: false,
-                        alias_hit: false,
+                        alias_hit: true,
                         gram_hits: 0,
-                    });
-                    if key == raw_key {
-                        signal.raw_exact_hit = true;
-                    }
-                    signal.exact_hit = true;
-                }
-            }
-            if let Some(ids) = lexicon.alias_index.get(key) {
-                for &entry_index in ids {
-                    alias_only
-                        .entry(entry_index)
-                        .or_insert_with(|| RetrievalSignals {
-                            raw_exact_hit: false,
-                            exact_hit: false,
-                            alias_hit: true,
-                            gram_hits: 0,
-                        })
-                        .alias_hit = true;
-                }
+                    })
+                    .alias_hit = true;
             }
         }
 
@@ -447,32 +443,28 @@ impl WeightedSpanDecoder {
         let mut signals = HashMap::<usize, RetrievalSignals>::new();
 
         for key in search_keys {
-            if let Some(ids) = lexicon.exact_index.get(key) {
-                for &entry_index in ids {
-                    signals.entry(entry_index).or_insert_with(|| RetrievalSignals {
+            for entry_index in self.data.ranked_exact_entry_ids(key) {
+                signals.entry(entry_index).or_insert_with(|| RetrievalSignals {
+                    raw_exact_hit: false,
+                    exact_hit: false,
+                    alias_hit: false,
+                    gram_hits: 0,
+                });
+                if key == raw_key {
+                    signals.get_mut(&entry_index).expect("entry inserted").raw_exact_hit = true;
+                }
+                signals.get_mut(&entry_index).expect("entry inserted").exact_hit = true;
+            }
+            for entry_index in self.data.ranked_alias_entry_ids(key) {
+                signals
+                    .entry(entry_index)
+                    .or_insert_with(|| RetrievalSignals {
                         raw_exact_hit: false,
                         exact_hit: false,
                         alias_hit: false,
                         gram_hits: 0,
-                    });
-                    if key == raw_key {
-                        signals.get_mut(&entry_index).expect("entry inserted").raw_exact_hit = true;
-                    }
-                    signals.get_mut(&entry_index).expect("entry inserted").exact_hit = true;
-                }
-            }
-            if let Some(ids) = lexicon.alias_index.get(key) {
-                for &entry_index in ids {
-                    signals
-                        .entry(entry_index)
-                        .or_insert_with(|| RetrievalSignals {
-                            raw_exact_hit: false,
-                            exact_hit: false,
-                            alias_hit: false,
-                            gram_hits: 0,
-                        })
-                        .alias_hit = true;
-                }
+                    })
+                    .alias_hit = true;
             }
             for gram in char_ngrams(key, 2) {
                 if let Some(ids) = lexicon.gram_index.get(&gram) {
