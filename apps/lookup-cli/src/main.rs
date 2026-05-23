@@ -10,7 +10,10 @@ use std::fs;
 use std::path::Path;
 use std::process;
 
-use roman_lookup::{DecoderConfig, DecoderMode, ShadowObservation, ShadowSummary, Transliterator};
+use roman_lookup::{
+    DecoderConfig, DecoderMode, ImeSession, ImeSessionOptions, SegmentedPreviewMode, ShadowObservation, ShadowSummary,
+    Transliterator,
+};
 
 fn main() {
     if let Err(error) = run() {
@@ -88,12 +91,6 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         }
     }
 
-    let transliterator = if let Some(path) = data_path {
-        Transliterator::from_data_path_with_config(path, config.clone())?
-    } else {
-        Transliterator::from_default_data_with_config(config.clone())?
-    };
-
     let Some(command) = args.get(index) else {
         print_usage(&args[0]);
         process::exit(2);
@@ -102,6 +99,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
 
     match command.as_str() {
         "stats" => {
+            let transliterator = load_transliterator(data_path, config.clone())?;
             println!("entries: {}", transliterator.entries().len());
         }
         "suggest" => {
@@ -109,16 +107,25 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                 print_usage(&args[0]);
                 process::exit(2);
             };
+            let transliterator = load_transliterator(data_path, config.clone())?;
             let history = HashMap::new();
             for suggestion in transliterator.suggest(query, &history) {
                 println!("{}", suggestion);
             }
+        }
+        "segmented" => {
+            let Some(query) = args.get(index) else {
+                print_usage(&args[0]);
+                process::exit(2);
+            };
+            run_segmented_dump(data_path, query)?;
         }
         "shadow-eval" => {
             let Some(path) = args.get(index) else {
                 print_usage(&args[0]);
                 process::exit(2);
             };
+            let transliterator = load_transliterator(data_path, config.clone())?;
             run_shadow_eval(&transliterator, path, emit_shadow_rows, output_path.as_deref())?;
         }
         _ => {
@@ -128,6 +135,17 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     Ok(())
+}
+
+fn load_transliterator(
+    data_path: Option<String>,
+    config: DecoderConfig,
+) -> Result<Transliterator, Box<dyn std::error::Error>> {
+    if let Some(path) = data_path {
+        Ok(Transliterator::from_data_path_with_config(path, config)?)
+    } else {
+        Ok(Transliterator::from_default_data_with_config(config)?)
+    }
 }
 
 fn print_usage(bin: &str) {
@@ -144,6 +162,7 @@ fn print_usage(bin: &str) {
         "  {} [--data <path/to/data.csv|data.tsv>] [--decoder-mode legacy|shadow|weighted-span|wfst|hybrid] [--emit-shadow-rows] [--output <report.txt>] shadow-eval <queries.txt>",
         bin
     );
+    eprintln!("  {} [--data <path/to/data.csv|data.tsv>] segmented <roman>", bin);
 }
 
 fn parse_decoder_mode(value: &str) -> Option<DecoderMode> {
@@ -154,6 +173,66 @@ fn parse_decoder_mode(value: &str) -> Option<DecoderMode> {
         "hybrid" => Some(DecoderMode::Hybrid),
         _ => None,
     }
+}
+
+fn run_segmented_dump(data_path: Option<String>, roman: &str) -> Result<(), Box<dyn std::error::Error>> {
+    // Match the ibus bridge's full-engine configuration.
+    let live = load_transliterator(data_path.clone(), DecoderConfig::shadow_interactive())?;
+    let mut visible_config = DecoderConfig::shadow_interactive().with_mode(DecoderMode::Hybrid);
+    visible_config.wfst_max_latency_ms = 75;
+    let visible_refiner = load_transliterator(data_path.clone(), visible_config)?;
+    let mut commit_config = DecoderConfig::default()
+        .with_mode(DecoderMode::Hybrid)
+        .with_shadow_log(false);
+    commit_config.wfst_max_latency_ms = 150;
+    let commit_refiner = load_transliterator(data_path, commit_config)?;
+    let mut session = ImeSession::new_with_visible_and_commit_refiners_input_mode_and_options(
+        live,
+        visible_refiner,
+        commit_refiner,
+        HashMap::new(),
+        Default::default(),
+        ImeSessionOptions {
+            segmented_preview: SegmentedPreviewMode::Enabled,
+        },
+    );
+    session.focus_in();
+    for ch in roman.chars() {
+        session.process_key_event(ch as u32, 0, 0);
+    }
+    let snapshot = session.snapshot();
+    println!("raw_preedit: {}", snapshot.raw_preedit);
+    println!("preedit:     {}", snapshot.preedit);
+    println!("segmented_active: {}", snapshot.segmented_active);
+    println!("focused_segment_index: {:?}", snapshot.focused_segment_index);
+    println!("--- segment_preview ---");
+    for (i, seg) in snapshot.segment_preview.iter().enumerate() {
+        println!(
+            "  [{i}] focused={} input={:?} output={:?}",
+            seg.focused, seg.input, seg.output
+        );
+    }
+    println!("--- top candidates for focused segment ---");
+    for (i, cand) in snapshot.candidates.iter().take(10).enumerate() {
+        println!("  [{i}] {}", cand);
+    }
+    for k in 1..snapshot.segment_preview.len() {
+        session.process_key_event(0xFF53, 0, 0);
+        let segment_snapshot = session.snapshot();
+        println!(
+            "--- candidates for segment {} (input={:?}) ---",
+            k,
+            segment_snapshot
+                .segment_preview
+                .get(k)
+                .map(|entry| entry.input.clone())
+                .unwrap_or_default()
+        );
+        for (i, cand) in segment_snapshot.candidates.iter().take(15).enumerate() {
+            println!("  [{i}] {}", cand);
+        }
+    }
+    Ok(())
 }
 
 fn run_shadow_eval(
