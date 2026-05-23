@@ -12,6 +12,10 @@ use super::search_index::SearchIndex;
 #[cfg(not(all(target_arch = "wasm32", feature = "fetch-data")))]
 pub(super) const DEFAULT_COMPILED_DATA: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/roman_lookup.lexicon.bin"));
 #[cfg(not(all(target_arch = "wasm32", feature = "fetch-data")))]
+#[allow(dead_code)]
+pub(super) const DEFAULT_DICTIONARY_IMAGE: &[u8] =
+    include_bytes!(concat!(env!("OUT_DIR"), "/khmerime.dictionary_image.bin"));
+#[cfg(not(all(target_arch = "wasm32", feature = "fetch-data")))]
 pub(super) const DEFAULT_COMPILED_KHPOS_STATS: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/khpos.stats.bin"));
 #[cfg(not(all(target_arch = "wasm32", feature = "fetch-data")))]
 pub(super) const DEFAULT_COMPILED_NEXT_WORD_STATS: &[u8] =
