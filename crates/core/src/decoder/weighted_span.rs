@@ -467,18 +467,16 @@ impl WeightedSpanDecoder {
                     .alias_hit = true;
             }
             for gram in char_ngrams(key, 2) {
-                if let Some(ids) = lexicon.gram_index.get(&gram) {
-                    for &entry_index in ids {
-                        signals
-                            .entry(entry_index)
-                            .or_insert_with(|| RetrievalSignals {
-                                raw_exact_hit: false,
-                                exact_hit: false,
-                                alias_hit: false,
-                                gram_hits: 0,
-                            })
-                            .gram_hits += 1;
-                    }
+                for entry_index in self.data.ranked_gram_entry_ids(&gram) {
+                    signals
+                        .entry(entry_index)
+                        .or_insert_with(|| RetrievalSignals {
+                            raw_exact_hit: false,
+                            exact_hit: false,
+                            alias_hit: false,
+                            gram_hits: 0,
+                        })
+                        .gram_hits += 1;
                 }
             }
         }

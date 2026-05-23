@@ -207,8 +207,8 @@ pub(crate) struct RankedLexicon {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum RankedLookupIndexMode {
-    BuildExactAlias,
-    SkipExactAlias,
+    BuildRetrievalIndexes,
+    SkipExactAliasAndGram,
 }
 
 #[derive(Serialize, Deserialize)]
