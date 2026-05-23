@@ -85,6 +85,8 @@ pub fn fallback_empty_snapshot_json(error: impl Into<String>) -> serde_json::Val
             "selected_index": serde_json::Value::Null,
             "segmented_active": false,
             "focused_segment_index": serde_json::Value::Null,
+            "segment_edit_active": false,
+            "segment_edit_index": serde_json::Value::Null,
             "segment_preview": [],
             "cursor_location": CursorLocation::default(),
         },
