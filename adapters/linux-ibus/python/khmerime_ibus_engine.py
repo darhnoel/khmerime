@@ -58,6 +58,8 @@ MODE_NIDA_SYMBOL = "ខ"
 MODE_ROMAN_LABEL = "Roman"
 MODE_NIDA_LABEL = "NIDA"
 MODE_TOOLTIP = "Toggle KhmerIME Roman/NIDA mode"
+SEGMENT_EDIT_HIGHLIGHT_BG = 0xFFE8A3
+SEGMENT_EDIT_HIGHLIGHT_FG = 0x111827
 DEBUG_LOGGING = os.environ.get("KHMERIME_IBUS_DEBUG", "").lower() in {"1", "true", "yes", "on"}
 LOG_TARGET = os.environ.get(
     "KHMERIME_IBUS_LOG",
@@ -217,6 +219,7 @@ class KhmerIMEEngine(IBus.Engine):
         preedit_visible = bool(render_preedit)
         segment_preview = snapshot.get("segment_preview") or []
         segmented_active = bool(snapshot.get("segmented_active", False))
+        segment_edit_active = bool(snapshot.get("segment_edit_active", False))
         preedit_text = IBus.Text.new_from_string(render_preedit)
         if segmented_active:
             focused_raw_span = focused_raw_input_span(
@@ -228,6 +231,9 @@ class KhmerIMEEngine(IBus.Engine):
                 start, end = focused_raw_span
                 attrs = IBus.AttrList.new()
                 attrs.append(IBus.attr_underline_new(IBus.AttrUnderline.SINGLE, start, end))
+                if segment_edit_active:
+                    attrs.append(IBus.attr_background_new(SEGMENT_EDIT_HIGHLIGHT_BG, start, end))
+                    attrs.append(IBus.attr_foreground_new(SEGMENT_EDIT_HIGHLIGHT_FG, start, end))
                 preedit_text.set_attributes(attrs)
         self.update_preedit_text(
             preedit_text,

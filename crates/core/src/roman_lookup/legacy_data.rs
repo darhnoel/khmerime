@@ -24,6 +24,7 @@ impl LegacyData {
             index: SearchIndex::new(&[], true, 2, 3),
             // Phase A avoids khPOS-derived ranking structures.
             ranked: RankedLexicon::default(),
+            dictionary_image: None,
             // Phase A defers next-word n-gram stats until full engine promotion.
             next_word: NextWordStats::default(),
             next_word_max_context_chars: 0,
@@ -44,6 +45,22 @@ impl LegacyData {
         next_word: NextWordStats,
         mut log_stage: impl FnMut(&str, f64),
     ) -> Self {
+        Self::from_entries_with_stats_stage_logger_and_dictionary_image(
+            entries,
+            corpus_stats,
+            next_word,
+            None,
+            &mut log_stage,
+        )
+    }
+
+    pub(crate) fn from_entries_with_stats_stage_logger_and_dictionary_image(
+        entries: Vec<Entry>,
+        corpus_stats: CorpusStats,
+        next_word: NextWordStats,
+        dictionary_image: Option<DictionaryImageView<'static>>,
+        mut log_stage: impl FnMut(&str, f64),
+    ) -> Self {
         let started = start_stage_timer();
         let mut maps = Self::build_lookup_maps(&entries);
         log_stage("build_lookup_maps", elapsed_stage_ms(started));
@@ -61,9 +78,19 @@ impl LegacyData {
         log_stage("next_word_context", elapsed_stage_ms(started));
 
         let started = start_stage_timer();
-        let ranked = RankedLexicon::from_entries_with_stage_logger(&entries, corpus_stats, |stage, elapsed_ms| {
-            log_stage(&format!("ranked_lexicon.{stage}"), elapsed_ms);
-        });
+        let index_mode = if dictionary_image.is_some() {
+            RankedLookupIndexMode::SkipExactAliasAndGram
+        } else {
+            RankedLookupIndexMode::BuildRetrievalIndexes
+        };
+        let ranked = RankedLexicon::from_entries_with_stage_logger_and_index_mode(
+            &entries,
+            corpus_stats,
+            index_mode,
+            |stage, elapsed_ms| {
+                log_stage(&format!("ranked_lexicon.{stage}"), elapsed_ms);
+            },
+        );
         log_stage("ranked_lexicon", elapsed_stage_ms(started));
 
         let started = start_stage_timer();
@@ -81,6 +108,7 @@ impl LegacyData {
             roman_prefix_index: maps.roman_prefix_index,
             index,
             ranked,
+            dictionary_image,
             next_word,
             next_word_max_context_chars,
         };
@@ -428,6 +456,53 @@ impl LegacyData {
 
     pub(crate) fn exact_targets(&self, normalized: &str) -> Option<&[String]> {
         self.by_normalized.get(normalized).map(Vec::as_slice)
+    }
+
+    pub(crate) fn attach_dictionary_image(&mut self, dictionary_image: DictionaryImageView<'static>) {
+        self.dictionary_image = Some(dictionary_image);
+    }
+
+    pub(crate) fn has_ranked_exact_key(&self, key: &str) -> bool {
+        if let Some(image) = self.dictionary_image {
+            return image.exact_postings(key).ok().flatten().is_some();
+        }
+        self.ranked.exact_index.contains_key(key)
+    }
+
+    pub(crate) fn ranked_exact_entry_ids(&self, key: &str) -> Vec<usize> {
+        if let Some(image) = self.dictionary_image {
+            return image
+                .exact_postings(key)
+                .ok()
+                .flatten()
+                .map(|ids| ids.map(|id| id as usize).collect())
+                .unwrap_or_default();
+        }
+        self.ranked.exact_index.get(key).cloned().unwrap_or_default()
+    }
+
+    pub(crate) fn ranked_alias_entry_ids(&self, key: &str) -> Vec<usize> {
+        if let Some(image) = self.dictionary_image {
+            return image
+                .alias_postings(key)
+                .ok()
+                .flatten()
+                .map(|ids| ids.map(|id| id as usize).collect())
+                .unwrap_or_default();
+        }
+        self.ranked.alias_index.get(key).cloned().unwrap_or_default()
+    }
+
+    pub(crate) fn ranked_gram_entry_ids(&self, key: &str) -> Vec<usize> {
+        if let Some(image) = self.dictionary_image {
+            return image
+                .gram_postings(key)
+                .ok()
+                .flatten()
+                .map(|ids| ids.map(|id| id as usize).collect())
+                .unwrap_or_default();
+        }
+        self.ranked.gram_index.get(key).cloned().unwrap_or_default()
     }
 }
 

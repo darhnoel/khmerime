@@ -26,6 +26,7 @@ sys.path.insert(0, str(PYTHON_ADAPTER))
 class _StubText:
     def __init__(self, text: str) -> None:
         self.text = text
+        self.attributes: List[Any] = []
 
     @staticmethod
     def new_from_string(text: str) -> "_StubText":
@@ -33,6 +34,9 @@ class _StubText:
 
     def get_text(self) -> str:
         return self.text
+
+    def set_attributes(self, attrs: "_StubAttrList") -> None:
+        self.attributes = attrs.attrs
 
 
 class _StubAttrList:
@@ -183,6 +187,7 @@ class _StubEngineBase:
         self.updated_props: List[_StubProperty] = []
         self.committed_text: List[str] = []
         self.preedit_updates: List[Any] = []
+        self.preedit_attr_updates: List[Any] = []
         self.lookup_updates: List[Any] = []
         self.aux_updates: List[Any] = []
 
@@ -198,6 +203,7 @@ class _StubEngineBase:
 
     def update_preedit_text(self, text: _StubText, cursor: int, visible: bool) -> None:
         self.preedit_updates.append((text.get_text(), cursor, visible))
+        self.preedit_attr_updates.append(list(text.attributes))
 
     def update_lookup_table(self, table: _StubLookupTable, visible: bool) -> None:
         self.lookup_updates.append((len(table.candidates), visible))
@@ -216,6 +222,14 @@ def attr_underline_new(*_args: Any, **_kwargs: Any) -> Any:
     return ("underline",) + tuple(_args)
 
 
+def attr_background_new(*_args: Any, **_kwargs: Any) -> Any:
+    return ("background",) + tuple(_args)
+
+
+def attr_foreground_new(*_args: Any, **_kwargs: Any) -> Any:
+    return ("foreground",) + tuple(_args)
+
+
 class _StubIBus(types.SimpleNamespace):
     pass
 
@@ -228,6 +242,8 @@ def _install_stub_modules() -> None:
     ibus.Text = _StubText
     ibus.AttrList = _StubAttrList
     ibus.attr_underline_new = attr_underline_new
+    ibus.attr_background_new = attr_background_new
+    ibus.attr_foreground_new = attr_foreground_new
     ibus.AttrUnderline = _StubAttrUnderline
     ibus.Property = _StubProperty
     ibus.PropList = _StubPropList
@@ -507,6 +523,56 @@ def test_apply_snapshot_updates_symbol_to_match_input_mode() -> None:
 
     eng._apply_snapshot(_FakeBridgeResponse(snapshot={"input_mode": "roman"}))
     assert prop.symbol.get_text() == "R"
+
+
+def test_segmented_preedit_focus_uses_underline_only() -> None:
+    eng = _make_engine("roman")
+
+    eng._apply_snapshot(
+        _FakeBridgeResponse(
+            snapshot={
+                "input_mode": "roman",
+                "raw_preedit": "khnhomtov",
+                "preedit": "ខ្ញុំទៅ",
+                "segmented_active": True,
+                "focused_segment_index": 0,
+                "segment_edit_active": False,
+                "segment_preview": [
+                    {"output": "ខ្ញុំ", "input": "khnhom", "focused": True},
+                    {"output": "ទៅ", "input": "tov", "focused": False},
+                ],
+            }
+        )
+    )
+
+    assert eng.preedit_attr_updates[-1] == [("underline", _StubAttrUnderline.SINGLE, 0, 6)]
+
+
+def test_segment_edit_preedit_uses_underline_and_background() -> None:
+    eng = _make_engine("roman")
+
+    eng._apply_snapshot(
+        _FakeBridgeResponse(
+            snapshot={
+                "input_mode": "roman",
+                "raw_preedit": "khnhomtov",
+                "preedit": "ខ្ញុំទៅ",
+                "segmented_active": True,
+                "focused_segment_index": 0,
+                "segment_edit_active": True,
+                "segment_edit_index": 0,
+                "segment_preview": [
+                    {"output": "ខ្ញុំ", "input": "khnhom", "focused": True},
+                    {"output": "ទៅ", "input": "tov", "focused": False},
+                ],
+            }
+        )
+    )
+
+    attrs = eng.preedit_attr_updates[-1]
+    assert ("underline", _StubAttrUnderline.SINGLE, 0, 6) in attrs
+    assert any(attr[0] == "background" and attr[-2:] == (0, 6) for attr in attrs)
+    assert ("foreground", engine_mod.SEGMENT_EDIT_HIGHLIGHT_FG, 0, 6) in attrs
 
 
 def test_key_release_does_not_cancel_pending_refinement() -> None:
