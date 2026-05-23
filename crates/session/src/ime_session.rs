@@ -3,11 +3,12 @@ use std::collections::{HashMap, HashSet};
 use crate::nida_keymap::{lookup_nida_output, NidaModifiers};
 use khmerime_core::{
     build_segmented_session, move_session_focus, normalize_visible_suggestions, normalized_suggestion_key,
-    reflow_segmented_session_from_selection, SegmentedSession, Transliterator,
+    reflow_segmented_session_from_selection, SegmentedChoice, SegmentedSession, Transliterator,
 };
 use serde::{Deserialize, Serialize};
 
 const KEY_BACKSPACE: u32 = 0xFF08;
+const KEY_TAB: u32 = 0xFF09;
 const KEY_ESCAPE: u32 = 0xFF1B;
 const KEY_LEFT: u32 = 0xFF51;
 const KEY_UP: u32 = 0xFF52;
@@ -134,6 +135,8 @@ pub struct SessionSnapshot {
     pub selected_index: Option<usize>,
     pub segmented_active: bool,
     pub focused_segment_index: Option<usize>,
+    pub segment_edit_active: bool,
+    pub segment_edit_index: Option<usize>,
     pub segment_preview: Vec<SegmentPreviewEntry>,
     pub cursor_location: CursorLocation,
 }
@@ -189,10 +192,18 @@ pub struct ImeSession {
     selected_index: usize,
     selection_touched: bool,
     segmented_session: Option<SegmentedSession>,
+    segment_edit_state: Option<SegmentEditState>,
     visible_refined_segments: Option<Vec<String>>,
     cursor_location: CursorLocation,
     input_mode: InputMode,
     options: ImeSessionOptions,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+struct SegmentEditState {
+    index: usize,
+    original_segment: SegmentedChoice,
+    replace_next_printable: bool,
 }
 
 impl ImeSession {
@@ -296,6 +307,7 @@ impl ImeSession {
             selected_index: 0,
             selection_touched: false,
             segmented_session: None,
+            segment_edit_state: None,
             visible_refined_segments: None,
             cursor_location: CursorLocation::default(),
             input_mode: InputMode::Roman,
@@ -399,6 +411,7 @@ impl ImeSession {
         self.selected_index = 0;
         self.selection_touched = false;
         self.segmented_session = None;
+        self.segment_edit_state = None;
         self.visible_refined_segments = None;
     }
 
@@ -476,6 +489,11 @@ impl ImeSession {
             })
             .collect::<Vec<_>>();
         let focused_segment_index = self.segmented_session.as_ref().map(|session| session.focused);
+        let segment_edit_index = self
+            .segment_edit_state
+            .as_ref()
+            .map(|state| state.index)
+            .filter(|_| self.segmented_session.is_some());
         let segment_preview = self
             .segmented_session
             .as_ref()
@@ -504,6 +522,8 @@ impl ImeSession {
             selected_index,
             segmented_active,
             focused_segment_index,
+            segment_edit_active: segment_edit_index.is_some(),
+            segment_edit_index,
             segment_preview,
             cursor_location: self.cursor_location,
         }
@@ -580,6 +600,7 @@ impl ImeSession {
 
         match keyval {
             KEY_LEFT => self.handle_left(),
+            KEY_TAB => self.handle_tab(),
             KEY_UP => self.handle_up(),
             KEY_RIGHT => self.handle_right(),
             KEY_DOWN => self.handle_down(),
@@ -630,6 +651,9 @@ impl ImeSession {
         } else {
             ch
         };
+        if self.segment_edit_state.is_some() {
+            return self.handle_segment_edit_printable(normalized);
+        }
         self.composition_raw.push(normalized);
         self.recompute_composition_state();
         if self.should_auto_commit_single_keycap(normalized) {
@@ -671,6 +695,59 @@ impl ImeSession {
         };
         move_session_focus(&mut session, -1);
         self.segmented_session = Some(session);
+        self.segment_edit_state = None;
+        SessionResult {
+            consumed: true,
+            ..SessionResult::default()
+        }
+    }
+
+    fn handle_tab(&mut self) -> SessionResult {
+        let Some(session) = &self.segmented_session else {
+            return SessionResult::default();
+        };
+        if self.segment_edit_state.is_some() {
+            self.segment_edit_state = None;
+        } else {
+            let Some(original_segment) = session.segments.get(session.focused).cloned() else {
+                return SessionResult::default();
+            };
+            self.segment_edit_state = Some(SegmentEditState {
+                index: session.focused,
+                original_segment,
+                replace_next_printable: true,
+            });
+        }
+        SessionResult {
+            consumed: true,
+            ..SessionResult::default()
+        }
+    }
+
+    fn handle_segment_edit_printable(&mut self, ch: char) -> SessionResult {
+        let Some(edit_state) = self.segment_edit_state.as_ref() else {
+            return SessionResult::default();
+        };
+        let Some(session) = &self.segmented_session else {
+            self.segment_edit_state = None;
+            return SessionResult::default();
+        };
+        let Some(segment) = session.segments.get(edit_state.index) else {
+            self.segment_edit_state = None;
+            return SessionResult::default();
+        };
+
+        let mut input = if edit_state.replace_next_printable {
+            String::new()
+        } else {
+            segment.input.clone()
+        };
+        input.push(ch);
+        self.replace_segment_input(edit_state.index, input);
+        self.selection_touched = true;
+        if let Some(edit_state) = &mut self.segment_edit_state {
+            edit_state.replace_next_printable = false;
+        }
         SessionResult {
             consumed: true,
             ..SessionResult::default()
@@ -683,6 +760,7 @@ impl ImeSession {
         };
         move_session_focus(&mut session, 1);
         self.segmented_session = Some(session);
+        self.segment_edit_state = None;
         SessionResult {
             consumed: true,
             ..SessionResult::default()
@@ -698,6 +776,9 @@ impl ImeSession {
     }
 
     fn handle_space(&mut self) -> SessionResult {
+        if self.segment_edit_state.is_some() {
+            return self.commit_selected_or_raw();
+        }
         self.cycle_candidates(1)
     }
 
@@ -739,6 +820,10 @@ impl ImeSession {
     }
 
     fn handle_backspace(&mut self) -> SessionResult {
+        if self.segment_edit_state.is_some() {
+            return self.handle_segment_edit_backspace();
+        }
+
         if self.composition_raw.is_empty() {
             return SessionResult::default();
         }
@@ -750,7 +835,96 @@ impl ImeSession {
         }
     }
 
+    fn handle_segment_edit_backspace(&mut self) -> SessionResult {
+        let Some(edit_state) = self.segment_edit_state.as_ref() else {
+            return SessionResult::default();
+        };
+        let Some(session) = &self.segmented_session else {
+            self.segment_edit_state = None;
+            return SessionResult::default();
+        };
+        let Some(segment) = session.segments.get(edit_state.index) else {
+            self.segment_edit_state = None;
+            return SessionResult::default();
+        };
+        if segment.input.is_empty() {
+            return self.handle_empty_segment_edit_backspace(edit_state.index);
+        }
+
+        let mut input = segment.input.clone();
+        input.pop();
+        self.replace_segment_input(edit_state.index, input);
+        self.selection_touched = true;
+        if let Some(edit_state) = &mut self.segment_edit_state {
+            edit_state.replace_next_printable = false;
+        }
+        SessionResult {
+            consumed: true,
+            ..SessionResult::default()
+        }
+    }
+
+    fn handle_empty_segment_edit_backspace(&mut self, index: usize) -> SessionResult {
+        if index == 0 {
+            return SessionResult {
+                consumed: true,
+                ..SessionResult::default()
+            };
+        }
+
+        let Some(session) = &mut self.segmented_session else {
+            self.segment_edit_state = None;
+            return SessionResult::default();
+        };
+        if index >= session.segments.len() {
+            self.segment_edit_state = None;
+            return SessionResult::default();
+        }
+
+        session.segments.remove(index);
+        self.composition_raw = recompute_segment_ranges_and_raw(session);
+        session.raw_input = self.composition_raw.clone();
+
+        if session.segments.len() <= 1 {
+            self.segmented_session = None;
+            self.segment_edit_state = None;
+            self.recompute_composition_state();
+            return SessionResult {
+                consumed: true,
+                ..SessionResult::default()
+            };
+        }
+
+        let next_index = index - 1;
+        session.focused = next_index;
+        let original_segment = session.segments[next_index].clone();
+        self.segment_edit_state = Some(SegmentEditState {
+            index: next_index,
+            original_segment,
+            replace_next_printable: true,
+        });
+        SessionResult {
+            consumed: true,
+            ..SessionResult::default()
+        }
+    }
+
     fn handle_escape(&mut self) -> SessionResult {
+        if let Some(edit_state) = self.segment_edit_state.take() {
+            if let Some(session) = &mut self.segmented_session {
+                if edit_state.index < session.segments.len() {
+                    session.segments[edit_state.index] = edit_state.original_segment;
+                    session.focused = edit_state.index;
+                    self.composition_raw = recompute_segment_ranges_and_raw(session);
+                    session.raw_input = self.composition_raw.clone();
+                }
+            }
+            return SessionResult {
+                consumed: true,
+                ..SessionResult::default()
+            };
+        }
+
         if self.composition_raw.is_empty() {
             return SessionResult::default();
         }
@@ -767,6 +941,15 @@ impl ImeSession {
                 return self.handle_printable(ch);
             }
             return SessionResult::default();
+        }
+
+        if let Some(edit_state) = &self.segment_edit_state {
+            self.select_segment_candidate_without_reflow(edit_state.index, index);
+            self.selection_touched = true;
+            return SessionResult {
+                consumed: true,
+                ..SessionResult::default()
+            };
         }
 
         if let Some(session) = self.segmented_session.clone() {
@@ -920,6 +1103,46 @@ impl ImeSession {
         self.segmented_session = Some(self.maybe_reflow_segmented_session(session));
     }
 
+    fn select_segment_candidate_without_reflow(&mut self, segment_index: usize, candidate_index: usize) {
+        let Some(session) = &mut self.segmented_session else {
+            return;
+        };
+        let Some(segment) = session.segments.get_mut(segment_index) else {
+            return;
+        };
+        if candidate_index < segment.candidates.len() {
+            segment.selected = candidate_index;
+        }
+    }
+
+    fn replace_segment_input(&mut self, index: usize, input: String) {
+        let candidates = self.candidates_for_segment_input(&input);
+        let Some(session) = &mut self.segmented_session else {
+            return;
+        };
+        let Some(segment) = session.segments.get_mut(index) else {
+            return;
+        };
+        segment.input = input;
+        segment.candidates = candidates;
+        segment.selected = 0;
+        self.composition_raw = recompute_segment_ranges_and_raw(session);
+        session.raw_input = self.composition_raw.clone();
+    }
+
+    fn candidates_for_segment_input(&self, input: &str) -> Vec<String> {
+        let mut candidates = exact_matches_first(
+            &self.transliterator,
+            input,
+            normalize_visible_suggestions(self.transliterator.suggest(input, &self.history)),
+        );
+        if candidates.is_empty() {
+            candidates.push(input.to_owned());
+        }
+        candidates.truncate(10);
+        candidates
+    }
+
     fn maybe_reflow_segmented_session(&self, session: SegmentedSession) -> SegmentedSession {
         let transliterator = &self.transliterator;
         let suggest = |input: &str, history: &HashMap<String, usize>| -> Vec<String> {
@@ -958,6 +1181,7 @@ impl ImeSession {
             self.selected_index = 0;
             self.selection_touched = false;
             self.segmented_session = None;
+            self.segment_edit_state = None;
             self.visible_refined_segments = None;
             return;
         }
@@ -973,6 +1197,7 @@ impl ImeSession {
 
         if self.options.segmented_preview != SegmentedPreviewMode::Enabled {
             self.segmented_session = None;
+            self.segment_edit_state = None;
             return;
         }
 
@@ -983,6 +1208,9 @@ impl ImeSession {
         if self.options.segmented_preview == SegmentedPreviewMode::Disabled {
             self.segmented_session = None;
             return false;
+        }
+        if self.segment_edit_state.is_some() {
+            return self.segmented_session.is_some();
         }
         if self.composition_raw.is_empty() || self.composition_raw != raw_preedit {
             return false;
@@ -1061,6 +1289,18 @@ fn keyval_to_ascii_char(keyval: u32) -> Option<char> {
 fn offset_index(current: usize, len: usize, delta: isize) -> usize {
     debug_assert!(len > 0);
     (current as isize + delta).rem_euclid(len as isize) as usize
+}
+
+fn recompute_segment_ranges_and_raw(session: &mut SegmentedSession) -> String {
+    let mut raw = String::new();
+    let mut cursor = 0;
+    for segment in &mut session.segments {
+        segment.start = cursor;
+        cursor += segment.input.chars().count();
+        segment.end = cursor;
+        raw.push_str(&segment.input);
+    }
+    raw
 }
 
 fn is_single_keycap_char(ch: char) -> bool {
@@ -1374,6 +1614,44 @@ mod tests {
         assert_eq!(session.history().get("នេះជាស្នាដៃបកប្រែ"), None);
     }
 
+    fn segmented_default_session_like_ibus_bridge() -> ImeSession {
+        let live =
+            Transliterator::from_default_data_with_config(DecoderConfig::shadow_interactive()).expect("default data");
+        let mut visible_config = DecoderConfig::shadow_interactive().with_mode(DecoderMode::Hybrid);
+        visible_config.wfst_max_latency_ms = 75;
+        let visible_refiner = Transliterator::from_default_data_with_config(visible_config).expect("default data");
+        let mut commit_config = DecoderConfig::default()
+            .with_mode(DecoderMode::Hybrid)
+            .with_shadow_log(false);
+        commit_config.wfst_max_latency_ms = 150;
+        let commit_refiner = Transliterator::from_default_data_with_config(commit_config).expect("default data");
+        let mut session =
+            ImeSession::new_with_visible_and_commit_refiners(live, visible_refiner, commit_refiner, HashMap::new());
+        session.focus_in();
+        session
+    }
+
+    #[test]
+    fn segmenter_does_not_collapse_steurthleay_into_rare_pali_compound() {
+        let mut session = segmented_default_session_like_ibus_bridge();
+        type_ascii(&mut session, "teungttrungsteurthleay");
+        let snapshot = session.snapshot();
+        assert!(snapshot.segmented_active, "expected segmented session");
+        let outputs: Vec<&str> = snapshot
+            .segment_preview
+            .iter()
+            .map(|entry| entry.output.as_str())
+            .collect();
+        assert_eq!(
+            outputs,
+            vec!["តឹង", "ទ្រូង", "ស្ទើរ", "ធ្លាយ"],
+            "segmenter should split steurthleay rather than fall through to a frequency-1 Pali compound"
+        );
+        for segment in &snapshot.segment_preview {
+            assert_ne!(segment.output, "អច្ឆិទ្ទវុត្តី");
+        }
+    }
+
     #[test]
     fn hidden_commit_refinement_does_not_override_visible_default_candidate() {
         let mut session = flat_default_session_with_commit_refiner();
@@ -1566,6 +1844,279 @@ mod tests {
         let left = session.process_key_event(0xFF51, 0, 0);
         assert!(left.consumed);
         assert_eq!(session.snapshot().focused_segment_index, Some(0));
+    }
+
+    #[test]
+    fn tab_in_segmented_session_enters_segment_edit_mode_on_focused_segment() {
+        let mut session = session();
+        type_ascii(&mut session, "khnhomtov");
+        let before = session.snapshot();
+        assert!(before.segmented_active);
+        assert_eq!(before.focused_segment_index, Some(0));
+        assert!(!before.segment_edit_active);
+        assert_eq!(before.segment_edit_index, None);
+
+        let tab = session.process_key_event(0xFF09, 0, 0);
+
+        assert!(tab.consumed);
+        let snapshot = session.snapshot();
+        assert!(snapshot.segment_edit_active);
+        assert_eq!(snapshot.segment_edit_index, before.focused_segment_index);
+    }
+
+    #[test]
+    fn tab_in_segment_edit_mode_exits_and_re_pins_segment() {
+        let mut session = session();
+        type_ascii(&mut session, "khnhomtov");
+        let down = session.process_key_event(0xFF54, 0, 0);
+        assert!(down.consumed);
+        let selected_output = session.snapshot().segment_preview[0].output.clone();
+
+        let enter_edit = session.process_key_event(0xFF09, 0, 0);
+        assert!(enter_edit.consumed);
+        assert!(session.snapshot().segment_edit_active);
+
+        let exit_edit = session.process_key_event(0xFF09, 0, 0);
+
+        assert!(exit_edit.consumed);
+        let snapshot = session.snapshot();
+        assert!(!snapshot.segment_edit_active);
+        assert_eq!(snapshot.segment_edit_index, None);
+        assert_eq!(snapshot.segment_preview[0].output, selected_output);
+    }
+
+    #[test]
+    fn escape_in_segment_edit_mode_cancels_and_restores_original_segment() {
+        let mut session = session();
+        type_ascii(&mut session, "khnhomtov");
+        let original = session.snapshot().segment_preview[0].clone();
+
+        let enter_edit = session.process_key_event(0xFF09, 0, 0);
+        assert!(enter_edit.consumed);
+        let s = session.process_key_event('s' as u32, 0, 0);
+        assert!(s.consumed);
+        assert_ne!(session.snapshot().segment_preview[0], original);
+
+        let escape = session.process_key_event(0xFF1B, 0, 0);
+
+        assert!(escape.consumed);
+        let snapshot = session.snapshot();
+        assert!(snapshot.segmented_active);
+        assert!(!snapshot.segment_edit_active);
+        assert_eq!(snapshot.segment_edit_index, None);
+        assert_eq!(snapshot.segment_preview[0], original);
+        assert_eq!(snapshot.raw_preedit, "khnhomtov");
+    }
+
+    #[test]
+    fn tab_is_inert_outside_segmented_session() {
+        let mut session = session();
+        type_ascii(&mut session, "jea");
+        let before = session.snapshot();
+        assert!(!before.segmented_active);
+        assert!(!before.segment_edit_active);
+
+        let tab = session.process_key_event(0xFF09, 0, 0);
+
+        assert!(!tab.consumed);
+        assert_eq!(session.snapshot(), before);
+    }
+
+    #[test]
+    fn first_printable_in_segment_edit_mode_replaces_segment_roman() {
+        let mut session = session();
+        type_ascii(&mut session, "khnhomtov");
+        let before = session.snapshot();
+        let sibling = before.segment_preview[1].clone();
+
+        let tab = session.process_key_event(0xFF09, 0, 0);
+        assert!(tab.consumed);
+        let s = session.process_key_event('s' as u32, 0, 0);
+
+        assert!(s.consumed);
+        let snapshot = session.snapshot();
+        assert!(snapshot.segment_edit_active);
+        assert_eq!(snapshot.segment_preview.len(), before.segment_preview.len());
+        assert_eq!(snapshot.segment_preview[0].input, "s");
+        assert_eq!(snapshot.segment_preview[1], sibling);
+
+        let o = session.process_key_event('o' as u32, 0, 0);
+
+        assert!(o.consumed);
+        let snapshot = session.snapshot();
+        assert_eq!(snapshot.segment_preview[0].input, "so");
+        assert_eq!(snapshot.segment_preview[1], sibling);
+    }
+
+    #[test]
+    fn backspace_in_segment_edit_mode_deletes_one_char_at_a_time() {
+        let mut session = session();
+        type_ascii(&mut session, "khnhomtov");
+        let tab = session.process_key_event(0xFF09, 0, 0);
+        assert!(tab.consumed);
+        type_ascii(&mut session, "tver");
+        assert_eq!(session.snapshot().segment_preview[0].input, "tver");
+
+        let backspace = session.process_key_event(0xFF08, 0, 0);
+
+        assert!(backspace.consumed);
+        assert_eq!(session.snapshot().segment_preview[0].input, "tve");
+
+        let backspace = session.process_key_event(0xFF08, 0, 0);
+
+        assert!(backspace.consumed);
+        assert_eq!(session.snapshot().segment_preview[0].input, "tv");
+    }
+
+    #[test]
+    fn backspace_on_empty_in_edit_segment_transfers_mode_to_previous_segment() {
+        let mut transfer = session();
+        type_ascii(&mut transfer, "khnhomtovkhnhom");
+        assert_eq!(transfer.snapshot().segment_preview.len(), 3);
+        transfer.process_key_event(0xFF53, 0, 0);
+        transfer.process_key_event(0xFF53, 0, 0);
+        assert_eq!(transfer.snapshot().focused_segment_index, Some(2));
+        transfer.process_key_event(0xFF09, 0, 0);
+
+        for _ in 0.."khnhom".len() {
+            let backspace = transfer.process_key_event(0xFF08, 0, 0);
+            assert!(backspace.consumed);
+        }
+        assert_eq!(transfer.snapshot().segment_preview[2].input, "");
+        let remove_empty = transfer.process_key_event(0xFF08, 0, 0);
+
+        assert!(remove_empty.consumed);
+        let snapshot = transfer.snapshot();
+        assert!(snapshot.segmented_active);
+        assert!(snapshot.segment_edit_active);
+        assert_eq!(snapshot.segment_edit_index, Some(1));
+        assert_eq!(snapshot.focused_segment_index, Some(1));
+        assert_eq!(snapshot.segment_preview.len(), 2);
+
+        let mut first_segment = session();
+        type_ascii(&mut first_segment, "khnhomtov");
+        first_segment.process_key_event(0xFF09, 0, 0);
+        for _ in 0.."khnhom".len() {
+            first_segment.process_key_event(0xFF08, 0, 0);
+        }
+        let before = first_segment.snapshot();
+        assert_eq!(before.segment_edit_index, Some(0));
+        assert_eq!(before.segment_preview[0].input, "");
+        let no_op = first_segment.process_key_event(0xFF08, 0, 0);
+        assert!(no_op.consumed);
+        assert_eq!(first_segment.snapshot(), before);
+
+        let mut dissolving = session();
+        type_ascii(&mut dissolving, "khnhomtov");
+        dissolving.process_key_event(0xFF53, 0, 0);
+        dissolving.process_key_event(0xFF09, 0, 0);
+        for _ in 0.."tov".len() {
+            dissolving.process_key_event(0xFF08, 0, 0);
+        }
+        let remove_empty = dissolving.process_key_event(0xFF08, 0, 0);
+        assert!(remove_empty.consumed);
+        let snapshot = dissolving.snapshot();
+        assert!(!snapshot.segmented_active);
+        assert!(!snapshot.segment_edit_active);
+        assert_eq!(snapshot.segment_edit_index, None);
+    }
+
+    #[test]
+    fn left_right_auto_exit_segment_edit_mode_and_navigate() {
+        let mut session = session();
+        type_ascii(&mut session, "khnhomtov");
+        session.process_key_event(0xFF09, 0, 0);
+        assert!(session.snapshot().segment_edit_active);
+
+        let right = session.process_key_event(0xFF53, 0, 0);
+
+        assert!(right.consumed);
+        let snapshot = session.snapshot();
+        assert!(!snapshot.segment_edit_active);
+        assert_eq!(snapshot.segment_edit_index, None);
+        assert_eq!(snapshot.focused_segment_index, Some(1));
+    }
+
+    #[test]
+    fn digit_in_segment_edit_mode_selects_candidate_without_committing_whole_composition() {
+        let mut session = session();
+        type_ascii(&mut session, "khnhomtov");
+        let snapshot = session.snapshot();
+        assert!(snapshot.candidates.len() >= 2);
+        assert_eq!(snapshot.candidates[1], "ខ្ញំ");
+
+        session.process_key_event(0xFF09, 0, 0);
+        let digit = session.process_key_event('2' as u32, 0, 0);
+
+        assert!(digit.consumed);
+        assert_eq!(digit.commit_text, None);
+        let snapshot = session.snapshot();
+        assert!(snapshot.segment_edit_active);
+        assert_eq!(snapshot.segment_preview[0].output, "ខ្ញំ");
+
+        let enter = session.process_key_event(0xFF0D, 0, 0);
+        assert_eq!(enter.commit_text.as_deref(), Some("ខ្ញំទៅ"));
+    }
+
+    #[test]
+    fn space_in_segment_edit_mode_commits_whole_composition() {
+        let mut session = session();
+        type_ascii(&mut session, "khnhomtov");
+        session.process_key_event(0xFF09, 0, 0);
+
+        let space = session.process_key_event(0x20, 0, 0);
+
+        assert!(space.consumed);
+        assert_eq!(space.commit_text.as_deref(), Some("ខ្ញុំទៅ"));
+        assert!(session.snapshot().preedit.is_empty());
+    }
+
+    #[test]
+    fn enter_in_segment_edit_mode_commits_whole_composition() {
+        let mut session = session();
+        type_ascii(&mut session, "khnhomtov");
+        session.process_key_event(0xFF09, 0, 0);
+
+        let enter = session.process_key_event(0xFF0D, 0, 0);
+
+        assert!(enter.consumed);
+        assert_eq!(enter.commit_text.as_deref(), Some("ខ្ញុំទៅ"));
+        assert!(session.snapshot().preedit.is_empty());
+    }
+
+    #[test]
+    fn zero_candidate_in_edit_roman_commits_literal_roman_on_exit() {
+        let mut session = session();
+        type_ascii(&mut session, "khnhomtov");
+        session.process_key_event(0xFF09, 0, 0);
+        type_ascii(&mut session, "xqz");
+
+        let tab = session.process_key_event(0xFF09, 0, 0);
+
+        assert!(tab.consumed);
+        let snapshot = session.snapshot();
+        assert!(!snapshot.segment_edit_active);
+        assert_eq!(snapshot.segment_preview[0].input, "xqz");
+        assert_eq!(snapshot.segment_preview[0].output, "xqz");
+
+        let enter = session.process_key_event(0xFF0D, 0, 0);
+        assert_eq!(enter.commit_text.as_deref(), Some("xqzទៅ"));
+    }
+
+    #[test]
+    fn decoder_runs_flat_inside_segment_edit_mode_no_internal_resegmentation() {
+        let mut session = session();
+        type_ascii(&mut session, "khnhomtov");
+        let before_len = session.snapshot().segment_preview.len();
+        assert!(before_len >= 2);
+        session.process_key_event(0xFF09, 0, 0);
+
+        type_ascii(&mut session, "khnhomtov");
+
+        let snapshot = session.snapshot();
+        assert!(snapshot.segment_edit_active);
+        assert_eq!(snapshot.segment_preview.len(), before_len);
+        assert_eq!(snapshot.segment_preview[0].input, "khnhomtov");
     }
 
     #[test]

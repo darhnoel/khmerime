@@ -554,6 +554,34 @@ fn bridge_supports_segment_focus_and_full_phrase_commit() {
 }
 
 #[test]
+fn bridge_snapshot_exposes_segment_edit_mode_fields() {
+    let (child, mut stdin, mut stdout) = spawn_full_bridge();
+
+    send_command(&mut stdin, r#"{"cmd":"focus_in"}"#);
+    let _ = read_response(&mut stdout);
+
+    for keyval in [107, 104, 110, 104, 111, 109, 116, 111, 118] {
+        send_command(
+            &mut stdin,
+            &format!(r#"{{"cmd":"process_key_event","keyval":{keyval},"keycode":0,"state":0}}"#),
+        );
+        let _ = read_response(&mut stdout);
+    }
+
+    send_command(
+        &mut stdin,
+        r#"{"cmd":"process_key_event","keyval":65289,"keycode":0,"state":0}"#,
+    );
+    let tab = read_response(&mut stdout);
+
+    assert_eq!(tab["consumed"], Value::Bool(true));
+    assert_eq!(tab["snapshot"]["segment_edit_active"], Value::Bool(true));
+    assert_eq!(tab["snapshot"]["segment_edit_index"], Value::from(0));
+
+    shutdown_and_assert_ok(child, &mut stdin, &mut stdout);
+}
+
+#[test]
 fn bridge_refines_long_phrase_on_enter() {
     let (child, mut stdin, mut stdout) = spawn_full_bridge();
 
