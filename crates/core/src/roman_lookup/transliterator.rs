@@ -26,6 +26,11 @@ fn startup_trace_log(stage: &str) {
     eprintln!("{message}");
 }
 
+#[cfg(not(all(target_arch = "wasm32", feature = "fetch-data")))]
+fn default_dictionary_image() -> Result<DictionaryImageView<'static>> {
+    DictionaryImageView::parse(DEFAULT_DICTIONARY_IMAGE)
+}
+
 impl Transliterator {
     #[cfg(not(all(target_arch = "wasm32", feature = "fetch-data")))]
     pub fn from_default_data() -> Result<Self> {
@@ -64,7 +69,14 @@ impl Transliterator {
         let entries = parse_compiled_lexicon(DEFAULT_COMPILED_DATA)?;
         let corpus_stats = parse_compiled_khpos_stats(DEFAULT_COMPILED_KHPOS_STATS)?;
         let next_word = parse_compiled_next_word_stats(DEFAULT_COMPILED_NEXT_WORD_STATS)?;
-        Self::from_entries_with_config(entries, corpus_stats, next_word, config)
+        let dictionary_image = default_dictionary_image()?;
+        Self::from_entries_with_config_and_dictionary_image(
+            entries,
+            corpus_stats,
+            next_word,
+            Some(dictionary_image),
+            config,
+        )
     }
 
     #[doc(hidden)]
@@ -83,7 +95,8 @@ impl Transliterator {
         #[cfg(not(target_arch = "wasm32"))]
         if let Some(key) = cache_key.as_deref() {
             let started = start_stage_timer();
-            if let Some((legacy, composer)) = super::cache::try_load(key) {
+            if let Some((mut legacy, composer)) = super::cache::try_load(key) {
+                legacy.attach_dictionary_image(default_dictionary_image()?);
                 log_stage("cache_hit", elapsed_stage_ms(started));
                 return Ok(SharedTransliteratorData {
                     legacy: Arc::new(legacy),
@@ -105,7 +118,17 @@ impl Transliterator {
         let next_word = parse_compiled_next_word_stats(DEFAULT_COMPILED_NEXT_WORD_STATS)?;
         log_stage("parse_next_word", elapsed_stage_ms(started));
 
-        let shared = Self::shared_data_from_entries_with_stage_logger(entries, corpus_stats, next_word, &mut log_stage);
+        let started = start_stage_timer();
+        let dictionary_image = default_dictionary_image()?;
+        log_stage("parse_dictionary_image", elapsed_stage_ms(started));
+
+        let shared = Self::shared_data_from_entries_with_stage_logger_and_dictionary_image(
+            entries,
+            corpus_stats,
+            next_word,
+            Some(dictionary_image),
+            &mut log_stage,
+        );
 
         #[cfg(not(target_arch = "wasm32"))]
         if let Some(key) = cache_key.as_deref() {
@@ -176,7 +199,24 @@ impl Transliterator {
         next_word: NextWordStats,
         config: DecoderConfig,
     ) -> Result<Self> {
-        let legacy = Arc::new(LegacyData::from_entries_with_stats(entries, corpus_stats, next_word));
+        Self::from_entries_with_config_and_dictionary_image(entries, corpus_stats, next_word, None, config)
+    }
+
+    #[cfg(not(all(target_arch = "wasm32", feature = "fetch-data")))]
+    fn from_entries_with_config_and_dictionary_image(
+        entries: Vec<Entry>,
+        corpus_stats: CorpusStats,
+        next_word: NextWordStats,
+        dictionary_image: Option<DictionaryImageView<'static>>,
+        config: DecoderConfig,
+    ) -> Result<Self> {
+        let legacy = Arc::new(LegacyData::from_entries_with_stats_stage_logger_and_dictionary_image(
+            entries,
+            corpus_stats,
+            next_word,
+            dictionary_image,
+            |_, _| {},
+        ));
         let composer = ComposerTable::from_entries(legacy.entries());
         Ok(Self::from_shared_parts(legacy, Arc::new(composer), config))
     }
@@ -193,13 +233,30 @@ impl Transliterator {
         entries: Vec<Entry>,
         corpus_stats: CorpusStats,
         next_word: NextWordStats,
-        mut log_stage: impl FnMut(&str, f64),
+        log_stage: impl FnMut(&str, f64),
     ) -> SharedTransliteratorData {
-        let started = start_stage_timer();
-        let legacy = Arc::new(LegacyData::from_entries_with_stats_and_stage_logger(
+        Self::shared_data_from_entries_with_stage_logger_and_dictionary_image(
             entries,
             corpus_stats,
             next_word,
+            None,
+            log_stage,
+        )
+    }
+
+    fn shared_data_from_entries_with_stage_logger_and_dictionary_image(
+        entries: Vec<Entry>,
+        corpus_stats: CorpusStats,
+        next_word: NextWordStats,
+        dictionary_image: Option<DictionaryImageView<'static>>,
+        mut log_stage: impl FnMut(&str, f64),
+    ) -> SharedTransliteratorData {
+        let started = start_stage_timer();
+        let legacy = Arc::new(LegacyData::from_entries_with_stats_stage_logger_and_dictionary_image(
+            entries,
+            corpus_stats,
+            next_word,
+            dictionary_image,
             |stage, elapsed_ms| {
                 log_stage(&format!("build_legacy_data.{stage}"), elapsed_ms);
             },

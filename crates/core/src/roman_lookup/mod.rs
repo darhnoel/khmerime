@@ -15,6 +15,10 @@ use crate::decoder::{
 #[cfg(not(target_arch = "wasm32"))]
 mod cache;
 mod compiled_io;
+#[allow(dead_code)]
+mod dictionary_image;
+#[allow(dead_code)]
+mod dictionary_image_format;
 mod legacy_data;
 mod normalization;
 mod ranked_lexicon;
@@ -25,6 +29,7 @@ mod types;
 use compiled_io::{parse_compiled_khpos_stats, parse_compiled_lexicon, parse_compiled_next_word_stats};
 #[cfg(not(all(target_arch = "wasm32", feature = "fetch-data")))]
 use compiled_io::{parse_csv, parse_tsv};
+use dictionary_image::DictionaryImageView;
 use normalization::map_next_word_context_token;
 use types::*;
 
@@ -164,6 +169,85 @@ mod tests {
         assert!(compiled_entries
             .iter()
             .any(|entry| entry.roman == "quality" && entry.target == "គុណភាព"));
+    }
+
+    #[test]
+    fn dictionary_image_matches_ranked_retrieval_indexes() {
+        let compiled_entries = parse_compiled_lexicon(DEFAULT_COMPILED_DATA).unwrap();
+        let ranked = RankedLexicon::from_entries(&compiled_entries, CorpusStats::default());
+        let image = dictionary_image::DictionaryImageView::parse(DEFAULT_DICTIONARY_IMAGE).unwrap();
+
+        assert_eq!(image.entry_count(), ranked.entries.len());
+        assert_eq!(image.exact_key_count(), ranked.exact_index.len());
+        assert_eq!(image.alias_key_count(), ranked.alias_index.len());
+        assert_eq!(image.gram_key_count(), ranked.gram_index.len());
+
+        for (entry_id, expected) in ranked.entries.iter().enumerate() {
+            let actual = image.entry(entry_id as u32).unwrap();
+            assert_eq!(actual.target().unwrap(), expected.target.as_str());
+            assert_eq!(actual.canonical_roman().unwrap(), expected.canonical_roman.as_str());
+            assert_eq!(actual.normalized_key().unwrap(), expected.normalized_key.as_str());
+            assert_eq!(actual.frequency().unwrap(), expected.frequency);
+            assert_eq!(actual.frequency_lang().unwrap(), expected.frequency_lang.as_str());
+            assert_eq!(actual.first_tag().unwrap(), None);
+            assert_eq!(actual.last_tag().unwrap(), None);
+        }
+
+        for (key, expected) in &ranked.exact_index {
+            let actual = image
+                .exact_postings(key)
+                .unwrap()
+                .map(Iterator::collect::<Vec<_>>)
+                .unwrap_or_default();
+            let expected = expected.iter().map(|id| *id as u32).collect::<Vec<_>>();
+            assert_eq!(actual, expected, "exact postings mismatch for {key}");
+        }
+
+        for (key, expected) in &ranked.alias_index {
+            let actual = image
+                .alias_postings(key)
+                .unwrap()
+                .map(Iterator::collect::<Vec<_>>)
+                .unwrap_or_default();
+            let expected = expected.iter().map(|id| *id as u32).collect::<Vec<_>>();
+            assert_eq!(actual, expected, "alias postings mismatch for {key}");
+        }
+
+        for (key, expected) in &ranked.gram_index {
+            let actual = image
+                .gram_postings(key)
+                .unwrap()
+                .map(Iterator::collect::<Vec<_>>)
+                .unwrap_or_default();
+            let expected = expected.iter().map(|id| *id as u32).collect::<Vec<_>>();
+            assert_eq!(actual, expected, "gram postings mismatch for {key}");
+        }
+    }
+
+    #[test]
+    fn default_shared_data_uses_dictionary_image_for_ranked_exact_and_alias_lookup() {
+        let shared = Transliterator::from_default_shared_data().unwrap();
+        assert!(shared.legacy.dictionary_image.is_some());
+        assert!(shared.legacy.ranked.exact_index.is_empty());
+        assert!(shared.legacy.ranked.alias_index.is_empty());
+        assert!(shared.legacy.ranked.gram_index.is_empty());
+
+        let transliterator = Transliterator::from_shared_data_with_config(
+            &shared,
+            DecoderConfig::default().with_mode(DecoderMode::Wfst),
+        );
+        let history = HashMap::new();
+        assert_eq!(
+            transliterator
+                .suggest("khnhomttov", &history)
+                .first()
+                .map(String::as_str),
+            Some("ខ្ញុំទៅ")
+        );
+        assert!(transliterator
+            .suggest("kit", &history)
+            .iter()
+            .any(|candidate| candidate == "គិត"));
     }
 
     #[test]

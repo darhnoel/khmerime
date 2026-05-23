@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use std::env;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -21,6 +21,15 @@ const MAGIC: &[u8; 4] = b"RLX2";
 const KHPOS_MAGIC: &[u8; 4] = b"KPS1";
 const NEXT_WORD_MAGIC: &[u8; 4] = b"NWS1";
 const MAX_JOINED_SURFACE_TOKENS: usize = 4;
+
+#[path = "src/roman_lookup/dictionary_image_format.rs"]
+mod dictionary_image_format;
+#[allow(dead_code)]
+#[path = "src/roman_lookup/normalization.rs"]
+mod normalization;
+
+use dictionary_image_format::*;
+use normalization::{normalize, roman_search_variants};
 
 #[derive(Clone, Copy)]
 enum LexiconSourceFormat {
@@ -204,6 +213,7 @@ fn main() {
     let additional_source =
         fs::read_to_string(&additional_lexicon_csv).expect("additional most-common English-Khmer CSV must be readable");
     entries.extend(parse_additional_csv_entries(&additional_source));
+    let compiled_dictionary_image = compile_dictionary_image(&entries).expect("default dictionary image must compile");
     let compiled = compile_lexicon_entries(entries).expect("default lexicon entries must compile");
     let khpos_train =
         fs::read_to_string(&data_paths.khpos_train).expect("khPOS after-replace train corpus must be readable");
@@ -232,6 +242,9 @@ fn main() {
     let out_dir = PathBuf::from(env::var("OUT_DIR").expect("OUT_DIR must be set"));
     let output_path = out_dir.join("roman_lookup.lexicon.bin");
     fs::write(&output_path, compiled).expect("compiled lexicon must be written");
+    let dictionary_image_output_path = out_dir.join("khmerime.dictionary_image.bin");
+    fs::write(&dictionary_image_output_path, compiled_dictionary_image)
+        .expect("compiled dictionary image must be written");
     let khpos_output_path = out_dir.join("khpos.stats.bin");
     fs::write(&khpos_output_path, compiled_khpos).expect("compiled khPOS stats must be written");
     let next_word_output_path = out_dir.join("next_word.stats.bin");
@@ -253,6 +266,11 @@ fn main() {
         fs::create_dir_all(&assets_data).expect("assets/data dir must be creatable");
         fs::copy(&output_path, assets_data.join("roman_lookup.lexicon.bin"))
             .expect("lexicon bin must copy to assets/data");
+        fs::copy(
+            &dictionary_image_output_path,
+            assets_data.join("khmerime.dictionary_image.bin"),
+        )
+        .expect("dictionary image must copy to assets/data");
         fs::copy(&khpos_output_path, assets_data.join("khpos.stats.bin")).expect("khpos bin must copy to assets/data");
         fs::copy(&next_word_output_path, assets_data.join("next_word.stats.bin"))
             .expect("next-word bin must copy to assets/data");
@@ -542,6 +560,204 @@ fn compile_lexicon_entries(entries: Vec<BuildLexiconEntry>) -> Result<Vec<u8>, S
         output.push(0);
     }
 
+    Ok(output)
+}
+
+#[derive(Default)]
+struct DictionaryImageInterner {
+    ids: HashMap<String, u32>,
+    strings: Vec<String>,
+}
+
+impl DictionaryImageInterner {
+    fn intern(&mut self, value: &str) -> Result<u32, String> {
+        if let Some(id) = self.ids.get(value) {
+            return Ok(*id);
+        }
+        let id = u32::try_from(self.strings.len())
+            .map_err(|_| "dictionary image string table exceeded u32 ids".to_owned())?;
+        self.ids.insert(value.to_owned(), id);
+        self.strings.push(value.to_owned());
+        Ok(id)
+    }
+}
+
+struct DictionaryImageEntryRecord {
+    target_id: u32,
+    canonical_roman_id: u32,
+    normalized_key_id: u32,
+    frequency: u32,
+    frequency_lang_id: u32,
+    first_tag_id: u32,
+    last_tag_id: u32,
+}
+
+fn compile_dictionary_image(entries: &[BuildLexiconEntry]) -> Result<Vec<u8>, String> {
+    let mut interner = DictionaryImageInterner::default();
+    let mut image_entries = Vec::<DictionaryImageEntryRecord>::with_capacity(entries.len());
+    let mut exact_index = BTreeMap::<String, Vec<u32>>::new();
+    let mut alias_index = BTreeMap::<String, Vec<u32>>::new();
+    let mut gram_index = BTreeMap::<String, Vec<u32>>::new();
+    let mut target_frequency = HashMap::<(String, String), u32>::new();
+
+    for entry in entries {
+        if entry.roman.contains('\0') || entry.target.contains('\0') || entry.frequency_lang.contains('\0') {
+            return Err("NUL byte is not supported in dictionary image entries".to_owned());
+        }
+        let normalized_key = normalize(&entry.roman);
+        if normalized_key.is_empty() {
+            continue;
+        }
+
+        let target_id = interner.intern(&entry.target)?;
+        let canonical_roman_id = interner.intern(&entry.roman)?;
+        let normalized_key_id = interner.intern(&normalized_key)?;
+        let frequency_lang_id = interner.intern(&entry.frequency_lang)?;
+        let frequency = *target_frequency
+            .entry((entry.target.clone(), entry.frequency_lang.clone()))
+            .or_insert(entry.frequency.max(1));
+        let entry_id = u32::try_from(image_entries.len())
+            .map_err(|_| "dictionary image entry table exceeded u32 ids".to_owned())?;
+
+        exact_index.entry(normalized_key.clone()).or_default().push(entry_id);
+        for key in roman_search_variants(&entry.roman)
+            .into_iter()
+            .filter(|key| key != &normalized_key)
+        {
+            interner.intern(&key)?;
+            push_dictionary_grams(&mut gram_index, &key, entry_id);
+            alias_index.entry(key).or_default().push(entry_id);
+        }
+        push_dictionary_grams(&mut gram_index, &normalized_key, entry_id);
+
+        image_entries.push(DictionaryImageEntryRecord {
+            target_id,
+            canonical_roman_id,
+            normalized_key_id,
+            frequency,
+            frequency_lang_id,
+            first_tag_id: MISSING_STRING_ID,
+            last_tag_id: MISSING_STRING_ID,
+        });
+    }
+
+    let entries_section = compile_dictionary_entry_section(&image_entries);
+    let (exact_keys, exact_postings) = compile_dictionary_key_index(&mut interner, exact_index)?;
+    let (alias_keys, alias_postings) = compile_dictionary_key_index(&mut interner, alias_index)?;
+    let (gram_keys, gram_postings) = compile_dictionary_key_index(&mut interner, gram_index)?;
+
+    // Key-index compilation may intern late keys; write string sections after
+    // all sections have had a chance to assign string IDs.
+    let (string_refs, string_data) = compile_dictionary_string_sections(&interner)?;
+
+    write_dictionary_image_sections(&[
+        (SECTION_STRING_REFS, string_refs),
+        (SECTION_STRING_DATA, string_data),
+        (SECTION_ENTRIES, entries_section),
+        (SECTION_EXACT_KEYS, exact_keys),
+        (SECTION_EXACT_POSTINGS, exact_postings),
+        (SECTION_ALIAS_KEYS, alias_keys),
+        (SECTION_ALIAS_POSTINGS, alias_postings),
+        (SECTION_GRAM_KEYS, gram_keys),
+        (SECTION_GRAM_POSTINGS, gram_postings),
+    ])
+}
+
+fn push_dictionary_grams(index: &mut BTreeMap<String, Vec<u32>>, input: &str, entry_id: u32) {
+    let chars = input.chars().collect::<Vec<_>>();
+    if chars.len() < 2 {
+        return;
+    }
+    for start in 0..=chars.len() - 2 {
+        index
+            .entry(chars[start..start + 2].iter().collect())
+            .or_default()
+            .push(entry_id);
+    }
+}
+
+fn compile_dictionary_string_sections(interner: &DictionaryImageInterner) -> Result<(Vec<u8>, Vec<u8>), String> {
+    let mut refs = Vec::with_capacity(interner.strings.len() * STRING_REF_RECORD_LEN);
+    let mut data = Vec::new();
+    for value in &interner.strings {
+        let offset =
+            u32::try_from(data.len()).map_err(|_| "dictionary image string blob exceeded u32 offsets".to_owned())?;
+        let len = u32::try_from(value.len()).map_err(|_| "dictionary image string length exceeded u32".to_owned())?;
+        write_u32(&mut refs, offset);
+        write_u32(&mut refs, len);
+        data.extend_from_slice(value.as_bytes());
+    }
+    Ok((refs, data))
+}
+
+fn compile_dictionary_entry_section(entries: &[DictionaryImageEntryRecord]) -> Vec<u8> {
+    let mut output = Vec::with_capacity(entries.len() * ENTRY_RECORD_LEN);
+    for entry in entries {
+        write_u32(&mut output, entry.target_id);
+        write_u32(&mut output, entry.canonical_roman_id);
+        write_u32(&mut output, entry.normalized_key_id);
+        write_u32(&mut output, entry.frequency);
+        write_u32(&mut output, entry.frequency_lang_id);
+        write_u32(&mut output, entry.first_tag_id);
+        write_u32(&mut output, entry.last_tag_id);
+    }
+    output
+}
+
+fn compile_dictionary_key_index(
+    interner: &mut DictionaryImageInterner,
+    index: BTreeMap<String, Vec<u32>>,
+) -> Result<(Vec<u8>, Vec<u8>), String> {
+    let mut keys = Vec::with_capacity(index.len() * KEY_RANGE_RECORD_LEN);
+    let mut postings = Vec::new();
+    for (key, ids) in index {
+        let key_id = interner.intern(&key)?;
+        let start = u32::try_from(postings.len() / 4)
+            .map_err(|_| "dictionary image postings exceeded u32 offsets".to_owned())?;
+        let len =
+            u32::try_from(ids.len()).map_err(|_| "dictionary image posting range exceeded u32 length".to_owned())?;
+        write_u32(&mut keys, key_id);
+        write_u32(&mut keys, start);
+        write_u32(&mut keys, len);
+        for id in ids {
+            write_u32(&mut postings, id);
+        }
+    }
+    Ok((keys, postings))
+}
+
+fn write_dictionary_image_sections(sections: &[(u32, Vec<u8>)]) -> Result<Vec<u8>, String> {
+    let section_count =
+        u32::try_from(sections.len()).map_err(|_| "dictionary image section count exceeded u32".to_owned())?;
+    if section_count != DICTIONARY_IMAGE_SECTION_COUNT {
+        return Err("dictionary image section count does not match format".to_owned());
+    }
+
+    let table_len = sections
+        .len()
+        .checked_mul(SECTION_RECORD_LEN)
+        .and_then(|len| HEADER_LEN.checked_add(len))
+        .ok_or_else(|| "dictionary image header exceeded usize".to_owned())?;
+    let mut output = Vec::with_capacity(table_len + sections.iter().map(|(_, data)| data.len()).sum::<usize>());
+    output.extend_from_slice(DICTIONARY_IMAGE_MAGIC);
+    write_u32(&mut output, DICTIONARY_IMAGE_SCHEMA_VERSION);
+    write_u32(&mut output, section_count);
+
+    let mut section_offset =
+        u32::try_from(table_len).map_err(|_| "dictionary image section offset exceeded u32".to_owned())?;
+    for (id, data) in sections {
+        let len = u32::try_from(data.len()).map_err(|_| "dictionary image section length exceeded u32".to_owned())?;
+        write_u32(&mut output, *id);
+        write_u32(&mut output, section_offset);
+        write_u32(&mut output, len);
+        section_offset = section_offset
+            .checked_add(len)
+            .ok_or_else(|| "dictionary image section offsets exceeded u32".to_owned())?;
+    }
+
+    for (_, data) in sections {
+        output.extend_from_slice(data);
+    }
     Ok(output)
 }
 

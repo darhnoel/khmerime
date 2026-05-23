@@ -7,10 +7,15 @@ use serde::{Deserialize, Serialize};
 use crate::composer::ComposerTable;
 use crate::decoder::DecoderManager;
 
+use super::dictionary_image::DictionaryImageView;
 use super::search_index::SearchIndex;
 
 #[cfg(not(all(target_arch = "wasm32", feature = "fetch-data")))]
 pub(super) const DEFAULT_COMPILED_DATA: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/roman_lookup.lexicon.bin"));
+#[cfg(not(all(target_arch = "wasm32", feature = "fetch-data")))]
+#[allow(dead_code)]
+pub(super) const DEFAULT_DICTIONARY_IMAGE: &[u8] =
+    include_bytes!(concat!(env!("OUT_DIR"), "/khmerime.dictionary_image.bin"));
 #[cfg(not(all(target_arch = "wasm32", feature = "fetch-data")))]
 pub(super) const DEFAULT_COMPILED_KHPOS_STATS: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/khpos.stats.bin"));
 #[cfg(not(all(target_arch = "wasm32", feature = "fetch-data")))]
@@ -200,6 +205,12 @@ pub(crate) struct RankedLexicon {
     pub tag_bigrams: HashMap<(String, String), u32>,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum RankedLookupIndexMode {
+    BuildRetrievalIndexes,
+    SkipExactAliasAndGram,
+}
+
 #[derive(Serialize, Deserialize)]
 pub(crate) struct LegacyData {
     pub(super) entries: Vec<Entry>,
@@ -211,6 +222,8 @@ pub(crate) struct LegacyData {
     pub(super) roman_prefix_index: HashMap<String, Vec<String>>,
     pub(super) index: SearchIndex,
     pub(super) ranked: RankedLexicon,
+    #[serde(skip)]
+    pub(super) dictionary_image: Option<DictionaryImageView<'static>>,
     pub(super) next_word: NextWordStats,
     pub(super) next_word_max_context_chars: usize,
 }
