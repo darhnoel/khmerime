@@ -12,6 +12,10 @@ _Avoid_: dictionary, vocabulary
 The fully-built in-memory artifact produced from the **Lexicon** plus khPOS corpus and mobile-keyboard n-grams. Holds lookup maps, ranked lexicon, search index, and composer state. Built once per bridge process; the three view-Transliterators (live engine, visible refiner, commit refiner) are cheap clones over the same shared data.
 _Avoid_: lexicon data, lookup tables
 
+**Dictionary Image**:
+A compact, immutable, file-backed representation of **Lexicon**-derived lookup data, addressed by IDs and offsets instead of heap-owned strings and maps.
+_Avoid_: mmap cache, binary cache, serialized SharedTransliteratorData
+
 **Search Index**:
 The fuzzy roman→Khmer lookup structure used by the suggester. One of two backends, selected at startup by `KHMERIME_SEARCH_INDEX`: **Ngram** (default) or **SymSpell**. Both live inside the **SharedTransliteratorData**.
 _Avoid_: fuzzy index, lookup index
@@ -62,6 +66,7 @@ _Avoid_: refiner (use the qualified form)
 ## Relationships
 
 - A **Lexicon** is built into one **SharedTransliteratorData** at startup
+- A **Dictionary Image** can replace heap-owned parts of **SharedTransliteratorData** while preserving the same IME behavior
 - A **SharedTransliteratorData** contains exactly one **Search Index**
 - A **SharedTransliteratorData** is shared by the live engine, **Visible Refiner**, and **Commit Refiner** (three views, one underlying data)
 - A **Composition** may have zero or one **Segmented Session**
