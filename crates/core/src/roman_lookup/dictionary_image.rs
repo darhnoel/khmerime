@@ -4,7 +4,7 @@ use std::ops::Range;
 use super::dictionary_image_format::*;
 use super::{LexiconError, Result};
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub(crate) struct DictionaryImageView<'a> {
     string_refs: &'a [u8],
     string_data: &'a [u8],
@@ -15,7 +15,7 @@ pub(crate) struct DictionaryImageView<'a> {
     alias_postings: &'a [u8],
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub(crate) struct DictionaryEntryView<'a> {
     image: DictionaryImageView<'a>,
     offset: usize,

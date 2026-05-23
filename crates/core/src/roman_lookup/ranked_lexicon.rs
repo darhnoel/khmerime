@@ -17,12 +17,29 @@ impl RankedLexicon {
     pub(crate) fn from_entries_with_stage_logger(
         entries: &[Entry],
         corpus_stats: CorpusStats,
+        log_stage: impl FnMut(&str, f64),
+    ) -> Self {
+        Self::from_entries_with_stage_logger_and_index_mode(
+            entries,
+            corpus_stats,
+            RankedLookupIndexMode::BuildExactAlias,
+            log_stage,
+        )
+    }
+
+    pub(crate) fn from_entries_with_stage_logger_and_index_mode(
+        entries: &[Entry],
+        corpus_stats: CorpusStats,
+        index_mode: RankedLookupIndexMode,
         mut log_stage: impl FnMut(&str, f64),
     ) -> Self {
+        let build_exact_alias = index_mode == RankedLookupIndexMode::BuildExactAlias;
         let mut ranked = Self::default();
         ranked.entries = Vec::with_capacity(entries.len());
-        ranked.exact_index = HashMap::with_capacity(entries.len());
-        ranked.alias_index = HashMap::with_capacity(entries.len().saturating_mul(2));
+        if build_exact_alias {
+            ranked.exact_index = HashMap::with_capacity(entries.len());
+            ranked.alias_index = HashMap::with_capacity(entries.len().saturating_mul(2));
+        }
         ranked.gram_index = HashMap::with_capacity(entries.len().saturating_mul(4));
         ranked.word_unigrams = HashMap::with_capacity(entries.len());
         ranked.word_bigrams = HashMap::with_capacity(entries.len() / 4);
@@ -76,15 +93,19 @@ impl RankedLexicon {
                 last_tag,
             };
             let entry_index = ranked.entries.len();
-            ranked
-                .exact_index
-                .entry(normalized_key.clone())
-                .or_default()
-                .push(entry_index);
+            if build_exact_alias {
+                ranked
+                    .exact_index
+                    .entry(normalized_key.clone())
+                    .or_default()
+                    .push(entry_index);
+            }
 
             for key in &ranked_entry.alias_keys {
                 push_grams(&mut ranked.gram_index, &key, entry_index);
-                ranked.alias_index.entry(key.clone()).or_default().push(entry_index);
+                if build_exact_alias {
+                    ranked.alias_index.entry(key.clone()).or_default().push(entry_index);
+                }
             }
             push_grams(&mut ranked.gram_index, &normalized_key, entry_index);
             ranked.entries.push(ranked_entry);

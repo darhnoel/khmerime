@@ -29,6 +29,7 @@ mod types;
 use compiled_io::{parse_compiled_khpos_stats, parse_compiled_lexicon, parse_compiled_next_word_stats};
 #[cfg(not(all(target_arch = "wasm32", feature = "fetch-data")))]
 use compiled_io::{parse_csv, parse_tsv};
+use dictionary_image::DictionaryImageView;
 use normalization::map_next_word_context_token;
 use types::*;
 
@@ -210,6 +211,32 @@ mod tests {
             let expected = expected.iter().map(|id| *id as u32).collect::<Vec<_>>();
             assert_eq!(actual, expected, "alias postings mismatch for {key}");
         }
+    }
+
+    #[test]
+    fn default_shared_data_uses_dictionary_image_for_ranked_exact_and_alias_lookup() {
+        let shared = Transliterator::from_default_shared_data().unwrap();
+        assert!(shared.legacy.dictionary_image.is_some());
+        assert!(shared.legacy.ranked.exact_index.is_empty());
+        assert!(shared.legacy.ranked.alias_index.is_empty());
+        assert!(!shared.legacy.ranked.gram_index.is_empty());
+
+        let transliterator = Transliterator::from_shared_data_with_config(
+            &shared,
+            DecoderConfig::default().with_mode(DecoderMode::Wfst),
+        );
+        let history = HashMap::new();
+        assert_eq!(
+            transliterator
+                .suggest("khnhomttov", &history)
+                .first()
+                .map(String::as_str),
+            Some("ខ្ញុំទៅ")
+        );
+        assert!(transliterator
+            .suggest("kit", &history)
+            .iter()
+            .any(|candidate| candidate == "គិត"));
     }
 
     #[test]
