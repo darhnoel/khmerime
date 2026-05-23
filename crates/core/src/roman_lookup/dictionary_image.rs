@@ -13,6 +13,8 @@ pub(crate) struct DictionaryImageView<'a> {
     exact_postings: &'a [u8],
     alias_keys: &'a [u8],
     alias_postings: &'a [u8],
+    gram_keys: &'a [u8],
+    gram_postings: &'a [u8],
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -56,6 +58,8 @@ impl<'a> DictionaryImageView<'a> {
             exact_postings: section(source, section_count, SECTION_EXACT_POSTINGS)?,
             alias_keys: section(source, section_count, SECTION_ALIAS_KEYS)?,
             alias_postings: section(source, section_count, SECTION_ALIAS_POSTINGS)?,
+            gram_keys: section(source, section_count, SECTION_GRAM_KEYS)?,
+            gram_postings: section(source, section_count, SECTION_GRAM_POSTINGS)?,
         };
         view.validate_record_sections()?;
         Ok(view)
@@ -71,6 +75,10 @@ impl<'a> DictionaryImageView<'a> {
 
     pub(crate) fn alias_key_count(&self) -> usize {
         self.alias_keys.len() / KEY_RANGE_RECORD_LEN
+    }
+
+    pub(crate) fn gram_key_count(&self) -> usize {
+        self.gram_keys.len() / KEY_RANGE_RECORD_LEN
     }
 
     pub(crate) fn entry(&self, entry_id: u32) -> Result<DictionaryEntryView<'a>> {
@@ -89,6 +97,10 @@ impl<'a> DictionaryImageView<'a> {
 
     pub(crate) fn alias_postings(&self, key: &str) -> Result<Option<DictionaryPostings<'a>>> {
         self.lookup_key(self.alias_keys, self.alias_postings, key)
+    }
+
+    pub(crate) fn gram_postings(&self, key: &str) -> Result<Option<DictionaryPostings<'a>>> {
+        self.lookup_key(self.gram_keys, self.gram_postings, key)
     }
 
     fn lookup_key(&self, keys: &'a [u8], postings: &'a [u8], query: &str) -> Result<Option<DictionaryPostings<'a>>> {
@@ -157,6 +169,7 @@ impl<'a> DictionaryImageView<'a> {
             ("entries", self.entries.len(), ENTRY_RECORD_LEN),
             ("exact keys", self.exact_keys.len(), KEY_RANGE_RECORD_LEN),
             ("alias keys", self.alias_keys.len(), KEY_RANGE_RECORD_LEN),
+            ("gram keys", self.gram_keys.len(), KEY_RANGE_RECORD_LEN),
         ] {
             if len % record_len != 0 {
                 return Err(LexiconError::Parse(format!(
@@ -164,7 +177,8 @@ impl<'a> DictionaryImageView<'a> {
                 )));
             }
         }
-        if self.exact_postings.len() % 4 != 0 || self.alias_postings.len() % 4 != 0 {
+        if self.exact_postings.len() % 4 != 0 || self.alias_postings.len() % 4 != 0 || self.gram_postings.len() % 4 != 0
+        {
             return Err(LexiconError::Parse(
                 "dictionary image postings section has partial record".to_owned(),
             ));

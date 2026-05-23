@@ -172,7 +172,7 @@ mod tests {
     }
 
     #[test]
-    fn dictionary_image_matches_ranked_exact_and_alias_indexes() {
+    fn dictionary_image_matches_ranked_retrieval_indexes() {
         let compiled_entries = parse_compiled_lexicon(DEFAULT_COMPILED_DATA).unwrap();
         let ranked = RankedLexicon::from_entries(&compiled_entries, CorpusStats::default());
         let image = dictionary_image::DictionaryImageView::parse(DEFAULT_DICTIONARY_IMAGE).unwrap();
@@ -180,6 +180,7 @@ mod tests {
         assert_eq!(image.entry_count(), ranked.entries.len());
         assert_eq!(image.exact_key_count(), ranked.exact_index.len());
         assert_eq!(image.alias_key_count(), ranked.alias_index.len());
+        assert_eq!(image.gram_key_count(), ranked.gram_index.len());
 
         for (entry_id, expected) in ranked.entries.iter().enumerate() {
             let actual = image.entry(entry_id as u32).unwrap();
@@ -211,6 +212,16 @@ mod tests {
             let expected = expected.iter().map(|id| *id as u32).collect::<Vec<_>>();
             assert_eq!(actual, expected, "alias postings mismatch for {key}");
         }
+
+        for (key, expected) in &ranked.gram_index {
+            let actual = image
+                .gram_postings(key)
+                .unwrap()
+                .map(Iterator::collect::<Vec<_>>)
+                .unwrap_or_default();
+            let expected = expected.iter().map(|id| *id as u32).collect::<Vec<_>>();
+            assert_eq!(actual, expected, "gram postings mismatch for {key}");
+        }
     }
 
     #[test]
@@ -219,7 +230,7 @@ mod tests {
         assert!(shared.legacy.dictionary_image.is_some());
         assert!(shared.legacy.ranked.exact_index.is_empty());
         assert!(shared.legacy.ranked.alias_index.is_empty());
-        assert!(!shared.legacy.ranked.gram_index.is_empty());
+        assert!(shared.legacy.ranked.gram_index.is_empty());
 
         let transliterator = Transliterator::from_shared_data_with_config(
             &shared,

@@ -79,9 +79,9 @@ impl LegacyData {
 
         let started = start_stage_timer();
         let index_mode = if dictionary_image.is_some() {
-            RankedLookupIndexMode::SkipExactAlias
+            RankedLookupIndexMode::SkipExactAliasAndGram
         } else {
-            RankedLookupIndexMode::BuildExactAlias
+            RankedLookupIndexMode::BuildRetrievalIndexes
         };
         let ranked = RankedLexicon::from_entries_with_stage_logger_and_index_mode(
             &entries,
@@ -491,6 +491,18 @@ impl LegacyData {
                 .unwrap_or_default();
         }
         self.ranked.alias_index.get(key).cloned().unwrap_or_default()
+    }
+
+    pub(crate) fn ranked_gram_entry_ids(&self, key: &str) -> Vec<usize> {
+        if let Some(image) = self.dictionary_image {
+            return image
+                .gram_postings(key)
+                .ok()
+                .flatten()
+                .map(|ids| ids.map(|id| id as usize).collect())
+                .unwrap_or_default();
+        }
+        self.ranked.gram_index.get(key).cloned().unwrap_or_default()
     }
 }
 

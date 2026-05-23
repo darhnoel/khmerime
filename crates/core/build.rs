@@ -597,6 +597,7 @@ fn compile_dictionary_image(entries: &[BuildLexiconEntry]) -> Result<Vec<u8>, St
     let mut image_entries = Vec::<DictionaryImageEntryRecord>::with_capacity(entries.len());
     let mut exact_index = BTreeMap::<String, Vec<u32>>::new();
     let mut alias_index = BTreeMap::<String, Vec<u32>>::new();
+    let mut gram_index = BTreeMap::<String, Vec<u32>>::new();
     let mut target_frequency = HashMap::<(String, String), u32>::new();
 
     for entry in entries {
@@ -624,8 +625,10 @@ fn compile_dictionary_image(entries: &[BuildLexiconEntry]) -> Result<Vec<u8>, St
             .filter(|key| key != &normalized_key)
         {
             interner.intern(&key)?;
+            push_dictionary_grams(&mut gram_index, &key, entry_id);
             alias_index.entry(key).or_default().push(entry_id);
         }
+        push_dictionary_grams(&mut gram_index, &normalized_key, entry_id);
 
         image_entries.push(DictionaryImageEntryRecord {
             target_id,
@@ -641,6 +644,7 @@ fn compile_dictionary_image(entries: &[BuildLexiconEntry]) -> Result<Vec<u8>, St
     let entries_section = compile_dictionary_entry_section(&image_entries);
     let (exact_keys, exact_postings) = compile_dictionary_key_index(&mut interner, exact_index)?;
     let (alias_keys, alias_postings) = compile_dictionary_key_index(&mut interner, alias_index)?;
+    let (gram_keys, gram_postings) = compile_dictionary_key_index(&mut interner, gram_index)?;
 
     // Key-index compilation may intern late keys; write string sections after
     // all sections have had a chance to assign string IDs.
@@ -654,7 +658,22 @@ fn compile_dictionary_image(entries: &[BuildLexiconEntry]) -> Result<Vec<u8>, St
         (SECTION_EXACT_POSTINGS, exact_postings),
         (SECTION_ALIAS_KEYS, alias_keys),
         (SECTION_ALIAS_POSTINGS, alias_postings),
+        (SECTION_GRAM_KEYS, gram_keys),
+        (SECTION_GRAM_POSTINGS, gram_postings),
     ])
+}
+
+fn push_dictionary_grams(index: &mut BTreeMap<String, Vec<u32>>, input: &str, entry_id: u32) {
+    let chars = input.chars().collect::<Vec<_>>();
+    if chars.len() < 2 {
+        return;
+    }
+    for start in 0..=chars.len() - 2 {
+        index
+            .entry(chars[start..start + 2].iter().collect())
+            .or_default()
+            .push(entry_id);
+    }
 }
 
 fn compile_dictionary_string_sections(interner: &DictionaryImageInterner) -> Result<(Vec<u8>, Vec<u8>), String> {
