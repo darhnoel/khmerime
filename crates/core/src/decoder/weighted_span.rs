@@ -11,6 +11,8 @@ use super::{
 const MIN_SPAN_LEN: usize = 3;
 const MIN_EXACT_ANCHOR_LEN: usize = 2;
 const CHUNK_EDIT_FLOOR: f64 = 0.46;
+const RARE_ENTRY_FUZZY_FLOOR: f64 = 0.65;
+const RARE_ENTRY_FREQUENCY_MAX: u32 = 1;
 const SEGMENT_LIMIT_PER_START: usize = 12;
 
 // Weighted span decoder.
@@ -514,6 +516,14 @@ impl WeightedSpanDecoder {
         }
 
         if best_edit < CHUNK_EDIT_FLOOR && !signals.exact_hit && !signals.alias_hit {
+            return None;
+        }
+
+        if entry.frequency <= RARE_ENTRY_FREQUENCY_MAX
+            && best_edit < RARE_ENTRY_FUZZY_FLOOR
+            && !signals.exact_hit
+            && !signals.alias_hit
+        {
             return None;
         }
 
