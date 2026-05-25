@@ -3,17 +3,18 @@
 use std::sync::OnceLock;
 
 use windows::core::{w, Result, PCWSTR};
-use windows::Win32::Foundation::{COLORREF, HWND, LPARAM, LRESULT, POINT, RECT, WPARAM};
+use windows::Win32::Foundation::{COLORREF, HWND, LPARAM, LRESULT, POINT, RECT, SIZE, WPARAM};
 use windows::Win32::Graphics::Gdi::{
-    BeginPaint, CreateFontW, DeleteObject, EndPaint, FillRect, GetMonitorInfoW, GetSysColor, GetSysColorBrush,
-    InvalidateRect, MonitorFromPoint, SelectObject, SetBkMode, SetTextColor, TextOutW, UpdateWindow, COLOR_HIGHLIGHT,
-    COLOR_HIGHLIGHTTEXT, COLOR_WINDOW, COLOR_WINDOWTEXT, MONITORINFO, MONITOR_DEFAULTTONEAREST, PAINTSTRUCT,
+    BeginPaint, CreateFontW, CreatePen, CreateRoundRectRgn, CreateSolidBrush, DeleteObject, EndPaint, FillRect, GetDC,
+    GetMonitorInfoW, GetSysColor, GetSysColorBrush, GetTextExtentPoint32W, InvalidateRect, MonitorFromPoint, ReleaseDC,
+    RoundRect, SelectObject, SetBkMode, SetTextColor, SetWindowRgn, TextOutW, UpdateWindow, COLOR_HIGHLIGHT,
+    COLOR_HIGHLIGHTTEXT, COLOR_WINDOW, COLOR_WINDOWTEXT, MONITORINFO, MONITOR_DEFAULTTONEAREST, PAINTSTRUCT, PS_SOLID,
     TRANSPARENT,
 };
 use windows::Win32::UI::WindowsAndMessaging::{
     CreateWindowExW, DefWindowProcW, DestroyWindow, GetSystemMetrics, GetWindowLongPtrW, RegisterClassExW,
     SetWindowLongPtrW, SetWindowPos, ShowWindow, CS_HREDRAW, CS_VREDRAW, GWLP_USERDATA, HMENU, HWND_TOPMOST,
-    SM_CXSCREEN, SM_CYSCREEN, SWP_NOACTIVATE, SWP_SHOWWINDOW, SW_HIDE, WM_NCHITTEST, WM_PAINT, WNDCLASSEXW, WS_BORDER,
+    SM_CXSCREEN, SM_CYSCREEN, SWP_NOACTIVATE, SWP_SHOWWINDOW, SW_HIDE, WM_NCHITTEST, WM_PAINT, WNDCLASSEXW,
     WS_EX_NOACTIVATE, WS_EX_TOOLWINDOW, WS_EX_TOPMOST, WS_POPUP,
 };
 
@@ -32,13 +33,18 @@ pub const CANDIDATE_SOURCE_FIELDS: &[&str] = &[
 // Window class name — registered once per process.
 const WCLASS: PCWSTR = w!("KhmerIMECandidates");
 
-const WIN_W: i32 = 300;
+const MIN_WIN_W: i32 = 300;
+const MAX_WIN_W: i32 = 720;
 const ROW_H: i32 = 32;
 const PAD_X: i32 = 10;
 const PAD_Y: i32 = 6;
 const FONT_HEIGHT: i32 = 22;
 const MAX_ROWS: usize = 9;
 const ANCHOR_GAP: i32 = 2;
+const OUTER_RADIUS: i32 = 8;
+const SELECT_RADIUS: i32 = 6;
+const SELECT_INSET_X: i32 = 4;
+const TEXT_GAP: i32 = 12;
 const RECOMMENDED_MARK: &str = "\u{2713}";
 const DERIVED_MARK: &str = "~";
 const SEGMENT_SEPARATOR: &str = " | ";
@@ -52,6 +58,8 @@ static CLASS_REGISTERED: OnceLock<()> = OnceLock::new();
 struct CandidateData {
     // Each entry is the display string and whether that row is selected.
     rows: Vec<(String, bool)>,
+    width: i32,
+    height: i32,
 }
 
 // ---------------------------------------------------------------------------
@@ -78,10 +86,10 @@ impl CandidateWindow {
                 WS_EX_TOPMOST | WS_EX_NOACTIVATE | WS_EX_TOOLWINDOW,
                 WCLASS,
                 PCWSTR::null(),
-                WS_POPUP | WS_BORDER,
+                WS_POPUP,
                 0,
                 0,
-                WIN_W,
+                MIN_WIN_W,
                 ROW_H,
                 HWND::default(),
                 HMENU::default(),
@@ -122,8 +130,10 @@ impl CandidateWindow {
                 .map(|(i, (_candidate, label))| (format!("{}  {}", i + 1, label), i == selected)),
         );
 
+        let work_area = monitor_work_area_for_location(location);
+        let width = self.measure_window_width(&rows, work_area);
         let height = candidate_window_height(rows.len());
-        let placement = candidate_window_placement(location, WIN_W, height, monitor_work_area_for_location(location));
+        let placement = candidate_window_placement(location, width, height, work_area);
 
         unsafe {
             // Replace paint data atomically (still on the STA thread).
@@ -131,8 +141,17 @@ impl CandidateWindow {
             if !old.is_null() {
                 drop(Box::from_raw(old));
             }
-            let data = Box::new(CandidateData { rows });
+            let data = Box::new(CandidateData { rows, width, height });
             SetWindowLongPtrW(self.hwnd, GWLP_USERDATA, Box::into_raw(data) as isize);
+            let region = CreateRoundRectRgn(
+                0,
+                0,
+                placement.width + 1,
+                placement.height + 1,
+                OUTER_RADIUS,
+                OUTER_RADIUS,
+            );
+            let _ = SetWindowRgn(self.hwnd, region, true);
 
             let _ = SetWindowPos(
                 self.hwnd,
@@ -146,6 +165,27 @@ impl CandidateWindow {
             let _ = InvalidateRect(self.hwnd, None, true);
             let _ = UpdateWindow(self.hwnd);
         }
+    }
+
+    fn measure_window_width(&self, rows: &[(String, bool)], work_area: RECT) -> i32 {
+        let hdc = unsafe { GetDC(self.hwnd) };
+        if hdc.is_invalid() {
+            return candidate_window_width_for_text_width(0, work_area_width(work_area));
+        }
+
+        let hfont = unsafe { CreateFontW(-FONT_HEIGHT, 0, 0, 0, 400, 0, 0, 0, 1, 0, 0, 5, 34, w!("Khmer UI")) };
+        let old_font = unsafe { SelectObject(hdc, hfont) };
+        let max_text_width = rows
+            .iter()
+            .map(|(text, _)| measure_text_width(hdc, text))
+            .max()
+            .unwrap_or(0);
+        unsafe {
+            SelectObject(hdc, old_font);
+            let _ = DeleteObject(hfont);
+            let _ = ReleaseDC(self.hwnd, hdc);
+        }
+        candidate_window_width_for_text_width(max_text_width, work_area_width(work_area))
     }
 
     pub fn hide(&self) {
@@ -165,6 +205,17 @@ struct CandidateWindowPlacement {
 
 fn candidate_window_height(row_count: usize) -> i32 {
     PAD_Y * 2 + row_count as i32 * ROW_H
+}
+
+fn candidate_window_width_for_text_width(text_width: i32, work_area_width: i32) -> i32 {
+    let work_area_width = work_area_width.max(1);
+    let min_width = MIN_WIN_W.min(work_area_width);
+    let max_width = MAX_WIN_W.min(work_area_width).max(min_width);
+    (text_width + PAD_X * 2 + TEXT_GAP).clamp(min_width, max_width)
+}
+
+fn work_area_width(work_area: RECT) -> i32 {
+    (work_area.right - work_area.left).max(1)
 }
 
 fn candidate_window_placement(
@@ -275,23 +326,52 @@ unsafe extern "system" fn candidate_wnd_proc(hwnd: HWND, msg: u32, wparam: WPARA
                 let old_font = SelectObject(hdc, hfont);
                 SetBkMode(hdc, TRANSPARENT);
 
+                let bg_brush = CreateSolidBrush(COLORREF(GetSysColor(COLOR_WINDOW)));
+                let border_pen = CreatePen(PS_SOLID, 1, COLORREF(GetSysColor(COLOR_WINDOWTEXT)));
+                let old_brush = SelectObject(hdc, bg_brush);
+                let old_pen = SelectObject(hdc, border_pen);
+                let _ = RoundRect(hdc, 0, 0, data.width, data.height, OUTER_RADIUS, OUTER_RADIUS);
+                SelectObject(hdc, old_pen);
+                SelectObject(hdc, old_brush);
+                let _ = DeleteObject(border_pen);
+                let _ = DeleteObject(bg_brush);
+
                 for (i, (text, is_selected)) in data.rows.iter().enumerate() {
                     let row_top = PAD_Y + i as i32 * ROW_H;
                     let row_rect = RECT {
-                        left: 0,
+                        left: SELECT_INSET_X,
                         top: row_top,
-                        right: WIN_W,
+                        right: data.width - SELECT_INSET_X,
                         bottom: row_top + ROW_H,
                     };
 
                     if *is_selected {
-                        FillRect(hdc, &row_rect, GetSysColorBrush(COLOR_HIGHLIGHT));
+                        let selected_brush = CreateSolidBrush(COLORREF(GetSysColor(COLOR_HIGHLIGHT)));
+                        let selected_pen = CreatePen(PS_SOLID, 1, COLORREF(GetSysColor(COLOR_HIGHLIGHT)));
+                        let old_brush = SelectObject(hdc, selected_brush);
+                        let old_pen = SelectObject(hdc, selected_pen);
+                        let _ = RoundRect(
+                            hdc,
+                            row_rect.left,
+                            row_rect.top,
+                            row_rect.right,
+                            row_rect.bottom,
+                            SELECT_RADIUS,
+                            SELECT_RADIUS,
+                        );
+                        SelectObject(hdc, old_pen);
+                        SelectObject(hdc, old_brush);
+                        let _ = DeleteObject(selected_pen);
+                        let _ = DeleteObject(selected_brush);
                         SetTextColor(hdc, COLORREF(GetSysColor(COLOR_HIGHLIGHTTEXT)));
                     } else {
+                        FillRect(hdc, &row_rect, GetSysColorBrush(COLOR_WINDOW));
                         SetTextColor(hdc, COLORREF(GetSysColor(COLOR_WINDOWTEXT)));
                     }
 
-                    let utf16: Vec<u16> = text.encode_utf16().collect();
+                    let available_width = data.width - PAD_X * 2;
+                    let row_text = ellipsize_text(hdc, text, available_width.max(0));
+                    let utf16: Vec<u16> = row_text.encode_utf16().collect();
                     let _ = TextOutW(hdc, PAD_X, row_top + (ROW_H - FONT_HEIGHT) / 2, &utf16);
                 }
 
@@ -309,6 +389,44 @@ unsafe extern "system" fn candidate_wnd_proc(hwnd: HWND, msg: u32, wparam: WPARA
         }
         _ => DefWindowProcW(hwnd, msg, wparam, lparam),
     }
+}
+
+fn measure_text_width(hdc: windows::Win32::Graphics::Gdi::HDC, text: &str) -> i32 {
+    let utf16 = text.encode_utf16().collect::<Vec<_>>();
+    if utf16.is_empty() {
+        return 0;
+    }
+    let mut size = SIZE::default();
+    unsafe {
+        if GetTextExtentPoint32W(hdc, &utf16, &mut size).as_bool() {
+            size.cx
+        } else {
+            0
+        }
+    }
+}
+
+fn ellipsize_text(hdc: windows::Win32::Graphics::Gdi::HDC, text: &str, max_width: i32) -> String {
+    if measure_text_width(hdc, text) <= max_width {
+        return text.to_owned();
+    }
+
+    const ELLIPSIS: &str = "...";
+    let ellipsis_width = measure_text_width(hdc, ELLIPSIS);
+    if ellipsis_width >= max_width {
+        return ELLIPSIS.to_owned();
+    }
+
+    let mut truncated = String::new();
+    for ch in text.chars() {
+        truncated.push(ch);
+        let candidate = format!("{truncated}{ELLIPSIS}");
+        if measure_text_width(hdc, &candidate) > max_width {
+            truncated.pop();
+            break;
+        }
+    }
+    format!("{truncated}{ELLIPSIS}")
 }
 
 // ---------------------------------------------------------------------------
@@ -519,6 +637,18 @@ mod tests {
         let rows = display_candidate_rows(&["ជា".to_owned(), "jea".to_owned()], &[]);
 
         assert_eq!(rows, vec!["ជា", "jea"]);
+    }
+
+    #[test]
+    fn candidate_window_width_grows_with_content_and_clamps_to_bounds() {
+        assert_eq!(candidate_window_width_for_text_width(40, 800), MIN_WIN_W);
+        assert_eq!(candidate_window_width_for_text_width(420, 800), 452);
+        assert_eq!(candidate_window_width_for_text_width(2000, 800), MAX_WIN_W);
+    }
+
+    #[test]
+    fn candidate_window_width_respects_small_work_area() {
+        assert_eq!(candidate_window_width_for_text_width(2000, 240), 240);
     }
 
     #[test]
