@@ -2,15 +2,16 @@
 
 use std::sync::{Arc, Mutex};
 
-use windows::core::{implement, Interface, Result};
+use windows::core::{implement, Interface, Result, VARIANT};
 use windows::Win32::Foundation::{BOOL, FALSE, POINT, RECT};
 use windows::Win32::Graphics::Gdi::ClientToScreen;
 use windows::Win32::System::Com::{CoCreateInstance, CLSCTX_INPROC_SERVER};
 use windows::Win32::UI::Accessibility::{CUIAutomation, IUIAutomation};
 use windows::Win32::UI::TextServices::{
-    ITfCompositionSink, ITfContext, ITfContextComposition, ITfEditSession, ITfEditSession_Impl, ITfInsertAtSelection,
-    ITfRange, TF_AE_END, TF_ANCHOR_END, TF_CONTEXT_EDIT_CONTEXT_FLAGS, TF_ES_READWRITE, TF_ES_SYNC, TF_IAS_QUERYONLY,
-    TF_SELECTION, TF_SELECTIONSTYLE,
+    CLSID_TF_CategoryMgr, ITfCategoryMgr, ITfCompositionSink, ITfContext, ITfContextComposition, ITfEditSession,
+    ITfEditSession_Impl, ITfInsertAtSelection, ITfRange, GUID_PROP_ATTRIBUTE, TF_AE_END, TF_ANCHOR_END,
+    TF_ANCHOR_START, TF_CONTEXT_EDIT_CONTEXT_FLAGS, TF_ES_READWRITE, TF_ES_SYNC, TF_IAS_QUERYONLY, TF_SELECTION,
+    TF_SELECTIONSTYLE,
 };
 use windows::Win32::UI::WindowsAndMessaging::{GetGUIThreadInfo, GUITHREADINFO};
 
@@ -21,6 +22,7 @@ use crate::diagnostics::log;
 use crate::com::text_service::TextServiceState;
 use crate::tsf::candidates::CandidateWindow;
 use crate::tsf::composition::KhmerImeCompositionSink;
+use crate::tsf::display_attributes::{register_display_attribute_guids, PreeditDisplaySpan};
 use crate::WindowsRenderState;
 
 /// Planned mutation responsibilities for edit sessions.
@@ -147,6 +149,9 @@ impl KhmerImeEditSession_Impl {
             unsafe {
                 range.SetText(ec, 0, &text)?;
             }
+            if let Err(err) = self.apply_preedit_display_attributes(ec, &range, preedit) {
+                log(format!("edit_session::display attributes failed: {err:?}"));
+            }
             let measure_range = unsafe { range.Clone()? };
             let selection_range = unsafe { range.Clone()? };
             unsafe {
@@ -154,6 +159,7 @@ impl KhmerImeEditSession_Impl {
             }
             set_selection_to_range(&self.context, ec, selection_range)?;
             state.current_preedit = preedit.to_owned();
+            state.current_preedit_display_span = self.render_state.preedit_display_span;
             return Ok(measure_range);
         }
 
@@ -173,6 +179,9 @@ impl KhmerImeEditSession_Impl {
         unsafe {
             comp_range.SetText(ec, 0, &text)?;
         }
+        if let Err(err) = self.apply_preedit_display_attributes(ec, &comp_range, preedit) {
+            log(format!("edit_session::display attributes failed: {err:?}"));
+        }
         let measure_range = unsafe { comp_range.Clone()? };
         let selection_range = unsafe { comp_range.Clone()? };
         unsafe {
@@ -181,6 +190,7 @@ impl KhmerImeEditSession_Impl {
         set_selection_to_range(&self.context, ec, selection_range)?;
         state.composition = Some(composition);
         state.current_preedit = preedit.to_owned();
+        state.current_preedit_display_span = self.render_state.preedit_display_span;
         Ok(measure_range)
     }
 
@@ -213,6 +223,7 @@ impl KhmerImeEditSession_Impl {
             set_selection_to_range(&self.context, ec, range)?;
         }
         state.current_preedit.clear();
+        state.current_preedit_display_span = None;
         Ok(())
     }
 
@@ -229,6 +240,31 @@ impl KhmerImeEditSession_Impl {
             }
         }
         state.current_preedit.clear();
+        state.current_preedit_display_span = None;
+        Ok(())
+    }
+
+    fn apply_preedit_display_attributes(&self, ec: u32, composition_range: &ITfRange, preedit: &str) -> Result<()> {
+        let property = unsafe { self.context.GetProperty(&GUID_PROP_ATTRIBUTE)? };
+        unsafe {
+            property.Clear(ec, composition_range)?;
+        }
+
+        let Some(span) = self.render_state.preedit_display_span else {
+            return Ok(());
+        };
+        let Some(style_range) = display_attribute_range(ec, composition_range, span, preedit)? else {
+            return Ok(());
+        };
+
+        register_display_attribute_guids();
+        let categories: ITfCategoryMgr =
+            unsafe { CoCreateInstance(&CLSID_TF_CategoryMgr, None, CLSCTX_INPROC_SERVER)? };
+        let atom = unsafe { categories.RegisterGUID(&span.attribute.guid())? };
+        let value = VARIANT::from(atom as i32);
+        unsafe {
+            property.SetValue(ec, &style_range, &value)?;
+        }
         Ok(())
     }
 
@@ -408,6 +444,35 @@ fn set_selection_to_range(context: &ITfContext, ec: u32, range: ITfRange) -> Res
         std::mem::ManuallyDrop::drop(&mut selection.range);
     }
     Ok(())
+}
+
+fn display_attribute_range(
+    ec: u32,
+    composition_range: &ITfRange,
+    span: PreeditDisplaySpan,
+    preedit: &str,
+) -> Result<Option<ITfRange>> {
+    let start = span.start_utf16(preedit);
+    let end = span.end_utf16(preedit);
+    if end <= start {
+        return Ok(None);
+    }
+
+    let style_range = unsafe { composition_range.Clone()? };
+    unsafe {
+        style_range.Collapse(ec, TF_ANCHOR_START)?;
+        let mut shifted_end = 0;
+        style_range.ShiftEnd(ec, end, &mut shifted_end, std::ptr::null())?;
+        if shifted_end != end {
+            return Ok(None);
+        }
+        let mut shifted_start = 0;
+        style_range.ShiftStart(ec, start, &mut shifted_start, std::ptr::null())?;
+        if shifted_start != start {
+            return Ok(None);
+        }
+    }
+    Ok(Some(style_range))
 }
 
 #[cfg(test)]

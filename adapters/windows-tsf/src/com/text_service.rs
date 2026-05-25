@@ -5,7 +5,9 @@ use std::sync::{mpsc::Receiver, Arc, Mutex};
 use windows::core::{implement, Error, Interface, Result};
 use windows::Win32::Foundation::{E_FAIL, TRUE};
 use windows::Win32::UI::TextServices::{
-    ITfComposition, ITfKeyEventSink, ITfKeystrokeMgr, ITfTextInputProcessor, ITfTextInputProcessor_Impl, ITfThreadMgr,
+    IEnumTfDisplayAttributeInfo, ITfComposition, ITfDisplayAttributeInfo, ITfDisplayAttributeProvider,
+    ITfDisplayAttributeProvider_Impl, ITfKeyEventSink, ITfKeystrokeMgr, ITfTextInputProcessor,
+    ITfTextInputProcessor_Impl, ITfThreadMgr,
 };
 
 use khmerime_session::CursorLocation;
@@ -14,6 +16,7 @@ use crate::com::dll_module;
 use crate::diagnostics::log;
 use crate::session_driver::WindowsSessionDriver;
 use crate::tsf::candidates::CandidateWindow;
+use crate::tsf::display_attributes::{enum_display_attribute_info, get_display_attribute_info, PreeditDisplaySpan};
 use crate::tsf::key_event_sink::KhmerImeKeyEventSink;
 
 /// Planned lifecycle callbacks for the TSF text service shell.
@@ -32,6 +35,8 @@ pub struct TextServiceState {
     /// Last preedit text successfully written to the TSF composition range.
     /// Used to skip redundant edit sessions when only candidates changed.
     pub current_preedit: String,
+    /// Last display attribute span applied to the TSF composition range.
+    pub current_preedit_display_span: Option<PreeditDisplaySpan>,
     /// Last candidate popup anchor resolved from a composition range.
     /// Reused for candidate-only updates that don't need a TSF edit session.
     pub last_candidate_anchor: Option<CursorLocation>,
@@ -48,12 +53,13 @@ impl Default for TextServiceState {
             composition: None,
             candidate_window: None,
             current_preedit: String::new(),
+            current_preedit_display_span: None,
             last_candidate_anchor: None,
         }
     }
 }
 
-#[implement(ITfTextInputProcessor)]
+#[implement(ITfTextInputProcessor, ITfDisplayAttributeProvider)]
 pub struct KhmerImeTextService {
     state: Arc<Mutex<TextServiceState>>,
 }
@@ -103,6 +109,8 @@ impl ITfTextInputProcessor_Impl for KhmerImeTextService_Impl {
             state.composition = None;
             state.client_id = tid;
             state.thread_mgr = ptim.cloned();
+            state.current_preedit.clear();
+            state.current_preedit_display_span = None;
         }
 
         if let Some(thread_mgr) = ptim {
@@ -134,6 +142,7 @@ impl ITfTextInputProcessor_Impl for KhmerImeTextService_Impl {
             state.driver = None;
             state.pending_driver = None;
             state.current_preedit.clear();
+            state.current_preedit_display_span = None;
             (thread_mgr, client_id, key_sink)
         };
 
@@ -151,6 +160,31 @@ impl ITfTextInputProcessor_Impl for KhmerImeTextService_Impl {
             }
         }
         Ok(())
+    }
+}
+
+impl ITfDisplayAttributeProvider_Impl for KhmerImeTextService_Impl {
+    fn EnumDisplayAttributeInfo(&self) -> Result<IEnumTfDisplayAttributeInfo> {
+        enum_display_attribute_info()
+    }
+
+    fn GetDisplayAttributeInfo(&self, guid: *const windows::core::GUID) -> Result<ITfDisplayAttributeInfo> {
+        get_display_attribute_info(guid)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use windows::Win32::UI::TextServices::ITfDisplayAttributeProvider;
+
+    #[test]
+    fn text_service_exposes_display_attribute_provider_interface() {
+        let service: windows::core::IUnknown = KhmerImeTextService::new().into();
+
+        let provider = service.cast::<ITfDisplayAttributeProvider>();
+
+        assert!(provider.is_ok());
     }
 }
 

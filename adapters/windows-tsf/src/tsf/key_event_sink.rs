@@ -66,7 +66,7 @@ impl ITfKeyEventSink_Impl for KhmerImeKeyEventSink_Impl {
             return Ok(FALSE);
         };
 
-        let (client_id, current_preedit, has_active_composition, render_state) = {
+        let (client_id, current_preedit, current_preedit_display_span, has_active_composition, render_state) = {
             let mut state = lock_state(&self.state)?;
             poll_pending_driver(&mut state);
             let Some(driver) = state.driver.as_mut() else {
@@ -78,8 +78,15 @@ impl ITfKeyEventSink_Impl for KhmerImeKeyEventSink_Impl {
             }
             let render_state = driver.process_callback(WindowsTsfCallback::KeyDown(event));
             let current_preedit = state.current_preedit.clone();
+            let current_preedit_display_span = state.current_preedit_display_span;
             let has_active_composition = state.composition.is_some();
-            (state.client_id, current_preedit, has_active_composition, render_state)
+            (
+                state.client_id,
+                current_preedit,
+                current_preedit_display_span,
+                has_active_composition,
+                render_state,
+            )
         };
 
         if let Some(context) = pic {
@@ -88,6 +95,7 @@ impl ITfKeyEventSink_Impl for KhmerImeKeyEventSink_Impl {
             // mutation and refresh the popup window directly with the cached anchor.
             let preedit_changed = render_state.commit_text.is_some()
                 || render_state.preedit != current_preedit
+                || render_state.preedit_display_span != current_preedit_display_span
                 || (render_state.preedit.is_empty() && has_active_composition);
 
             if preedit_changed {

@@ -9,7 +9,7 @@ use windows::Win32::System::Registry::{
 };
 use windows::Win32::UI::TextServices::{
     CLSID_TF_CategoryMgr, CLSID_TF_InputProcessorProfiles, ITfCategoryMgr, ITfInputProcessorProfiles,
-    GUID_TFCAT_TIP_KEYBOARD,
+    GUID_TFCAT_DISPLAYATTRIBUTEPROVIDER, GUID_TFCAT_TIP_KEYBOARD,
 };
 
 pub const CLSID_KHMERIME_TEXT_SERVICE: GUID = GUID::from_u128(0x79f0a9c7_fec5_4637_9d9d_4dfc54c8b5c2);
@@ -22,6 +22,7 @@ pub const PLANNED_REGISTRATION_STEPS: &[&str] = &[
     "register COM CLSID",
     "register TSF input processor profile",
     "register keyboard text-service category",
+    "register TSF display attribute provider category",
     "unregister TSF profile before removing COM CLSID",
 ];
 
@@ -88,10 +89,27 @@ unsafe fn register_tsf_profile() -> Result<()> {
         &GUID_TFCAT_TIP_KEYBOARD,
         &CLSID_KHMERIME_TEXT_SERVICE,
     )?;
+    categories.RegisterCategory(
+        &CLSID_KHMERIME_TEXT_SERVICE,
+        &GUID_TFCAT_DISPLAYATTRIBUTEPROVIDER,
+        &CLSID_KHMERIME_TEXT_SERVICE,
+    )?;
     Ok(())
 }
 
 unsafe fn unregister_tsf_profile() {
+    if let Ok(categories) = CoCreateInstance::<_, ITfCategoryMgr>(&CLSID_TF_CategoryMgr, None, CLSCTX_INPROC_SERVER) {
+        let _ = categories.UnregisterCategory(
+            &CLSID_KHMERIME_TEXT_SERVICE,
+            &GUID_TFCAT_DISPLAYATTRIBUTEPROVIDER,
+            &CLSID_KHMERIME_TEXT_SERVICE,
+        );
+        let _ = categories.UnregisterCategory(
+            &CLSID_KHMERIME_TEXT_SERVICE,
+            &GUID_TFCAT_TIP_KEYBOARD,
+            &CLSID_KHMERIME_TEXT_SERVICE,
+        );
+    }
     if let Ok(profiles) =
         CoCreateInstance::<_, ITfInputProcessorProfiles>(&CLSID_TF_InputProcessorProfiles, None, CLSCTX_INPROC_SERVER)
     {

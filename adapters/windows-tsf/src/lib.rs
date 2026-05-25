@@ -19,6 +19,9 @@ pub mod session_driver;
 #[cfg(windows)]
 pub mod tsf;
 
+#[cfg(windows)]
+use tsf::display_attributes::{focused_raw_input_display_span, PreeditDisplaySpan};
+
 /// Logical callback surface from TSF COM interfaces and sinks.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum WindowsTsfCallback {
@@ -82,6 +85,11 @@ pub struct WindowsRenderState {
     pub segment_preview: Vec<SegmentPreviewEntry>,
     /// Focused segment index when segmented phrase refinement is active.
     pub focused_segment_index: Option<usize>,
+    /// Whether the focused segment is being edited in-place.
+    pub segment_edit_active: bool,
+    /// Optional display styling span for focused roman preedit segment.
+    #[cfg(windows)]
+    pub preedit_display_span: Option<PreeditDisplaySpan>,
     /// Composition string for marked/preedit text.
     pub preedit: String,
     /// Optional commit text to finalize in host document.
@@ -148,6 +156,14 @@ pub fn derive_render_state(snapshot: &SessionSnapshot, result: &SessionResult) -
         segmented_active: snapshot.segmented_active,
         segment_preview: snapshot.segment_preview.clone(),
         focused_segment_index: snapshot.focused_segment_index,
+        segment_edit_active: snapshot.segment_edit_active,
+        #[cfg(windows)]
+        preedit_display_span: focused_raw_input_display_span(
+            &snapshot.raw_preedit,
+            &snapshot.segment_preview,
+            snapshot.focused_segment_index,
+            snapshot.segment_edit_active,
+        ),
         preedit: render_preedit,
         commit_text: result.commit_text.clone(),
         cursor_location: snapshot.cursor_location,
@@ -209,6 +225,7 @@ mod tests {
                 focused: true,
             }],
             focused_segment_index: Some(0),
+            segment_edit_active: false,
             cursor_location: CursorLocation {
                 x: 10,
                 y: 20,
@@ -233,6 +250,7 @@ mod tests {
         assert!(render_state.segmented_active);
         assert_eq!(render_state.segment_preview.len(), 1);
         assert_eq!(render_state.focused_segment_index, Some(0));
+        assert!(!render_state.segment_edit_active);
         assert_eq!(render_state.commit_text.as_deref(), Some("candidate"));
         assert_eq!(render_state.cursor_location.x, 10);
         assert!(render_state.actions.contains(&render::RenderAction::CommitText));
@@ -251,11 +269,29 @@ mod tests {
             }],
             selected_index: Some(0),
             segmented_active: true,
-            segment_preview: vec![SegmentPreviewEntry {
-                output: "នេះ".to_owned(),
-                input: "nih".to_owned(),
-                focused: true,
-            }],
+            focused_segment_index: Some(0),
+            segment_preview: vec![
+                SegmentPreviewEntry {
+                    output: "នេះ".to_owned(),
+                    input: "nih".to_owned(),
+                    focused: true,
+                },
+                SegmentPreviewEntry {
+                    output: "ជា".to_owned(),
+                    input: "jea".to_owned(),
+                    focused: false,
+                },
+                SegmentPreviewEntry {
+                    output: "ស្នាដៃ".to_owned(),
+                    input: "snadai".to_owned(),
+                    focused: false,
+                },
+                SegmentPreviewEntry {
+                    output: "បកប្រែ".to_owned(),
+                    input: "borkbrae".to_owned(),
+                    focused: false,
+                },
+            ],
             ..SessionSnapshot::default()
         };
 
@@ -264,6 +300,11 @@ mod tests {
         assert_eq!(render_state.preedit, "nihjeasnadaiborkbrae");
         assert_eq!(render_state.candidates, vec!["នេះជាស្នាដៃបកប្រែ"]);
         assert_eq!(render_state.segment_preview[0].output, "នេះ");
+        #[cfg(windows)]
+        assert_eq!(
+            render_state.preedit_display_span.map(|span| (span.start, span.end)),
+            Some((0, 3))
+        );
         assert!(render_state.actions.contains(&render::RenderAction::UpdateComposition));
     }
 
