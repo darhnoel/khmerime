@@ -12,7 +12,9 @@ PAPER_CURRENT_TEX := khmerime_current_implementation_paper.tex
 WINDOWS_TSF_TARGET ?= x86_64-pc-windows-msvc
 WINDOWS_TSF_TARGET_DIR ?= target/windows-tsf
 WINDOWS_TSF_DEV_TARGET_DIR ?= target/windows-tsf-dev
-WINDOWS_TSF_REINSTALL_STAMP ?= $(shell date +%Y%m%d%H%M%S)
+WINDOWS_TSF_REINSTALL_STAMP ?= $(shell powershell -NoProfile -Command "Get-Date -Format yyyyMMddHHmmss")
+# Freeze the stamp once per make invocation so all deploy paths match.
+WINDOWS_TSF_REINSTALL_STAMP := $(WINDOWS_TSF_REINSTALL_STAMP)
 WINDOWS_TSF_DEPLOY_DIR ?= target/windows-tsf-deploy/$(WINDOWS_TSF_REINSTALL_STAMP)
 WINDOWS_TSF_DLL := $(WINDOWS_TSF_TARGET_DIR)/$(WINDOWS_TSF_TARGET)/debug/khmerime_windows_tsf.dll
 WINDOWS_TSF_DEV_DLL := $(WINDOWS_TSF_DEV_TARGET_DIR)/$(WINDOWS_TSF_TARGET)/debug/khmerime_windows_tsf.dll
