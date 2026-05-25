@@ -119,11 +119,17 @@ pub fn map_callback_to_session_command(callback: &WindowsTsfCallback) -> Option<
 
 /// Derives adapter-owned render responsibilities from session output.
 pub fn derive_render_state(snapshot: &SessionSnapshot, result: &SessionResult) -> WindowsRenderState {
+    let render_preedit = if snapshot.raw_preedit.is_empty() {
+        snapshot.preedit.clone()
+    } else {
+        snapshot.raw_preedit.clone()
+    };
+
     let mut actions = Vec::new();
     if result.commit_text.is_some() {
         actions.push(render::RenderAction::CommitText);
     }
-    if snapshot.preedit.is_empty() {
+    if render_preedit.is_empty() {
         actions.push(render::RenderAction::ClearComposition);
     } else {
         actions.push(render::RenderAction::UpdateComposition);
@@ -142,7 +148,7 @@ pub fn derive_render_state(snapshot: &SessionSnapshot, result: &SessionResult) -
         segmented_active: snapshot.segmented_active,
         segment_preview: snapshot.segment_preview.clone(),
         focused_segment_index: snapshot.focused_segment_index,
-        preedit: snapshot.preedit.clone(),
+        preedit: render_preedit,
         commit_text: result.commit_text.clone(),
         cursor_location: snapshot.cursor_location,
         actions,
@@ -230,6 +236,35 @@ mod tests {
         assert_eq!(render_state.commit_text.as_deref(), Some("candidate"));
         assert_eq!(render_state.cursor_location.x, 10);
         assert!(render_state.actions.contains(&render::RenderAction::CommitText));
+    }
+
+    #[test]
+    fn render_state_prefers_raw_roman_preedit_over_segmented_khmer_preview() {
+        let snapshot = SessionSnapshot {
+            raw_preedit: "nihjeasnadaiborkbrae".to_owned(),
+            preedit: "នេះជាស្នាដៃបកប្រែ".to_owned(),
+            candidates: vec!["នេះជាស្នាដៃបកប្រែ".to_owned()],
+            candidate_display: vec![CandidateDisplayEntry {
+                output: "នេះជាស្នាដៃបកប្រែ".to_owned(),
+                recommended: true,
+                roman_hints: vec!["nih jea snadai borkbrae".to_owned()],
+            }],
+            selected_index: Some(0),
+            segmented_active: true,
+            segment_preview: vec![SegmentPreviewEntry {
+                output: "នេះ".to_owned(),
+                input: "nih".to_owned(),
+                focused: true,
+            }],
+            ..SessionSnapshot::default()
+        };
+
+        let render_state = derive_render_state(&snapshot, &SessionResult::default());
+
+        assert_eq!(render_state.preedit, "nihjeasnadaiborkbrae");
+        assert_eq!(render_state.candidates, vec!["នេះជាស្នាដៃបកប្រែ"]);
+        assert_eq!(render_state.segment_preview[0].output, "នេះ");
+        assert!(render_state.actions.contains(&render::RenderAction::UpdateComposition));
     }
 
     #[test]
