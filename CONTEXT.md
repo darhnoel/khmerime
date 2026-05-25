@@ -25,7 +25,7 @@ The user's current in-progress input — the raw roman string, the candidate lis
 _Avoid_: preedit, input buffer
 
 **Segmented Session**:
-A multi-chunk view of a long **Composition** where the decoder identifies internal word boundaries. Each segment has its own candidates and selection; the user can navigate between segments with Left/Right.
+A multi-chunk view of a long **Composition** where the decoder identifies internal word boundaries. Each segment has its own Khmer candidates and selection; the user can navigate between segments with Left/Right. In romanization mode, segmented Khmer outputs are preview choices over the raw roman **Preedit**; they do not replace the inline **Preedit** before confirmation.
 _Avoid_: multi-segment preedit, split composition
 
 **Segment Edit Mode**:
@@ -33,11 +33,15 @@ A sub-state of a **Segmented Session** in which one focused segment is being rew
 _Avoid_: segment rewrite, active segment, segment focus
 
 **Preedit**:
-The Khmer text displayed inline at the cursor while the user is composing. Distinct from the **Commit Text** — the preedit is provisional; commit text is what lands in the application.
-_Avoid_: composition text (ambiguous with **Composition**)
+The provisional inline text displayed at the cursor while the user is composing. In romanization mode this is the user's raw roman input; Khmer choices are shown as candidates or previews until the user confirms. Distinct from the **Commit Text** — the preedit is provisional; commit text is what lands in the application.
+_Avoid_: composition text (ambiguous with **Composition**), inline Khmer preview
+
+**Candidate List**:
+The visible Khmer choices for the active **Composition** or focused **Segmented Session** segment. In romanization mode, the Candidate List should remain visible even when there is only one obvious choice, because it tells the user what Enter will commit while the inline **Preedit** stays roman.
+_Avoid_: suggestions (too broad), inline candidates
 
 **Commit Text**:
-The final Khmer string sent to the host application when the user confirms (Enter, Space, digit, etc.). May or may not equal the **Preedit** depending on whether the segmented or flat-refined path produces it.
+The confirmed text sent to the host application when the user confirms. In romanization mode, Enter is the normal confirmation key; Space and digit keys select candidates or segments during an active **Composition**. Commit text is normally Khmer, selected from candidates, a **Segmented Session**, or the **Commit Refiner**; it may fall back to roman text when no Khmer output is available.
 _Avoid_: output text, submission
 
 **Visible Segmented Commit**:
