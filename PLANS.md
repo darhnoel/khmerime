@@ -49,12 +49,26 @@ Those belong in `AGENTS.md` or `specs/`.
 
 ## Build-Time Dictionary Image For System Lexicon
 
-- status: planned
+- status: in_progress
 - scope: `crates/core/build.rs`, `crates/core/src/roman_lookup/`, `crates/core/src/decoder/weighted_span.rs`, `adapters/linux-ibus/src/bin/khmerime_ibus_bridge.rs`, tests/golden coverage
 - spec: `docs/adr/0004-build-time-dictionary-image-for-system-lexicon.md`, `specs/structure/module-boundaries.md`, `specs/structure/verification-surfaces.md`
 - goal: Replace heap-heavy system **Lexicon** structures in **SharedTransliteratorData** with a build-time **Dictionary Image** while preserving current IME behavior. First serious milestone is Linux **Bridge** steady-state RSS under 60 MB after full warmup and one `snapshot` command.
-- validation: `cargo fmt --all`; `cargo test -p khmerime_core`; `cargo test -p khmerime_session`; `cargo test --test decoder_golden`; bridge RSS harness with and without `KHMERIME_DISABLE_SHARED_DATA_CACHE=1`; representative `target/release/lookup_cli segmented <roman>` checks
-- notes: Use an embedded `include_bytes!` image with zero-copy internal views first, but keep the manual little-endian format mmap-compatible. Leave **Learned History** TSV/HashMap unchanged. Do not mmap the current bincode cache.
+- validation: `cargo fmt --all`; `cargo test -p khmerime_core`; `cargo test -p khmerime_session`; `cargo test --test decoder_golden`; `cargo test -p khmerime_linux_ibus --test ibus_bridge_protocol`; bridge RSS harness after `full_warmup.end` and one `snapshot` command; representative `target/release/lookup_cli segmented <roman>` and `target/release/lookup_cli suggest <roman>` checks
+- notes: Keep `LegacyData` as the internal behavior facade for `Transliterator`, decoders, session, CLI, Dioxus, and the **Bridge**. Remove heap-owned lookup maps only for the default system **Lexicon** path. Custom CSV/TSV and other runtime lexicon paths stay heap-backed until a later slice. Use an embedded `include_bytes!` image with zero-copy internal views first, but keep the manual little-endian format mmap-compatible. Leave **Learned History** TSV/HashMap unchanged. Retire the bincode `SharedTransliteratorData` cache for the image-backed default path; do not mmap the current bincode cache.
+
+### Current Measurements And Target
+
+- Installed **Bridge** cache-hit steady state: about 168 MB RSS, almost entirely private anonymous heap.
+- Current release full-build steady state: about 188 MB RSS; the extra ~20 MB is likely allocator-retained build-path temporary memory.
+- Isolated remaining contributors: heap-owned `LegacyData` lookup maps are about 82 MB; `SearchIndex(Ngram)` is about 23 MB; SymSpell is larger and not a memory-reduction path.
+- First image-backed legacy lookup slice reduced the release **Bridge** to about 107 MB RSS after `full_warmup.end` and one `snapshot` command. The next target is the heap-backed legacy `Search Index` and remaining ranked/corpus/entry duplication while preserving exact output parity across public `Transliterator` and session behavior.
+
+### Storage Boundary
+
+- `LegacyData` remains the facade; storage becomes an internal implementation detail.
+- Use a storage enum or equivalent internal boundary so default system data can be image-backed while custom/runtime data remains heap-backed.
+- Public behavior methods must continue to define the compatibility contract: `suggest()`, `exact_targets()`, `exact_match_roman_variants()`, `best_prefix_consumption()`, `next_word_suggestions()`, and `infer_next_word_context_suffix()`.
+- Image-backed helpers should expose behavior-level queries rather than raw sections: roman to targets, normalized roman to exact targets, target to roman variants, target frequency, roman to normalized roman, prefix to roman candidates, and all roman keys when fallback requires them.
 
 ### Dictionary Image Stages
 
@@ -77,15 +91,33 @@ Those belong in `AGENTS.md` or `specs/`.
    - Move word/surface/tag unigram and bigram stats into ID-keyed image tables.
    - Keep `corpus_word_bigrams` behavior measurable because it is hit in normal segmented typing but not dominant.
 
-5. Legacy flat suggestion slice:
-   - Move `LegacyData::suggest()` exact/prefix/search surfaces onto image-backed indexes.
-   - Temporarily keep current `SearchIndex` until flat suggestions are behavior-equivalent.
-   - Remove or shrink duplicated legacy maps after the image-backed path passes tests.
+5. Legacy exact/prefix/reverse slice:
+   - Extend the **Dictionary Image** with the heap-owned `LegacyData` lookup surfaces: `by_roman`, `by_normalized`, `by_target`, `target_frequency`, `roman_normalized`, and `roman_prefix_index`.
+   - Add dual-read parity tests against heap-backed maps before routing production behavior through the image.
+   - Route `LegacyData::suggest()`, `exact_targets()`, `exact_match_roman_variants()`, and `best_prefix_consumption()` through storage helpers.
+   - Remove the equivalent heap maps only for the default system **Lexicon** after public output parity holds.
+   - Temporarily keep current `SearchIndex(Ngram)` until flat exact/prefix/reverse suggestions are behavior-equivalent.
 
-6. Phase A/Phase B cleanup:
+6. Legacy `Search Index` slice:
+   - Move `SearchIndex(Ngram)` exact/items/gram tables into sorted image sections or replace it with equivalent image-backed range queries.
+   - Preserve current threshold and ordering behavior before removing the heap-backed Ngram index.
+   - Do not switch to SymSpell for memory reduction; measured SymSpell RSS is substantially larger.
+
+7. Default cache retirement slice:
+   - Bypass the bincode `SharedTransliteratorData` cache for the default image-backed path.
+   - Keep cache code available only for heap-backed custom/runtime paths if those paths still need it.
+   - Remove the cache-hit `attach_dictionary_image()` workaround once the default path no longer deserializes `LegacyData`.
+
+8. Phase A/Phase B cleanup:
    - Redefine Phase A as a cheap view over the same **Dictionary Image**, not a separate heap-built **SharedTransliteratorData**.
    - Measure whether Phase B can become lightweight lazy decoder/helper initialization.
    - Re-check allocator residue after full engine install.
+
+### Parity Gate
+
+- Exact output parity is required across public `Transliterator` and session surfaces, not byte-for-byte internal structure parity.
+- Focused parity tests should compare image-backed default data with heap-backed data for representative `suggest()`, `exact_match_targets()`, `exact_match_roman_variants()`, `best_prefix_consumption()`, and segmented-session flows.
+- Required test gate for slices that route behavior: `cargo fmt --all`; `cargo test -p khmerime_core`; `cargo test -p khmerime_session`; `cargo test --test decoder_golden`; `cargo test -p khmerime_linux_ibus --test ibus_bridge_protocol`.
 
 ## Ubuntu Native IBus Switching (Mozc-like v1)
 
