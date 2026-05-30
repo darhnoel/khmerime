@@ -73,7 +73,11 @@ pub fn convert_windows_key(input: WindowsKeyInput) -> ConvertedKey {
 
     ConvertedKey::Event(NativeKeyEvent {
         keyval,
-        keycode: input.virtual_key,
+        // The session expects a canonical scancode (set-1 / evdev main block),
+        // not the Windows virtual-key code. The `lParam` scan code is already in
+        // that numbering, so NIDA-mode lookup works without a VK translation
+        // table. Falls back to `keyval` in the session when this is 0.
+        keycode: input.scan_code,
         state: input.state,
     })
 }
@@ -94,6 +98,7 @@ mod tests {
     fn printable_ascii_becomes_session_keyval() {
         let converted = convert_windows_key(WindowsKeyInput {
             virtual_key: 0x41,
+            scan_code: 30,
             translated_char: Some('a'),
             ..WindowsKeyInput::default()
         });
@@ -102,7 +107,8 @@ mod tests {
             converted,
             ConvertedKey::Event(NativeKeyEvent {
                 keyval: 'a' as u32,
-                keycode: 0x41,
+                // Canonical scancode forwarded, not the virtual-key code.
+                keycode: 30,
                 state: 0,
             })
         );
@@ -115,6 +121,27 @@ mod tests {
         assert_eq!(keyval_for(VK_ESCAPE), Some(SESSION_KEY_ESCAPE));
         assert_eq!(keyval_for(VK_LEFT), Some(SESSION_KEY_LEFT));
         assert_eq!(keyval_for(VK_DOWN), Some(SESSION_KEY_DOWN));
+    }
+
+    #[test]
+    fn forwards_scancode_not_virtual_key_for_nida_lookup() {
+        // `K` is VK 0x4B but canonical scancode 37. NIDA-mode keymap lookup
+        // keys on the scancode, so the event must carry 37, not 0x4B.
+        let converted = convert_windows_key(WindowsKeyInput {
+            virtual_key: 0x4B,
+            scan_code: 37,
+            translated_char: Some('k'),
+            ..WindowsKeyInput::default()
+        });
+
+        assert_eq!(
+            converted,
+            ConvertedKey::Event(NativeKeyEvent {
+                keyval: 'k' as u32,
+                keycode: 37,
+                state: 0,
+            })
+        );
     }
 
     #[test]
