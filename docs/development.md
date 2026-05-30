@@ -14,7 +14,7 @@ Read these in order when you need context:
 
 1. `README.md` for the product summary
 2. `docs/development.md` for how to run and verify the project
-3. `docs/architecture.md` for the decoder and UI architecture
+3. `docs/architecture/` for cross-platform performance patterns and subsystem design
 4. `docs/khpos_mechanism.md` for the `khPOS` integration design and status
 5. `docs/ubuntu_ibus.md` when working on native Ubuntu input-source behavior
 

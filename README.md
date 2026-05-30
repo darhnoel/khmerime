@@ -1,124 +1,81 @@
-# Roman Lookup
+# KhmerIME
 
-Standalone Rust lookup engine with:
-- a separate CSV lexicon such as `data/your_lexicon.csv`
-- a Dioxus MVP that runs on web and desktop
+Type `nhomtovsalarien` and get `ខ្ញុំទៅសាលារៀន`.
 
-## Layout
+<!-- TODO: demo GIF here -->
 
-- Workspace core engine: `crates/core/`
-- Session contract/state machine: `crates/session/`
-- Linux IBus adapter + bridge: `adapters/linux-ibus/`
-- iOS keyboard scaffold: `adapters/ios-keyboard/`
-- macOS InputMethodKit scaffold: `adapters/macos-imk/`
-- Windows TSF scaffold: `adapters/windows-tsf/`
-- Android IME scaffold: `adapters/android-ime/`
-- Dioxus app: `apps/dioxus-app/`
-- CLI app: `apps/lookup-cli/`
-- IBus adapter script: `adapters/linux-ibus/python/khmerime_ibus_engine.py`
-- Architecture guide: [docs/architecture.md](docs/architecture.md)
-- Contributor guide: [CONTRIBUTING.md](CONTRIBUTING.md)
-- Platform docs: `docs/platforms/`
-- Default embedded data:
-  - primary: `data/roman_lookup.csv`
-  - secondary most-common English-Khmer source: `data/most-common-en-kh.csv`
+KhmerIME is a cross-platform Khmer input method engine built around a shared Rust
+core. It provides consistent transliteration behavior across platforms while
+keeping native integrations thin and platform-specific.
 
-## Usage
+## Why KhmerIME
 
-Preferred entrypoint:
+KhmerIME is designed as one input engine with multiple platform adapters. The
+core transliteration behavior — decoding, ranking, segmentation, and candidate
+selection — lives in:
 
-```
-$ make help
-```
+- [crates/core/](crates/core) — the transliteration engine
+- [crates/session/](crates/session) — the platform-neutral session contract
 
-Suggestion behavior note:
-- for roman-token queries, the literal typed token is always kept as the last candidate fallback (for example `leonhard`).
+Platform integrations such as IBus, Windows TSF, macOS IMK, iOS keyboard, Android
+IME, and the desktop/mobile scaffolds are intentionally thin. Their responsibility
+is to translate native key events, lifecycle events, and platform behavior into
+the shared session contract.
 
-### Ubuntu Native IBus (Mozc-like Source Switching)
+This architecture keeps the typing experience consistent across platforms while
+allowing platform-specific development to move independently.
 
-For local development on Ubuntu GNOME/Wayland:
+In short:
+
+- One shared engine.
+- Thin native adapters.
+- Consistent behavior everywhere.
+- Locked regression surface.
+
+## Getting Started
 
 ```bash
-make ibus-install
-make ibus-smoke
+make help
 ```
 
-`make ibus-install` may prompt for `sudo` because IBus scans system component
-paths on Ubuntu.
+`make help` lists the available developer commands, including commands for running
+apps, querying the engine, building data, and working with platform adapters.
 
-Then add from **Settings -> Keyboard -> Input Sources**:
-- search for `Khmer` (not `KhmerIME`), then select `KhmerIME`
+For full build, run, and verification instructions, see
+**[docs/development.md](docs/development.md)**.
 
-Switch sources with the desktop shortcut (for example `Super+Space`).
+## Project Layout
 
-Remove local install files with:
-
-```bash
-make ibus-uninstall
+```text
+crates/core/       Transliteration engine: lexicon, decoder, ranking
+crates/session/    Platform-neutral session contract and state machine
+adapters/          Native integrations for Linux, Windows, macOS, iOS, and Android
+apps/              Dioxus app and lookup CLI
+data/              CSV lexicon and compiled data sources
+docs/              Development, architecture, platform, and design documentation
 ```
 
-### Web Release Base Path
+## Design Principles
 
-For subpath hosting (for example `/khmerime-beta/`), build with one variable:
+- Keep transliteration behavior in one shared engine.
+- Keep platform adapters thin and predictable.
+- Avoid platform-specific logic drift.
+- Preserve a stable regression surface for decoding and ranking.
+- Prioritize low-latency typing behavior.
+- Make platform development possible without changing the core typing experience.
 
-```bash
-WEB_BASE_PATH=khmerime-beta make web-release
-```
+## Docs
 
-The release script will:
-- pass `--base-path` to Dioxus build output, and
-- export the same value as `KHMERIME_BASE_PATH` for runtime `.bin` fetch URLs.
-
-### Startup Diagnostics (iOS Critical Path)
-
-On `wasm32` + `fetch-data`, the app supports runtime startup profiles via query string:
-
-- `?startup_profile=defer_full` (default): phase-A legacy ready first, then background full promotion.
-- `?startup_profile=baseline`: wait for full engine before ready.
-- `?startup_profile=lexicon_only`: lexicon-only phase (skip khPOS fetch/promotion).
-- `?startup_profile=baseline_compression_audit`: baseline plus response header capture for compression/cache.
-
-Each startup run emits a single structured console report with per-stage timestamps.
-
-### Data Build Config
-
-Build-time data paths and durable build knobs live in `config/data_paths.toml`.
-The `[data_build]` section controls `khpos.stats.bin` size:
-
-```toml
-[data_build]
-khpos_surface_min_count = 1
-khpos_surface_top_n = 0
-```
-
-Set `khpos_surface_top_n = 0` to keep all compiled khPOS surfaces. Lower
-positive values shrink `khpos.stats.bin`, but must be checked against decoder
-goldens before becoming default.
-
-Environment variables still override config for experiments:
-
-- `KHPOS_SURFACE_MIN_COUNT=<u32>`
-- `KHPOS_SURFACE_TOP_N=<usize>`
-- `KHMERIME_SEARCH_INDEX=ngram|symspell`
-
-Example:
-
-```bash
-KHPOS_SURFACE_MIN_COUNT=2 KHPOS_SURFACE_TOP_N=120000 cargo build --release --bin khmerime_ibus_bridge
-```
-
-The `[runtime]` section controls the embedded default for runtime-search
-experiments:
-
-```toml
-[runtime]
-legacy_fuzzy_index = "ngram" # or "symspell"
-```
-
-Keep `ngram` as the default unless SymSpell's slower build cost is acceptable
-for the target runtime, or the SymSpell index is built lazily after startup.
+- [docs/development.md](docs/development.md) — how to run and verify the project
+- [CONTRIBUTING.md](CONTRIBUTING.md) — contribution rules and required checks
+- [CONTEXT.md](CONTEXT.md) — domain vocabulary and how the pieces relate
+- [docs/platforms/](docs/platforms/) — per-platform native packaging and install
+- [docs/architecture/](docs/architecture/) — cross-platform performance patterns and subsystem design
+- [docs/adr/](docs/adr/) — architecture decision records
 
 ## Data Credits
+
+KhmerIME uses data and references from the following open-source projects:
 
 - khPOS: https://github.com/ye-kyaw-thu/khPOS/tree/master
 - Khmerlang Keyboard: https://github.com/khmerlang/Khmerlang-Keyboard
