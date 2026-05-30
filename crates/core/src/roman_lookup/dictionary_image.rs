@@ -15,6 +15,15 @@ pub(crate) struct DictionaryImageView<'a> {
     alias_postings: &'a [u8],
     gram_keys: &'a [u8],
     gram_postings: &'a [u8],
+    legacy_roman_keys: &'a [u8],
+    legacy_roman_postings: &'a [u8],
+    legacy_normalized_keys: &'a [u8],
+    legacy_normalized_postings: &'a [u8],
+    legacy_target_keys: &'a [u8],
+    legacy_target_postings: &'a [u8],
+    legacy_prefix_keys: &'a [u8],
+    legacy_prefix_postings: &'a [u8],
+    legacy_target_frequencies: &'a [u8],
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -60,6 +69,15 @@ impl<'a> DictionaryImageView<'a> {
             alias_postings: section(source, section_count, SECTION_ALIAS_POSTINGS)?,
             gram_keys: section(source, section_count, SECTION_GRAM_KEYS)?,
             gram_postings: section(source, section_count, SECTION_GRAM_POSTINGS)?,
+            legacy_roman_keys: section(source, section_count, SECTION_LEGACY_ROMAN_KEYS)?,
+            legacy_roman_postings: section(source, section_count, SECTION_LEGACY_ROMAN_POSTINGS)?,
+            legacy_normalized_keys: section(source, section_count, SECTION_LEGACY_NORMALIZED_KEYS)?,
+            legacy_normalized_postings: section(source, section_count, SECTION_LEGACY_NORMALIZED_POSTINGS)?,
+            legacy_target_keys: section(source, section_count, SECTION_LEGACY_TARGET_KEYS)?,
+            legacy_target_postings: section(source, section_count, SECTION_LEGACY_TARGET_POSTINGS)?,
+            legacy_prefix_keys: section(source, section_count, SECTION_LEGACY_PREFIX_KEYS)?,
+            legacy_prefix_postings: section(source, section_count, SECTION_LEGACY_PREFIX_POSTINGS)?,
+            legacy_target_frequencies: section(source, section_count, SECTION_LEGACY_TARGET_FREQUENCIES)?,
         };
         view.validate_record_sections()?;
         Ok(view)
@@ -79,6 +97,22 @@ impl<'a> DictionaryImageView<'a> {
 
     pub(crate) fn gram_key_count(&self) -> usize {
         self.gram_keys.len() / KEY_RANGE_RECORD_LEN
+    }
+
+    pub(crate) fn legacy_roman_key_count(&self) -> usize {
+        self.legacy_roman_keys.len() / KEY_RANGE_RECORD_LEN
+    }
+
+    pub(crate) fn legacy_normalized_key_count(&self) -> usize {
+        self.legacy_normalized_keys.len() / KEY_RANGE_RECORD_LEN
+    }
+
+    pub(crate) fn legacy_target_key_count(&self) -> usize {
+        self.legacy_target_keys.len() / KEY_RANGE_RECORD_LEN
+    }
+
+    pub(crate) fn legacy_prefix_key_count(&self) -> usize {
+        self.legacy_prefix_keys.len() / KEY_RANGE_RECORD_LEN
     }
 
     pub(crate) fn entry(&self, entry_id: u32) -> Result<DictionaryEntryView<'a>> {
@@ -101,6 +135,62 @@ impl<'a> DictionaryImageView<'a> {
 
     pub(crate) fn gram_postings(&self, key: &str) -> Result<Option<DictionaryPostings<'a>>> {
         self.lookup_key(self.gram_keys, self.gram_postings, key)
+    }
+
+    pub(crate) fn legacy_roman_targets(&self, roman: &str) -> Result<Option<Vec<&'a str>>> {
+        self.lookup_string_values(self.legacy_roman_keys, self.legacy_roman_postings, roman)
+    }
+
+    pub(crate) fn legacy_normalized_targets(&self, normalized: &str) -> Result<Option<Vec<&'a str>>> {
+        self.lookup_string_values(self.legacy_normalized_keys, self.legacy_normalized_postings, normalized)
+    }
+
+    pub(crate) fn legacy_target_romans(&self, target: &str) -> Result<Option<Vec<&'a str>>> {
+        self.lookup_string_values(self.legacy_target_keys, self.legacy_target_postings, target)
+    }
+
+    pub(crate) fn legacy_prefix_romans(&self, prefix: &str) -> Result<Option<Vec<&'a str>>> {
+        self.lookup_string_values(self.legacy_prefix_keys, self.legacy_prefix_postings, prefix)
+    }
+
+    pub(crate) fn legacy_all_romans(&self) -> Result<Vec<&'a str>> {
+        self.key_strings(self.legacy_roman_keys)
+    }
+
+    pub(crate) fn legacy_target_frequency(&self, target: &str) -> Result<Option<u32>> {
+        let mut low = 0usize;
+        let mut high = self.legacy_target_frequencies.len() / STRING_U32_RECORD_LEN;
+        while low < high {
+            let mid = low + (high - low) / 2;
+            let offset = mid * STRING_U32_RECORD_LEN;
+            let target_id = read_u32_at(self.legacy_target_frequencies, offset)?;
+            let key = self.string(target_id)?;
+            match key.cmp(target) {
+                Ordering::Less => low = mid + 1,
+                Ordering::Equal => return read_u32_at(self.legacy_target_frequencies, offset + 4).map(Some),
+                Ordering::Greater => high = mid,
+            }
+        }
+        Ok(None)
+    }
+
+    fn lookup_string_values(&self, keys: &'a [u8], postings: &'a [u8], query: &str) -> Result<Option<Vec<&'a str>>> {
+        let Some(ids) = self.lookup_key(keys, postings, query)? else {
+            return Ok(None);
+        };
+        let mut values = Vec::new();
+        for id in ids {
+            values.push(self.string(id)?);
+        }
+        Ok(Some(values))
+    }
+
+    fn key_strings(&self, keys: &'a [u8]) -> Result<Vec<&'a str>> {
+        let mut values = Vec::with_capacity(keys.len() / KEY_RANGE_RECORD_LEN);
+        for offset in (0..keys.len()).step_by(KEY_RANGE_RECORD_LEN) {
+            values.push(self.string(read_u32_at(keys, offset)?)?);
+        }
+        Ok(values)
     }
 
     fn lookup_key(&self, keys: &'a [u8], postings: &'a [u8], query: &str) -> Result<Option<DictionaryPostings<'a>>> {
@@ -170,6 +260,27 @@ impl<'a> DictionaryImageView<'a> {
             ("exact keys", self.exact_keys.len(), KEY_RANGE_RECORD_LEN),
             ("alias keys", self.alias_keys.len(), KEY_RANGE_RECORD_LEN),
             ("gram keys", self.gram_keys.len(), KEY_RANGE_RECORD_LEN),
+            ("legacy roman keys", self.legacy_roman_keys.len(), KEY_RANGE_RECORD_LEN),
+            (
+                "legacy normalized keys",
+                self.legacy_normalized_keys.len(),
+                KEY_RANGE_RECORD_LEN,
+            ),
+            (
+                "legacy target keys",
+                self.legacy_target_keys.len(),
+                KEY_RANGE_RECORD_LEN,
+            ),
+            (
+                "legacy prefix keys",
+                self.legacy_prefix_keys.len(),
+                KEY_RANGE_RECORD_LEN,
+            ),
+            (
+                "legacy target frequencies",
+                self.legacy_target_frequencies.len(),
+                STRING_U32_RECORD_LEN,
+            ),
         ] {
             if len % record_len != 0 {
                 return Err(LexiconError::Parse(format!(
@@ -177,7 +288,13 @@ impl<'a> DictionaryImageView<'a> {
                 )));
             }
         }
-        if self.exact_postings.len() % 4 != 0 || self.alias_postings.len() % 4 != 0 || self.gram_postings.len() % 4 != 0
+        if self.exact_postings.len() % 4 != 0
+            || self.alias_postings.len() % 4 != 0
+            || self.gram_postings.len() % 4 != 0
+            || self.legacy_roman_postings.len() % 4 != 0
+            || self.legacy_normalized_postings.len() % 4 != 0
+            || self.legacy_target_postings.len() % 4 != 0
+            || self.legacy_prefix_postings.len() % 4 != 0
         {
             return Err(LexiconError::Parse(
                 "dictionary image postings section has partial record".to_owned(),
