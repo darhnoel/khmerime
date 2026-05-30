@@ -25,6 +25,48 @@ the shared session contract.
 This architecture keeps the typing experience consistent across platforms while
 allowing platform-specific development to move independently.
 
+```mermaid
+flowchart TB
+    subgraph Hosts["Host IME frameworks"]
+        IBus["IBus (Linux)"]
+        TSF["TSF (Windows)"]
+        IMK["IMK (macOS)"]
+        iOS["iOS keyboard"]
+        Android["Android IME"]
+        Web["Dioxus app (web/desktop)"]
+    end
+
+    subgraph Adapters["adapters/ + apps/ — thin native integration"]
+        A_IBus["linux-ibus"]
+        A_TSF["windows-tsf"]
+        A_IMK["macos-imk"]
+        A_iOS["ios-keyboard"]
+        A_Android["android-ime"]
+        A_Web["dioxus-app"]
+    end
+
+    Session["crates/session::ImeSession<br/>(session contract + state machine)"]
+    Core["crates/core::Transliterator<br/>(decode, rank, segment, select)"]
+    Data["data/<br/>(CSV lexicon + compiled sources)"]
+
+    IBus --> A_IBus
+    TSF --> A_TSF
+    IMK --> A_IMK
+    iOS --> A_iOS
+    Android --> A_Android
+    Web --> A_Web
+
+    A_IBus --> Session
+    A_TSF --> Session
+    A_IMK --> Session
+    A_iOS --> Session
+    A_Android --> Session
+    A_Web --> Session
+
+    Session --> Core
+    Core --> Data
+```
+
 In short:
 
 - One shared engine.
@@ -63,6 +105,30 @@ docs/              Development, architecture, platform, and design documentation
 - Preserve a stable regression surface for decoding and ranking.
 - Prioritize low-latency typing behavior.
 - Make platform development possible without changing the core typing experience.
+
+## How a keystroke flows (Linux IBus)
+
+The Linux path runs the engine as a Rust subprocess. The Python IBus engine owns
+the desktop integration and talks to the `khmerime_ibus_bridge` binary over a JSON
+line protocol; the bridge drives the shared session and returns a snapshot.
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant Py as khmerime_ibus_engine.py (IBus engine)
+    participant Bridge as khmerime_ibus_bridge (Rust subprocess)
+    participant Sess as ImeSession
+    participant Core as Transliterator
+
+    User->>Py: key event
+    Py->>Bridge: process_key_event {keyval, keycode, state} (JSON line)
+    Bridge->>Sess: process_key_event(...)
+    Sess->>Core: decode / suggest / refine
+    Core-->>Sess: candidates / segments
+    Sess-->>Bridge: SessionResult + SessionSnapshot
+    Bridge-->>Py: {consumed, commit_text, snapshot} (JSON line)
+    Py-->>User: update preedit / commit text
+```
 
 ## Docs
 
