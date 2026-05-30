@@ -90,8 +90,11 @@ impl Transliterator {
     pub fn from_default_shared_data_with_stage_logger(
         mut log_stage: impl FnMut(&str, f64),
     ) -> Result<SharedTransliteratorData> {
+        // The default system Lexicon is moving to direct Dictionary Image views.
+        // The old bincode cache rehydrates heap-owned SharedTransliteratorData,
+        // which defeats the bridge RSS goal for this path.
         #[cfg(not(target_arch = "wasm32"))]
-        let cache_key = (!super::cache::disabled()).then(super::cache::compute_key);
+        let cache_key: Option<String> = None;
         #[cfg(not(target_arch = "wasm32"))]
         if let Some(key) = cache_key.as_deref() {
             let started = start_stage_timer();
@@ -142,7 +145,17 @@ impl Transliterator {
 
     #[cfg(not(all(target_arch = "wasm32", feature = "fetch-data")))]
     pub fn from_default_phase_a_data(config: DecoderConfig) -> Result<Self> {
-        Self::from_phase_a_bytes(DEFAULT_COMPILED_DATA, config)
+        startup_trace_log("Transliterator::from_default_phase_a_data.start");
+        let entries = parse_compiled_lexicon(DEFAULT_COMPILED_DATA)?;
+        let dictionary_image = default_dictionary_image()?;
+        let legacy = Arc::new(LegacyData::from_entries_phase_a_with_dictionary_image(
+            entries,
+            dictionary_image,
+        ));
+        let composer = Arc::new(ComposerTable::from_entries(legacy.entries()));
+        let transliterator = Self::from_shared_parts(legacy, composer, config);
+        startup_trace_log("Transliterator::from_default_phase_a_data.end");
+        Ok(transliterator)
     }
 
     #[cfg(not(all(target_arch = "wasm32", feature = "fetch-data")))]
@@ -357,9 +370,7 @@ impl Transliterator {
         if normalized.is_empty() {
             return Vec::new();
         }
-        self.legacy
-            .exact_targets(&normalized)
-            .map_or_else(Vec::new, |targets| targets.to_vec())
+        self.legacy.exact_targets(&normalized)
     }
 
     pub fn exact_match_roman_variants(&self, input: &str, target: &str) -> Vec<String> {

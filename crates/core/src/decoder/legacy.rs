@@ -57,14 +57,18 @@ impl LegacyDecoder {
             let mut chunk_candidates = self
                 .data
                 .exact_targets(&chunk.normalized)
-                .map(|targets| targets.iter().take(PHRASE_CHUNK_LIMIT).cloned().collect::<Vec<_>>())
-                .unwrap_or_else(|| {
+                .into_iter()
+                .take(PHRASE_CHUNK_LIMIT)
+                .collect::<Vec<_>>();
+            if chunk_candidates.is_empty() {
+                chunk_candidates = {
                     self.data
                         .suggest(&chunk.normalized, request.history)
                         .into_iter()
                         .take(PHRASE_CHUNK_LIMIT)
                         .collect::<Vec<_>>()
-                });
+                };
+            }
             chunk_candidates.dedup();
             if chunk_candidates.is_empty() {
                 return Vec::new();

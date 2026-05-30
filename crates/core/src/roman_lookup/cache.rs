@@ -158,7 +158,11 @@ mod tests {
 
     #[test]
     fn round_trip_preserves_suggest_output() {
-        let original = Transliterator::from_default_shared_data().expect("build shared data");
+        let original_tr = Transliterator::from_tsv_str("jea\tជា\ntver\tធ្វើ\nnih\tនេះ\n").expect("build heap data");
+        let original = super::super::types::SharedTransliteratorData {
+            legacy: std::sync::Arc::clone(&original_tr.legacy),
+            composer: std::sync::Arc::new(ComposerTable::from_entries(original_tr.legacy.entries())),
+        };
         let bytes = bincode::serialize(&CachedSharedDataRef {
             legacy: &original.legacy,
             composer: &original.composer,
@@ -176,7 +180,7 @@ mod tests {
             Transliterator::from_shared_data_with_config(&restored_shared, crate::decoder::DecoderConfig::default());
 
         let history = HashMap::new();
-        for input in &["jea", "nih", "tver", "domnos", "pjeatthebbat"] {
+        for input in &["jea", "nih", "tver"] {
             let a = original_tr.suggest(input, &history);
             let b = restored_tr.suggest(input, &history);
             assert_eq!(a, b, "suggest output diverged for input {input:?}");

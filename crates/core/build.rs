@@ -213,14 +213,15 @@ fn main() {
     let additional_source =
         fs::read_to_string(&additional_lexicon_csv).expect("additional most-common English-Khmer CSV must be readable");
     entries.extend(parse_additional_csv_entries(&additional_source));
-    let compiled_dictionary_image = compile_dictionary_image(&entries).expect("default dictionary image must compile");
-    let compiled = compile_lexicon_entries(entries).expect("default lexicon entries must compile");
     let khpos_train =
         fs::read_to_string(&data_paths.khpos_train).expect("khPOS after-replace train corpus must be readable");
     let khpos_tags =
         fs::read_to_string(&data_paths.khpos_tag).expect("khPOS after-replace tag corpus must be readable");
     let compiled_khpos = compile_khpos_stats(&khpos_train, &khpos_tags, khpos_build_options)
         .expect("khPOS after-replace corpus must compile");
+    let compiled_dictionary_image = compile_dictionary_image(&entries, Some(&compiled_khpos.frequency_stats))
+        .expect("default dictionary image must compile");
+    let compiled = compile_lexicon_entries(entries).expect("default lexicon entries must compile");
     // Mobile keyboard n-grams improve next-word scoring, but they are optional
     // for normal development. Set KHMERIME_WARN_MISSING_OPTIONAL_DATA=1 when
     // auditing data-path configuration and you want missing optional files to be
@@ -246,7 +247,7 @@ fn main() {
     fs::write(&dictionary_image_output_path, compiled_dictionary_image)
         .expect("compiled dictionary image must be written");
     let khpos_output_path = out_dir.join("khpos.stats.bin");
-    fs::write(&khpos_output_path, compiled_khpos).expect("compiled khPOS stats must be written");
+    fs::write(&khpos_output_path, compiled_khpos.bytes).expect("compiled khPOS stats must be written");
     let next_word_output_path = out_dir.join("next_word.stats.bin");
     fs::write(&next_word_output_path, compiled_next_word).expect("compiled next-word stats must be written");
     let search_index_config_path = out_dir.join("search_index_config.rs");
@@ -592,7 +593,21 @@ struct DictionaryImageEntryRecord {
     last_tag_id: u32,
 }
 
-fn compile_dictionary_image(entries: &[BuildLexiconEntry]) -> Result<Vec<u8>, String> {
+struct CompiledKhposStats {
+    bytes: Vec<u8>,
+    frequency_stats: BuildCorpusFrequencyStats,
+}
+
+#[derive(Default)]
+struct BuildCorpusFrequencyStats {
+    word_unigrams: HashMap<String, u32>,
+    surface_unigrams: HashMap<String, u32>,
+}
+
+fn compile_dictionary_image(
+    entries: &[BuildLexiconEntry],
+    corpus_stats: Option<&BuildCorpusFrequencyStats>,
+) -> Result<Vec<u8>, String> {
     let mut interner = DictionaryImageInterner::default();
     let mut image_entries = Vec::<DictionaryImageEntryRecord>::with_capacity(entries.len());
     let mut exact_index = BTreeMap::<String, Vec<u32>>::new();
@@ -641,10 +656,20 @@ fn compile_dictionary_image(entries: &[BuildLexiconEntry]) -> Result<Vec<u8>, St
         });
     }
 
+    let legacy_indexes = build_legacy_dictionary_indexes(entries, corpus_stats);
     let entries_section = compile_dictionary_entry_section(&image_entries);
     let (exact_keys, exact_postings) = compile_dictionary_key_index(&mut interner, exact_index)?;
     let (alias_keys, alias_postings) = compile_dictionary_key_index(&mut interner, alias_index)?;
     let (gram_keys, gram_postings) = compile_dictionary_key_index(&mut interner, gram_index)?;
+    let (legacy_roman_keys, legacy_roman_postings) =
+        compile_dictionary_string_index(&mut interner, legacy_indexes.by_roman)?;
+    let (legacy_normalized_keys, legacy_normalized_postings) =
+        compile_dictionary_string_index(&mut interner, legacy_indexes.by_normalized)?;
+    let (legacy_target_keys, legacy_target_postings) =
+        compile_dictionary_string_index(&mut interner, legacy_indexes.by_target)?;
+    let (legacy_prefix_keys, legacy_prefix_postings) =
+        compile_dictionary_string_index(&mut interner, legacy_indexes.roman_prefix_index)?;
+    let legacy_target_frequencies = compile_dictionary_frequency_index(&mut interner, legacy_indexes.target_frequency)?;
 
     // Key-index compilation may intern late keys; write string sections after
     // all sections have had a chance to assign string IDs.
@@ -660,7 +685,114 @@ fn compile_dictionary_image(entries: &[BuildLexiconEntry]) -> Result<Vec<u8>, St
         (SECTION_ALIAS_POSTINGS, alias_postings),
         (SECTION_GRAM_KEYS, gram_keys),
         (SECTION_GRAM_POSTINGS, gram_postings),
+        (SECTION_LEGACY_ROMAN_KEYS, legacy_roman_keys),
+        (SECTION_LEGACY_ROMAN_POSTINGS, legacy_roman_postings),
+        (SECTION_LEGACY_NORMALIZED_KEYS, legacy_normalized_keys),
+        (SECTION_LEGACY_NORMALIZED_POSTINGS, legacy_normalized_postings),
+        (SECTION_LEGACY_TARGET_KEYS, legacy_target_keys),
+        (SECTION_LEGACY_TARGET_POSTINGS, legacy_target_postings),
+        (SECTION_LEGACY_PREFIX_KEYS, legacy_prefix_keys),
+        (SECTION_LEGACY_PREFIX_POSTINGS, legacy_prefix_postings),
+        (SECTION_LEGACY_TARGET_FREQUENCIES, legacy_target_frequencies),
     ])
+}
+
+struct LegacyDictionaryIndexes {
+    by_roman: BTreeMap<String, Vec<String>>,
+    by_normalized: BTreeMap<String, Vec<String>>,
+    by_target: BTreeMap<String, Vec<String>>,
+    target_frequency: BTreeMap<String, u32>,
+    roman_prefix_index: BTreeMap<String, Vec<String>>,
+}
+
+fn build_legacy_dictionary_indexes(
+    entries: &[BuildLexiconEntry],
+    corpus_stats: Option<&BuildCorpusFrequencyStats>,
+) -> LegacyDictionaryIndexes {
+    let target_frequency = target_frequency_map_for_dictionary_image(entries, corpus_stats);
+    let mut by_roman = BTreeMap::<String, Vec<String>>::new();
+    let mut by_normalized = BTreeMap::<String, Vec<String>>::new();
+    let mut by_target = BTreeMap::<String, Vec<String>>::new();
+
+    for entry in entries {
+        by_roman
+            .entry(entry.roman.clone())
+            .or_default()
+            .push(entry.target.clone());
+        by_normalized
+            .entry(normalize(&entry.roman))
+            .or_default()
+            .push(entry.target.clone());
+        by_target
+            .entry(entry.target.clone())
+            .or_default()
+            .push(normalize(&entry.roman));
+    }
+
+    for values in by_roman.values_mut() {
+        sort_targets_by_dictionary_frequency(values, &target_frequency);
+    }
+    for values in by_normalized.values_mut() {
+        sort_targets_by_dictionary_frequency(values, &target_frequency);
+    }
+
+    let mut sorted_romans = by_roman.keys().cloned().collect::<Vec<_>>();
+    sorted_romans.sort_by(|left, right| left.len().cmp(&right.len()).then_with(|| left.cmp(right)));
+    let mut roman_prefix_index = BTreeMap::<String, Vec<String>>::new();
+    for roman in sorted_romans {
+        let normalized = normalize(&roman);
+        for prefix_len in 1..=3 {
+            let prefix = normalized.chars().take(prefix_len).collect::<String>();
+            if prefix.chars().count() != prefix_len {
+                break;
+            }
+            roman_prefix_index.entry(prefix).or_default().push(roman.clone());
+        }
+    }
+
+    LegacyDictionaryIndexes {
+        by_roman,
+        by_normalized,
+        by_target,
+        target_frequency,
+        roman_prefix_index,
+    }
+}
+
+fn target_frequency_map_for_dictionary_image(
+    entries: &[BuildLexiconEntry],
+    corpus_stats: Option<&BuildCorpusFrequencyStats>,
+) -> BTreeMap<String, u32> {
+    let mut frequency = BTreeMap::<String, u32>::new();
+    for entry in entries {
+        let corpus_frequency = corpus_stats
+            .map(|stats| {
+                stats
+                    .surface_unigrams
+                    .get(&entry.target)
+                    .or_else(|| stats.word_unigrams.get(&entry.target))
+                    .copied()
+                    .unwrap_or(0)
+            })
+            .unwrap_or(0);
+        let effective = entry.frequency.max(corpus_frequency).max(1);
+        frequency
+            .entry(entry.target.clone())
+            .and_modify(|current| *current = (*current).max(effective))
+            .or_insert(effective);
+    }
+    frequency
+}
+
+fn sort_targets_by_dictionary_frequency(values: &mut [String], target_frequency: &BTreeMap<String, u32>) {
+    values.sort_by(|left, right| {
+        target_frequency
+            .get(right)
+            .copied()
+            .unwrap_or(1)
+            .cmp(&target_frequency.get(left).copied().unwrap_or(1))
+            .then_with(|| left.cmp(right))
+    });
 }
 
 fn push_dictionary_grams(index: &mut BTreeMap<String, Vec<u32>>, input: &str, entry_id: u32) {
@@ -724,6 +856,42 @@ fn compile_dictionary_key_index(
         }
     }
     Ok((keys, postings))
+}
+
+fn compile_dictionary_string_index(
+    interner: &mut DictionaryImageInterner,
+    index: BTreeMap<String, Vec<String>>,
+) -> Result<(Vec<u8>, Vec<u8>), String> {
+    let mut keys = Vec::with_capacity(index.len() * KEY_RANGE_RECORD_LEN);
+    let mut postings = Vec::new();
+    for (key, values) in index {
+        let key_id = interner.intern(&key)?;
+        let start = u32::try_from(postings.len() / 4)
+            .map_err(|_| "dictionary image string postings exceeded u32 offsets".to_owned())?;
+        let len = u32::try_from(values.len())
+            .map_err(|_| "dictionary image string posting range exceeded u32 length".to_owned())?;
+        write_u32(&mut keys, key_id);
+        write_u32(&mut keys, start);
+        write_u32(&mut keys, len);
+        for value in values {
+            let value_id = interner.intern(&value)?;
+            write_u32(&mut postings, value_id);
+        }
+    }
+    Ok((keys, postings))
+}
+
+fn compile_dictionary_frequency_index(
+    interner: &mut DictionaryImageInterner,
+    index: BTreeMap<String, u32>,
+) -> Result<Vec<u8>, String> {
+    let mut records = Vec::with_capacity(index.len() * STRING_U32_RECORD_LEN);
+    for (key, frequency) in index {
+        let key_id = interner.intern(&key)?;
+        write_u32(&mut records, key_id);
+        write_u32(&mut records, frequency);
+    }
+    Ok(records)
 }
 
 fn write_dictionary_image_sections(sections: &[(u32, Vec<u8>)]) -> Result<Vec<u8>, String> {
@@ -959,7 +1127,7 @@ fn compile_khpos_stats(
     train_source: &str,
     tag_source: &str,
     options: BuildDataBuildOptions,
-) -> Result<Vec<u8>, String> {
+) -> Result<CompiledKhposStats, String> {
     let train_lines = train_source
         .lines()
         .filter(|line| !line.trim().is_empty())
@@ -1071,7 +1239,13 @@ fn compile_khpos_stats(
     write_string_count_map(&mut output, &tag_unigrams)?;
     write_pair_count_map(&mut output, &tag_bigrams)?;
     write_dominant_tags(&mut output, &dominant_tags)?;
-    Ok(output)
+    Ok(CompiledKhposStats {
+        bytes: output,
+        frequency_stats: BuildCorpusFrequencyStats {
+            word_unigrams,
+            surface_unigrams,
+        },
+    })
 }
 
 fn trim_map_to_top_n(map: &mut HashMap<String, u32>, limit: usize) {

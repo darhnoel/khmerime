@@ -13,6 +13,7 @@ use crate::decoder::{
 };
 
 #[cfg(not(target_arch = "wasm32"))]
+#[allow(dead_code)]
 mod cache;
 mod compiled_io;
 #[allow(dead_code)]
@@ -225,12 +226,72 @@ mod tests {
     }
 
     #[test]
+    fn dictionary_image_matches_legacy_lookup_surfaces() {
+        let compiled_entries = parse_compiled_lexicon(DEFAULT_COMPILED_DATA).unwrap();
+        let corpus_stats = parse_compiled_khpos_stats(DEFAULT_COMPILED_KHPOS_STATS).unwrap();
+        let next_word = parse_compiled_next_word_stats(DEFAULT_COMPILED_NEXT_WORD_STATS).unwrap();
+        let heap = LegacyData::from_entries_with_stats(compiled_entries, corpus_stats, next_word);
+        let image = dictionary_image::DictionaryImageView::parse(DEFAULT_DICTIONARY_IMAGE).unwrap();
+
+        assert_eq!(image.legacy_roman_key_count(), heap.by_roman.len());
+        assert_eq!(image.legacy_normalized_key_count(), heap.by_normalized.len());
+        assert_eq!(image.legacy_target_key_count(), heap.by_target.len());
+        assert_eq!(image.legacy_prefix_key_count(), heap.roman_prefix_index.len());
+
+        for (key, expected) in &heap.by_roman {
+            let actual = image
+                .legacy_roman_targets(key)
+                .unwrap()
+                .map(|values| values.into_iter().map(str::to_owned).collect::<Vec<_>>())
+                .unwrap_or_default();
+            assert_eq!(actual, *expected, "legacy by_roman mismatch for {key}");
+        }
+        for (key, expected) in &heap.by_normalized {
+            let actual = image
+                .legacy_normalized_targets(key)
+                .unwrap()
+                .map(|values| values.into_iter().map(str::to_owned).collect::<Vec<_>>())
+                .unwrap_or_default();
+            assert_eq!(actual, *expected, "legacy by_normalized mismatch for {key}");
+        }
+        for (key, expected) in &heap.by_target {
+            let actual = image
+                .legacy_target_romans(key)
+                .unwrap()
+                .map(|values| values.into_iter().map(str::to_owned).collect::<Vec<_>>())
+                .unwrap_or_default();
+            assert_eq!(actual, *expected, "legacy by_target mismatch for {key}");
+        }
+        for (key, expected) in &heap.roman_prefix_index {
+            let actual = image
+                .legacy_prefix_romans(key)
+                .unwrap()
+                .map(|values| values.into_iter().map(str::to_owned).collect::<Vec<_>>())
+                .unwrap_or_default();
+            assert_eq!(actual, *expected, "legacy prefix mismatch for {key}");
+        }
+        for (target, expected) in &heap.target_frequency {
+            assert_eq!(
+                image.legacy_target_frequency(target).unwrap().unwrap_or(1),
+                *expected,
+                "legacy target_frequency mismatch for {target}"
+            );
+        }
+    }
+
+    #[test]
     fn default_shared_data_uses_dictionary_image_for_ranked_exact_and_alias_lookup() {
         let shared = Transliterator::from_default_shared_data().unwrap();
         assert!(shared.legacy.dictionary_image.is_some());
         assert!(shared.legacy.ranked.exact_index.is_empty());
         assert!(shared.legacy.ranked.alias_index.is_empty());
         assert!(shared.legacy.ranked.gram_index.is_empty());
+        assert!(shared.legacy.by_roman.is_empty());
+        assert!(shared.legacy.by_normalized.is_empty());
+        assert!(shared.legacy.by_target.is_empty());
+        assert!(shared.legacy.target_frequency.is_empty());
+        assert!(shared.legacy.roman_normalized.is_empty());
+        assert!(shared.legacy.roman_prefix_index.is_empty());
 
         let transliterator = Transliterator::from_shared_data_with_config(
             &shared,
@@ -248,6 +309,62 @@ mod tests {
             .suggest("kit", &history)
             .iter()
             .any(|candidate| candidate == "គិត"));
+    }
+
+    #[test]
+    fn default_phase_a_uses_dictionary_image_for_legacy_lookup_maps() {
+        let transliterator = Transliterator::from_default_phase_a_data(DecoderConfig::legacy()).unwrap();
+        assert!(transliterator.legacy.dictionary_image.is_some());
+        assert!(transliterator.legacy.by_roman.is_empty());
+        assert!(transliterator.legacy.by_normalized.is_empty());
+        assert!(transliterator.legacy.by_target.is_empty());
+        assert!(transliterator.legacy.target_frequency.is_empty());
+        assert!(transliterator.legacy.roman_normalized.is_empty());
+        assert!(transliterator.legacy.roman_prefix_index.is_empty());
+
+        let suggestions = transliterator.suggest("jea", &HashMap::new());
+        assert_eq!(suggestions.first().map(String::as_str), Some("ជា"));
+    }
+
+    #[test]
+    fn default_dictionary_image_preserves_public_transliterator_outputs() {
+        let entries = parse_compiled_lexicon(DEFAULT_COMPILED_DATA).unwrap();
+        let corpus_stats = parse_compiled_khpos_stats(DEFAULT_COMPILED_KHPOS_STATS).unwrap();
+        let next_word = parse_compiled_next_word_stats(DEFAULT_COMPILED_NEXT_WORD_STATS).unwrap();
+        let heap_legacy = Arc::new(LegacyData::from_entries_with_stats(entries, corpus_stats, next_word));
+        let heap_shared = SharedTransliteratorData {
+            legacy: Arc::clone(&heap_legacy),
+            composer: Arc::new(ComposerTable::from_entries(heap_legacy.entries())),
+        };
+        let image_shared = Transliterator::from_default_shared_data().unwrap();
+        let heap = Transliterator::from_shared_data_with_config(&heap_shared, DecoderConfig::default());
+        let image = Transliterator::from_shared_data_with_config(&image_shared, DecoderConfig::default());
+        let history = HashMap::new();
+
+        for input in [
+            "jea",
+            "tver",
+            "khnhomttov",
+            "meannekbongtte",
+            "quality",
+            "leonhard",
+            "b_eh",
+        ] {
+            assert_eq!(image.suggest(input, &history), heap.suggest(input, &history), "{input}");
+            assert_eq!(
+                image.exact_match_targets(input),
+                heap.exact_match_targets(input),
+                "{input}"
+            );
+        }
+        assert_eq!(
+            image.exact_match_roman_variants("jea", "ជា"),
+            heap.exact_match_roman_variants("jea", "ជា")
+        );
+        assert_eq!(
+            image.best_prefix_consumption("cheamnouslaor", "ជា"),
+            heap.best_prefix_consumption("cheamnouslaor", "ជា")
+        );
     }
 
     #[test]

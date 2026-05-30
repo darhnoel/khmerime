@@ -31,6 +31,29 @@ impl LegacyData {
         }
     }
 
+    pub(crate) fn from_entries_phase_a_with_dictionary_image(
+        entries: Vec<Entry>,
+        dictionary_image: DictionaryImageView<'static>,
+    ) -> Self {
+        Self {
+            entries,
+            by_roman: HashMap::new(),
+            by_normalized: HashMap::new(),
+            by_target: HashMap::new(),
+            target_frequency: HashMap::new(),
+            roman_normalized: HashMap::new(),
+            roman_prefix_index: HashMap::new(),
+            // Phase A avoids building the heavyweight fuzzy gram index.
+            index: SearchIndex::new(&[], true, 2, 3),
+            // Phase A avoids khPOS-derived ranking structures.
+            ranked: RankedLexicon::default(),
+            dictionary_image: Some(dictionary_image),
+            // Phase A defers next-word n-gram stats until full engine promotion.
+            next_word: NextWordStats::default(),
+            next_word_max_context_chars: 0,
+        }
+    }
+
     pub(crate) fn from_entries_with_stats(
         entries: Vec<Entry>,
         corpus_stats: CorpusStats,
@@ -62,15 +85,25 @@ impl LegacyData {
         mut log_stage: impl FnMut(&str, f64),
     ) -> Self {
         let started = start_stage_timer();
-        let mut maps = Self::build_lookup_maps(&entries);
+        let mut maps = if dictionary_image.is_some() {
+            LegacyLookupMaps::roman_keys_only(&entries)
+        } else {
+            Self::build_lookup_maps(&entries)
+        };
         log_stage("build_lookup_maps", elapsed_stage_ms(started));
 
         let started = start_stage_timer();
-        let target_frequency = target_frequency_map(&entries, Some(&corpus_stats));
+        let target_frequency = if dictionary_image.is_some() {
+            HashMap::new()
+        } else {
+            target_frequency_map(&entries, Some(&corpus_stats))
+        };
         log_stage("target_frequency", elapsed_stage_ms(started));
 
         let started = start_stage_timer();
-        sort_lookup_maps_by_frequency(&mut maps, &target_frequency);
+        if dictionary_image.is_none() {
+            sort_lookup_maps_by_frequency(&mut maps, &target_frequency);
+        }
         log_stage("sort_lookup_maps", elapsed_stage_ms(started));
 
         let started = start_stage_timer();
@@ -220,11 +253,9 @@ impl LegacyData {
         }
 
         let mut matches = self
-            .by_target
-            .get(target)?
-            .iter()
+            .romans_for_target(target)
+            .into_iter()
             .filter(|roman| !roman.is_empty() && normalized_input.starts_with(roman.as_str()))
-            .cloned()
             .collect::<Vec<_>>();
         matches.sort_by(|left, right| right.len().cmp(&left.len()).then_with(|| left.cmp(right)));
         matches.dedup();
@@ -238,14 +269,10 @@ impl LegacyData {
             return Vec::new();
         }
 
-        let Some(romans) = self.by_target.get(target) else {
-            return Vec::new();
-        };
-
-        let mut variants = romans
-            .iter()
+        let mut variants = self
+            .romans_for_target(target)
+            .into_iter()
             .filter(|roman| !roman.is_empty())
-            .cloned()
             .collect::<Vec<_>>();
         variants.sort_by(|left, right| {
             let left_is_query = left == &normalized_query;
@@ -293,18 +320,11 @@ impl LegacyData {
         if normalized.chars().count() <= 1 || romans.is_empty() {
             let prefix_seed = normalized.chars().take(3).collect::<String>();
             let seed_pool = self
-                .roman_prefix_index
-                .get(&prefix_seed)
-                .cloned()
-                .unwrap_or_else(|| self.by_roman.keys().cloned().collect::<Vec<_>>());
+                .prefix_romans(&prefix_seed)
+                .unwrap_or_else(|| self.all_roman_keys());
             let prefix_matches = seed_pool
                 .into_iter()
-                .filter(|roman| {
-                    self.roman_normalized
-                        .get(roman)
-                        .map(|value| value.starts_with(&normalized))
-                        .unwrap_or(false)
-                })
+                .filter(|roman| self.normalized_for_roman(roman).starts_with(&normalized))
                 .collect::<Vec<_>>();
 
             for roman in prefix_matches {
@@ -330,7 +350,7 @@ impl LegacyData {
                         target,
                         CandidateMeta {
                             exact_match: true,
-                            frequency: self.target_frequency.get(target).copied().unwrap_or(1),
+                            frequency: self.target_frequency_for(target),
                             target_len: target.chars().count(),
                             roman_len: roman.chars().count(),
                             visit_index,
@@ -342,21 +362,18 @@ impl LegacyData {
         }
 
         for roman in romans {
-            let exact_match = self
-                .roman_normalized
-                .get(&roman)
-                .map(|value| value == &normalized)
-                .unwrap_or(false);
+            let exact_match = self.normalized_for_roman(&roman) == normalized;
             let roman_len = roman.chars().count();
-            if let Some(values) = self.by_roman.get(&roman) {
+            let values = self.targets_for_roman(&roman);
+            if !values.is_empty() {
                 for target in values {
                     push_candidate(
                         &mut suggestions,
                         &mut seen,
-                        target,
+                        &target,
                         CandidateMeta {
                             exact_match,
-                            frequency: self.target_frequency.get(target).copied().unwrap_or(1),
+                            frequency: self.target_frequency_for(&target),
                             target_len: target.chars().count(),
                             roman_len,
                             visit_index,
@@ -454,8 +471,82 @@ impl LegacyData {
         None
     }
 
-    pub(crate) fn exact_targets(&self, normalized: &str) -> Option<&[String]> {
-        self.by_normalized.get(normalized).map(Vec::as_slice)
+    pub(crate) fn exact_targets(&self, normalized: &str) -> Vec<String> {
+        self.targets_for_normalized(normalized)
+    }
+
+    fn targets_for_roman(&self, roman: &str) -> Vec<String> {
+        if let Some(image) = self.dictionary_image {
+            return image
+                .legacy_roman_targets(roman)
+                .ok()
+                .flatten()
+                .map(|values| values.into_iter().map(str::to_owned).collect())
+                .unwrap_or_default();
+        }
+        self.by_roman.get(roman).cloned().unwrap_or_default()
+    }
+
+    fn targets_for_normalized(&self, normalized: &str) -> Vec<String> {
+        if let Some(image) = self.dictionary_image {
+            return image
+                .legacy_normalized_targets(normalized)
+                .ok()
+                .flatten()
+                .map(|values| values.into_iter().map(str::to_owned).collect())
+                .unwrap_or_default();
+        }
+        self.by_normalized.get(normalized).cloned().unwrap_or_default()
+    }
+
+    fn romans_for_target(&self, target: &str) -> Vec<String> {
+        if let Some(image) = self.dictionary_image {
+            return image
+                .legacy_target_romans(target)
+                .ok()
+                .flatten()
+                .map(|values| values.into_iter().map(str::to_owned).collect())
+                .unwrap_or_default();
+        }
+        self.by_target.get(target).cloned().unwrap_or_default()
+    }
+
+    fn prefix_romans(&self, prefix: &str) -> Option<Vec<String>> {
+        if let Some(image) = self.dictionary_image {
+            return image
+                .legacy_prefix_romans(prefix)
+                .ok()
+                .flatten()
+                .map(|values| values.into_iter().map(str::to_owned).collect());
+        }
+        self.roman_prefix_index.get(prefix).cloned()
+    }
+
+    fn all_roman_keys(&self) -> Vec<String> {
+        if let Some(image) = self.dictionary_image {
+            return image
+                .legacy_all_romans()
+                .map(|values| values.into_iter().map(str::to_owned).collect())
+                .unwrap_or_default();
+        }
+        self.by_roman.keys().cloned().collect()
+    }
+
+    fn normalized_for_roman(&self, roman: &str) -> String {
+        if self.dictionary_image.is_some() {
+            return normalize(roman);
+        }
+        self.roman_normalized
+            .get(roman)
+            .cloned()
+            .unwrap_or_else(|| normalize(roman))
+    }
+
+    fn target_frequency_for(&self, target: &str) -> u32 {
+        if let Some(image) = self.dictionary_image {
+            return image.legacy_target_frequency(target).ok().flatten().unwrap_or(1);
+        }
+        self.target_frequency.get(target).copied().unwrap_or(1)
     }
 
     pub(crate) fn attach_dictionary_image(&mut self, dictionary_image: DictionaryImageView<'static>) {
@@ -629,5 +720,19 @@ impl CandidateMeta {
             .then_with(|| other.roman_len.cmp(&self.roman_len))
             .then_with(|| self.frequency.cmp(&other.frequency))
             .then_with(|| other.visit_index.cmp(&self.visit_index))
+    }
+}
+
+impl LegacyLookupMaps {
+    fn roman_keys_only(entries: &[Entry]) -> Self {
+        Self {
+            by_roman: HashMap::new(),
+            by_normalized: HashMap::new(),
+            by_target: HashMap::new(),
+            target_frequency: HashMap::new(),
+            roman_normalized: HashMap::new(),
+            roman_prefix_index: HashMap::new(),
+            roman_keys: entries.iter().map(|entry| entry.roman.clone()).collect(),
+        }
     }
 }
