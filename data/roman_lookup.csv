@@ -2650,7 +2650,7 @@ bakhaeng,បាខែង,1,km
 bakkhakonanea,បក្ខគណនា,1,km
 bakkhapoanthor,បក្ខព័ន្ធ,1,km
 bakkhar,បក្ខ,40,km
-bakkhasampoanthor,បក្ខសម្ព័ន្ធ,1,km
+bakkhasampoan,បក្ខសម្ព័ន្ធ,1,km
 bakochoarobay,បាក់ជ័របាយ,1,km
 bakodamloung,បាក់ដំឡូង,1,km
 bakodong,បាក់ដង,1,km
@@ -4714,7 +4714,7 @@ bokennok,បកិណ្ណក,1,km
 bokkhokononea,បក្ខគណនា,1,km
 bokkhopoanthor,បក្ខព័ន្ធ,1,km
 bokkhor,បក្ខ,40,km
-bokkhosompoanthor,បក្ខសម្ព័ន្ធ,1,km
+bokkhosompoan,បក្ខសម្ព័ន្ធ,1,km
 bokleakd,បុកល័ក្ដ,1,km
 bokochay,ប៉ុកចាយ,1,km
 bokopauk,ប៉ុកពើក,1,km
@@ -8004,7 +8004,7 @@ chuob,ចួប,1,km
 chuon,ចួន,3,km
 chveng,ឆ្វេង,519,km
 chyot,ច្យុត,11,km
-chyote,ច្យុតិ,1,km
+chyot,ច្យុតិ,1,km
 ckut,ឆ្កួត,67,km
 cochinchina,កូសាំងស៊ីន,1,km
 codivoire,កូតឌីវ័រ,1,km
@@ -13535,9 +13535,9 @@ kolombia,កូឡុំប៊ី,1,km
 kolomonIslands,កោះសាឡូម៉ូន,1,km
 kolpirouth,កុលពិរោធ,1,km
 kolsambat,កុលសម្បត្តិ,1,km
-kolsampoanth,កុលសម្ព័ន្ធ,1,km
+kolsampoan,កុលសម្ព័ន្ធ,1,km
 kolsombat,កុលសម្បត្តិ,1,km
-kolsompoanth,កុលសម្ព័ន្ធ,1,km
+kolsompoan,កុលសម្ព័ន្ធ,1,km
 kolthida,កុលធីតា,1,km
 kolvek,កុលវគ្គ,1,km
 kolvibat,កុលវិបត្តិ,1,km
@@ -23579,6 +23579,7 @@ sampiet,សម្ពៀត,6,km
 sampiet,សំពៀត,1,km
 sampin,សំពិន,1,km
 samping,សំពីង,6,km
+sampoan,សម្ព័ន្ធ,1,km
 sampoar,សំព័រ,1,km
 sampochchhareak,សម្ពច្ឆរៈ,1,km
 sampol,សម្ពល,1,km
@@ -25559,6 +25560,7 @@ somphute,សម្ភូតិ,1,km
 sompiet,សម្ពៀត,6,km
 sompin,សំពិន,1,km
 somping,សំពីង,6,km
+sompoan,សម្ព័ន្ធ,1,km
 sompochchhoreak,សម្ពច្ឆរៈ,1,km
 sompol,សម្ពល,1,km
 sompoli,សម្ពលី,1,km
@@ -25567,6 +25569,7 @@ somponthin,សម្ពន្ធិន,1,km
 somponthini,សម្ពន្ធិនី,1,km
 somponthor,សម្ពន្ធ,21,km
 sompor,សម្ពរ,1,km
+somporn,សម្ព័ន្ធ,1,km
 sompouthi,សម្ពោធិ,1,km
 sompouthoneak,សម្ពោធនៈ,1,km
 sompov,សំពៅ,85,km
@@ -28333,6 +28336,7 @@ ttenh,ទេញ,1,km
 ttep,ទេព,145,km
 ttepda,ទេព្តា,1,km
 ttepi,ទេពី,1,km
+ttepjyot,ទេពច្យុត,1,km
 tteproksar,ទេព្រក្ស,1,km
 tteproksor,ទេព្រក្ស,1,km
 tter,ទេរ,16,km
