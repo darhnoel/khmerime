@@ -52,6 +52,10 @@ _Avoid_: hidden override, invisible correction
 The limited use of the **Commit Refiner** when visible state is not meaningfully commit-ready. It may recover a Khmer phrase when the visible candidate is empty, raw roman, or otherwise not useful as Khmer **Commit Text**, but it must not override a visible Khmer candidate or **Segmented Session**.
 _Avoid_: final refinement, commit correction
 
+**Commit Rules**:
+The ordered precedence applied at commit time to pick the **Commit Text** from a **Composition**: **Visible Segmented Commit** first, then **Visible Candidate Commit**, then **Hidden Commit Fallback**, with the raw roman string as the final floor. Each step is one of the rules above; the earliest one that yields useful Khmer wins, so visible state always outranks hidden refinement.
+_Avoid_: commit resolution, commit policy, commit precedence
+
 **Bridge**:
 The Rust subprocess (`khmerime-ibus-bridge`) that owns the **SharedTransliteratorData** and serves commands from the Python IBus adapter over stdin/stdout JSON. One bridge per `KhmerIMEEngine` instance.
 _Avoid_: backend, service
@@ -64,7 +68,7 @@ _Avoid_: user dictionary, learned words (ambiguous with corpus)
 A two-stage warmup. Phase A builds a minimal **SharedTransliteratorData** fast enough to accept keystrokes (~100 ms). Phase B builds the full version in a background thread (~800 ms ngram, ~1300 ms SymSpell). Phase B is swapped in transparently when ready.
 
 **Visible Refiner / Commit Refiner**:
-Two distinct `Transliterator` views built from the same **SharedTransliteratorData** but with different decoder configurations. The visible refiner has a 75 ms latency budget for in-flight preview refinement; the commit refiner has no budget and is used to produce the final **Commit Text** on Enter.
+Two distinct `Transliterator` views built from the same **SharedTransliteratorData** but with different decoder configurations. The visible refiner has a 75 ms latency budget for in-flight preview refinement; the commit refiner has a larger budget and produces the final **Commit Text** on Enter. Both budgets are wall-clock deadlines; when the commit refiner's trips, the commit degrades to the visible result rather than waiting (see ADR-0005).
 _Avoid_: refiner (use the qualified form)
 
 ## Relationships
