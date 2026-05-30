@@ -47,6 +47,15 @@ Those belong in `AGENTS.md` or `specs/`.
 
 ## Current Entries
 
+## ime_session.rs Module Split
+
+- status: done
+- scope: `crates/session/src/ime_session.rs` (~2,271 lines) → new sibling modules under `crates/session/src/`
+- spec: `specs/structure/module-boundaries.md` (Native IME Boundaries), `CONTEXT.md`
+- goal: Behavior-preserving extraction of the oversized `ime_session.rs` into focused modules named from the `CONTEXT.md` glossary. `ImeSession` and top-level `process_command()` / `process_key_event()` stay in `ime_session.rs`.
+- validation: `cargo fmt --all`; `cargo test -p khmerime_session`; `cargo test -p khmerime_linux_ibus --test ibus_bridge_protocol`; broader `cargo test` if shared behavior moved substantially
+- notes: Settled module names (grill-with-docs): `adapter_contract.rs` (NativeKeyEvent, SessionCommand, SessionSnapshot, SessionResult, InputMode, CursorLocation, HistoryStore, SegmentedPreviewMode, ImeSessionOptions); `session_snapshot.rs` (`snapshot()` + render projection); `segmented_session.rs` (glossary term); `segment_edit_mode.rs` (glossary term); `commit_rules.rs` (`commit_selected_or_raw`, `segmented_outputs`, `visible_candidate_outputs`, `hidden_commit_fallback`, `selected_or_raw_fallback`, `visible_refined_phrase_segments_for`, `refined_phrase_segments_for` — the three Commit Rules + raw floor, now a `CONTEXT.md` glossary entry). Rejected software-generic names: `commit_policy`, `commit_text`, `composition_commit`, `commit_resolution`, `commit_precedence`, `commit_source`, `contract`, `segmented`. No semantic / snapshot-JSON / Segment-Edit / history-learning changes during extraction.
+
 ## Build-Time Dictionary Image For System Lexicon
 
 - status: in_progress
