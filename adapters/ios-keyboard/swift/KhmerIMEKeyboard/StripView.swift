@@ -62,6 +62,8 @@ final class StripView: UIView {
         separator.translatesAutoresizingMaskIntoConstraints = false
         addSubview(separator)
 
+        addKhmerRowTapGesture()
+
         NSLayoutConstraint.activate([
             romanRow.topAnchor.constraint(equalTo: topAnchor, constant: 2),
             romanRow.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 8),
@@ -80,6 +82,10 @@ final class StripView: UIView {
         ])
     }
 
+    // Called when the user taps the Khmer row to cycle to the next candidate.
+    // Wire this in the ViewController to call session.selectCandidate(at: nextIndex).
+    var onKhmerRowTapped: (() -> Void)?
+
     // MARK: - Public API
 
     // Call after every session key event.
@@ -87,12 +93,20 @@ final class StripView: UIView {
     // host text field; pass it so the strip can show it when the session has
     // not yet produced segments (i.e. during short compositions).
     func render(_ state: IosRenderState, romanBuffer: String) {
+        // Use selectedIndex to show the candidate the session currently has active,
+        // not always the first one — the user may have already picked an alternative.
+        let selectedCandidate = selectedCandidate(from: state)
+
         if state.segmentEditActive {
             romanRow.text = editModeText(state)
-            khmerRow.text = state.candidates.first ?? ""
+            khmerRow.text = selectedCandidate
         } else if state.segments.isEmpty {
             romanRow.text = romanBuffer
-            khmerRow.text = state.candidates.first ?? ""
+            khmerRow.text = selectedCandidate
+            // Show a tap hint when there are multiple candidates to choose from.
+            khmerRow.text = state.candidates.count > 1
+                ? (selectedCandidate) + " ›"
+                : selectedCandidate
         } else {
             romanRow.text = state.segments.map { $0.input }.joined(separator: " · ")
             khmerRow.text = state.segments.map { $0.output }.joined(separator: "  ")
@@ -104,7 +118,28 @@ final class StripView: UIView {
         khmerRow.text = ""
     }
 
+    // MARK: - Setup (tap gesture)
+
+    private func addKhmerRowTapGesture() {
+        let tap = UITapGestureRecognizer(target: self, action: #selector(khmerRowTapped))
+        khmerRow.isUserInteractionEnabled = true
+        khmerRow.addGestureRecognizer(tap)
+    }
+
+    @objc private func khmerRowTapped() {
+        onKhmerRowTapped?()
+    }
+
     // MARK: - Private
+
+    // Returns the currently active candidate using selectedIndex, falling back
+    // to index 0. Always use this instead of candidates.first so the strip
+    // reflects the candidate the user picked in the panel.
+    private func selectedCandidate(from state: IosRenderState) -> String {
+        guard !state.candidates.isEmpty else { return "" }
+        let idx = state.selectedIndex.map { Int($0) } ?? 0
+        return state.candidates.indices.contains(idx) ? state.candidates[idx] : state.candidates[0]
+    }
 
     // Builds "✏ nhom · [ttov] · salarien" from the current segments.
     private func editModeText(_ state: IosRenderState) -> String {

@@ -163,7 +163,8 @@ final class CandidatePanelView: UIView {
     // render state arrives from the session.
     func render(_ state: IosRenderState) {
         rebuildChips(state.segments)
-        rebuildCandidates(state.candidates)
+        let selectedIdx = state.selectedIndex.map { Int($0) } ?? 0
+        rebuildCandidates(state.candidates, selectedIndex: selectedIdx)
     }
 
     // MARK: - Builders
@@ -179,10 +180,10 @@ final class CandidatePanelView: UIView {
         }
     }
 
-    private func rebuildCandidates(_ candidates: [String]) {
+    private func rebuildCandidates(_ candidates: [String], selectedIndex: Int) {
         candidateStack.arrangedSubviews.forEach { $0.removeFromSuperview() }
         for (i, text) in candidates.enumerated() {
-            candidateStack.addArrangedSubview(makeCandidateButton(text: text, index: i))
+            candidateStack.addArrangedSubview(makeCandidateButton(text: text, index: i, selected: i == selectedIndex))
         }
     }
 
@@ -231,13 +232,15 @@ final class CandidatePanelView: UIView {
         return container
     }
 
-    private func makeCandidateButton(text: String, index: Int) -> UIButton {
+    private func makeCandidateButton(text: String, index: Int, selected: Bool) -> UIButton {
         let btn = UIButton(type: .system)
         btn.setTitle(text, for: .normal)
-        btn.titleLabel?.font = .systemFont(ofSize: 20, weight: .medium)
-        btn.setTitleColor(.label, for: .normal)
-        btn.backgroundColor = .white
+        btn.titleLabel?.font = .systemFont(ofSize: 20, weight: selected ? .semibold : .medium)
+        btn.setTitleColor(selected ? .systemBlue : .label, for: .normal)
+        btn.backgroundColor = selected ? UIColor.systemBlue.withAlphaComponent(0.08) : .white
         btn.layer.cornerRadius = 8
+        btn.layer.borderWidth = selected ? 1.5 : 0
+        btn.layer.borderColor = selected ? UIColor.systemBlue.cgColor : UIColor.clear.cgColor
         btn.contentEdgeInsets = UIEdgeInsets(top: 8, left: 14, bottom: 8, right: 14)
         btn.tag = index
         btn.addTarget(self, action: #selector(candidateTapped(_:)), for: .touchUpInside)

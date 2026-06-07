@@ -108,6 +108,7 @@ class KeyboardViewController: UIInputViewController {
 
         stripView = StripView()
         stripView.translatesAutoresizingMaskIntoConstraints = false
+        stripView.onKhmerRowTapped = { [weak self] in self?.cycleCandidate() }
 
         panelView = CandidatePanelView()
         panelView.delegate = self
@@ -205,6 +206,17 @@ class KeyboardViewController: UIInputViewController {
     }
 
     // MARK: - Key Actions
+
+    // Cycles to the next candidate when the user taps the Khmer strip row.
+    // Works for both flat compositions (single word, multiple candidates)
+    // and segmented compositions (moves to next candidate for the focused segment).
+    private func cycleCandidate() {
+        guard let current = lastState, !current.candidates.isEmpty else { return }
+        let currentIdx = current.selectedIndex.map { Int($0) } ?? 0
+        let nextIdx = (currentIdx + 1) % current.candidates.count
+        let state = session.selectCandidate(at: nextIdx)
+        render(state)
+    }
 
     @objc func letterTapped(_ sender: UIButton) {
         guard let ch = sender.title(for: .normal)?.lowercased(), !ch.isEmpty else { return }
