@@ -176,3 +176,185 @@ impl KhmerIMESession {
         render_state(&s.snapshot(), &SessionResult::default())
     }
 }
+
+// ── Tests ─────────────────────────────────────────────────────────────────────
+//
+// All tests go through `KhmerIMESession::new()` (full compiled-in lexicon,
+// `DecoderConfig::shadow_interactive()`, `SegmentedPreviewMode::Enabled`) so
+// they exercise the exact same code path as the Swift extension.
+//
+// Key fixture facts:
+//   "nhom"       — single word, no segmented session, preedit = "nhom"
+//   "khnhomtov"  — two-word phrase, splits into ≥2 segments in shadow mode
+//   digit outside composition → auto-commits as Khmer numeral (build_segmented
+//     session returns None for a single digit, so should_auto_commit fires)
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn new_session() -> Arc<KhmerIMESession> {
+        KhmerIMESession::new()
+    }
+
+    fn type_str(s: &Arc<KhmerIMESession>, input: &str) -> IosRenderState {
+        let mut state = IosRenderState::default();
+        for ch in input.chars() {
+            state = s.process_character(ch.to_string());
+        }
+        state
+    }
+
+    // ── render_state field mapping ────────────────────────────────────────────
+
+    #[test]
+    fn focus_in_returns_clean_state() {
+        let s = new_session();
+        let state = s.focus_in();
+        assert_eq!(state.preedit, "");
+        assert!(state.candidates.is_empty());
+        assert!(state.segments.is_empty());
+        assert!(state.commit_text.is_none());
+        assert!(!state.segment_edit_active);
+        assert!(state.segment_edit_index.is_none());
+        assert!(state.focused_segment_index.is_none());
+        assert!(state.selected_index.is_none());
+    }
+
+    // ── basic composition ─────────────────────────────────────────────────────
+
+    #[test]
+    fn letter_input_builds_preedit_and_produces_candidates() {
+        let s = new_session();
+        s.focus_in();
+        let state = type_str(&s, "nhom");
+        // "nhom" is a single word; no segmented session → preedit == raw roman input.
+        assert_eq!(state.preedit, "nhom");
+        assert!(!state.candidates.is_empty(), "nhom must produce at least one candidate");
+        assert!(state.commit_text.is_none());
+    }
+
+    #[test]
+    fn backspace_removes_last_raw_preedit_char() {
+        let s = new_session();
+        s.focus_in();
+        type_str(&s, "nhom");
+        // "nhom" stays in the flat session, so preedit == composition_raw.
+        // After one backspace the raw input shrinks to "nho".
+        let state = s.process_backspace();
+        assert_eq!(state.preedit, "nho");
+        assert!(state.commit_text.is_none());
+    }
+
+    #[test]
+    fn enter_commits_composition_to_khmer_text() {
+        let s = new_session();
+        s.focus_in();
+        type_str(&s, "nhom");
+        let state = s.process_enter();
+        let committed = state.commit_text.expect("enter must produce commit_text");
+        assert!(!committed.is_empty());
+        // All committed characters should be in the Khmer Unicode block (U+1780–U+17FF).
+        assert!(
+            committed.chars().all(|c| ('\u{1780}'..='\u{17FF}').contains(&c)),
+            "committed text must be Khmer Unicode; got {committed:?}"
+        );
+    }
+
+    // ── digit key behaviour ───────────────────────────────────────────────────
+
+    #[test]
+    fn digit_1_outside_composition_commits_khmer_numeral() {
+        let s = new_session();
+        s.focus_in();
+        // '1' → Khmer numeral ១ (U+17E1). The commit fires because
+        // "1" is a single keycap with exactly one candidate (the Khmer digit).
+        let state = s.process_digit(1);
+        assert_eq!(
+            state.commit_text.as_deref(),
+            Some("១"),
+            "digit 1 outside composition must commit Khmer numeral ១"
+        );
+        assert!(state.preedit.is_empty());
+    }
+
+    #[test]
+    fn digit_during_composition_does_not_commit() {
+        let s = new_session();
+        s.focus_in();
+        type_str(&s, "nhom");
+        // During composition, digit 1 selects the first candidate; it must not
+        // auto-commit (that would lose the user's in-progress word).
+        let state = s.process_digit(1);
+        assert!(state.commit_text.is_none(), "digit during composition must not commit immediately");
+        assert_eq!(state.selected_index, Some(0u64), "digit 1 during composition must keep selected_index = 0");
+    }
+
+    // ── segmentation (requires shadow_interactive + SegmentedPreviewMode::Enabled) ──
+
+    #[test]
+    fn two_word_input_produces_multiple_segments() {
+        let s = new_session();
+        s.focus_in();
+        // "khnhomtov" → "khnhom" (ខ្ញuំ) + "tov" (ទៅ). The shadow decoder must
+        // split this into ≥2 segments; failure here means shadow_interactive is inactive.
+        let state = type_str(&s, "khnhomtov");
+        assert!(
+            state.segments.len() >= 2,
+            "khnhomtov must produce ≥2 segments (got {}); \
+             check DecoderConfig::shadow_interactive() is active",
+            state.segments.len()
+        );
+    }
+
+    #[test]
+    fn each_segment_has_non_empty_input_and_output() {
+        let s = new_session();
+        s.focus_in();
+        let state = type_str(&s, "khnhomtov");
+        assert!(!state.segments.is_empty());
+        for (i, seg) in state.segments.iter().enumerate() {
+            assert!(!seg.input.is_empty(), "segment {i} input must not be empty");
+            assert!(!seg.output.is_empty(), "segment {i} output must not be empty");
+        }
+    }
+
+    // ── segment edit mode ─────────────────────────────────────────────────────
+
+    #[test]
+    fn process_tab_enters_segment_edit_mode_on_segment_0() {
+        let s = new_session();
+        s.focus_in();
+        type_str(&s, "khnhomtov");
+        let state = s.process_tab();
+        assert!(state.segment_edit_active, "process_tab must set segment_edit_active = true");
+        assert_eq!(state.segment_edit_index, Some(0u64), "edit must begin on focused segment 0");
+    }
+
+    #[test]
+    fn segment_edit_index_equals_focused_segment_after_tab() {
+        let s = new_session();
+        s.focus_in();
+        type_str(&s, "khnhomtov");
+        // Move focus to segment 1, then enter edit mode; both indices must agree.
+        s.process_right();
+        let state = s.process_tab();
+        assert!(state.segment_edit_active);
+        assert_eq!(
+            state.segment_edit_index,
+            state.focused_segment_index,
+            "segment_edit_index must match focused_segment_index on tab entry"
+        );
+    }
+
+    #[test]
+    fn second_tab_exits_segment_edit_mode() {
+        let s = new_session();
+        s.focus_in();
+        type_str(&s, "khnhomtov");
+        s.process_tab();
+        let state = s.process_tab();
+        assert!(!state.segment_edit_active, "second process_tab must exit segment edit mode");
+        assert!(state.segment_edit_index.is_none());
+    }
+}
