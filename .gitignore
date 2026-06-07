@@ -37,3 +37,6 @@ short-common-en-words.txt
 
 # Claude skills install lock (local)
 skills-lock.json
+
+# data
+data/khPOS/
