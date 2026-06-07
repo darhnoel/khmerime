@@ -18,6 +18,7 @@ const KEY_RETURN:    u32 = 0xFF0D;
 const KEY_SPACE:     u32 = 0x20;
 const KEY_LEFT:      u32 = 0xFF51;
 const KEY_RIGHT:     u32 = 0xFF53;
+const KEY_TAB:       u32 = 0xFF09;
 
 fn key_event(keyval: u32) -> NativeKeyEvent {
     NativeKeyEvent { keyval, keycode: 0, state: 0 }
@@ -55,6 +56,10 @@ pub struct IosRenderState {
     /// Non-None only immediately after Enter; Swift deletes roman buffer and
     /// inserts this concatenated Khmer string.
     pub commit_text: Option<String>,
+    /// True while the user is retyping one segment's roman input in isolation.
+    pub segment_edit_active: bool,
+    /// Which segment is currently being edited (when segment_edit_active).
+    pub segment_edit_index: Option<u64>,
 }
 
 fn render_state(snapshot: &SessionSnapshot, result: &SessionResult) -> IosRenderState {
@@ -65,6 +70,8 @@ fn render_state(snapshot: &SessionSnapshot, result: &SessionResult) -> IosRender
         segments: snapshot.segment_preview.iter().map(IosSegmentEntry::from).collect(),
         focused_segment_index: snapshot.focused_segment_index.map(|i| i as u64),
         commit_text: result.commit_text.clone(),
+        segment_edit_active: snapshot.segment_edit_active,
+        segment_edit_index: snapshot.segment_edit_index.map(|i| i as u64),
     }
 }
 
@@ -144,6 +151,15 @@ impl KhmerIMESession {
     pub fn process_right(&self) -> IosRenderState {
         let mut s = self.inner.lock().unwrap();
         let result = s.process_native_key_event(key_event(KEY_RIGHT));
+        render_state(&s.snapshot(), &result)
+    }
+
+    /// Toggle Segment Edit Mode on the focused segment.
+    /// First call enters edit mode (next printable replaces segment roman input).
+    /// Second call exits edit mode.
+    pub fn process_tab(&self) -> IosRenderState {
+        let mut s = self.inner.lock().unwrap();
+        let result = s.process_native_key_event(key_event(KEY_TAB));
         render_state(&s.snapshot(), &result)
     }
 
