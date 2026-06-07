@@ -85,6 +85,7 @@ final class CandidatePanelView: UIView {
         chipScroll.showsHorizontalScrollIndicator = false
         chipScroll.backgroundColor = .systemBackground
         chipScroll.translatesAutoresizingMaskIntoConstraints = false
+        chipScroll.delaysContentTouches = false
 
         chipStack.axis = .horizontal
         chipStack.spacing = 8
@@ -97,6 +98,7 @@ final class CandidatePanelView: UIView {
         candidateScroll.showsHorizontalScrollIndicator = false
         candidateScroll.backgroundColor = UIColor.systemGray6
         candidateScroll.translatesAutoresizingMaskIntoConstraints = false
+        candidateScroll.delaysContentTouches = false
 
         candidateStack.axis = .horizontal
         candidateStack.spacing = 6
@@ -153,6 +155,11 @@ final class CandidatePanelView: UIView {
             bottomAnchorGuide.topAnchor.constraint(equalTo: candidateSeparator.bottomAnchor),
             bottomAnchorGuide.leadingAnchor.constraint(equalTo: leadingAnchor),
             bottomAnchorGuide.trailingAnchor.constraint(equalTo: trailingAnchor),
+
+            // Pin the view's own bottom so hitTest covers the chip + candidate rows.
+            // Without this, the frame height is 0: content paints (clipsToBounds=false)
+            // but all touches fall outside bounds and are never delivered to subviews.
+            bottomAnchor.constraint(equalTo: candidateSeparator.bottomAnchor),
         ])
     }
 
