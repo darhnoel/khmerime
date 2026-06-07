@@ -40,3 +40,7 @@ skills-lock.json
 
 # data
 data/khPOS/
+data/khmerlang-mobile-keyboard-data/
+
+# iOS build artifacts
+adapters/ios-keyboard/swift/Frameworks/
