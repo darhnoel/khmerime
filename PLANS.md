@@ -47,6 +47,15 @@ Those belong in `AGENTS.md` or `specs/`.
 
 ## Current Entries
 
+## iOS Keyboard Extension Phase 1
+
+- status: planned
+- scope: `adapters/ios-keyboard/`, `docs/platforms/ios.md`, `Makefile`
+- spec: `docs/adr/0006-uniffi-swift-rust-bridge-for-ios.md`, `docs/platforms/ios.md`
+- goal: Build a functional iOS custom keyboard extension with QWERTY layout, horizontal candidate strip, expandable segment panel, and UniFFI Rust bridge to `khmerime_session`.
+- validation: `cargo check -p khmerime_ios_keyboard`; `make platform-build-ios`; Xcode simulator smoke checklist in `docs/platforms/ios.md`
+- notes: UniFFI bridge (ADR-0006). `KhmerIMESession` is the Swift-visible session handle. `swift/` folder holds `KhmerIME.xcodeproj` with `KhmerIME` host app and `KhmerIMEKeyboard` extension targets. XCFramework built to `adapters/ios-keyboard/swift/Frameworks/` (gitignored). `Left`/`Right` are not keyboard buttons — the adapter fires them internally when the user taps a segment in the expanded panel. `Digit(n)` selects only; `Enter` is the explicit commit. `Tab`/`Escape` (Segment Edit Mode) deferred to a later milestone.
+
 ## ime_session.rs Module Split
 
 - status: done

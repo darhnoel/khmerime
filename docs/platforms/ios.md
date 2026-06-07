@@ -4,9 +4,126 @@ For the shared platform workflow, read [`docs/platforms/README.md`](README.md).
 
 ## Adapter
 
-- Planned crate: `adapters/ios-keyboard`
-- Runtime boundary: native keyboard extension callbacks -> `khmerime_session` commands
-- Dioxus note: Dioxus remains separate app/runtime and is not embedded in adapter.
+- Crate: `adapters/ios-keyboard`
+- Bridge: UniFFI (see [ADR-0006](../adr/0006-uniffi-swift-rust-bridge-for-ios.md))
+- Runtime boundary: `KhmerIMESession` (UniFFI-exported) ← Swift → `khmerime_session::ImeSession`
+- Dioxus is not embedded in the adapter.
+
+## Folder Structure
+
+```
+adapters/ios-keyboard/
+├── Cargo.toml                          ← Rust adapter crate (staticlib + UniFFI)
+├── src/lib.rs                          ← IosKeyEvent, IosRenderState, KhmerIMESession
+├── swift/
+│   ├── KhmerIME.xcodeproj              ← Xcode project
+│   ├── KhmerIME/                       ← host app target (required by Apple)
+│   │   ├── Info.plist
+│   │   └── AppDelegate.swift
+│   ├── KhmerIMEKeyboard/               ← keyboard extension target
+│   │   ├── Info.plist
+│   │   └── KeyboardViewController.swift
+│   └── Frameworks/                     ← gitignored, built by make platform-build-ios
+│       └── KhmerIME.xcframework
+└── README.md
+```
+
+`swift/` follows the same naming pattern as `python/` in `adapters/linux-ibus`:
+the non-Rust layer is named after its language, not the product.
+
+## Key Event Model
+
+`IosKeyEvent` is the iOS-specific input type. All variants convert to
+`NativeKeyEvent { keycode: 0, state: 0, keyval }` before reaching `ImeSession`.
+`keycode: 0` is the documented fallback when no physical scancode is available.
+
+| `IosKeyEvent` variant | Trigger | Session keyval |
+| --- | --- | --- |
+| `Character(char)` | QWERTY key tapped | `char as u32` |
+| `Backspace` | ⌫ button | `0xFF08` |
+| `Space` | space bar | `0x20` |
+| `Enter` | Return button | `0xFF0D` |
+| `Left` | adapter-internal (segment tap, left) | `0xFF51` |
+| `Right` | adapter-internal (segment tap, right) | `0xFF53` |
+| `Digit(n)` | candidate strip tap at index n | `'0' + n` |
+
+`Left` and `Right` are not keyboard buttons. The adapter fires them when the user
+taps a segment in the expanded panel: it reads `focused_segment_index` from the
+last snapshot, computes the delta to the tapped segment, and fires Left/Right that
+many times.
+
+`Digit(n)` selects a candidate. It does NOT commit. `Enter` is always the explicit
+commit gesture.
+
+`Tab` and `Escape` (Segment Edit Mode) are deferred until that UI is added.
+
+## Keyboard Layout
+
+```
+┌──────────────────────────────────────────────────────┐
+│  ខ្ញុំ  │  ទៅ  │  សាលារៀន  ↓                         │ ← candidate strip
+├──────────────────────────────────────────────────────┤
+│  Q  W  E  R  T  Y  U  I  O  P                       │
+│   A  S  D  F  G  H  J  K  L                         │
+│  ⇧   Z  X  C  V  B  N  M    ⌫                       │
+│  123   🙂        space          return               │
+└──────────────────────────────────────────────────────┘
+```
+
+Tapping ↓ expands to show the full segment panel. The QWERTY rows hide.
+Tapping ↑ collapses back. Expand/collapse is pure Swift `@State` — no session command.
+
+## Segment Selection Flow
+
+```
+User types: nhomttovsalarien
+
+Expanded panel:  ខ្ញុំ  │  ទៅ  │  សាលារៀន
+
+User taps "ទៅ" (index 1, currently focused on index 0)
+  → adapter fires Right once
+  → snapshot: focused_segment_index = 1
+  → candidate strip: ទៅ │ តូវ │ ...
+
+User taps "តូវ" in the strip
+  → adapter fires Digit(2)
+  → snapshot: selected candidate for segment 1 = "តូវ"
+  → panel: ខ្ញុំ │ [តូវ] │ សាលារៀន
+
+User taps Return
+  → adapter fires Enter
+  → result.commit_text = "ខ្ញុំតូវសាលារៀន"
+  → textDocumentProxy.insertText("ខ្ញុំតូវសាលារៀន")
+```
+
+## Lifecycle Mapping
+
+| Swift callback | `KhmerIMESession` method | Notes |
+| --- | --- | --- |
+| `viewDidAppear` | `focusIn()` | Start composition session |
+| `viewWillDisappear` | `focusOut()` | Clear preedit state |
+| key button tap | `processKey(event:)` | Main transliteration path |
+| candidate strip tap | `processKey(.digit(n))` | Selects; does not commit |
+| segment tap | `processKey(.left/.right)` × delta | Moves focus to tapped segment |
+| `selectionDidChange` | `setCursorLocation(x:y:width:height:)` | Anchor candidate strip UI |
+
+## Build Prerequisites
+
+Before opening Xcode:
+
+```bash
+rustup target add aarch64-apple-ios aarch64-apple-ios-sim
+cargo install uniffi-bindgen
+make platform-build-ios
+```
+
+`make platform-build-ios` does:
+1. `cargo build --target aarch64-apple-ios --release -p khmerime_ios_keyboard`
+2. `cargo build --target aarch64-apple-ios-sim --release -p khmerime_ios_keyboard`
+3. `uniffi-bindgen generate` — produces Swift wrappers in `swift/KhmerIMEKeyboard/Generated/`
+4. `xcodebuild -create-xcframework` — assembles `swift/Frameworks/KhmerIME.xcframework`
+
+The XCFramework is gitignored. Rerun `make platform-build-ios` whenever the Rust API changes.
 
 ## Official References
 
@@ -15,37 +132,37 @@ For the shared platform workflow, read [`docs/platforms/README.md`](README.md).
 - Custom Keyboard guide:
   <https://developer.apple.com/library/archive/documentation/General/Conceptual/ExtensibilityPG/CustomKeyboard.html>
 
-## Lifecycle Mapping (Planned)
-
-| Native callback | Session intent |
-| --- | --- |
-| `viewDidAppear` | `focus_in` |
-| `viewWillDisappear` | `focus_out` |
-| key input callback | `process_key_event` |
-| `selectionDidChange` | `set_cursor_location` |
-
 ## Milestones
 
-1. Add Swift extension shell and callback bridge.
-2. Implement callback-to-session mapping and render state wiring.
-3. Implement candidate/preedit/commit behavior through `textDocumentProxy`.
-4. Add manual smoke checklist in sample host apps.
+1. Add `staticlib` crate-type and UniFFI scaffolding to `adapters/ios-keyboard/Cargo.toml`.
+2. Add `make platform-build-ios` Makefile target.
+3. Create Xcode project with `KhmerIME` host app and `KhmerIMEKeyboard` extension targets.
+4. Wire `viewDidAppear`/`viewWillDisappear` to `focusIn`/`focusOut`.
+5. Wire QWERTY button taps to `processKey(.character(...))`.
+6. Render candidate strip from `IosRenderState.candidates`.
+7. Wire candidate strip tap to `processKey(.digit(n))`.
+8. Implement expanded segment panel from `IosRenderState.segments`.
+9. Wire segment tap to internal Left/Right dispatch.
+10. Wire Return to `processKey(.enter)` and `textDocumentProxy.insertText`.
+11. Add smoke checklist in simulator (Safari + Notes text fields).
 
 ## Package Criteria
 
-Do not add `make ios-package` yet. Add iOS packaging only after a real keyboard
-extension target exists and can run inside a host app or simulator.
+Do not add `make ios-package` yet. Add it only after the keyboard extension can be
+enabled, opened from a text field, render candidates, and commit Khmer text through
+`UITextDocumentProxy` in a simulator. The artifact path when ready is
+`dist/ios/KhmerIME-<version>.xcarchive`.
 
-The target package workflow should use Xcode archive/export and write artifacts
-under `dist/ios/`.
+## Smoke Checklist
 
-The smoke checklist must prove the extension can be enabled, opened from a text
-field, render candidates, and commit Khmer text through `UITextDocumentProxy`.
+Before marking a milestone done, verify in the iOS simulator:
 
-## First Contributor Tasks
-
-1. Wire `viewDidAppear`/`viewWillDisappear` lifecycle to session focus commands.
-2. Add key-event conversion into `NativeKeyEvent`.
-3. Add candidate strip rendering from `SessionSnapshot.candidates`.
-4. Add commit integration via `textDocumentProxy.insertText`.
-5. Add smoke script/checklist for Safari + Notes text input.
+- [ ] Extension appears in Settings → General → Keyboard → Keyboards
+- [ ] Keyboard loads when a text field is focused
+- [ ] Typing roman letters shows Khmer candidates in the strip
+- [ ] Tapping a candidate selects it (highlights, does not commit)
+- [ ] Tapping Return commits the selected candidate into the text field
+- [ ] Tapping ↓ expands the segment panel
+- [ ] Tapping a segment moves focus and updates the candidate strip
+- [ ] Tapping ⌫ deletes the last roman character
+- [ ] `viewWillDisappear` clears the preedit (verified by switching to system keyboard)
