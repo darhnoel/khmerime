@@ -6,8 +6,8 @@
 
 use std::sync::{Arc, Mutex};
 
-use khmerime_core::Transliterator;
-use khmerime_session::{ImeSession, NativeKeyEvent, SegmentPreviewEntry, SessionResult, SessionSnapshot};
+use khmerime_core::{DecoderConfig, Transliterator};
+use khmerime_session::{ImeSession, ImeSessionOptions, NativeKeyEvent, SegmentPreviewEntry, SegmentedPreviewMode, SessionResult, SessionSnapshot};
 
 uniffi::setup_scaffolding!("khmerime_ios_keyboard");
 
@@ -85,9 +85,16 @@ impl KhmerIMESession {
     /// data (no external files needed on iOS).
     #[uniffi::constructor]
     pub fn new() -> Arc<Self> {
-        let transliterator = Transliterator::from_default_data()
-            .expect("compiled-in lexicon data must be valid");
-        let session = ImeSession::new(transliterator, std::collections::HashMap::new());
+        let transliterator = Transliterator::from_default_data_with_config(
+            DecoderConfig::shadow_interactive(),
+        )
+        .expect("compiled-in lexicon data must be valid");
+        let session = ImeSession::new_with_input_mode_and_options(
+            transliterator,
+            std::collections::HashMap::new(),
+            khmerime_session::InputMode::Roman,
+            ImeSessionOptions { segmented_preview: SegmentedPreviewMode::Enabled },
+        );
         Arc::new(KhmerIMESession { inner: Mutex::new(session) })
     }
 
