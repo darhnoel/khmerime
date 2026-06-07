@@ -1,4 +1,4 @@
-.PHONY: help web web-release web-phone desktop stats suggest suggest-wfst suggest-shadow shadow-eval data-split data-build data-check lexicon-editor visualize-lexicon visualize-lexicon-streamlit fmt test test-golden test-ui platform-check platform-check-linux platform-check-android platform-check-ios platform-check-macos platform-check-windows platform-build-windows platform-install-windows platform-uninstall-windows platform-reinstall-windows platform-smoke-windows-notepad platform-smoke-windows-notepad-python windows-package linux-package ibus-install ibus-uninstall ibus-smoke paper-current paper-current-clean
+.PHONY: help web web-release web-phone desktop stats suggest suggest-wfst suggest-shadow shadow-eval data-split data-build data-check lexicon-editor visualize-lexicon visualize-lexicon-streamlit fmt test test-golden test-ui platform-check platform-check-linux platform-check-android platform-check-ios platform-check-macos platform-check-windows platform-build-ios platform-build-windows platform-install-windows platform-uninstall-windows platform-reinstall-windows platform-smoke-windows-notepad platform-smoke-windows-notepad-python windows-package linux-package ibus-install ibus-uninstall ibus-smoke paper-current paper-current-clean
 
 DX ?= dx
 APP_DIR := apps/dioxus-app
@@ -24,6 +24,16 @@ WINDOWS_TSF_DLL_ABS := $(subst /,\,$(CURDIR)/$(WINDOWS_TSF_DLL))
 WINDOWS_TSF_DEV_DLL_ABS := $(subst /,\,$(CURDIR)/$(WINDOWS_TSF_DEV_DLL))
 WINDOWS_TSF_DEPLOY_DLL_ABS := $(subst /,\,$(CURDIR)/$(WINDOWS_TSF_DEPLOY_DLL))
 WINDOWS_TSF_SMOKE_DELAY ?= 8
+
+IOS_ADAPTER_DIR     := adapters/ios-keyboard
+IOS_TARGET_DEVICE   := aarch64-apple-ios
+IOS_TARGET_SIM      := aarch64-apple-ios-sim
+IOS_LIB_NAME        := libkhmerime_ios_keyboard.a
+IOS_BINDGEN_OUT     := $(IOS_ADAPTER_DIR)/swift/KhmerIMEKeyboard/Generated
+IOS_XCFRAMEWORK_OUT := $(IOS_ADAPTER_DIR)/swift/Frameworks/KhmerIME.xcframework
+IOS_SIM_ID          ?= FDED48C6-BFCE-4666-BA4C-F279438340A7
+IOS_SIM_BUNDLE_ID   := com.khmerime.KhmerIME
+IOS_SIM_APP         := $(HOME)/Library/Developer/Xcode/DerivedData/KhmerIME-*/Build/Products/Debug-iphonesimulator/KhmerIME.app
 
 help:
 	@printf "%s\n" \
@@ -51,6 +61,7 @@ help:
 	"  make test-ui                     Run the browser/UI Python test file" \
 	"  make platform-check              Check all native platform adapter crates" \
 	"  make platform-check-<platform>   Check one adapter: linux, android, ios, macos, windows" \
+	"  make platform-build-ios          Build iOS static libs, generate UniFFI Swift bindings, assemble XCFramework" \
 	"  make platform-build-windows      Build the Windows TSF DLL target under target/windows-tsf/" \
 	"  make platform-install-windows    Build and register the Windows TSF DLL with regsvr32" \
 	"  make platform-uninstall-windows  Unregister the Windows TSF DLL with regsvr32 /u" \
@@ -148,6 +159,33 @@ platform-check-macos:
 
 platform-check-windows:
 	cargo check -p khmerime_windows_tsf
+
+platform-build-ios:
+	cargo build -p khmerime_ios_keyboard --target $(IOS_TARGET_DEVICE) --release
+	cargo build -p khmerime_ios_keyboard --target $(IOS_TARGET_SIM) --release
+	mkdir -p $(IOS_BINDGEN_OUT)
+	cargo run -p khmerime_ios_keyboard --bin uniffi-bindgen -- \
+		--swift-sources target/$(IOS_TARGET_DEVICE)/release/$(IOS_LIB_NAME) $(IOS_BINDGEN_OUT)
+	cargo run -p khmerime_ios_keyboard --bin uniffi-bindgen -- \
+		--headers target/$(IOS_TARGET_DEVICE)/release/$(IOS_LIB_NAME) $(IOS_BINDGEN_OUT)
+	cargo run -p khmerime_ios_keyboard --bin uniffi-bindgen -- \
+		--modulemap target/$(IOS_TARGET_DEVICE)/release/$(IOS_LIB_NAME) $(IOS_BINDGEN_OUT)
+	# XCFramework needs module.modulemap (Clang's implicit name) for canImport() to work.
+	mkdir -p /tmp/khmerime-xcfw-headers
+	cp $(IOS_BINDGEN_OUT)/khmerime_ios_keyboardFFI.h /tmp/khmerime-xcfw-headers/
+	cp $(IOS_BINDGEN_OUT)/khmerime_ios_keyboard.modulemap /tmp/khmerime-xcfw-headers/module.modulemap
+	# Module name must match the Swift import: khmerime_ios_keyboardFFI (not khmerime_ios_keyboard)
+	sed -i '' 's/^module khmerime_ios_keyboard {/module khmerime_ios_keyboardFFI {/' /tmp/khmerime-xcfw-headers/module.modulemap
+	mkdir -p $(IOS_ADAPTER_DIR)/swift/Frameworks
+	rm -rf $(IOS_XCFRAMEWORK_OUT)
+	xcodebuild -create-xcframework \
+		-library target/$(IOS_TARGET_DEVICE)/release/$(IOS_LIB_NAME) \
+		-headers /tmp/khmerime-xcfw-headers \
+		-library target/$(IOS_TARGET_SIM)/release/$(IOS_LIB_NAME) \
+		-headers /tmp/khmerime-xcfw-headers \
+		-output $(IOS_XCFRAMEWORK_OUT)
+	rm -rf /tmp/khmerime-xcfw-headers
+	cd $(IOS_ADAPTER_DIR)/swift && xcodegen generate
 
 platform-build-windows:
 	cargo build -p khmerime_windows_tsf --target $(WINDOWS_TSF_TARGET) --target-dir $(WINDOWS_TSF_TARGET_DIR)
