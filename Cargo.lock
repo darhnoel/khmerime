@@ -2650,7 +2650,9 @@ dependencies = [
 name = "khmerime_macos_imk"
 version = "0.1.0"
 dependencies = [
+ "khmerime_core",
  "khmerime_session",
+ "uniffi",
 ]
 
 [[package]]
