@@ -262,6 +262,27 @@ impl MacosIMKSession {
         })
     }
 
+    /// Called by the Swift layer when the visible refiner finishes processing.
+    /// Inserts the refined candidate at position 0 if `raw_preedit` still matches
+    /// the current composition and no candidate has been manually selected.
+    /// Ignored (no-op) when a segmented session is already active.
+    pub fn refine_composition(&self, raw_preedit: String) -> MacosRenderState {
+        self.with_session(|s| {
+            s.apply_refined_candidate(&raw_preedit);
+            render_state(&s.snapshot(), &SessionResult::default(), true)
+        })
+    }
+
+    /// Called by the Swift layer when the visible refiner finishes building a
+    /// segmented preview (deferred mode). Rebuilds the segmented session if
+    /// `raw_preedit` still matches and no candidate has been touched.
+    pub fn refresh_segmented_preview(&self, raw_preedit: String) -> MacosRenderState {
+        self.with_session(|s| {
+            s.refresh_segmented_preview(&raw_preedit);
+            render_state(&s.snapshot(), &SessionResult::default(), true)
+        })
+    }
+
     /// Input mode toggle (Roman ↔ NIDA). Clears composition.
     pub fn toggle_input_mode(&self) -> MacosRenderState {
         self.with_session(|s| {

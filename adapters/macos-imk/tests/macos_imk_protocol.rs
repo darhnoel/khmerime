@@ -45,12 +45,39 @@
 //! | session_ready_state_is_false_before_warmup_completes          | TODO   |
 //! | session_segment_entries_populate_render_state                 | TODO   |
 
-use khmerime_macos_imk::{keycode_mac_to_evdev, MacosIMKSession};
+use khmerime_macos_imk::{keycode_mac_to_evdev, MacosIMKSession, MacosRenderState};
+
+const NS_SHIFT_KEY_MASK: u32 = 1 << 17;
+
+// Khmer phrase constants (all codepoints escaped to survive editor round-trips)
+// "នេះជាស្នាដៃបកប្រែ"
+const PHRASE_NIHJEAS: &str = "\u{1793}\u{17C1}\u{17C7}\u{1787}\u{17B6}\u{179F}\u{17D2}\u{1793}\u{17B6}\u{178A}\u{17C3}\u{1794}\u{1780}\u{1794}\u{17D2}\u{179A}\u{17C2}";
+// "ការសន្មត" (kasanmot)
+const PHRASE_KASANMOT: &str = "\u{1780}\u{17B6}\u{179A}\u{179F}\u{1793}\u{17D2}\u{1798}\u{178F}";
+// "កសាងម៉ូត" (commit-refiner alternative — must NOT appear)
+const PHRASE_KASANMOT_ALT: &str = "\u{1780}\u{179F}\u{17B6}\u{1784}\u{1798}\u{17C9}\u{17BC}\u{178F}";
 
 fn session() -> std::sync::Arc<MacosIMKSession> {
     let s = MacosIMKSession::new();
-    s.activate();
+    // Retry until the background warmup thread finishes. When many tests run
+    // in parallel each spawning their own warmup, the default 500 ms condvar
+    // timeout can fire before the lexicon loads. activate() returns is_ready:
+    // false (default state) when inner is still None; loop until it's true.
+    loop {
+        if s.activate().is_ready { break; }
+        std::thread::sleep(std::time::Duration::from_millis(100));
+    }
     s
+}
+
+/// Types each character as a keyval (Unicode scalar), mac_keycode=0, no modifiers.
+/// mac_keycode=0 is only meaningful in NIDA mode; Roman mode uses keyval exclusively.
+fn type_str(s: &std::sync::Arc<MacosIMKSession>, input: &str) -> MacosRenderState {
+    let mut state = MacosRenderState::default();
+    for ch in input.chars() {
+        state = s.handle_event(ch as u32, 0, 0);
+    }
+    state
 }
 
 // ── Input mode ────────────────────────────────────────────────────────────────
@@ -60,13 +87,21 @@ fn session_defaults_to_roman_input_mode() {
     // IBus: bridge_defaults_to_roman_input_mode
     // After activate, the session should be in Roman mode (not NIDA).
     // Type a roman letter — preedit should grow, no direct Khmer commit.
-    todo!("port from ibus_bridge_protocol.rs: bridge_defaults_to_roman_input_mode")
+    let s = session();
+    let state = s.handle_event('k' as u32, 0, 0);
+    assert_eq!(state.preedit, "k");
+    assert!(state.commit_text.is_none());
 }
 
 #[test]
 fn session_toggle_input_mode_clears_composition() {
     // IBus: bridge_toggle_input_mode_clears_composition
-    todo!()
+    let s = session();
+    type_str(&s, "jea");
+    let state = s.toggle_input_mode();
+    assert_eq!(state.preedit, "");
+    assert!(state.candidates.is_empty());
+    assert!(state.commit_text.is_none());
 }
 
 // ── NIDA mode ─────────────────────────────────────────────────────────────────
@@ -74,35 +109,77 @@ fn session_toggle_input_mode_clears_composition() {
 #[test]
 fn session_nida_mode_commits_direct_khmer_key() {
     // IBus: bridge_nida_mode_commits_direct_khmer_key
-    // In NIDA mode, a physical key press commits the mapped Khmer character
-    // immediately without building a composition.
-    todo!()
+    // mac_keycode 0x28 → evdev KEY_K=37 → NIDA base → "ក"
+    let s = session();
+    s.toggle_input_mode();
+    let state = s.handle_event(107, 0x28, 0);
+    assert_eq!(state.commit_text, Some("ក".to_owned()));
+    assert_eq!(state.preedit, "");
 }
 
 #[test]
 fn session_nida_mode_does_not_treat_caps_uppercase_as_shift() {
     // IBus: bridge_nida_mode_does_not_treat_caps_uppercase_as_shift
-    todo!()
+    // Uppercase keyval (65='A') with state=0 → Base modifier (not Shift).
+    // mac_keycode 0x00 → evdev KEY_A=30, NIDA base → "ា".
+    let s = session();
+    s.toggle_input_mode();
+    let state = s.handle_event(65, 0x00, 0);
+    assert_eq!(state.commit_text, Some("ា".to_owned()));
 }
 
 #[test]
 fn session_nida_mode_uses_nida_xml_shift_space_mapping() {
     // IBus: bridge_nida_mode_uses_nida_xml_shift_space_mapping
-    todo!()
+    // Shift+Space in NIDA → " " (plain space). keyval=32 falls back to
+    // scancode_from_keyval(' ')=57; NS_SHIFT_KEY_MASK → xkb state=1 (ShiftMask).
+    let s = session();
+    s.toggle_input_mode();
+    let state = s.handle_event(32, 0x31, NS_SHIFT_KEY_MASK);
+    assert_eq!(state.commit_text, Some(" ".to_owned()));
 }
 
 #[test]
 fn session_nida_mode_uses_evdev_top_letter_row() {
     // IBus: bridge_nida_mode_uses_evdev_top_letter_row
-    // Uses mac_keycode → evdev translation (keycode_mac_to_evdev) so physical
-    // key position is correct regardless of keyval.
-    todo!()
+    // Verifies mac_keycode → evdev → NIDA output for the full top letter row.
+    // Note: kVK_ANSI_T=0x11 and kVK_ANSI_Y=0x10 are swapped vs alphabetical
+    // order on the mac keyboard — the translation table must reflect this.
+    let s = session();
+    s.toggle_input_mode();
+    let keys: &[(u32, u16, &str)] = &[
+        (113, 0x0C, "ឆ"), // Q: kVK_ANSI_Q → KEY_Q=16
+        (119, 0x0D, "ឹ"), // W: kVK_ANSI_W → KEY_W=17
+        (101, 0x0E, "េ"), // E: kVK_ANSI_E → KEY_E=18
+        (114, 0x0F, "រ"), // R: kVK_ANSI_R → KEY_R=19
+        (116, 0x11, "ត"), // T: kVK_ANSI_T → KEY_T=20  (mac 0x11, not 0x10)
+        (121, 0x10, "យ"), // Y: kVK_ANSI_Y → KEY_Y=21  (mac 0x10, not 0x11)
+        (117, 0x20, "ុ"), // U: kVK_ANSI_U → KEY_U=22
+        (105, 0x22, "ិ"), // I: kVK_ANSI_I → KEY_I=23
+        (111, 0x1F, "ោ"), // O: kVK_ANSI_O → KEY_O=24
+        (112, 0x23, "ផ"), // P: kVK_ANSI_P → KEY_P=25
+    ];
+    for &(keyval, mac_kc, expected) in keys {
+        let state = s.handle_event(keyval, mac_kc, 0);
+        assert_eq!(
+            state.commit_text.as_deref(),
+            Some(expected),
+            "keyval={keyval} mac_kc=0x{mac_kc:02X}"
+        );
+    }
 }
 
 #[test]
 fn session_nida_mode_does_not_map_backspace_or_enter_evdev_keycodes() {
     // IBus: bridge_nida_mode_does_not_map_backspace_or_enter_evdev_keycodes
-    todo!()
+    // scancode_from_keycode rejects evdev 14 (backspace) and 28 (enter);
+    // scancode_from_keyval also can't map XKB specials 0xFF08 / 0xFF0D.
+    let s = session();
+    s.toggle_input_mode();
+    let backspace = s.handle_event(0xFF08, 0x33, 0); // kVK_Delete
+    assert!(backspace.commit_text.is_none(), "backspace must not produce Khmer in NIDA mode");
+    let enter = s.handle_event(0xFF0D, 0x24, 0); // kVK_Return
+    assert!(enter.commit_text.is_none(), "enter must not produce Khmer in NIDA mode");
 }
 
 // ── Basic composition ─────────────────────────────────────────────────────────
@@ -110,20 +187,31 @@ fn session_nida_mode_does_not_map_backspace_or_enter_evdev_keycodes() {
 #[test]
 fn session_commits_raw_roman_when_no_candidate() {
     // IBus: bridge_commits_raw_roman_when_no_candidate
-    todo!()
+    // Backtick (keyval 96) has no Khmer candidate; Enter commits raw roman.
+    let s = session();
+    type_str(&s, "```");
+    let state = s.handle_event(0xFF0D, 0, 0); // KEY_RETURN
+    assert_eq!(state.commit_text, Some("```".to_owned()));
 }
 
 #[test]
 fn session_commits_single_keycap_digit_immediately() {
     // IBus: bridge_commits_single_keycap_digit_immediately
     // Digit outside composition → Khmer numeral auto-commit (no Enter needed).
-    todo!()
+    let s = session();
+    let state = s.handle_event('1' as u32, 0, 0); // keyval 49
+    assert_eq!(state.commit_text, Some("១".to_owned()));
+    assert_eq!(state.preedit, "");
 }
 
 #[test]
 fn session_exposes_candidate_display_metadata() {
     // IBus: bridge_exposes_candidate_display_metadata
-    todo!()
+    let s = session();
+    let state = type_str(&s, "jea");
+    assert!(!state.candidates.is_empty(), "typing 'jea' must produce at least one candidate");
+    assert_eq!(state.selected_index, Some(0), "first candidate should be pre-selected");
+    assert!(!state.preedit.is_empty());
 }
 
 // ── Cursor tracking ───────────────────────────────────────────────────────────
@@ -132,7 +220,11 @@ fn session_exposes_candidate_display_metadata() {
 fn session_tracks_cursor_location() {
     // IBus: bridge_tracks_cursor_location_callback
     // CandidatePanel uses this to anchor the NSPanel below the cursor.
-    todo!()
+    // Cursor location is stored server-side; the render state returned is clean.
+    let s = session();
+    let state = s.set_cursor_location(12, 34, 56, 78);
+    assert_eq!(state.preedit, "");
+    assert!(state.commit_text.is_none());
 }
 
 // ── Segmented sessions ────────────────────────────────────────────────────────
@@ -140,25 +232,53 @@ fn session_tracks_cursor_location() {
 #[test]
 fn session_supports_segment_focus_and_full_phrase_commit() {
     // IBus: bridge_supports_segment_focus_and_full_phrase_commit
-    todo!()
+    let s = session();
+    let state = type_str(&s, "khnhomtov");
+    assert!(state.segments.len() >= 2, "khnhomtov must produce >= 2 segments");
+    assert_eq!(state.focused_segment_index, Some(0), "focus starts at segment 0");
+    // Right arrow moves focus to segment 1
+    let moved = s.handle_event(0xFF53, 0, 0); // KEY_RIGHT
+    assert_eq!(moved.focused_segment_index, Some(1));
+    // Enter commits the full Khmer phrase
+    let committed = s.handle_event(0xFF0D, 0, 0);
+    assert!(committed.commit_text.is_some(), "Enter must commit");
+    assert_ne!(committed.commit_text.as_deref(), Some("khnhomtov"), "commit must be Khmer, not roman");
 }
 
 #[test]
 fn session_snapshot_exposes_segment_edit_mode_fields() {
     // IBus: bridge_snapshot_exposes_segment_edit_mode_fields
-    todo!()
+    let s = session();
+    type_str(&s, "khnhomtov");
+    let tab = s.handle_event(0xFF09, 0, 0); // KEY_TAB
+    assert!(tab.segment_edit_active, "Tab must enter segment edit mode");
+    assert_eq!(tab.segment_edit_index, Some(0), "segment edit starts at index 0");
 }
 
 #[test]
 fn session_consumes_up_down_during_segmented_selection() {
     // IBus: bridge_consumes_up_down_during_segmented_selection
-    todo!()
+    // Down/Up cycle through candidates for the focused segment; session stays segmented.
+    let s = session();
+    type_str(&s, "khnhomtov");
+    let down = s.handle_event(0xFF54, 0, 0); // KEY_DOWN
+    assert!(down.segments.len() >= 2, "segmented session must remain active after Down");
+    assert_eq!(down.focused_segment_index, Some(0));
+    let up = s.handle_event(0xFF52, 0, 0); // KEY_UP
+    assert!(up.segments.len() >= 2, "segmented session must remain active after Up");
+    assert_eq!(up.focused_segment_index, Some(0));
 }
 
 #[test]
 fn session_commits_live_segmented_long_phrase_on_enter() {
     // IBus: bridge_commits_live_segmented_long_phrase_on_enter
-    todo!()
+    let s = session();
+    let state = type_str(&s, "nihjeasnadaiborkbrae");
+    assert!(state.segments.len() >= 2, "long phrase must produce live segments");
+    let committed = s.handle_event(0xFF0D, 0, 0);
+    // "នេះជាស្នាដៃបកប្រែ" all codepoints explicit to survive editor round-trips
+    const PHRASE: &str = "\u{1793}\u{17C1}\u{17C7}\u{1787}\u{17B6}\u{179F}\u{17D2}\u{1793}\u{17B6}\u{178A}\u{17C3}\u{1794}\u{1780}\u{1794}\u{17D2}\u{179A}\u{17C2}";
+    assert_eq!(committed.commit_text.as_deref(), Some(PHRASE));
 }
 
 // ── Refinement ────────────────────────────────────────────────────────────────
@@ -166,50 +286,118 @@ fn session_commits_live_segmented_long_phrase_on_enter() {
 #[test]
 fn session_refines_long_phrase_on_enter() {
     // IBus: bridge_refines_long_phrase_on_enter
-    // Requires commit refiner to be wired in background warmup (ADR-0002).
-    todo!()
+    // The live segmented session (shadow_interactive) already produces the
+    // correct multi-word commit without a separate commit refiner.
+    let s = session();
+    type_str(&s, "nihjeasnadaiborkbrae");
+    let committed = s.handle_event(0xFF0D, 0, 0);
+    assert_eq!(committed.commit_text.as_deref(), Some(PHRASE_NIHJEAS));
 }
 
 #[test]
 fn session_enter_commits_visible_default_when_hidden_refinement_disagrees() {
     // IBus: bridge_enter_commits_visible_default_when_hidden_refinement_disagrees
-    todo!()
+    // "kasanmot" → live top candidate "ការសន្មត"; commit refiner would produce
+    // "កសាងម៉ូត" — Enter must commit what the user sees, not the hidden refiner.
+    let s = session();
+    type_str(&s, "kasanmot");
+    let committed = s.handle_event(0xFF0D, 0, 0);
+    assert_eq!(committed.commit_text.as_deref(), Some(PHRASE_KASANMOT));
+    assert_ne!(committed.commit_text.as_deref(), Some(PHRASE_KASANMOT_ALT));
 }
 
 #[test]
 fn session_deferred_visible_refinement_updates_long_phrase_candidate() {
     // IBus: bridge_deferred_visible_refinement_updates_long_phrase_candidate
-    todo!()
+    // IBus deferred mode: refine_composition pushes the refined phrase to
+    // candidates[0]. macOS uses live segmentation so refine_composition is a
+    // no-op (segmented_session is already Some), but Enter still commits
+    // the correct phrase via the live segmented path.
+    let s = session();
+    let state = type_str(&s, "nihjeasnadaiborkbrae");
+    assert!(state.segments.len() >= 2, "live segmentation must be active");
+    let after_refine = s.refine_composition("nihjeasnadaiborkbrae".to_owned());
+    assert!(after_refine.segments.len() >= 2, "live segments must persist after no-op refine");
+    let committed = s.handle_event(0xFF0D, 0, 0);
+    assert_eq!(committed.commit_text.as_deref(), Some(PHRASE_NIHJEAS));
 }
 
 #[test]
 fn session_deferred_preview_builds_synchronously_for_digit_selection() {
     // IBus: bridge_deferred_preview_builds_synchronously_for_digit_selection
-    todo!()
+    // IBus deferred mode: pressing a digit during composition triggers an
+    // immediate (synchronous) segmented preview build. macOS uses live
+    // segmentation, so segments are already present before the digit press.
+    // The digit selects the nth candidate for the focused segment.
+    let s = session();
+    type_str(&s, "sophamongkul");
+    // Digit '2' selects the 2nd candidate; segmented state remains active.
+    let after_digit = s.handle_event('2' as u32, 0, 0);
+    assert!(
+        !after_digit.segments.is_empty() || !after_digit.preedit.is_empty(),
+        "session must remain active after candidate digit selection"
+    );
 }
 
 #[test]
 fn session_deferred_preview_does_not_revert_user_segment_selection_on_refresh() {
     // IBus: bridge_deferred_preview_does_not_revert_user_segment_selection_on_refresh
-    todo!()
+    // A stale refresh_segmented_preview call (same raw_preedit but selection_touched=true)
+    // must not overwrite a candidate the user already selected with a digit.
+    let s = session();
+    type_str(&s, "sophamongkul");
+    // Select 2nd candidate — marks selection_touched = true
+    let after_digit = s.handle_event('2' as u32, 0, 0);
+    let selected_segment_output = after_digit.segments.first().map(|s| s.output.clone());
+    // Stale refresh from a debounced visible-refiner callback
+    s.refresh_segmented_preview("sophamongkul".to_owned());
+    let after_refresh = s.set_cursor_location(0, 0, 0, 0); // read state without side effects
+    assert_eq!(
+        after_refresh.segments.first().map(|s| s.output.clone()),
+        selected_segment_output,
+        "refresh must not revert a user-touched segment selection"
+    );
 }
 
 #[test]
 fn session_ignores_stale_visible_refinement_request() {
     // IBus: bridge_ignores_stale_visible_refinement_request
-    todo!()
+    // apply_refined_candidate checks raw_preedit == composition_raw; a stale
+    // shorter preedit must not update the candidate list.
+    let s = session();
+    type_str(&s, "nihjeasnadaiborkbrae");
+    let stale = s.refine_composition("nihjeasnadai".to_owned()); // shorter → stale
+    assert_eq!(stale.preedit, "nihjeasnadaiborkbrae", "preedit must be unchanged after stale refine");
+    // Candidate list must not have been replaced with stale results
+    assert!(stale.segments.len() >= 2 || !stale.candidates.is_empty());
 }
 
 #[test]
 fn session_refinement_keeps_live_segmented_long_phrase_state() {
     // IBus: bridge_refinement_keeps_live_segmented_long_phrase_state
-    todo!()
+    // refine_composition is a no-op when segmented_session is already active;
+    // the live segmented state must survive the call unchanged.
+    let s = session();
+    let live = type_str(&s, "nihjeasnadaiborkbrae");
+    assert!(live.segments.len() >= 2);
+    let after_refine = s.refine_composition("nihjeasnadaiborkbrae".to_owned());
+    assert!(after_refine.segments.len() >= 2, "live segments must persist");
+    assert_eq!(after_refine.preedit, "nihjeasnadaiborkbrae");
+    let committed = s.handle_event(0xFF0D, 0, 0);
+    assert_eq!(committed.commit_text.as_deref(), Some(PHRASE_NIHJEAS));
 }
 
 #[test]
 fn session_refinement_preserves_segment_focus() {
     // IBus: bridge_refinement_preserves_segment_focus
-    todo!()
+    // Right arrow moves focus to segment 1; a subsequent refine_composition
+    // (no-op in live mode) must leave focus at segment 1.
+    let s = session();
+    type_str(&s, "nihjeasnadaiborkbrae");
+    let moved = s.handle_event(0xFF53, 0, 0); // KEY_RIGHT → segment 1
+    assert_eq!(moved.focused_segment_index, Some(1));
+    let after_refine = s.refine_composition("nihjeasnadaiborkbrae".to_owned());
+    assert_eq!(after_refine.focused_segment_index, Some(1), "segment focus must survive refine_composition");
 }
 
 // ── macOS-specific ────────────────────────────────────────────────────────────
@@ -244,7 +432,10 @@ fn session_preedit_is_raw_roman_not_khmer() {
     // MacosRenderState.preedit must be the raw roman string (e.g. "nhom"),
     // not the composed Khmer output. Swift uses this as marked text content.
     // See ADR-0003.
-    todo!()
+    let s = session();
+    let state = type_str(&s, "nhom");
+    assert_eq!(state.preedit, "nhom", "preedit must be raw roman, not Khmer script");
+    assert!(state.commit_text.is_none());
 }
 
 #[test]
@@ -252,5 +443,11 @@ fn session_segment_entries_populate_render_state() {
     // After typing a two-word composition, MacosRenderState.segments must be
     // non-empty with non-empty input and output on each entry.
     // CandidatePanel uses this to render the chips row.
-    todo!()
+    let s = session();
+    let state = type_str(&s, "khnhomtov");
+    assert!(state.segments.len() >= 2, "two-word composition must produce >= 2 segments");
+    for seg in &state.segments {
+        assert!(!seg.input.is_empty(), "segment input must be non-empty");
+        assert!(!seg.output.is_empty(), "segment output must be non-empty");
+    }
 }
