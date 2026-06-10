@@ -35,6 +35,16 @@ IOS_SIM_ID          ?= FDED48C6-BFCE-4666-BA4C-F279438340A7
 IOS_SIM_BUNDLE_ID   := com.khmerime.KhmerIME
 IOS_SIM_APP         := $(HOME)/Library/Developer/Xcode/DerivedData/KhmerIME-*/Build/Products/Debug-iphonesimulator/KhmerIME.app
 
+MACOS_ADAPTER_DIR       := adapters/macos-imk
+MACOS_TARGET            := aarch64-apple-darwin
+MACOS_TARGET_X86        := x86_64-apple-darwin
+MACOS_LIB_NAME          := libkhmerime_macos_imk.a
+MACOS_BINDGEN_OUT       := $(MACOS_ADAPTER_DIR)/swift/KhmerIMEMacOS/Generated
+MACOS_XCFRAMEWORK_OUT   := $(MACOS_ADAPTER_DIR)/swift/Frameworks/KhmerIME.xcframework
+MACOS_INPUT_METHODS_DIR := $(HOME)/Library/Input\ Methods
+# Override with: make platform-install-macos DEVELOPMENT_TEAM=AB12CD34EF
+DEVELOPMENT_TEAM        ?=
+
 help:
 	@printf "%s\n" \
 	"khmerime developer commands" \
@@ -62,6 +72,8 @@ help:
 	"  make platform-check              Check all native platform adapter crates" \
 	"  make platform-check-<platform>   Check one adapter: linux, android, ios, macos, windows" \
 	"  make platform-build-ios          Build iOS static libs, generate UniFFI Swift bindings, assemble XCFramework" \
+	"  make platform-build-macos        Build macOS static libs, generate UniFFI Swift bindings, assemble XCFramework" \
+	"  make platform-install-macos      Build and install the macOS input method to ~/Library/Input Methods/" \
 	"  make platform-build-windows      Build the Windows TSF DLL target under target/windows-tsf/" \
 	"  make platform-install-windows    Build and register the Windows TSF DLL with regsvr32" \
 	"  make platform-uninstall-windows  Unregister the Windows TSF DLL with regsvr32 /u" \
@@ -186,6 +198,52 @@ platform-build-ios:
 		-output $(IOS_XCFRAMEWORK_OUT)
 	rm -rf /tmp/khmerime-xcfw-headers
 	cd $(IOS_ADAPTER_DIR)/swift && xcodegen generate
+
+platform-build-macos:
+	cargo build -p khmerime_macos_imk --target $(MACOS_TARGET) --release
+	cargo build -p khmerime_macos_imk --target $(MACOS_TARGET_X86) --release
+	mkdir -p $(MACOS_BINDGEN_OUT)
+	cargo run -p khmerime_macos_imk --bin uniffi-bindgen -- \
+		--swift-sources target/$(MACOS_TARGET)/release/$(MACOS_LIB_NAME) $(MACOS_BINDGEN_OUT)
+	cargo run -p khmerime_macos_imk --bin uniffi-bindgen -- \
+		--headers target/$(MACOS_TARGET)/release/$(MACOS_LIB_NAME) $(MACOS_BINDGEN_OUT)
+	cargo run -p khmerime_macos_imk --bin uniffi-bindgen -- \
+		--modulemap target/$(MACOS_TARGET)/release/$(MACOS_LIB_NAME) $(MACOS_BINDGEN_OUT)
+	# lipo arm64 + x86_64 into a single universal static lib before xcframework
+	mkdir -p /tmp/khmerime-macos-universal
+	lipo -create \
+		target/$(MACOS_TARGET)/release/$(MACOS_LIB_NAME) \
+		target/$(MACOS_TARGET_X86)/release/$(MACOS_LIB_NAME) \
+		-output /tmp/khmerime-macos-universal/$(MACOS_LIB_NAME)
+	mkdir -p /tmp/khmerime-macos-xcfw-headers
+	cp $(MACOS_BINDGEN_OUT)/khmerime_macos_imkFFI.h /tmp/khmerime-macos-xcfw-headers/
+	cp $(MACOS_BINDGEN_OUT)/khmerime_macos_imk.modulemap /tmp/khmerime-macos-xcfw-headers/module.modulemap
+	sed -i '' 's/^module khmerime_macos_imk {/module khmerime_macos_imkFFI {/' /tmp/khmerime-macos-xcfw-headers/module.modulemap
+	mkdir -p $(MACOS_ADAPTER_DIR)/swift/Frameworks
+	rm -rf $(MACOS_XCFRAMEWORK_OUT)
+	xcodebuild -create-xcframework \
+		-library /tmp/khmerime-macos-universal/$(MACOS_LIB_NAME) \
+		-headers /tmp/khmerime-macos-xcfw-headers \
+		-output $(MACOS_XCFRAMEWORK_OUT)
+	rm -rf /tmp/khmerime-macos-xcfw-headers /tmp/khmerime-macos-universal
+	cd $(MACOS_ADAPTER_DIR)/swift && xcodegen generate
+
+platform-install-macos: platform-build-macos
+	xcodebuild -project $(MACOS_ADAPTER_DIR)/swift/KhmerIMEMacOS.xcodeproj \
+		-scheme KhmerIMEMacOS \
+		-configuration Release \
+		-derivedDataPath /tmp/khmerime-macos-build \
+		$(if $(DEVELOPMENT_TEAM),DEVELOPMENT_TEAM=$(DEVELOPMENT_TEAM) CODE_SIGN_STYLE=Automatic,CODE_SIGN_IDENTITY=- CODE_SIGN_STYLE=Manual) \
+		-allowProvisioningUpdates \
+		build
+	mkdir -p $(MACOS_INPUT_METHODS_DIR)
+	rm -rf $(MACOS_INPUT_METHODS_DIR)/KhmerIMEMacOS.app
+	cp -r /tmp/khmerime-macos-build/Build/Products/Release/KhmerIMEMacOS.app \
+		$(MACOS_INPUT_METHODS_DIR)/KhmerIMEMacOS.app
+	xattr -dr com.apple.quarantine $(MACOS_INPUT_METHODS_DIR)/KhmerIMEMacOS.app 2>/dev/null || true
+	/System/Library/Frameworks/CoreServices.framework/Versions/Current/Frameworks/LaunchServices.framework/Versions/Current/Support/lsregister \
+		-f -R -trusted $(MACOS_INPUT_METHODS_DIR)/KhmerIMEMacOS.app
+	@echo "Done. Log out and back in, then add 'Khmer IME' in System Settings → Keyboard → Input Sources."
 
 platform-build-windows:
 	cargo build -p khmerime_windows_tsf --target $(WINDOWS_TSF_TARGET) --target-dir $(WINDOWS_TSF_TARGET_DIR)

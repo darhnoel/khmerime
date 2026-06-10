@@ -1,0 +1,36 @@
+name: KhmerIMEMacOS
+options:
+  bundleIdPrefix: com.khmerime
+  deploymentTarget:
+    macOS: "13.0"
+
+settings:
+  base:
+    SWIFT_VERSION: "5.0"
+    MACOSX_DEPLOYMENT_TARGET: "13.0"
+    # Signing: replace DEVELOPMENT_TEAM with your 10-char team ID for device builds.
+    # Use "-" for ad-hoc local development.
+    CODE_SIGN_STYLE: Manual
+    CODE_SIGN_IDENTITY: "-"
+    DEVELOPMENT_TEAM: ""
+
+targets:
+
+  KhmerIMEMacOS:
+    type: application
+    platform: macOS
+    deploymentTarget: "13.0"
+    sources:
+      - path: KhmerIMEMacOS
+        excludes:
+          - "**/.gitkeep"
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.khmerime.KhmerIMEMacOS
+        INFOPLIST_FILE: KhmerIMEMacOS/Info.plist
+        LD_RUNPATH_SEARCH_PATHS: "@loader_path/../Frameworks"
+        OTHER_LDFLAGS: "-ObjC"
+    dependencies:
+      - framework: Frameworks/KhmerIME.xcframework
+        embed: false
+      - sdk: InputMethodKit.framework

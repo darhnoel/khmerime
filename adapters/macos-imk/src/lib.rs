@@ -132,6 +132,8 @@ pub struct MacosRenderState {
     pub segment_edit_index: Option<u64>,
     /// False until the background warmup thread finishes loading all three engines.
     pub is_ready: bool,
+    /// True when the session consumed the key event (Swift returns true from handle(_:client:)).
+    pub consumed: bool,
 }
 
 fn render_state(snapshot: &SessionSnapshot, result: &SessionResult, ready: bool) -> MacosRenderState {
@@ -145,6 +147,7 @@ fn render_state(snapshot: &SessionSnapshot, result: &SessionResult, ready: bool)
         segment_edit_active: snapshot.segment_edit_active,
         segment_edit_index: snapshot.segment_edit_index.map(|i| i as u64),
         is_ready: ready,
+        consumed: result.consumed,
     }
 }
 
