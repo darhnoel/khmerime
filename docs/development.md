@@ -18,6 +18,65 @@ Read these in order when you need context:
 4. `docs/khpos_mechanism.md` for the `khPOS` integration design and status
 5. `docs/ubuntu_ibus.md` when working on native Ubuntu input-source behavior
 
+## First-Time Data Setup
+
+The build requires several data files that are not generated automatically. Run these
+steps once after cloning, and again whenever the lexicon chunks change.
+
+### 1. Generate the lexicon CSV
+
+The lexicon is stored as reviewed chunk files under `data/lexicon/chunks/`. Generate
+the combined runtime CSV from them:
+
+```bash
+make data-build
+```
+
+This writes `data/roman_lookup.csv`. Rerun whenever you edit or add chunk files.
+
+### 2. khPOS corpus
+
+The Khmer POS corpus is required for the build. It lives at
+`data/khPOS/corpus-draft-ver-1.0/data/after-replace/`. If the directory is empty
+or missing (e.g. after a fresh clone that did not recurse into `data/khPOS`), clone
+it manually:
+
+```bash
+git clone https://github.com/ye-kyaw-thu/khPOS data/khPOS
+```
+
+The corpus is attributed to Vichet Chea and Ye Kyaw Thu. See `docs/khpos_mechanism.md`
+for the full attribution and how the data is used.
+
+### 3. Khmer character relation CSV
+
+`data/khmer_character_relation.csv` is embedded at compile time by the manual
+character typing module. It is committed to this repository. If it is missing after
+a clone, check that your clone is up to date:
+
+```bash
+git pull
+```
+
+### 4. Mobile keyboard n-gram data (optional)
+
+`data/khmerlang-mobile-keyboard-data/keyboard-data/extracted/` improves next-word
+scoring. The build continues without it and logs a warning when the files are absent.
+
+The two required files are:
+- `mobile-keyboard-data-1gram.csv`
+- `mobile-keyboard-data-2gram.csv`
+
+Place them at the paths above. The directory name carries the dataset attribution.
+
+### Verify the setup
+
+After completing the steps above, this should succeed without errors:
+
+```bash
+cargo check
+```
+
 ## Common Commands
 
 Use the root `Makefile` for common tasks:

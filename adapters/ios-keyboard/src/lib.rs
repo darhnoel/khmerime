@@ -1,113 +1,360 @@
-//! iOS custom-keyboard adapter scaffold.
+//! iOS custom-keyboard adapter.
 //!
-//! This crate is intentionally a **commented contract skeleton**.
-//! It documents how an iOS keyboard extension (`UIInputViewController`)
-//! should translate platform callbacks into shared `khmerime_session`
-//! commands without embedding Dioxus runtime code.
-//! The Swift/Obj-C layer should remain a thin platform shell over the shared
-//! session contract rather than owning transliteration or ranking behavior.
-//!
-//! References:
-//! - UIInputViewController: <https://developer.apple.com/documentation/uikit/uiinputviewcontroller>
-//! - UITextDocumentProxy: <https://developer.apple.com/documentation/uikit/uitextdocumentproxy>
-//! - Custom Keyboard Guide:
-//!   <https://developer.apple.com/library/archive/documentation/General/Conceptual/ExtensibilityPG/CustomKeyboard.html>
+//! `KhmerIMESession` wraps `khmerime_session::ImeSession` behind a UniFFI-exported
+//! Arc<Mutex<_>> handle. Swift calls one method per key tap; each returns a fresh
+//! `IosRenderState` that drives the strip + candidate panel.
 
-use khmerime_session::{CursorLocation, NativeKeyEvent, SessionCommand, SessionResult, SessionSnapshot};
+use std::sync::{Arc, Mutex};
 
-/// Native iOS keyboard-extension callbacks that eventually need wiring.
-///
-/// These are *logical* callback names. Real implementation will be in Swift/Obj-C,
-/// then forwarded into Rust adapter code by a thin FFI boundary.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub enum IosKeyboardCallback {
-    /// Keyboard view became active for a host text field.
-    ViewDidAppear,
-    /// Keyboard view is being dismissed.
-    ViewWillDisappear,
-    /// Host text/selection changed. Useful to refresh context-dependent UI.
-    TextDidChange,
-    /// Host cursor moved/selection changed.
-    SelectionDidChange,
-    /// Hardware/software key tap routed from native layer.
-    KeyInput(NativeKeyEvent),
-    /// Keyboard's own cursor/caret anchor (screen-space) changed.
-    CursorLocationChanged(CursorLocation),
-    /// Explicit user cancel action from keyboard chrome.
-    CancelComposition,
+use khmerime_core::{DecoderConfig, Transliterator};
+use khmerime_session::{ImeSession, ImeSessionOptions, NativeKeyEvent, SegmentPreviewEntry, SegmentedPreviewMode, SessionResult, SessionSnapshot};
+
+uniffi::setup_scaffolding!("khmerime_ios_keyboard");
+
+// ── Key constants ────────────────────────────────────────────────────────────
+
+const KEY_BACKSPACE: u32 = 0xFF08;
+const KEY_RETURN:    u32 = 0xFF0D;
+const KEY_SPACE:     u32 = 0x20;
+const KEY_LEFT:      u32 = 0xFF51;
+const KEY_RIGHT:     u32 = 0xFF53;
+const KEY_TAB:       u32 = 0xFF09;
+
+fn key_event(keyval: u32) -> NativeKeyEvent {
+    NativeKeyEvent { keyval, keycode: 0, state: 0 }
 }
 
-/// Lifecycle mapping row used by docs/tests to keep callback expectations explicit.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct CallbackMapping {
-    pub callback: &'static str,
-    pub session_intent: &'static str,
-    pub notes: &'static str,
+// ── Public UniFFI types ───────────────────────────────────────────────────────
+
+/// One entry in the expanded segment panel / phrase bar.
+#[derive(Clone, Debug, Default, PartialEq, Eq, uniffi::Record)]
+pub struct IosSegmentEntry {
+    pub output: String,
+    pub input: String,
+    pub focused: bool,
 }
 
-const CALLBACK_MAP: &[CallbackMapping] = &[
-    CallbackMapping {
-        callback: "viewDidAppear",
-        session_intent: "focus_in",
-        notes: "start IME session when keyboard extension becomes visible",
-    },
-    CallbackMapping {
-        callback: "viewWillDisappear",
-        session_intent: "focus_out",
-        notes: "drop preedit state when keyboard leaves focus",
-    },
-    CallbackMapping {
-        callback: "textDidChange",
-        session_intent: "snapshot refresh",
-        notes: "host text context changed; recompute keyboard UI only",
-    },
-    CallbackMapping {
-        callback: "selectionDidChange",
-        session_intent: "set_cursor_location",
-        notes: "sync segment preview anchor with host cursor",
-    },
-    CallbackMapping {
-        callback: "keyInput",
-        session_intent: "process_key_event",
-        notes: "main transliteration key path",
-    },
-];
+impl From<&SegmentPreviewEntry> for IosSegmentEntry {
+    fn from(s: &SegmentPreviewEntry) -> Self {
+        IosSegmentEntry { output: s.output.clone(), input: s.input.clone(), focused: s.focused }
+    }
+}
 
-/// Minimal render responsibilities from a session snapshot/result.
-#[derive(Clone, Debug, Default, PartialEq, Eq)]
+/// Render state returned to Swift after every session call.
+#[derive(Clone, Debug, Default, PartialEq, Eq, uniffi::Record)]
 pub struct IosRenderState {
-    /// Candidate rows shown in the keyboard's candidate strip.
+    /// Khmer candidates for the focused segment.
     pub candidates: Vec<String>,
-    /// Preedit/composition text shown in keyboard-owned UI.
+    /// Currently selected candidate index, if any.
+    pub selected_index: Option<u64>,
+    /// Raw roman preedit (what the user typed).
     pub preedit: String,
-    /// Optional commit text to push through `textDocumentProxy.insertText`.
+    /// Segment entries for the phrase bar (empty when no segmented session).
+    pub segments: Vec<IosSegmentEntry>,
+    /// Which segment owns candidate focus.
+    pub focused_segment_index: Option<u64>,
+    /// Non-None only immediately after Enter; Swift deletes roman buffer and
+    /// inserts this concatenated Khmer string.
     pub commit_text: Option<String>,
+    /// True while the user is retyping one segment's roman input in isolation.
+    pub segment_edit_active: bool,
+    /// Which segment is currently being edited (when segment_edit_active).
+    pub segment_edit_index: Option<u64>,
 }
 
-/// Returns a static callback-to-command map for contributor onboarding and tests.
-pub fn callback_map() -> &'static [CallbackMapping] {
-    CALLBACK_MAP
-}
-
-/// Converts iOS callback intent to a session command.
-///
-/// Implemented later once Swift callback/FFI wiring lands.
-pub fn map_callback_to_session_command(_callback: &IosKeyboardCallback) -> Option<SessionCommand> {
-    // Implemented later:
-    // - Map visibility callbacks to FocusIn/FocusOut.
-    // - Convert native key payloads to SessionCommand::ProcessKeyEvent.
-    // - Forward cursor geometry to SetCursorLocation when available.
-    None
-}
-
-/// Derives UI update instructions from session output.
-///
-/// iOS custom keyboards own their candidate/preedit UI, so this render struct is
-/// intentionally separate from any Dioxus web/desktop components.
-pub fn derive_render_state(snapshot: &SessionSnapshot, result: &SessionResult) -> IosRenderState {
+fn render_state(snapshot: &SessionSnapshot, result: &SessionResult) -> IosRenderState {
     IosRenderState {
         candidates: snapshot.candidates.clone(),
+        selected_index: snapshot.selected_index.map(|i| i as u64),
         preedit: snapshot.preedit.clone(),
+        segments: snapshot.segment_preview.iter().map(IosSegmentEntry::from).collect(),
+        focused_segment_index: snapshot.focused_segment_index.map(|i| i as u64),
         commit_text: result.commit_text.clone(),
+        segment_edit_active: snapshot.segment_edit_active,
+        segment_edit_index: snapshot.segment_edit_index.map(|i| i as u64),
+    }
+}
+
+// ── Session handle ────────────────────────────────────────────────────────────
+
+/// Swift-visible session handle, exported via UniFFI.
+///
+/// Wraps the real `ImeSession` so every key tap goes through the full
+/// romanization → segmentation → candidate ranking pipeline.
+#[derive(uniffi::Object)]
+pub struct KhmerIMESession {
+    inner: Mutex<ImeSession>,
+}
+
+#[uniffi::export]
+impl KhmerIMESession {
+    /// Called once in `viewDidLoad`. Builds the transliterator from compiled-in
+    /// data (no external files needed on iOS).
+    #[uniffi::constructor]
+    pub fn new() -> Arc<Self> {
+        let transliterator = Transliterator::from_default_data_with_config(
+            DecoderConfig::shadow_interactive(),
+        )
+        .expect("compiled-in lexicon data must be valid");
+        let session = ImeSession::new_with_input_mode_and_options(
+            transliterator,
+            std::collections::HashMap::new(),
+            khmerime_session::InputMode::Roman,
+            ImeSessionOptions { segmented_preview: SegmentedPreviewMode::Enabled },
+        );
+        Arc::new(KhmerIMESession { inner: Mutex::new(session) })
+    }
+
+    pub fn focus_in(&self) -> IosRenderState {
+        let mut s = self.inner.lock().unwrap();
+        s.focus_in();
+        render_state(&s.snapshot(), &SessionResult::default())
+    }
+
+    pub fn focus_out(&self) -> IosRenderState {
+        let mut s = self.inner.lock().unwrap();
+        s.focus_out();
+        render_state(&s.snapshot(), &SessionResult::default())
+    }
+
+    pub fn process_character(&self, ch: String) -> IosRenderState {
+        let keyval = ch.chars().next().unwrap_or('?') as u32;
+        let mut s = self.inner.lock().unwrap();
+        let result = s.process_native_key_event(key_event(keyval));
+        render_state(&s.snapshot(), &result)
+    }
+
+    pub fn process_backspace(&self) -> IosRenderState {
+        let mut s = self.inner.lock().unwrap();
+        let result = s.process_native_key_event(key_event(KEY_BACKSPACE));
+        render_state(&s.snapshot(), &result)
+    }
+
+    pub fn process_space(&self) -> IosRenderState {
+        let mut s = self.inner.lock().unwrap();
+        let result = s.process_native_key_event(key_event(KEY_SPACE));
+        render_state(&s.snapshot(), &result)
+    }
+
+    pub fn process_enter(&self) -> IosRenderState {
+        let mut s = self.inner.lock().unwrap();
+        let result = s.process_native_key_event(key_event(KEY_RETURN));
+        render_state(&s.snapshot(), &result)
+    }
+
+    pub fn process_left(&self) -> IosRenderState {
+        let mut s = self.inner.lock().unwrap();
+        let result = s.process_native_key_event(key_event(KEY_LEFT));
+        render_state(&s.snapshot(), &result)
+    }
+
+    pub fn process_right(&self) -> IosRenderState {
+        let mut s = self.inner.lock().unwrap();
+        let result = s.process_native_key_event(key_event(KEY_RIGHT));
+        render_state(&s.snapshot(), &result)
+    }
+
+    /// Toggle Segment Edit Mode on the focused segment.
+    /// First call enters edit mode (next printable replaces segment roman input).
+    /// Second call exits edit mode.
+    pub fn process_tab(&self) -> IosRenderState {
+        let mut s = self.inner.lock().unwrap();
+        let result = s.process_native_key_event(key_event(KEY_TAB));
+        render_state(&s.snapshot(), &result)
+    }
+
+    pub fn process_digit(&self, n: u8) -> IosRenderState {
+        let keyval = b'0' as u32 + n as u32;
+        let mut s = self.inner.lock().unwrap();
+        let result = s.process_native_key_event(key_event(keyval));
+        render_state(&s.snapshot(), &result)
+    }
+
+    pub fn set_cursor_location(&self, x: i32, y: i32, width: i32, height: i32) -> IosRenderState {
+        let mut s = self.inner.lock().unwrap();
+        s.set_cursor_location(x, y, width, height);
+        render_state(&s.snapshot(), &SessionResult::default())
+    }
+}
+
+// ── Tests ─────────────────────────────────────────────────────────────────────
+//
+// All tests go through `KhmerIMESession::new()` (full compiled-in lexicon,
+// `DecoderConfig::shadow_interactive()`, `SegmentedPreviewMode::Enabled`) so
+// they exercise the exact same code path as the Swift extension.
+//
+// Key fixture facts:
+//   "nhom"       — single word, no segmented session, preedit = "nhom"
+//   "khnhomtov"  — two-word phrase, splits into ≥2 segments in shadow mode
+//   digit outside composition → auto-commits as Khmer numeral (build_segmented
+//     session returns None for a single digit, so should_auto_commit fires)
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn new_session() -> Arc<KhmerIMESession> {
+        KhmerIMESession::new()
+    }
+
+    fn type_str(s: &Arc<KhmerIMESession>, input: &str) -> IosRenderState {
+        let mut state = IosRenderState::default();
+        for ch in input.chars() {
+            state = s.process_character(ch.to_string());
+        }
+        state
+    }
+
+    // ── render_state field mapping ────────────────────────────────────────────
+
+    #[test]
+    fn focus_in_returns_clean_state() {
+        let s = new_session();
+        let state = s.focus_in();
+        assert_eq!(state.preedit, "");
+        assert!(state.candidates.is_empty());
+        assert!(state.segments.is_empty());
+        assert!(state.commit_text.is_none());
+        assert!(!state.segment_edit_active);
+        assert!(state.segment_edit_index.is_none());
+        assert!(state.focused_segment_index.is_none());
+        assert!(state.selected_index.is_none());
+    }
+
+    // ── basic composition ─────────────────────────────────────────────────────
+
+    #[test]
+    fn letter_input_builds_preedit_and_produces_candidates() {
+        let s = new_session();
+        s.focus_in();
+        let state = type_str(&s, "nhom");
+        // "nhom" is a single word; no segmented session → preedit == raw roman input.
+        assert_eq!(state.preedit, "nhom");
+        assert!(!state.candidates.is_empty(), "nhom must produce at least one candidate");
+        assert!(state.commit_text.is_none());
+    }
+
+    #[test]
+    fn backspace_removes_last_raw_preedit_char() {
+        let s = new_session();
+        s.focus_in();
+        type_str(&s, "nhom");
+        // "nhom" stays in the flat session, so preedit == composition_raw.
+        // After one backspace the raw input shrinks to "nho".
+        let state = s.process_backspace();
+        assert_eq!(state.preedit, "nho");
+        assert!(state.commit_text.is_none());
+    }
+
+    #[test]
+    fn enter_commits_composition_to_khmer_text() {
+        let s = new_session();
+        s.focus_in();
+        type_str(&s, "nhom");
+        let state = s.process_enter();
+        let committed = state.commit_text.expect("enter must produce commit_text");
+        assert!(!committed.is_empty());
+        // All committed characters should be in the Khmer Unicode block (U+1780–U+17FF).
+        assert!(
+            committed.chars().all(|c| ('\u{1780}'..='\u{17FF}').contains(&c)),
+            "committed text must be Khmer Unicode; got {committed:?}"
+        );
+    }
+
+    // ── digit key behaviour ───────────────────────────────────────────────────
+
+    #[test]
+    fn digit_1_outside_composition_commits_khmer_numeral() {
+        let s = new_session();
+        s.focus_in();
+        // '1' → Khmer numeral ១ (U+17E1). The commit fires because
+        // "1" is a single keycap with exactly one candidate (the Khmer digit).
+        let state = s.process_digit(1);
+        assert_eq!(
+            state.commit_text.as_deref(),
+            Some("១"),
+            "digit 1 outside composition must commit Khmer numeral ១"
+        );
+        assert!(state.preedit.is_empty());
+    }
+
+    #[test]
+    fn digit_during_composition_does_not_commit() {
+        let s = new_session();
+        s.focus_in();
+        type_str(&s, "nhom");
+        // During composition, digit 1 selects the first candidate; it must not
+        // auto-commit (that would lose the user's in-progress word).
+        let state = s.process_digit(1);
+        assert!(state.commit_text.is_none(), "digit during composition must not commit immediately");
+        assert_eq!(state.selected_index, Some(0u64), "digit 1 during composition must keep selected_index = 0");
+    }
+
+    // ── segmentation (requires shadow_interactive + SegmentedPreviewMode::Enabled) ──
+
+    #[test]
+    fn two_word_input_produces_multiple_segments() {
+        let s = new_session();
+        s.focus_in();
+        // "khnhomtov" → "khnhom" (ខ្ញuំ) + "tov" (ទៅ). The shadow decoder must
+        // split this into ≥2 segments; failure here means shadow_interactive is inactive.
+        let state = type_str(&s, "khnhomtov");
+        assert!(
+            state.segments.len() >= 2,
+            "khnhomtov must produce ≥2 segments (got {}); \
+             check DecoderConfig::shadow_interactive() is active",
+            state.segments.len()
+        );
+    }
+
+    #[test]
+    fn each_segment_has_non_empty_input_and_output() {
+        let s = new_session();
+        s.focus_in();
+        let state = type_str(&s, "khnhomtov");
+        assert!(!state.segments.is_empty());
+        for (i, seg) in state.segments.iter().enumerate() {
+            assert!(!seg.input.is_empty(), "segment {i} input must not be empty");
+            assert!(!seg.output.is_empty(), "segment {i} output must not be empty");
+        }
+    }
+
+    // ── segment edit mode ─────────────────────────────────────────────────────
+
+    #[test]
+    fn process_tab_enters_segment_edit_mode_on_segment_0() {
+        let s = new_session();
+        s.focus_in();
+        type_str(&s, "khnhomtov");
+        let state = s.process_tab();
+        assert!(state.segment_edit_active, "process_tab must set segment_edit_active = true");
+        assert_eq!(state.segment_edit_index, Some(0u64), "edit must begin on focused segment 0");
+    }
+
+    #[test]
+    fn segment_edit_index_equals_focused_segment_after_tab() {
+        let s = new_session();
+        s.focus_in();
+        type_str(&s, "khnhomtov");
+        // Move focus to segment 1, then enter edit mode; both indices must agree.
+        s.process_right();
+        let state = s.process_tab();
+        assert!(state.segment_edit_active);
+        assert_eq!(
+            state.segment_edit_index,
+            state.focused_segment_index,
+            "segment_edit_index must match focused_segment_index on tab entry"
+        );
+    }
+
+    #[test]
+    fn second_tab_exits_segment_edit_mode() {
+        let s = new_session();
+        s.focus_in();
+        type_str(&s, "khnhomtov");
+        s.process_tab();
+        let state = s.process_tab();
+        assert!(!state.segment_edit_active, "second process_tab must exit segment edit mode");
+        assert!(state.segment_edit_index.is_none());
     }
 }
