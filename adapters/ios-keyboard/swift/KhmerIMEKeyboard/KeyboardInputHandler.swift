@@ -47,9 +47,6 @@ final class KeyboardInputHandler {
     // trailing space (autocorrect replacement detection) but documentContextBeforeInput
     // is stale until UIKit calls textDidChange(), so the check must live there.
     private var pendingAutoSpaceCheck = false
-    // Set by returnTapped() when pendingAutoSpaceCheck is true. The "\n" is
-    // deferred so it is inserted only after the auto-space has been removed.
-    private var pendingNewlineInsert = false
 
     // MARK: - UI Callbacks
 
@@ -77,22 +74,21 @@ final class KeyboardInputHandler {
     }
 
     func textDidChange() {
-        // Remove the iOS autocorrect auto-space that was appended after our last
-        // deleteBackward×N + insertText(Khmer) sequence. documentContextBeforeInput
-        // is now fresh (UIKit has processed the insertion).
+        // Remove the iOS autocorrect auto-space appended after deleteBackward×N +
+        // insertText(Khmer). documentContextBeforeInput is now fresh.
+        // Two cases depending on whether return was pressed:
+        //   • Strip-tap / space flow: cursor is right after Khmer " " → remove the trailing " "
+        //   • Return flow:            cursor is after Khmer " \n"      → remove " " before "\n"
         if pendingAutoSpaceCheck {
             pendingAutoSpaceCheck = false
-            if (proxy.documentContextBeforeInput ?? "").hasSuffix(" ") {
+            let before = proxy.documentContextBeforeInput ?? ""
+            if before.hasSuffix(" ") {
                 proxy.deleteBackward()
+            } else if before.hasSuffix("\n"), String(before.dropLast()).hasSuffix(" ") {
+                proxy.deleteBackward()   // remove \n
+                proxy.deleteBackward()   // remove auto-space
+                proxy.insertText("\n")   // re-insert \n
             }
-        }
-
-        // Insert the deferred "\n" from returnTapped() now that the auto-space
-        // has been removed.
-        if pendingNewlineInsert {
-            pendingNewlineInsert = false
-            proxy.insertText("\n")
-            return
         }
 
         // Detects external text changes (e.g. ✖ clear in a search bar).
@@ -174,13 +170,9 @@ final class KeyboardInputHandler {
             proxy.deleteBackward()
             trailingSpace = false
         }
-        if pendingAutoSpaceCheck {
-            // Auto-space check is pending in textDidChange(). Defer "\n" there
-            // so it is inserted only after the unwanted space has been removed.
-            pendingNewlineInsert = true
-        } else {
-            proxy.insertText("\n")
-        }
+        proxy.insertText("\n")
+        // pendingAutoSpaceCheck may be set by commitComposition(); textDidChange()
+        // will detect and remove the unwanted space before the newline.
     }
 
     func backspaceTapped() {

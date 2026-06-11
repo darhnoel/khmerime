@@ -41,20 +41,17 @@ final class KeyboardInputHandlerTests: XCTestCase {
             "committed text must contain only Khmer characters and newline, got: \(proxy.text.debugDescription)")
     }
 
-    // Documents the deferred-newline contract: returnTapped() must NOT insert "\n"
-    // synchronously when a commit happened (pendingAutoSpaceCheck is set). The "\n"
-    // is inserted by textDidChange() once the proxy context is fresh.
-    func test_return_newlineIsDeferredToTextDidChange() {
+    // returnTapped() must insert "\n" immediately, never deferring to textDidChange().
+    // (Earlier versions deferred it, but textDidChange() fires unreliably mid-operation
+    // on device — e.g. after the first deleteBackward — consuming the flag too early.)
+    func test_return_newlineInsertedDirectlyByReturnTapped() {
         let (handler, proxy) = makeHandler()
         type("nhom", into: handler)
 
         handler.returnTapped()
-        XCTAssertFalse(proxy.text.hasSuffix("\n"),
-            "newline must not be inserted synchronously — it is deferred to textDidChange()")
 
-        handler.textDidChange()
         XCTAssertTrue(proxy.text.hasSuffix("\n"),
-            "textDidChange() must insert the deferred newline")
+            "newline must be inserted by returnTapped() itself, not deferred to textDidChange()")
     }
 
     // MARK: - Test A: no trailing space before newline
@@ -128,7 +125,8 @@ final class KeyboardInputHandlerTests: XCTestCase {
 
     func test_commit_removesIOSAutoSpace() {
         // Simulates real device: iOS appends " " after deleteBackward×N + insertText.
-        // The fix defers the check to textDidChange() where the proxy context is fresh.
+        // returnTapped() inserts "\n" immediately, leaving "Khmer \n" in the proxy.
+        // textDidChange() detects the " \n" pattern and swaps it for "\n".
         let proxy = MockTextProxy()
         proxy.autoSpaceAfterInsert = true
         let handler = KeyboardInputHandler(proxy: proxy, session: KeyboardSession())
@@ -136,7 +134,7 @@ final class KeyboardInputHandlerTests: XCTestCase {
         type("nhom", into: handler)
 
         handler.returnTapped()
-        handler.textDidChange()     // removes auto-space, then inserts deferred "\n"
+        handler.textDidChange()     // fixes "Khmer \n" → "Khmer\n"
 
         XCTAssertFalse(proxy.text.hasSuffix(" \n"),
             "iOS auto-space must be removed before newline; got \(proxy.text.debugDescription)")
