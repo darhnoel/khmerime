@@ -43,14 +43,12 @@ impl BridgeRuntime {
         let store = DesktopHistoryStore;
         let transliterator = Transliterator::from_default_phase_a_data(DecoderConfig::legacy())?;
         let history = store.load().unwrap_or_default();
-        let session = ImeSession::new_with_input_mode_and_options(
-            transliterator,
-            history,
-            input_mode,
-            ImeSessionOptions {
+        let session = ImeSession::builder(transliterator, history)
+            .input_mode(input_mode)
+            .options(ImeSessionOptions {
                 segmented_preview: SegmentedPreviewMode::Disabled,
-            },
-        );
+            })
+            .build();
         eprintln!(
             "[ibus-startup] phase_a_session.end elapsed_ms={:.2}",
             started.elapsed().as_secs_f64() * 1000.0
@@ -70,16 +68,14 @@ impl BridgeRuntime {
         let store = DesktopHistoryStore;
         let engines = build_full_engines()?;
         let history = store.load().unwrap_or_default();
-        let mut session = ImeSession::new_with_visible_and_commit_refiners_input_mode_and_options(
-            engines.live,
-            engines.visible_refiner,
-            engines.commit_refiner,
-            history,
-            input_mode,
-            ImeSessionOptions {
+        let mut session = ImeSession::builder(engines.live, history)
+            .input_mode(input_mode)
+            .visible_refiner(engines.visible_refiner)
+            .commit_refiner(engines.commit_refiner)
+            .options(ImeSessionOptions {
                 segmented_preview: full_segmented_preview_mode,
-            },
-        );
+            })
+            .build();
         session.set_cursor_location(0, 0, 0, 0);
         eprintln!(
             "[ibus-startup] full_session.end elapsed_ms={:.2}",

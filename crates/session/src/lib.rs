@@ -35,4 +35,4 @@ pub use crate::adapter_contract::{
     ImeSessionSnapshot, ImeSessionUpdate, InputMode, NativeKeyEvent, SegmentPreviewEntry, SegmentedPreviewMode,
     SessionCommand, SessionResult, SessionSnapshot, MAX_PERSISTED_HISTORY_WORD_CHARS,
 };
-pub use crate::ime_session::ImeSession;
+pub use crate::ime_session::{ImeSession, ImeSessionBuilder};

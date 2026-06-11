@@ -40,7 +40,9 @@ pub(crate) fn flat_default_session_with_commit_refiner() -> ImeSession {
     // refined Khmer result, not latency, so disable the budget here.
     commit_config.wfst_max_latency_ms = u64::MAX;
     let commit_refiner = Transliterator::from_default_data_with_config(commit_config).expect("default data must load");
-    let mut session = ImeSession::new_with_commit_refiner(transliterator, commit_refiner, HashMap::new());
+    let mut session = ImeSession::builder(transliterator, HashMap::new())
+        .commit_refiner(commit_refiner)
+        .build();
     session.focus_in();
     session
 }
@@ -58,12 +60,10 @@ pub(crate) fn flat_default_session_with_split_refiners() -> ImeSession {
             .with_shadow_log(false),
     )
     .expect("default data must load");
-    let mut session = ImeSession::new_with_visible_and_commit_refiners(
-        transliterator,
-        visible_refiner,
-        commit_refiner,
-        HashMap::new(),
-    );
+    let mut session = ImeSession::builder(transliterator, HashMap::new())
+        .visible_refiner(visible_refiner)
+        .commit_refiner(commit_refiner)
+        .build();
     session.focus_in();
     session
 }
@@ -71,14 +71,12 @@ pub(crate) fn flat_default_session_with_split_refiners() -> ImeSession {
 pub(crate) fn phase_a_session_without_segmented_preview() -> ImeSession {
     let transliterator =
         Transliterator::from_default_phase_a_data(DecoderConfig::legacy()).expect("phase-A data must load");
-    let mut session = ImeSession::new_with_input_mode_and_options(
-        transliterator,
-        HashMap::new(),
-        InputMode::Roman,
-        ImeSessionOptions {
+    let mut session = ImeSession::builder(transliterator, HashMap::new())
+        .input_mode(InputMode::Roman)
+        .options(ImeSessionOptions {
             segmented_preview: SegmentedPreviewMode::Disabled,
-        },
-    );
+        })
+        .build();
     session.focus_in();
     session
 }
@@ -94,8 +92,10 @@ pub(crate) fn segmented_default_session_like_ibus_bridge() -> ImeSession {
         .with_shadow_log(false);
     commit_config.wfst_max_latency_ms = 150;
     let commit_refiner = Transliterator::from_default_data_with_config(commit_config).expect("default data");
-    let mut session =
-        ImeSession::new_with_visible_and_commit_refiners(live, visible_refiner, commit_refiner, HashMap::new());
+    let mut session = ImeSession::builder(live, HashMap::new())
+        .visible_refiner(visible_refiner)
+        .commit_refiner(commit_refiner)
+        .build();
     session.focus_in();
     session
 }
