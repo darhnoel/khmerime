@@ -1,7 +1,7 @@
 import UIKit
 
-// KeyboardViewController+Layers
-// ==============================
+// KeyboardLayout
+// ==============
 // Builds the three standard keyboard layers (QWERTY, 123, #+=) and the shared
 // bottom row. All views are purely declarative: they know nothing about the
 // session; user interactions are forwarded to the ViewController via @objc

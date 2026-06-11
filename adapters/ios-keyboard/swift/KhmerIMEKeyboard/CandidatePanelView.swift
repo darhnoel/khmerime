@@ -69,9 +69,9 @@ private final class CandidateCell: UICollectionViewCell {
 //
 // Layout (replaces key rows; strip stays above):
 //   ┌───────────────────────────────────────────┐
-//   │  [💡]  [ណuំ ✏]  [ទៅ ✏]  [សាលារៀន ✏]  44pt │  ← chips (scrollable h)
+//   │  [💡]  [ណុំ ✏]  [ទៅ ✏]  [សាលារៀន ✏]  44pt │  ← chips (scrollable h)
 //   ├───────────────────────────────────────────┤
-//   │  ខ្ញuំ   ញuំ   ណuំ                        │
+//   │  ខ្ញុំ   ញុំ   ណុំ                        │
 //   │  ណ៉ំ    ណ     …                  120pt  │  ← candidates (wrapped, scrollable v)
 //   ├───────────────────────────────────────────┤
 //   │  123  │      space      │  .  │    ⏎     │  ← bottom row (from VC)
@@ -194,6 +194,12 @@ final class CandidatePanelView: UIView {
         rebuildCandidates(state.candidates, selectedIndex: selectedIdx)
     }
 
+    /// Update only the candidate collection without touching the chip row.
+    /// Used in CharPick mode where the alphabet chips must stay intact.
+    func renderCharPickCandidates(_ candidates: [String]) {
+        rebuildCandidates(candidates, selectedIndex: 0)
+    }
+
     // Letters that have at least one Khmer mapping in khmer_character_relation.csv.
     // f, q, w, x, z have no mappings and are omitted.
     private static let charPickLetters = "abcdeghijklmnoprstuvy"
@@ -239,13 +245,18 @@ final class CandidatePanelView: UIView {
         let container = UIView()
         container.translatesAutoresizingMaskIntoConstraints = false
 
-        let chip = UIButton(type: .system)
-        chip.setTitle(text, for: .normal)
-        chip.titleLabel?.font = .systemFont(ofSize: 16, weight: focused ? .semibold : .regular)
-        chip.setTitleColor(focused ? .systemBlue : .label, for: .normal)
-        chip.backgroundColor = focused ? UIColor.systemBlue.withAlphaComponent(0.12) : UIColor.systemGray5
-        chip.layer.cornerRadius = 12
-        chip.contentEdgeInsets = UIEdgeInsets(top: 6, left: 12, bottom: 6, right: 12)
+        var chipConfig = UIButton.Configuration.plain()
+        chipConfig.title = text
+        chipConfig.baseForegroundColor = focused ? .systemBlue : .label
+        chipConfig.contentInsets = NSDirectionalEdgeInsets(top: 6, leading: 12, bottom: 6, trailing: 12)
+        chipConfig.titleTextAttributesTransformer = UIConfigurationTextAttributesTransformer { attrs in
+            var a = attrs
+            a.font = UIFont.systemFont(ofSize: 16, weight: focused ? .semibold : .regular)
+            return a
+        }
+        chipConfig.background.backgroundColor = focused ? UIColor.systemBlue.withAlphaComponent(0.12) : UIColor.systemGray5
+        chipConfig.background.cornerRadius = 12
+        let chip = UIButton(configuration: chipConfig)
         chip.tag = index
         chip.addTarget(self, action: #selector(chipTapped(_:)), for: .touchUpInside)
         chip.translatesAutoresizingMaskIntoConstraints = false
@@ -294,13 +305,18 @@ final class CandidatePanelView: UIView {
     // MARK: - Button factories (CharPick alphabet)
 
     private func makeLetterChip(_ letter: String) -> UIButton {
-        let btn = UIButton(type: .system)
-        btn.setTitle(letter, for: .normal)
-        btn.titleLabel?.font = .systemFont(ofSize: 16, weight: .medium)
-        btn.setTitleColor(.label, for: .normal)
-        btn.backgroundColor = UIColor.systemGray5
-        btn.layer.cornerRadius = 12
-        btn.contentEdgeInsets = UIEdgeInsets(top: 6, left: 10, bottom: 6, right: 10)
+        var config = UIButton.Configuration.plain()
+        config.title = letter
+        config.baseForegroundColor = .label
+        config.contentInsets = NSDirectionalEdgeInsets(top: 6, leading: 10, bottom: 6, trailing: 10)
+        config.titleTextAttributesTransformer = UIConfigurationTextAttributesTransformer { attrs in
+            var a = attrs
+            a.font = UIFont.systemFont(ofSize: 16, weight: .medium)
+            return a
+        }
+        config.background.backgroundColor = UIColor.systemGray5
+        config.background.cornerRadius = 12
+        let btn = UIButton(configuration: config)
         // UITapGestureRecognizer is not blocked by the parent UIScrollView's
         // delaysContentTouches / canCancelContentTouches settings, so it fires
         // reliably while still allowing the scroll view to scroll.
@@ -318,7 +334,9 @@ final class CandidatePanelView: UIView {
 
     @objc private func charPickLetterTapped(_ sender: UITapGestureRecognizer) {
         guard let btn = sender.view as? UIButton,
-              let title = btn.title(for: .normal),
+              // Configuration-based buttons store their title in config.title,
+              // not in the legacy title(for:) slot — that always returns nil here.
+              let title = btn.configuration?.title,
               let letter = title.lowercased().first else { return }
         delegate?.candidatePanel(self, didTapCharPickLetter: letter)
     }

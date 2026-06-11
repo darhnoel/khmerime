@@ -24,7 +24,7 @@ Transitions: `QWERTY ↔ 123 ↔ #+=` and `QWERTY ↔ Panel` (via 💡).
 The two-row display pinned above the key rows, visible in all keyboard states.
 
 - **Roman Row** — top line. Shows the segmented roman input, e.g. `nhom · ttov · salarien`. When there are no segments yet, shows the raw roman buffer.
-- **Khmer Row** — bottom line. Shows the best Khmer candidate per segment, e.g. `ខ្ញuំ  ទៅ  សាលារៀន`. When there are no segments, shows the top-ranked candidate for the whole composition.
+- **Khmer Row** — bottom line. Shows the best Khmer candidate per segment, e.g. `ខ្ញុំ  ទៅ  សាលារៀន`. When there are no segments, shows the top-ranked candidate for the whole composition.
 
 The strip is always visible. It does not hide when the keyboard switches to 123, #+= , or Panel.
 
@@ -73,7 +73,7 @@ The complete snapshot returned by the session after every key event. Contains:
 
 A unit of a segmented composition. One segment maps one roman slice to one Khmer word.
 
-Example: `nhomttovsalarien` → three segments: `nhom→ខ្ញuំ`, `ttov→ទៅ`, `salarien→សាលារៀន`.
+Example: `nhomttovsalarien` → three segments: `nhom→ខ្ញុំ`, `ttov→ទៅ`, `salarien→សាលារៀន`.
 
 A segment has:
 - **Input** — the roman slice (e.g. `ttov`)
@@ -108,9 +108,9 @@ The full-replacement keyboard view activated by the 💡 button. Layout:
 ┌──────────────────────────────────────────────┐
 │  strip (roman row / khmer row)               │
 ├──────────────────────────────────────────────┤
-│  [ ខ្ញuំ ]  [ ទៅ ]  [ សាលារៀន ]   ← chips      │
+│  [ ខ្ញុំ ]  [ ទៅ ]  [ សាលារៀន ]   ← chips      │
 ├──────────────────────────────────────────────┤
-│  ខ្ញuំ   ញuំ   ណuំ   ណ៉ំ  …          ← candidates │
+│  ខ្ញុំ   ញុំ   ណុំ   ណ៉ំ  …          ← candidates │
 ├──────────────────────────────────────────────┤
 │   123   │        space        │  .  │   ⏎   │
 └──────────────────────────────────────────────┘

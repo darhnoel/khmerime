@@ -312,7 +312,7 @@ mod tests {
     fn two_word_input_produces_multiple_segments() {
         let s = new_session();
         s.focus_in();
-        // "khnhomtov" → "khnhom" (ខ្ញuំ) + "tov" (ទៅ). The shadow decoder must
+        // "khnhomtov" → "khnhom" (ខ្ញុំ) + "tov" (ទៅ). The shadow decoder must
         // split this into ≥2 segments; failure here means shadow_interactive is inactive.
         let state = type_str(&s, "khnhomtov");
         assert!(
