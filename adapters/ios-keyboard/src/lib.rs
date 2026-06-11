@@ -175,6 +175,22 @@ impl KhmerIMESession {
         s.set_cursor_location(x, y, width, height);
         render_state(&s.snapshot(), &SessionResult::default())
     }
+
+    pub fn enter_char_pick(&self) -> IosRenderState {
+        let mut s = self.inner.lock().unwrap();
+        s.process_command(khmerime_session::SessionCommand::SetInputMode(
+            khmerime_session::InputMode::CharPick,
+        ));
+        render_state(&s.snapshot(), &SessionResult::default())
+    }
+
+    pub fn exit_char_pick(&self) -> IosRenderState {
+        let mut s = self.inner.lock().unwrap();
+        s.process_command(khmerime_session::SessionCommand::SetInputMode(
+            khmerime_session::InputMode::Roman,
+        ));
+        render_state(&s.snapshot(), &SessionResult::default())
+    }
 }
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
@@ -356,5 +372,45 @@ mod tests {
         let state = s.process_tab();
         assert!(!state.segment_edit_active, "second process_tab must exit segment edit mode");
         assert!(state.segment_edit_index.is_none());
+    }
+
+    // ── CharPick mode ─────────────────────────────────────────────────────────
+
+    #[test]
+    fn enter_char_pick_switches_mode_and_clears_composition() {
+        let s = new_session();
+        type_str(&s, "nhom");
+
+        let state = s.enter_char_pick();
+
+        assert!(state.preedit.is_empty(), "preedit must clear on entering CharPick");
+        assert!(state.candidates.is_empty(), "no candidates until a key is typed");
+    }
+
+    #[test]
+    fn process_character_in_char_pick_mode_returns_relation_candidates() {
+        let s = new_session();
+        s.enter_char_pick();
+
+        let state = s.process_character("k".to_string());
+
+        assert!(
+            state.candidates.iter().any(|c| c == "ក"),
+            "candidates must include ក for 'k', got: {:?}", state.candidates
+        );
+        assert!(state.preedit.is_empty(), "preedit must stay empty in CharPick mode");
+        assert!(state.commit_text.is_none(), "process_character must not commit in CharPick mode");
+    }
+
+    #[test]
+    fn exit_char_pick_returns_to_roman_mode() {
+        let s = new_session();
+        s.enter_char_pick();
+
+        s.exit_char_pick();
+        let state = s.process_character("k".to_string());
+
+        // Back in Roman mode: 'k' builds a composition, not a char-pick lookup
+        assert_eq!(state.preedit, "k", "roman mode preedit must be the typed roman letter");
     }
 }

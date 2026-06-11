@@ -20,7 +20,7 @@ import UIKit
 // Key row anatomy:
 //   QWERTY row 1: q w e r t y u i o p       (10 letter keys, fillEqually)
 //   QWERTY row 2:   a s d f g h j k l       (9 letter keys, fillEqually, inset)
-//   QWERTY row 3: ⊞ z x c v b n m ⌫        (special | letters | special)
+//   QWERTY row 3: 💡 z x c v b n m ⌫        (special | letters | special)
 //   Bottom row:   123 | space (flex) | . | ⏎
 //
 //   123 row 3:    #+= | . , ? ! ' | ⌫
@@ -99,7 +99,7 @@ extension KeyboardViewController {
         row.spacing = 6
         row.distribution = .fill
 
-        let toggleBtn = makeSpecialKey("⊞", action: #selector(togglePanelTapped))
+        let toggleBtn = makeSpecialKey("💡", action: #selector(togglePanelTapped))
         toggleBtn.widthAnchor.constraint(equalToConstant: 42).isActive = true
 
         let mid = makeLetterRow(["z","x","c","v","b","n","m"])

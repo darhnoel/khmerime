@@ -14,6 +14,7 @@ mod adapter_contract;
 mod commit_rules;
 // `ImeSession` itself: state, constructors, lifecycle, and key-event dispatch
 // that routes into the other modules.
+mod char_pick;
 mod ime_session;
 // NIDA input mode: the `Nida` key handler plus its direct-Khmer keymap table.
 mod nida;

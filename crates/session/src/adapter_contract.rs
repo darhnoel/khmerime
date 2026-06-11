@@ -67,15 +67,18 @@ pub struct NativeKeyEvent {
 
 /// Shared input mode for native IME sessions.
 ///
-/// `Roman` is the existing decoder-backed KhmerIME flow. `Nida` is reserved for
-/// direct Khmer keymap input, where mapped printable keys commit immediately and
-/// decoder composition stays inactive.
+/// `Roman` is the existing decoder-backed KhmerIME flow. `Nida` is direct Khmer
+/// keymap input — mapped printable keys commit immediately with no Composition.
+/// `CharPick` is phonetic character lookup — each roman keystroke returns all
+/// Khmer characters whose relation includes that letter as candidates; tapping
+/// one commits it immediately with no preedit accumulation.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum InputMode {
     #[default]
     Roman,
     Nida,
+    CharPick,
 }
 
 /// Adapter-facing command model for native IME integrations.

@@ -27,14 +27,18 @@ import UIKit
 //
 // Keyboard states
 // ---------------
-//   .qwerty   Default roman-input view. ⊞ in shift slot, 123/space/./⏎ bottom.
-//   .numeric  123 layer: 1–0, punctuation, #+=, ABC/space/⏎.
-//   .symbols  #+= layer: []{}#%^*+=, currencies, 123/space/⏎.
-//   .panel    ⊞ candidate panel: chips + candidates + bottom row.
+//   .qwerty    Default roman-input view. 💡 in shift slot, 123/space/./⏎ bottom.
+//   .numeric   123 layer: 1–0, punctuation, #+=, ABC/space/⏎.
+//   .symbols   #+= layer: []{}#%^*+=, currencies, 123/space/⏎.
+//   .panel     💡 candidate panel: chips + candidates + bottom row.
+//   .charPick  CharPick mode: panel visible with A–Z chip row + candidate collection.
+//              Tap a letter chip → candidates shown; tap a candidate → commits and
+//              resets to alphabet. ⌫ cancels lookup. 💡 exits CharPick entirely.
 //
 // State transitions:
-//   qwerty ⇄ numeric ⇄ symbols   (123 / #+= / ABC keys)
-//   qwerty ⇄ panel               (⊞ key or ✏ chip edit)
+//   qwerty ⇄ numeric ⇄ symbols         (123 / #+= / ABC keys)
+//   qwerty ⇄ panel                     (💡 when composition is active, or ✏ chip edit)
+//   qwerty ⇄ charPick                  (💡 when no composition is active)
 //
 // Roman-buffer contract (see KeyboardSession.swift for full explanation)
 // -----------------------------------------------------------------------
@@ -42,8 +46,10 @@ import UIKit
 // are bulk-deleted and the committed Khmer text is inserted instead. The
 // buffer also mirrors what to delete when the session auto-commits (e.g.
 // a digit key outside composition → Khmer digit).
+// In CharPick mode the roman buffer is always empty — roman input is a lookup
+// filter only and is never inserted into the host text field.
 
-private enum KeyboardState { case qwerty, numeric, symbols, panel }
+private enum KeyboardState { case qwerty, numeric, symbols, panel, charPick }
 
 class KeyboardViewController: UIInputViewController {
 
@@ -84,6 +90,21 @@ class KeyboardViewController: UIInputViewController {
     override func viewWillDisappear(_ animated: Bool) {
         super.viewWillDisappear(animated)
         _ = session.focusOut()
+    }
+
+    // Detects external text changes (e.g., ✖ clear button in search bars).
+    // If the text before the cursor no longer ends with our roman buffer,
+    // something cleared it externally — reset composition and strip.
+    override func textDidChange(_ textInput: UITextInput?) {
+        guard !romanBuffer.isEmpty else { return }
+        let before = textDocumentProxy.documentContextBeforeInput ?? ""
+        guard !before.hasSuffix(romanBuffer) else { return }
+        romanBuffer = ""
+        _ = session.sendReturn()
+        stripView.clear()
+        if keyboardState == .panel || keyboardState == .charPick {
+            transition(to: .qwerty)
+        }
     }
 
     // MARK: - Layout
@@ -157,7 +178,7 @@ class KeyboardViewController: UIInputViewController {
             panelBottomRow.topAnchor.constraint(equalTo: panelView.bottomAnchorGuide.topAnchor, constant: 8),
             panelBottomRow.leadingAnchor.constraint(equalTo: root.leadingAnchor, constant: 3),
             panelBottomRow.trailingAnchor.constraint(equalTo: root.trailingAnchor, constant: -3),
-            panelBottomRow.bottomAnchor.constraint(equalTo: root.bottomAnchor, constant: -4),
+            panelBottomRow.heightAnchor.constraint(equalToConstant: 44),
         ])
 
         transition(to: .qwerty)
@@ -170,7 +191,8 @@ class KeyboardViewController: UIInputViewController {
         qwertyView.isHidden  = state != .qwerty
         numericView.isHidden = state != .numeric
         symbolsView.isHidden = state != .symbols
-        let inPanel = state == .panel
+        // CharPick shows the panel (A–Z chips + candidate collection) instead of QWERTY.
+        let inPanel = state == .panel || state == .charPick
         panelView.isHidden      = !inPanel
         panelBottomRow.isHidden = !inPanel
     }
@@ -182,7 +204,7 @@ class KeyboardViewController: UIInputViewController {
     private func render(_ state: IosRenderState) {
         lastState = state
         stripView.render(state, romanBuffer: romanBuffer)
-        if keyboardState == .panel { panelView.render(state) }
+        if keyboardState == .panel || keyboardState == .charPick { panelView.render(state) }
     }
 
     // MARK: - Character Input
@@ -194,6 +216,8 @@ class KeyboardViewController: UIInputViewController {
     // a digit outside composition → Khmer digit), the speculative roman char is
     // deleted and the committed Khmer text is inserted in its place.
     private func sendChar(_ ch: String) {
+        // CharPick uses the panel's alphabet chips, not QWERTY keys.
+        guard keyboardState != .charPick else { return }
         textDocumentProxy.insertText(ch)
         romanBuffer += ch
         let state = session.sendCharacter(ch)
@@ -231,6 +255,20 @@ class KeyboardViewController: UIInputViewController {
     @objc func periodTapped() { sendChar(".") }
 
     @objc func backspaceTapped() {
+        if keyboardState == .charPick {
+
+            if let current = lastState, !current.candidates.isEmpty {
+                // Cancel the current letter lookup and go back to the alphabet picker.
+                _ = session.enterCharPick()
+                lastState = nil
+                stripView.clear()
+                panelView.renderCharPickAlphabet()
+            } else {
+                // Already at alphabet — delete the last committed Khmer character.
+                textDocumentProxy.deleteBackward()
+            }
+            return
+        }
         if !romanBuffer.isEmpty { romanBuffer.removeLast() }
         textDocumentProxy.deleteBackward()
         let state = session.sendBackspace()
@@ -245,6 +283,17 @@ class KeyboardViewController: UIInputViewController {
     }
 
     @objc func returnTapped() {
+        if keyboardState == .charPick {
+            if let current = lastState, !current.candidates.isEmpty {
+                textDocumentProxy.insertText(current.candidates[0])
+                _ = session.enterCharPick()
+                lastState = nil
+                stripView.clear()
+                panelView.renderCharPickAlphabet()
+            }
+
+            return
+        }
         let state = session.sendReturn()
 
         // Build the Khmer commit string from segments (concatenated, no spaces —
@@ -264,11 +313,30 @@ class KeyboardViewController: UIInputViewController {
     }
 
     @objc func togglePanelTapped() {
-        if keyboardState == .panel {
+        switch keyboardState {
+        case .panel:
             transition(to: .qwerty)
-        } else {
-            if let state = lastState { panelView.render(state) }
-            transition(to: .panel)
+        case .charPick:
+            // 💡 on the qwerty row while charPick is active (shouldn't normally occur
+            // since qwerty is hidden, but handle it defensively).
+            _ = session.exitCharPick()
+
+            stripView.clear()
+            transition(to: .qwerty)
+        default:
+            // With active composition: show word candidate panel.
+            // Without composition: enter CharPick directly.
+            let hasComposition = lastState.map { !$0.candidates.isEmpty } ?? false
+            if hasComposition {
+                if let state = lastState { panelView.render(state) }
+                transition(to: .panel)
+            } else {
+                _ = session.enterCharPick()
+                lastState = nil
+                stripView.clear()
+                panelView.renderCharPickAlphabet()
+                transition(to: .charPick)
+            }
         }
     }
 
@@ -307,12 +375,45 @@ extension KeyboardViewController: CandidatePanelDelegate {
         transition(to: .qwerty)
     }
 
+    func candidatePanelDidEnterCharPick(_ panel: CandidatePanelView) {
+        for _ in romanBuffer { textDocumentProxy.deleteBackward() }
+        romanBuffer = ""
+        _ = session.enterCharPick()
+        lastState = nil
+        stripView.clear()
+        panelView.renderCharPickAlphabet()
+        transition(to: .charPick)
+    }
+
+    func candidatePanel(_ panel: CandidatePanelView, didTapCharPickLetter letter: Character) {
+        let state = session.sendCharacter(String(letter))
+        lastState = state
+        stripView.render(state, romanBuffer: String(letter))
+        panelView.render(state)
+    }
+
     func candidatePanel(_ panel: CandidatePanelView, didSelectCandidateAt index: Int) {
+        if keyboardState == .charPick {
+            if let candidate = lastState?.candidates[index] {
+                textDocumentProxy.insertText(candidate)
+            }
+
+            _ = session.enterCharPick()
+            lastState = nil
+            stripView.clear()
+            panelView.renderCharPickAlphabet()
+            return
+        }
         let state = session.selectCandidate(at: index)
         render(state)
     }
 
     func candidatePanelDidDismiss(_ panel: CandidatePanelView) {
+        if keyboardState == .charPick {
+            _ = session.exitCharPick()
+
+            stripView.clear()
+        }
         transition(to: .qwerty)
     }
 }

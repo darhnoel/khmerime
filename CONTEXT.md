@@ -68,6 +68,10 @@ _Avoid_: backend, service
 The per-user `HashMap<String, usize>` counting how often each Khmer **unigram** has been committed. Boosts ranking in `suggest()` and `next_word_suggestions()` alongside the static corpus statistics. Persisted via `HistoryStore` (TSV today; see ADR-0002). Keys are individual Khmer words, never concatenated multi-word phrases — when a **Commit Text** spans multiple segments (from a **Segmented Session** or the **Commit Refiner**'s WFST output), each segment is learned separately.
 _Avoid_: user dictionary, learned words (ambiguous with corpus)
 
+**CharPick Mode**:
+An input mode (`InputMode::CharPick`) for typing Khmer text that is not in the **Lexicon** — names, place names, loanwords. The user types one roman letter; the session looks up all Khmer characters whose phonetic relation includes that letter (from `khmer_character_relation.csv`) and returns them as the **Candidate List**. Tapping a candidate commits that single Khmer character immediately to the host application with no **Composition** or preedit accumulation. Each keystroke is an independent lookup; there is no progressive multi-letter narrowing. On iOS, ⊞ enters CharPick Mode when no **Composition** is active.
+_Avoid_: name mode, character picker, direct character input
+
 **Phase A / Phase B startup**:
 A two-stage warmup. Phase A builds a minimal **SharedTransliteratorData** fast enough to accept keystrokes (~100 ms). Phase B builds the full version in a background thread (~800 ms ngram, ~1300 ms SymSpell). Phase B is swapped in transparently when ready.
 

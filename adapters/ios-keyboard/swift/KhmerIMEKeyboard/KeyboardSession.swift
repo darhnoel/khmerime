@@ -78,4 +78,13 @@ final class KeyboardSession {
         guard index < 9 else { return inner.focusIn() }
         return inner.processDigit(n: UInt8(index + 1))
     }
+
+    // MARK: - CharPick mode
+
+    // Enters CharPick mode. Clears any active composition.
+    // Returns a clean render state with empty candidates (no roman letter typed yet).
+    func enterCharPick() -> IosRenderState { inner.enterCharPick() }
+
+    // Exits CharPick mode and returns to Roman mode.
+    func exitCharPick() -> IosRenderState { inner.exitCharPick() }
 }

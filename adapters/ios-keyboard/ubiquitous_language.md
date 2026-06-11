@@ -10,12 +10,12 @@ The currently visible keyboard view. Exactly one state is active at all times.
 
 | State | Description |
 |---|---|
-| **QWERTY** | Default roman-input view. ⊞ in shift position, `123 space . ⏎` bottom row. |
+| **QWERTY** | Default roman-input view. 💡 in shift position, `123 space . ⏎` bottom row. |
 | **123** | Number/symbol layer. Native iOS layout. All keys go through the session. |
 | **#+=** | Secondary symbol layer, reached from 123. Full native iOS layout. |
 | **Panel** | Candidate panel. Replaces QWERTY area. Shows segment chips + candidate row. |
 
-Transitions: `QWERTY ↔ 123 ↔ #+=` and `QWERTY ↔ Panel` (via ⊞).
+Transitions: `QWERTY ↔ 123 ↔ #+=` and `QWERTY ↔ Panel` (via 💡).
 
 ---
 
@@ -100,9 +100,9 @@ The horizontally scrollable row in the Panel showing all Khmer candidates for th
 
 ---
 
-## Panel (⊞ Panel / Candidate Panel)
+## Panel (💡 Panel / Candidate Panel)
 
-The full-replacement keyboard view activated by the ⊞ button. Layout:
+The full-replacement keyboard view activated by the 💡 button. Layout:
 
 ```
 ┌──────────────────────────────────────────────┐
@@ -116,7 +116,7 @@ The full-replacement keyboard view activated by the ⊞ button. Layout:
 └──────────────────────────────────────────────┘
 ```
 
-Tapping ⊞ again (or a letter key) returns to QWERTY.
+Tapping 💡 again (or a letter key) returns to QWERTY.
 
 ---
 
@@ -139,7 +139,7 @@ A key event that the session emits unchanged. Symbols (`-`, `/`, `(`, etc.) have
 
 ---
 
-## ⊞ Button
+## 💡 Button
 
 The toggle button in the shift-key position (row 3, left). Switches between QWERTY and Panel states. Does not send any event to the session.
 

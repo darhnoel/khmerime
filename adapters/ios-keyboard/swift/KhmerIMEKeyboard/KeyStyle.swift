@@ -18,7 +18,7 @@ import UIKit
 //
 // Visual guide:
 //   Letter / Symbol keys:  white bg, 5pt radius, 1pt bottom shadow
-//   Special keys (⌫ ⊞ 123 space ⏎ …): systemGray3 bg, same radius + shadow
+//   Special keys (⌫ 💡 123 space ⏎ …): systemGray3 bg, same radius + shadow
 
 enum KeyStyle {
 

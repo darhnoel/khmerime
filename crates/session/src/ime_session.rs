@@ -291,7 +291,7 @@ impl ImeSession {
     pub fn toggle_input_mode(&mut self) {
         let next = match self.input_mode {
             InputMode::Roman => InputMode::Nida,
-            InputMode::Nida => InputMode::Roman,
+            InputMode::Nida | InputMode::CharPick => InputMode::Roman,
         };
         self.set_input_mode(next);
     }
@@ -367,6 +367,10 @@ impl ImeSession {
 
         if self.input_mode == InputMode::Nida {
             return self.process_nida_key_event(keyval, keycode, state);
+        }
+
+        if self.input_mode == InputMode::CharPick {
+            return self.process_char_pick_key_event(keyval);
         }
 
         match keyval {
@@ -787,5 +791,37 @@ mod tests {
         session.process_key_event('j' as u32, 0, 0);
         session.focus_out();
         assert!(session.snapshot().preedit.is_empty());
+    }
+
+    #[test]
+    fn char_pick_mode_typing_k_returns_relation_candidates() {
+        let mut session = session();
+        session.process_command(SessionCommand::SetInputMode(InputMode::CharPick));
+
+        let result = session.process_key_event('k' as u32, 0, 0);
+
+        assert!(result.consumed);
+        assert!(result.commit_text.is_none());
+        let snapshot = session.snapshot();
+        assert!(snapshot.preedit.is_empty(), "preedit must be empty in CharPick mode");
+        assert!(
+            snapshot.candidates.iter().any(|c| c == "ក"),
+            "candidates must include ក for 'k', got: {:?}",
+            snapshot.candidates
+        );
+        assert!(
+            !snapshot.candidates.iter().any(|c| c == "ម"),
+            "candidates must not include ម for 'k'"
+        );
+    }
+
+    #[test]
+    fn char_pick_mode_does_not_affect_roman_mode() {
+        let mut session = session();
+        // Roman mode: 'k' builds a Composition with roman preedit, not a char-pick lookup
+        let result = session.process_key_event('k' as u32, 0, 0);
+        assert!(result.consumed);
+        // The roman path is confirmed by raw_preedit containing the typed letter
+        assert_eq!(session.snapshot().raw_preedit, "k");
     }
 }

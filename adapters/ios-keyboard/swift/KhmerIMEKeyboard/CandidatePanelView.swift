@@ -2,23 +2,6 @@ import UIKit
 
 // MARK: - Delegate
 
-// CandidatePanelDelegate
-// ======================
-// Notified by CandidatePanelView on every user interaction. The owner
-// (KeyboardViewController) implements this to forward events to the session.
-//
-// Android equivalent
-// ------------------
-// Define a Kotlin interface (listener) with the same four callbacks and pass
-// it to the CandidatePanelView during construction:
-//
-//   interface CandidatePanelListener {
-//       fun onChipTapped(index: Int)
-//       fun onEditChipTapped(index: Int)
-//       fun onCandidateSelected(index: Int)
-//       fun onDismiss()
-//   }
-
 protocol CandidatePanelDelegate: AnyObject {
     /// User tapped a segment chip to move focus to that segment.
     func candidatePanel(_ panel: CandidatePanelView, didTapChipAt index: Int)
@@ -26,36 +9,70 @@ protocol CandidatePanelDelegate: AnyObject {
     func candidatePanel(_ panel: CandidatePanelView, didRequestEditAt index: Int)
     /// User tapped a candidate to select it for the focused segment.
     func candidatePanel(_ panel: CandidatePanelView, didSelectCandidateAt index: Int)
-    /// User tapped ⊞ to dismiss the panel and return to the QWERTY view.
+    /// User tapped 💡 to dismiss the panel and return to the QWERTY view.
     func candidatePanelDidDismiss(_ panel: CandidatePanelView)
+    /// User tapped the CharPick entry button (ក) in the word candidate panel.
+    func candidatePanelDidEnterCharPick(_ panel: CandidatePanelView)
+    /// User tapped a letter chip in CharPick mode.
+    func candidatePanel(_ panel: CandidatePanelView, didTapCharPickLetter letter: Character)
+}
+
+// MARK: - Cell
+
+private final class CandidateCell: UICollectionViewCell {
+    static let reuseID = "CandidateCell"
+
+    private let label = UILabel()
+
+    override init(frame: CGRect) {
+        super.init(frame: frame)
+        // Required for self-sizing: contentView must use Auto Layout, not its
+        // autoresizing mask, so systemLayoutSizeFitting returns the label's size.
+        contentView.translatesAutoresizingMaskIntoConstraints = false
+        label.font = .systemFont(ofSize: 20, weight: .medium)
+        label.textAlignment = .center
+        label.translatesAutoresizingMaskIntoConstraints = false
+        contentView.addSubview(label)
+        contentView.layer.cornerRadius = 8
+        NSLayoutConstraint.activate([
+            // Pin contentView to cell edges so the cell frame matches.
+            contentView.topAnchor.constraint(equalTo: topAnchor),
+            contentView.leadingAnchor.constraint(equalTo: leadingAnchor),
+            contentView.trailingAnchor.constraint(equalTo: trailingAnchor),
+            contentView.bottomAnchor.constraint(equalTo: bottomAnchor),
+
+            label.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 8),
+            label.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -8),
+            label.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 14),
+            label.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -14),
+        ])
+    }
+
+    required init?(coder: NSCoder) { fatalError("use init(frame:)") }
+
+    func configure(text: String, selected: Bool) {
+        label.text = text
+        label.font = .systemFont(ofSize: 20, weight: selected ? .semibold : .medium)
+        label.textColor = selected ? .systemBlue : .label
+        contentView.backgroundColor = selected ? UIColor.systemBlue.withAlphaComponent(0.08) : .white
+        contentView.layer.borderWidth = selected ? 1.5 : 0
+        contentView.layer.borderColor = selected ? UIColor.systemBlue.cgColor : UIColor.clear.cgColor
+    }
 }
 
 // MARK: - View
 
 // CandidatePanelView
 // ==================
-// Full-replacement view for the key-rows area, shown when the user taps ⊞.
+// Full-replacement view for the key-rows area, shown when the user taps 💡.
 // The strip (StripView) remains above it at all times.
-//
-// Android equivalent
-// ------------------
-// A ConstraintLayout replacing the key rows:
-//
-//   <ConstraintLayout>
-//       <HorizontalScrollView android:id="@+id/chipScroll" />  <!-- chips row -->
-//       <View android:id="@+id/sep1" android:layout_height="0.5dp" />
-//       <HorizontalScrollView android:id="@+id/candScroll" />  <!-- candidates -->
-//       <View android:id="@+id/sep2" android:layout_height="0.5dp" />
-//       <!-- bottom row comes from the shared layout -->
-//   </ConstraintLayout>
-//
-//   fun render(state: IosRenderState) { rebuildChips(…); rebuildCandidates(…) }
 //
 // Layout (replaces key rows; strip stays above):
 //   ┌───────────────────────────────────────────┐
-//   │  [⊞]  [ណuំ ✏]  [ទៅ ✏]  [សាលារៀន ✏]  44pt │  ← chips (scrollable)
+//   │  [💡]  [ណuំ ✏]  [ទៅ ✏]  [សាលារៀន ✏]  44pt │  ← chips (scrollable h)
 //   ├───────────────────────────────────────────┤
-//   │  ខ្ញuំ   ញuំ   ណuំ   ណ៉ំ  …             52pt │  ← candidates (scrollable)
+//   │  ខ្ញuំ   ញuំ   ណuំ                        │
+//   │  ណ៉ំ    ណ     …                  120pt  │  ← candidates (wrapped, scrollable v)
 //   ├───────────────────────────────────────────┤
 //   │  123  │      space      │  .  │    ⏎     │  ← bottom row (from VC)
 //   └───────────────────────────────────────────┘
@@ -67,10 +84,29 @@ final class CandidatePanelView: UIView {
     // Exposed so the ViewController can embed the shared bottom row.
     let bottomAnchorGuide = UILayoutGuide()
 
-    private let chipScroll      = UIScrollView()
-    private let chipStack       = UIStackView()
-    private let candidateScroll = UIScrollView()
-    private let candidateStack  = UIStackView()
+    private let chipScroll  = UIScrollView()
+    private let chipStack   = UIStackView()
+
+    private let candidateCollection: UICollectionView = {
+        let layout = UICollectionViewFlowLayout()
+        layout.scrollDirection = .vertical
+        // Concrete estimate so the layout has a valid starting size before
+        // preferredLayoutAttributesFitting refines it. .automaticSize (-1,-1)
+        // causes cells to size to zero on some iOS versions.
+        layout.estimatedItemSize = CGSize(width: 64, height: 44)
+        layout.minimumInteritemSpacing = 6
+        layout.minimumLineSpacing = 6
+        layout.sectionInset = UIEdgeInsets(top: 6, left: 8, bottom: 6, right: 8)
+        let cv = UICollectionView(frame: .zero, collectionViewLayout: layout)
+        cv.backgroundColor = UIColor.systemGray6
+        cv.showsVerticalScrollIndicator = true
+        cv.showsHorizontalScrollIndicator = false
+        cv.translatesAutoresizingMaskIntoConstraints = false
+        return cv
+    }()
+
+    private var displayCandidates: [String] = []
+    private var displaySelectedIndex: Int = 0
 
     override init(frame: CGRect) {
         super.init(frame: frame)
@@ -82,10 +118,10 @@ final class CandidatePanelView: UIView {
     // MARK: - Setup
 
     private func setup() {
+        // Chip scroll
         chipScroll.showsHorizontalScrollIndicator = false
         chipScroll.backgroundColor = .systemBackground
         chipScroll.translatesAutoresizingMaskIntoConstraints = false
-        chipScroll.delaysContentTouches = false
 
         chipStack.axis = .horizontal
         chipStack.spacing = 8
@@ -93,60 +129,49 @@ final class CandidatePanelView: UIView {
         chipStack.translatesAutoresizingMaskIntoConstraints = false
         chipScroll.addSubview(chipStack)
 
+        // Chip stack uses contentLayoutGuide so chips can scroll past the visible edge.
+        NSLayoutConstraint.activate([
+            chipStack.topAnchor.constraint(equalTo: chipScroll.contentLayoutGuide.topAnchor),
+            chipStack.leadingAnchor.constraint(equalTo: chipScroll.contentLayoutGuide.leadingAnchor, constant: 8),
+            chipStack.trailingAnchor.constraint(equalTo: chipScroll.contentLayoutGuide.trailingAnchor, constant: -8),
+            chipStack.bottomAnchor.constraint(equalTo: chipScroll.contentLayoutGuide.bottomAnchor),
+            chipStack.heightAnchor.constraint(equalTo: chipScroll.frameLayoutGuide.heightAnchor),
+        ])
+
         let chipSeparator = makeSeparator()
 
-        candidateScroll.showsHorizontalScrollIndicator = false
-        candidateScroll.backgroundColor = UIColor.systemGray6
-        candidateScroll.translatesAutoresizingMaskIntoConstraints = false
-        candidateScroll.delaysContentTouches = false
-
-        candidateStack.axis = .horizontal
-        candidateStack.spacing = 6
-        candidateStack.alignment = .center
-        candidateStack.translatesAutoresizingMaskIntoConstraints = false
-        candidateScroll.addSubview(candidateStack)
+        // Candidate collection
+        candidateCollection.dataSource = self
+        candidateCollection.delegate   = self
+        candidateCollection.register(CandidateCell.self, forCellWithReuseIdentifier: CandidateCell.reuseID)
 
         let candidateSeparator = makeSeparator()
 
         addLayoutGuide(bottomAnchorGuide)
 
-        for v in [chipScroll, chipSeparator, candidateScroll, candidateSeparator] as [UIView] {
+        for v in [chipScroll, chipSeparator, candidateCollection, candidateSeparator] as [UIView] {
             addSubview(v)
         }
 
         NSLayoutConstraint.activate([
-            // Chip scroll view
+            // Chip scroll
             chipScroll.topAnchor.constraint(equalTo: topAnchor, constant: 4),
             chipScroll.leadingAnchor.constraint(equalTo: leadingAnchor),
             chipScroll.trailingAnchor.constraint(equalTo: trailingAnchor),
             chipScroll.heightAnchor.constraint(equalToConstant: 44),
-
-            // Chip stack inside chip scroll
-            chipStack.topAnchor.constraint(equalTo: chipScroll.topAnchor),
-            chipStack.leadingAnchor.constraint(equalTo: chipScroll.leadingAnchor, constant: 8),
-            chipStack.trailingAnchor.constraint(equalTo: chipScroll.trailingAnchor, constant: -8),
-            chipStack.bottomAnchor.constraint(equalTo: chipScroll.bottomAnchor),
-            chipStack.heightAnchor.constraint(equalTo: chipScroll.heightAnchor),
 
             chipSeparator.topAnchor.constraint(equalTo: chipScroll.bottomAnchor),
             chipSeparator.leadingAnchor.constraint(equalTo: leadingAnchor),
             chipSeparator.trailingAnchor.constraint(equalTo: trailingAnchor),
             chipSeparator.heightAnchor.constraint(equalToConstant: 0.5),
 
-            // Candidate scroll view
-            candidateScroll.topAnchor.constraint(equalTo: chipSeparator.bottomAnchor),
-            candidateScroll.leadingAnchor.constraint(equalTo: leadingAnchor),
-            candidateScroll.trailingAnchor.constraint(equalTo: trailingAnchor),
-            candidateScroll.heightAnchor.constraint(equalToConstant: 52),
+            // Candidate collection — wraps and scrolls vertically
+            candidateCollection.topAnchor.constraint(equalTo: chipSeparator.bottomAnchor),
+            candidateCollection.leadingAnchor.constraint(equalTo: leadingAnchor),
+            candidateCollection.trailingAnchor.constraint(equalTo: trailingAnchor),
+            candidateCollection.heightAnchor.constraint(equalToConstant: 120),
 
-            // Candidate stack inside candidate scroll
-            candidateStack.topAnchor.constraint(equalTo: candidateScroll.topAnchor),
-            candidateStack.leadingAnchor.constraint(equalTo: candidateScroll.leadingAnchor, constant: 8),
-            candidateStack.trailingAnchor.constraint(equalTo: candidateScroll.trailingAnchor, constant: -8),
-            candidateStack.bottomAnchor.constraint(equalTo: candidateScroll.bottomAnchor),
-            candidateStack.heightAnchor.constraint(equalTo: candidateScroll.heightAnchor),
-
-            candidateSeparator.topAnchor.constraint(equalTo: candidateScroll.bottomAnchor),
+            candidateSeparator.topAnchor.constraint(equalTo: candidateCollection.bottomAnchor),
             candidateSeparator.leadingAnchor.constraint(equalTo: leadingAnchor),
             candidateSeparator.trailingAnchor.constraint(equalTo: trailingAnchor),
             candidateSeparator.heightAnchor.constraint(equalToConstant: 0.5),
@@ -156,49 +181,60 @@ final class CandidatePanelView: UIView {
             bottomAnchorGuide.leadingAnchor.constraint(equalTo: leadingAnchor),
             bottomAnchorGuide.trailingAnchor.constraint(equalTo: trailingAnchor),
 
-            // Pin the view's own bottom so hitTest covers the chip + candidate rows.
-            // Without this, the frame height is 0: content paints (clipsToBounds=false)
-            // but all touches fall outside bounds and are never delivered to subviews.
+            // Pin view's own bottom so hit-testing works on all subviews.
             bottomAnchor.constraint(equalTo: candidateSeparator.bottomAnchor),
         ])
     }
 
     // MARK: - Public API
 
-    // Rebuild the chip and candidate rows from the latest render state.
-    // Call this every time the keyboard is in the panel state and a new
-    // render state arrives from the session.
     func render(_ state: IosRenderState) {
         rebuildChips(state.segments)
         let selectedIdx = state.selectedIndex.map { Int($0) } ?? 0
         rebuildCandidates(state.candidates, selectedIndex: selectedIdx)
     }
 
+    // Letters that have at least one Khmer mapping in khmer_character_relation.csv.
+    // f, q, w, x, z have no mappings and are omitted.
+    private static let charPickLetters = "abcdeghijklmnoprstuvy"
+
+    /// Switch the chip row to the mapped-letter picker used in CharPick mode.
+    /// Clears any displayed candidates.
+    func renderCharPickAlphabet() {
+        chipStack.arrangedSubviews.forEach { $0.removeFromSuperview() }
+        chipStack.addArrangedSubview(makeSpecialButton("💡", action: #selector(dismissTapped)))
+        for letter in Self.charPickLetters {
+            chipStack.addArrangedSubview(makeLetterChip(String(letter).uppercased()))
+        }
+        displayCandidates = []
+        displaySelectedIndex = 0
+        candidateCollection.reloadData()
+    }
+
     // MARK: - Builders
 
     private func rebuildChips(_ segments: [IosSegmentEntry]) {
         chipStack.arrangedSubviews.forEach { $0.removeFromSuperview() }
-
-        let dismissBtn = makeSpecialButton("⊞", action: #selector(dismissTapped))
-        chipStack.addArrangedSubview(dismissBtn)
-
+        chipStack.addArrangedSubview(makeSpecialButton("💡", action: #selector(dismissTapped)))
+        // CharPick entry button — lets the user discard the current composition
+        // and switch to individual character picking.
+        chipStack.addArrangedSubview(makeSpecialButton("ក…", action: #selector(enterCharPickTapped)))
         for (i, seg) in segments.enumerated() {
             chipStack.addArrangedSubview(makeChipContainer(text: seg.output, focused: seg.focused, index: i))
         }
     }
 
     private func rebuildCandidates(_ candidates: [String], selectedIndex: Int) {
-        candidateStack.arrangedSubviews.forEach { $0.removeFromSuperview() }
-        for (i, text) in candidates.enumerated() {
-            candidateStack.addArrangedSubview(makeCandidateButton(text: text, index: i, selected: i == selectedIndex))
+        displayCandidates = candidates
+        displaySelectedIndex = selectedIndex
+        candidateCollection.reloadData()
+        if !candidates.isEmpty {
+            candidateCollection.scrollToItem(at: IndexPath(item: 0, section: 0), at: .top, animated: false)
         }
     }
 
     // MARK: - Button factories
 
-    // A chip is a container with the Khmer output label and a small ✏ edit button.
-    // The ✏ button is only visible when the chip is focused so it doesn't clutter
-    // unfocused chips.
     private func makeChipContainer(text: String, focused: Bool, index: Int) -> UIView {
         let container = UIView()
         container.translatesAutoresizingMaskIntoConstraints = false
@@ -235,23 +271,7 @@ final class CandidatePanelView: UIView {
             editBtn.centerYAnchor.constraint(equalTo: container.centerYAnchor),
             editBtn.widthAnchor.constraint(equalToConstant: 20),
         ])
-
         return container
-    }
-
-    private func makeCandidateButton(text: String, index: Int, selected: Bool) -> UIButton {
-        let btn = UIButton(type: .system)
-        btn.setTitle(text, for: .normal)
-        btn.titleLabel?.font = .systemFont(ofSize: 20, weight: selected ? .semibold : .medium)
-        btn.setTitleColor(selected ? .systemBlue : .label, for: .normal)
-        btn.backgroundColor = selected ? UIColor.systemBlue.withAlphaComponent(0.08) : .white
-        btn.layer.cornerRadius = 8
-        btn.layer.borderWidth = selected ? 1.5 : 0
-        btn.layer.borderColor = selected ? UIColor.systemBlue.cgColor : UIColor.clear.cgColor
-        btn.contentEdgeInsets = UIEdgeInsets(top: 8, left: 14, bottom: 8, right: 14)
-        btn.tag = index
-        btn.addTarget(self, action: #selector(candidateTapped(_:)), for: .touchUpInside)
-        return btn
     }
 
     private func makeSpecialButton(_ title: String, action: Selector) -> UIButton {
@@ -271,10 +291,55 @@ final class CandidatePanelView: UIView {
         return v
     }
 
+    // MARK: - Button factories (CharPick alphabet)
+
+    private func makeLetterChip(_ letter: String) -> UIButton {
+        let btn = UIButton(type: .system)
+        btn.setTitle(letter, for: .normal)
+        btn.titleLabel?.font = .systemFont(ofSize: 16, weight: .medium)
+        btn.setTitleColor(.label, for: .normal)
+        btn.backgroundColor = UIColor.systemGray5
+        btn.layer.cornerRadius = 12
+        btn.contentEdgeInsets = UIEdgeInsets(top: 6, left: 10, bottom: 6, right: 10)
+        // UITapGestureRecognizer is not blocked by the parent UIScrollView's
+        // delaysContentTouches / canCancelContentTouches settings, so it fires
+        // reliably while still allowing the scroll view to scroll.
+        let tap = UITapGestureRecognizer(target: self, action: #selector(charPickLetterTapped(_:)))
+        btn.addGestureRecognizer(tap)
+        return btn
+    }
+
     // MARK: - Actions
 
-    @objc private func dismissTapped()              { delegate?.candidatePanelDidDismiss(self) }
-    @objc private func chipTapped(_ s: UIButton)    { delegate?.candidatePanel(self, didTapChipAt: s.tag) }
-    @objc private func editTapped(_ s: UIButton)    { delegate?.candidatePanel(self, didRequestEditAt: s.tag) }
-    @objc private func candidateTapped(_ s: UIButton) { delegate?.candidatePanel(self, didSelectCandidateAt: s.tag) }
+    @objc private func dismissTapped()           { delegate?.candidatePanelDidDismiss(self) }
+    @objc private func enterCharPickTapped()     { delegate?.candidatePanelDidEnterCharPick(self) }
+    @objc private func chipTapped(_ s: UIButton) { delegate?.candidatePanel(self, didTapChipAt: s.tag) }
+    @objc private func editTapped(_ s: UIButton) { delegate?.candidatePanel(self, didRequestEditAt: s.tag) }
+
+    @objc private func charPickLetterTapped(_ sender: UITapGestureRecognizer) {
+        guard let btn = sender.view as? UIButton,
+              let title = btn.title(for: .normal),
+              let letter = title.lowercased().first else { return }
+        delegate?.candidatePanel(self, didTapCharPickLetter: letter)
+    }
+}
+
+// MARK: - UICollectionViewDataSource / Delegate
+
+extension CandidatePanelView: UICollectionViewDataSource, UICollectionViewDelegate {
+
+    func collectionView(_ collectionView: UICollectionView, numberOfItemsInSection section: Int) -> Int {
+        displayCandidates.count
+    }
+
+    func collectionView(_ collectionView: UICollectionView, cellForItemAt indexPath: IndexPath) -> UICollectionViewCell {
+        let cell = collectionView.dequeueReusableCell(
+            withReuseIdentifier: CandidateCell.reuseID, for: indexPath) as! CandidateCell
+        cell.configure(text: displayCandidates[indexPath.item], selected: indexPath.item == displaySelectedIndex)
+        return cell
+    }
+
+    func collectionView(_ collectionView: UICollectionView, didSelectItemAt indexPath: IndexPath) {
+        delegate?.candidatePanel(self, didSelectCandidateAt: indexPath.item)
+    }
 }
