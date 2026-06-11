@@ -14,6 +14,25 @@ settings:
     CODE_SIGN_IDENTITY: "-"
     DEVELOPMENT_TEAM: ""
 
+schemes:
+  KhmerIME:
+    build:
+      targets:
+        KhmerIME: all
+
+  KhmerIMEKeyboard:
+    build:
+      targets:
+        KhmerIMEKeyboard: all
+
+  KhmerIMEKeyboardTests:
+    build:
+      targets:
+        KhmerIMEKeyboardTests: test
+    test:
+      targets:
+        - KhmerIMEKeyboardTests
+
 targets:
 
   KhmerIME:
@@ -53,19 +72,19 @@ targets:
     sources:
       - path: KhmerIMEKeyboardTests
       # Share the handler + session source directly (no linking the extension bundle).
-      - path: KhmerIMEKeyboard/CandidatePanelView.swift
-      - path: KhmerIMEKeyboard/KeyboardHostLayout.swift
-      - path: KhmerIMEKeyboard/KeyboardLayout.swift
-      - path: KhmerIMEKeyboard/KeyboardInputHandler.swift
-      - path: KhmerIMEKeyboard/KeyStyle.swift
-      - path: KhmerIMEKeyboard/KeyboardViewHierarchyBuilder.swift
-      - path: KhmerIMEKeyboard/KeyboardLayerVisibility.swift
-      - path: KhmerIMEKeyboard/KeyboardLayoutMetrics.swift
-      - path: KhmerIMEKeyboard/KeyboardRootView.swift
-      - path: KhmerIMEKeyboard/KeyboardState.swift
-      - path: KhmerIMEKeyboard/KeyboardSession.swift
-      - path: KhmerIMEKeyboard/StripView.swift
-      - path: KhmerIMEKeyboard/TextProxy.swift
+      - path: KhmerIMEKeyboard/Input/KeyboardInputHandler.swift
+      - path: KhmerIMEKeyboard/Input/KeyboardSession.swift
+      - path: KhmerIMEKeyboard/Input/KeyboardState.swift
+      - path: KhmerIMEKeyboard/Input/TextProxy.swift
+      - path: KhmerIMEKeyboard/Layout/KeyboardHostLayout.swift
+      - path: KhmerIMEKeyboard/Layout/KeyboardLayerFactory.swift
+      - path: KhmerIMEKeyboard/Layout/KeyboardLayerVisibility.swift
+      - path: KhmerIMEKeyboard/Layout/KeyboardLayoutMetrics.swift
+      - path: KhmerIMEKeyboard/Layout/KeyboardViewHierarchyBuilder.swift
+      - path: KhmerIMEKeyboard/Views/CandidatePanelView.swift
+      - path: KhmerIMEKeyboard/Views/KeyboardRootView.swift
+      - path: KhmerIMEKeyboard/Views/KeyStyle.swift
+      - path: KhmerIMEKeyboard/Views/StripView.swift
       - path: KhmerIMEKeyboard/Generated/khmerime_ios_keyboard.swift
     settings:
       base:
