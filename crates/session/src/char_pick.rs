@@ -30,7 +30,9 @@ fn parse_relations() -> Vec<CharRelationEntry> {
         if line.is_empty() {
             continue;
         }
-        let Some((text, rest)) = line.split_once(',') else { continue };
+        let Some((text, rest)) = line.split_once(',') else {
+            continue;
+        };
         if !is_selectable(text) {
             continue;
         }
@@ -43,7 +45,10 @@ fn parse_relations() -> Vec<CharRelationEntry> {
             .filter_map(|s| s.chars().next())
             .collect();
         if !relations.is_empty() {
-            entries.push(CharRelationEntry { text: text.to_owned(), relations });
+            entries.push(CharRelationEntry {
+                text: text.to_owned(),
+                relations,
+            });
         }
     }
     entries
@@ -93,7 +98,10 @@ impl ImeSession {
         self.candidates = matches;
         self.selected_index = 0;
         self.segmented_session = None;
-        SessionResult { consumed: true, ..SessionResult::default() }
+        SessionResult {
+            consumed: true,
+            ..SessionResult::default()
+        }
     }
 }
 
