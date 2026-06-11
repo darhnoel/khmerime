@@ -12,10 +12,11 @@
 //!
 //! Visible state always outranks hidden refinement.
 
-use khmerime_core::{normalized_suggestion_key, Transliterator};
+use khmerime_core::Transliterator;
 
 use crate::adapter_contract::SessionResult;
 use crate::ime_session::ImeSession;
+use crate::segment_model::normalized_suggestion_key;
 
 impl ImeSession {
     pub(crate) fn commit_selected_or_raw(&mut self) -> SessionResult {

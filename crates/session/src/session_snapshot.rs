@@ -6,10 +6,9 @@
 
 use std::collections::HashSet;
 
-use khmerime_core::{normalized_suggestion_key, SegmentedSession};
-
 use crate::adapter_contract::{CandidateDisplayEntry, SegmentPreviewEntry, SessionSnapshot};
 use crate::ime_session::ImeSession;
+use crate::segment_model::{normalized_suggestion_key, SegmentedSession};
 
 impl ImeSession {
     pub fn snapshot(&self) -> SessionSnapshot {

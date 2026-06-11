@@ -9,10 +9,9 @@
 //! Segmented Session). Escape (cancel/restore) is dispatched from
 //! [`crate::ime_session`] since it also handles the non-segmented case.
 
-use khmerime_core::SegmentedChoice;
-
 use crate::adapter_contract::SessionResult;
 use crate::ime_session::{recompute_segment_ranges_and_raw, ImeSession};
+use crate::segment_model::SegmentedChoice;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) struct SegmentEditState {

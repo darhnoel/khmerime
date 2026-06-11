@@ -11,7 +11,7 @@
 
 use std::collections::HashSet;
 
-use khmerime_core::{normalized_suggestion_key, SegmentedSession, Transliterator};
+use khmerime_core::Transliterator;
 
 use std::collections::HashMap;
 
@@ -19,6 +19,7 @@ use crate::adapter_contract::{
     CursorLocation, ImeSessionOptions, InputMode, NativeKeyEvent, SegmentedPreviewMode, SessionCommand, SessionResult,
 };
 use crate::segment_edit_mode::SegmentEditState;
+use crate::segment_model::{normalized_suggestion_key, SegmentedSession};
 
 const KEY_BACKSPACE: u32 = 0xFF08;
 const KEY_TAB: u32 = 0xFF09;
