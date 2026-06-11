@@ -34,3 +34,24 @@ targets:
       - framework: Frameworks/KhmerIME.xcframework
         embed: false
       - sdk: InputMethodKit.framework
+
+  KhmerIMEMacOSTests:
+    type: bundle.unit-test
+    platform: macOS
+    deploymentTarget: "13.0"
+    sources:
+      - path: KhmerIMEMacOSTests
+      # Share handler + session sources directly (no linking the app bundle) —
+      # same recipe as KhmerIMEKeyboardTests on iOS.
+      - path: KhmerIMEMacOS/KhmerInputHandler.swift
+      - path: KhmerIMEMacOS/TextClient.swift
+      - path: KhmerIMEMacOS/KeyvalMapping.swift
+      - path: KhmerIMEMacOS/Generated/khmerime_macos_imk.swift
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.khmerime.KhmerIMEMacOSTests
+        GENERATE_INFOPLIST_FILE: YES
+        OTHER_LDFLAGS: "-ObjC"
+    dependencies:
+      - framework: Frameworks/KhmerIME.xcframework
+        embed: false

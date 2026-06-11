@@ -3,22 +3,26 @@ import AppKit
 // CandidatePanel
 // ==============
 // Non-activating floating NSPanel shown while composition is active.
+// DISPLAY-ONLY: it renders MacosRenderState and accepts no mouse input —
+// all interaction is keyboard-driven and interpreted by the Rust session
+// (←/→ segment focus, ↑/↓ candidate highlight, 1–9 pick, Tab edit, Enter
+// commit), exactly like the IBus lookup table on Linux.
 //
-// Layout (mirrors CandidatePanelView on iOS — see ADR-0003):
+// (Khmer spelling reminder: the -om sign is 'ុំ', never Roman 'uំ'.)
 //
+// Layout:
 //   ┌───────────────────────────────────────────┐
-//   │  [ណuំ ✏]  [ទៅ ✏]  [សាលារៀន ✏]         44pt │  ← chips row (NSScrollView)
+//   │  [ណុំ]   ទៅ   សាលារៀន               44pt │  ← chips row (focused = accent)
 //   ├───────────────────────────────────────────┤
-//   │  ខ្ញuំ   ញuំ   ណuំ   ណ៉ំ  …             44pt │  ← candidates row (NSScrollView)
+//   │  ខ្ញុំ   ញុំ   ណុំ   ណ៉ំ  …            44pt │  ← candidates row (selected = accent)
 //   └───────────────────────────────────────────┘
 //
 // Positioning: anchored just below the cursor using firstRectForCharacterRange:
 // from the IMKTextInput client. Uses NSWindowStyleMask.nonActivatingPanel so
-// the panel never steals keyboard focus from the host application.
+// the panel never steals keyboard focus from the host application;
+// ignoresMouseEvents makes the display-only contract explicit.
 
 final class CandidatePanel: NSPanel {
-
-    private weak var controller: KhmerInputController?
 
     // Chip row
     private let chipScrollView = NSScrollView()
@@ -33,8 +37,7 @@ final class CandidatePanel: NSPanel {
 
     // MARK: - Init
 
-    init(controller: KhmerInputController) {
-        self.controller = controller
+    init() {
         let frame = NSRect(x: 0, y: 0, width: 480, height: 92)
         super.init(
             contentRect: frame,
@@ -47,6 +50,7 @@ final class CandidatePanel: NSPanel {
         isOpaque         = false
         backgroundColor  = NSColor.windowBackgroundColor
         hasShadow        = true
+        ignoresMouseEvents = true
         collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
         setupUI()
     }
@@ -74,7 +78,7 @@ final class CandidatePanel: NSPanel {
         chipScrollView.documentView = chipStack
 
         // ── Separator ────────────────────────────────────────────────────────
-        separator.boxType           = .separator
+        separator.boxType = .separator
         separator.translatesAutoresizingMaskIntoConstraints = false
 
         // ── Candidate scroll ─────────────────────────────────────────────────
@@ -134,92 +138,57 @@ final class CandidatePanel: NSPanel {
         orderOut(nil)
     }
 
-    // MARK: - Rebuild chip row
+    // MARK: - Chip row
 
     private func rebuildChips(_ segments: [MacosSegmentEntry]) {
         chipStack.arrangedSubviews.forEach { $0.removeFromSuperview() }
-        for (i, seg) in segments.enumerated() {
-            chipStack.addArrangedSubview(makeChip(seg, index: i))
+        for seg in segments {
+            chipStack.addArrangedSubview(makeChip(seg))
         }
         chipScrollView.documentView?.frame.size.width =
             max(chipScrollView.frame.width, chipStack.fittingSize.width + 16)
     }
 
-    private func makeChip(_ seg: MacosSegmentEntry, index: Int) -> NSView {
-        let container = NSView()
-        container.translatesAutoresizingMaskIntoConstraints = false
-
-        let chip = NSButton(title: seg.output, target: self, action: #selector(chipTapped(_:)))
-        chip.tag = index
-        chip.isBordered = false
-        chip.wantsLayer = true
-        chip.layer?.cornerRadius = 10
-        chip.layer?.backgroundColor = seg.focused
+    private func makeChip(_ seg: MacosSegmentEntry) -> NSView {
+        let label = makeLabel(seg.output)
+        label.font = .systemFont(ofSize: 15, weight: seg.focused ? .semibold : .regular)
+        label.textColor = seg.focused ? .controlAccentColor : .labelColor
+        label.layer?.backgroundColor = seg.focused
             ? NSColor.controlAccentColor.withAlphaComponent(0.15).cgColor
             : NSColor.controlBackgroundColor.cgColor
-        chip.font = .systemFont(ofSize: 15, weight: seg.focused ? .semibold : .regular)
-        chip.contentTintColor = seg.focused ? .controlAccentColor : .labelColor
-        chip.translatesAutoresizingMaskIntoConstraints = false
-        container.addSubview(chip)
-
-        let editBtn = NSButton(title: "✏", target: self, action: #selector(editTapped(_:)))
-        editBtn.tag = index
-        editBtn.isBordered = false
-        editBtn.font = .systemFont(ofSize: 11)
-        editBtn.contentTintColor = .controlAccentColor
-        editBtn.isHidden = !seg.focused
-        editBtn.translatesAutoresizingMaskIntoConstraints = false
-        container.addSubview(editBtn)
-
-        NSLayoutConstraint.activate([
-            chip.topAnchor.constraint(equalTo: container.topAnchor, constant: 4),
-            chip.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: 4),
-            chip.bottomAnchor.constraint(equalTo: container.bottomAnchor, constant: -4),
-
-            editBtn.leadingAnchor.constraint(equalTo: chip.trailingAnchor, constant: 2),
-            editBtn.trailingAnchor.constraint(equalTo: container.trailingAnchor, constant: -4),
-            editBtn.centerYAnchor.constraint(equalTo: container.centerYAnchor),
-            editBtn.widthAnchor.constraint(equalToConstant: 18),
-        ])
-        return container
+        label.layer?.cornerRadius = 10
+        return label
     }
 
-    // MARK: - Rebuild candidate row
+    // MARK: - Candidate row
 
     private func rebuildCandidates(_ candidates: [String], selectedIndex: Int) {
         candidateStack.arrangedSubviews.forEach { $0.removeFromSuperview() }
         for (i, text) in candidates.enumerated() {
-            candidateStack.addArrangedSubview(makeCandidateButton(text: text, index: i, selected: i == selectedIndex))
+            candidateStack.addArrangedSubview(makeCandidate(text, selected: i == selectedIndex))
         }
         candidateScrollView.documentView?.frame.size.width =
             max(candidateScrollView.frame.width, candidateStack.fittingSize.width + 16)
     }
 
-    private func makeCandidateButton(text: String, index: Int, selected: Bool) -> NSButton {
-        let btn = NSButton(title: text, target: self, action: #selector(candidateTapped(_:)))
-        btn.tag = index
-        btn.isBordered = false
-        btn.wantsLayer = true
-        btn.layer?.cornerRadius = 6
-        btn.layer?.backgroundColor = selected
+    private func makeCandidate(_ text: String, selected: Bool) -> NSView {
+        let label = makeLabel(text)
+        label.font = .systemFont(ofSize: 18, weight: selected ? .semibold : .medium)
+        label.textColor = selected ? .controlAccentColor : .labelColor
+        label.layer?.backgroundColor = selected
             ? NSColor.controlAccentColor.withAlphaComponent(0.1).cgColor
             : NSColor.clear.cgColor
-        btn.font = .systemFont(ofSize: 18, weight: selected ? .semibold : .medium)
-        btn.contentTintColor = selected ? .controlAccentColor : .labelColor
-        return btn
+        label.layer?.cornerRadius = 6
+        return label
     }
 
-    // MARK: - Actions
+    // MARK: - Label factory
 
-    @objc private func chipTapped(_ sender: NSButton) {
-        controller?.panelDidTapChip(at: sender.tag)
-    }
-
-    @objc private func editTapped(_ sender: NSButton) {
-        controller?.panelDidRequestEdit(at: sender.tag)
-    }
-
-    @objc private func candidateTapped(_ sender: NSButton) {
-        controller?.panelDidSelectCandidate(at: sender.tag)
+    private func makeLabel(_ text: String) -> NSTextField {
+        let label = NSTextField(labelWithString: text)
+        label.wantsLayer = true
+        label.alignment = .center
+        label.translatesAutoresizingMaskIntoConstraints = false
+        return label
     }
 }
