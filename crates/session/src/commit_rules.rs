@@ -12,10 +12,11 @@
 //!
 //! Visible state always outranks hidden refinement.
 
-use khmerime_core::{normalized_suggestion_key, Transliterator};
+use khmerime_core::Transliterator;
 
 use crate::adapter_contract::SessionResult;
 use crate::ime_session::ImeSession;
+use crate::segment_model::normalized_suggestion_key;
 
 impl ImeSession {
     pub(crate) fn commit_selected_or_raw(&mut self) -> SessionResult {
@@ -25,8 +26,6 @@ impl ImeSession {
 
         let commit_segments = if let Some(outputs) = self.segmented_outputs() {
             outputs
-        } else if self.selection_touched {
-            vec![self.selected_or_raw_fallback()]
         } else if let Some(outputs) = self.visible_candidate_outputs() {
             outputs
         } else {
@@ -334,6 +333,21 @@ mod tests {
         let update = session.process_key_event(0xFF0D, 0, 0);
         assert_eq!(update.commit_text.as_deref(), Some("jea"));
         assert!(!update.history_changed);
+    }
+
+    #[test]
+    fn touched_raw_visible_fallback_still_allows_hidden_commit_refinement() {
+        let mut session = flat_default_session_with_commit_refiner();
+        type_ascii(&mut session, "nihjeasnadaiborkbrae");
+        session.candidates = vec!["nihjeasnadaiborkbrae".to_owned()];
+        session.selected_index = 0;
+        session.selection_touched = true;
+        session.segmented_session = None;
+
+        let update = session.process_key_event(0xFF0D, 0, 0);
+
+        assert_eq!(update.commit_text.as_deref(), Some("នេះជាស្នាដៃបកប្រែ"));
+        assert!(update.history_changed);
     }
 
     #[test]

@@ -9,10 +9,29 @@ settings:
     SWIFT_VERSION: "5.0"
     IPHONEOS_DEPLOYMENT_TARGET: "16.0"
     # Signing: use "-" for ad-hoc (no Apple account needed, simulator only).
-    # Replace with your 10-char DEVELOPMENT_TEAM ID for device builds.
+    # For device builds, configure signing directly in Xcode (do not edit here).
     CODE_SIGN_STYLE: Manual
     CODE_SIGN_IDENTITY: "-"
     DEVELOPMENT_TEAM: ""
+
+schemes:
+  KhmerIME:
+    build:
+      targets:
+        KhmerIME: all
+
+  KhmerIMEKeyboard:
+    build:
+      targets:
+        KhmerIMEKeyboard: all
+
+  KhmerIMEKeyboardTests:
+    build:
+      targets:
+        KhmerIMEKeyboardTests: test
+    test:
+      targets:
+        - KhmerIMEKeyboardTests
 
 targets:
 
@@ -42,6 +61,35 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.khmerime.KhmerIME.Keyboard
         INFOPLIST_FILE: KhmerIMEKeyboard/Info.plist
+    dependencies:
+      - framework: Frameworks/KhmerIME.xcframework
+        embed: false
+
+  KhmerIMEKeyboardTests:
+    type: bundle.unit-test
+    platform: iOS
+    deploymentTarget: "16.0"
+    sources:
+      - path: KhmerIMEKeyboardTests
+      # Share the handler + session source directly (no linking the extension bundle).
+      - path: KhmerIMEKeyboard/Input/KeyboardInputHandler.swift
+      - path: KhmerIMEKeyboard/Input/KeyboardSession.swift
+      - path: KhmerIMEKeyboard/Input/KeyboardState.swift
+      - path: KhmerIMEKeyboard/Input/TextProxy.swift
+      - path: KhmerIMEKeyboard/Layout/KeyboardHostLayout.swift
+      - path: KhmerIMEKeyboard/Layout/KeyboardLayerFactory.swift
+      - path: KhmerIMEKeyboard/Layout/KeyboardLayerVisibility.swift
+      - path: KhmerIMEKeyboard/Layout/KeyboardLayoutMetrics.swift
+      - path: KhmerIMEKeyboard/Layout/KeyboardViewHierarchyBuilder.swift
+      - path: KhmerIMEKeyboard/Views/CandidatePanelView.swift
+      - path: KhmerIMEKeyboard/Views/KeyboardRootView.swift
+      - path: KhmerIMEKeyboard/Views/KeyStyle.swift
+      - path: KhmerIMEKeyboard/Views/StripView.swift
+      - path: KhmerIMEKeyboard/Generated/khmerime_ios_keyboard.swift
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.khmerime.KhmerIMEKeyboardTests
+        GENERATE_INFOPLIST_FILE: YES
     dependencies:
       - framework: Frameworks/KhmerIME.xcframework
         embed: false

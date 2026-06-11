@@ -14,12 +14,16 @@ mod adapter_contract;
 mod commit_rules;
 // `ImeSession` itself: state, constructors, lifecycle, and key-event dispatch
 // that routes into the other modules.
+mod char_pick;
 mod ime_session;
 // NIDA input mode: the `Nida` key handler plus its direct-Khmer keymap table.
 mod nida;
 // Segment Edit Mode: rewriting one focused segment in isolation (Tab/Backspace
 // semantics, sibling pinning).
 mod segment_edit_mode;
+// Session-owned segmented composition model: focus state, per-segment candidate
+// selection, visible-suggestion normalization, and reflow.
+mod segment_model;
 // Segmented Session navigation: focus movement, per-segment candidate cycling,
 // and reflow/rebuild from decoder observations.
 mod segmented_session;
@@ -34,4 +38,4 @@ pub use crate::adapter_contract::{
     ImeSessionSnapshot, ImeSessionUpdate, InputMode, NativeKeyEvent, SegmentPreviewEntry, SegmentedPreviewMode,
     SessionCommand, SessionResult, SessionSnapshot, MAX_PERSISTED_HISTORY_WORD_CHARS,
 };
-pub use crate::ime_session::ImeSession;
+pub use crate::ime_session::{ImeSession, ImeSessionBuilder};

@@ -28,7 +28,7 @@ struct BridgeRuntime {
     session: ImeSession,
     readiness: BridgeReadiness,
     full_warmup: Option<Receiver<Result<FullEngines, String>>>,
-    pending_live: Option<Transliterator>,
+    pending_engines: Option<FullEngines>,
     full_segmented_preview_mode: SegmentedPreviewMode,
 }
 
@@ -43,14 +43,12 @@ impl BridgeRuntime {
         let store = DesktopHistoryStore;
         let transliterator = Transliterator::from_default_phase_a_data(DecoderConfig::legacy())?;
         let history = store.load().unwrap_or_default();
-        let session = ImeSession::new_with_input_mode_and_options(
-            transliterator,
-            history,
-            input_mode,
-            ImeSessionOptions {
+        let session = ImeSession::builder(transliterator, history)
+            .input_mode(input_mode)
+            .options(ImeSessionOptions {
                 segmented_preview: SegmentedPreviewMode::Disabled,
-            },
-        );
+            })
+            .build();
         eprintln!(
             "[ibus-startup] phase_a_session.end elapsed_ms={:.2}",
             started.elapsed().as_secs_f64() * 1000.0
@@ -59,7 +57,7 @@ impl BridgeRuntime {
             session,
             readiness: BridgeReadiness::PhaseA,
             full_warmup,
-            pending_live: None,
+            pending_engines: None,
             full_segmented_preview_mode,
         })
     }
@@ -70,16 +68,14 @@ impl BridgeRuntime {
         let store = DesktopHistoryStore;
         let engines = build_full_engines()?;
         let history = store.load().unwrap_or_default();
-        let mut session = ImeSession::new_with_visible_and_commit_refiners_input_mode_and_options(
-            engines.live,
-            engines.visible_refiner,
-            engines.commit_refiner,
-            history,
-            input_mode,
-            ImeSessionOptions {
+        let mut session = ImeSession::builder(engines.live, history)
+            .input_mode(input_mode)
+            .visible_refiner(engines.visible_refiner)
+            .commit_refiner(engines.commit_refiner)
+            .options(ImeSessionOptions {
                 segmented_preview: full_segmented_preview_mode,
-            },
-        );
+            })
+            .build();
         session.set_cursor_location(0, 0, 0, 0);
         eprintln!(
             "[ibus-startup] full_session.end elapsed_ms={:.2}",
@@ -89,7 +85,7 @@ impl BridgeRuntime {
             session,
             readiness: BridgeReadiness::Full,
             full_warmup: None,
-            pending_live: None,
+            pending_engines: None,
             full_segmented_preview_mode,
         })
     }
@@ -154,9 +150,7 @@ impl BridgeRuntime {
             return;
         }
 
-        self.session.set_visible_refiner(engines.visible_refiner);
-        self.session.set_commit_refiner(engines.commit_refiner);
-        self.pending_live = Some(engines.live);
+        self.pending_engines = Some(engines);
         self.readiness = BridgeReadiness::FullPending;
         eprintln!("[ibus-startup] full_upgrade.deferred active_composition=true");
     }
@@ -165,11 +159,15 @@ impl BridgeRuntime {
         if self.readiness != BridgeReadiness::FullPending || !self.session.composition_is_empty() {
             return;
         }
-        let Some(live) = self.pending_live.take() else {
+        let Some(engines) = self.pending_engines.take() else {
             return;
         };
-        self.session
-            .replace_live_transliterator(live, self.full_segmented_preview_mode);
+        self.session.replace_engines_with_refiners(
+            engines.live,
+            Some(engines.visible_refiner),
+            Some(engines.commit_refiner),
+            self.full_segmented_preview_mode,
+        );
         self.readiness = BridgeReadiness::Full;
         eprintln!("[ibus-startup] full_upgrade.applied_after_idle");
     }

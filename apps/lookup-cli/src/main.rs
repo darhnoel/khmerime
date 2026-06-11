@@ -186,16 +186,13 @@ fn run_segmented_dump(data_path: Option<String>, roman: &str) -> Result<(), Box<
         .with_shadow_log(false);
     commit_config.wfst_max_latency_ms = 150;
     let commit_refiner = load_transliterator(data_path, commit_config)?;
-    let mut session = ImeSession::new_with_visible_and_commit_refiners_input_mode_and_options(
-        live,
-        visible_refiner,
-        commit_refiner,
-        HashMap::new(),
-        Default::default(),
-        ImeSessionOptions {
+    let mut session = ImeSession::builder(live, HashMap::new())
+        .visible_refiner(visible_refiner)
+        .commit_refiner(commit_refiner)
+        .options(ImeSessionOptions {
             segmented_preview: SegmentedPreviewMode::Enabled,
-        },
-    );
+        })
+        .build();
     session.focus_in();
     for ch in roman.chars() {
         session.process_key_event(ch as u32, 0, 0);

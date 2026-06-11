@@ -9,13 +9,12 @@
 
 use std::collections::HashMap;
 
-use khmerime_core::{
+use crate::adapter_contract::{SegmentedPreviewMode, SessionResult};
+use crate::ime_session::{exact_matches_first, offset_index, recompute_segment_ranges_and_raw, ImeSession};
+use crate::segment_model::{
     build_segmented_session, move_session_focus, normalize_visible_suggestions,
     reflow_segmented_session_from_selection, SegmentedSession,
 };
-
-use crate::adapter_contract::{SegmentedPreviewMode, SessionResult};
-use crate::ime_session::{exact_matches_first, offset_index, recompute_segment_ranges_and_raw, ImeSession};
 
 impl ImeSession {
     pub(crate) fn handle_left(&mut self) -> SessionResult {

@@ -11,7 +11,7 @@
 
 use std::collections::HashSet;
 
-use khmerime_core::{normalized_suggestion_key, SegmentedSession, Transliterator};
+use khmerime_core::Transliterator;
 
 use std::collections::HashMap;
 
@@ -19,6 +19,7 @@ use crate::adapter_contract::{
     CursorLocation, ImeSessionOptions, InputMode, NativeKeyEvent, SegmentedPreviewMode, SessionCommand, SessionResult,
 };
 use crate::segment_edit_mode::SegmentEditState;
+use crate::segment_model::{normalized_suggestion_key, SegmentedSession};
 
 const KEY_BACKSPACE: u32 = 0xFF08;
 const KEY_TAB: u32 = 0xFF09;
@@ -60,11 +61,66 @@ pub struct ImeSession {
     pub(crate) options: ImeSessionOptions,
 }
 
+pub struct ImeSessionBuilder {
+    transliterator: Transliterator,
+    visible_refiner: Option<Transliterator>,
+    commit_refiner: Option<Transliterator>,
+    history: HashMap<String, usize>,
+    input_mode: InputMode,
+    options: ImeSessionOptions,
+}
+
+impl ImeSessionBuilder {
+    pub fn visible_refiner(mut self, visible_refiner: Transliterator) -> Self {
+        self.visible_refiner = Some(visible_refiner);
+        self
+    }
+
+    pub fn commit_refiner(mut self, commit_refiner: Transliterator) -> Self {
+        self.commit_refiner = Some(commit_refiner);
+        self
+    }
+
+    pub fn input_mode(mut self, input_mode: InputMode) -> Self {
+        self.input_mode = input_mode;
+        self
+    }
+
+    pub fn options(mut self, options: ImeSessionOptions) -> Self {
+        self.options = options;
+        self
+    }
+
+    pub fn build(self) -> ImeSession {
+        let mut session = ImeSession::new_with_optional_refiners(
+            self.transliterator,
+            self.visible_refiner,
+            self.commit_refiner,
+            self.history,
+        );
+        session.input_mode = self.input_mode;
+        session.options = self.options;
+        session
+    }
+}
+
 impl ImeSession {
+    pub fn builder(transliterator: Transliterator, history: HashMap<String, usize>) -> ImeSessionBuilder {
+        ImeSessionBuilder {
+            transliterator,
+            visible_refiner: None,
+            commit_refiner: None,
+            history,
+            input_mode: InputMode::Roman,
+            options: ImeSessionOptions::default(),
+        }
+    }
+
     pub fn new(transliterator: Transliterator, history: HashMap<String, usize>) -> Self {
         Self::new_with_optional_refiners(transliterator, None, None, history)
     }
 
+    #[deprecated(note = "use ImeSession::builder(...).input_mode(...).build()")]
     pub fn new_with_input_mode(
         transliterator: Transliterator,
         history: HashMap<String, usize>,
@@ -75,6 +131,7 @@ impl ImeSession {
         session
     }
 
+    #[deprecated(note = "use ImeSession::builder(...).input_mode(...).options(...).build()")]
     pub fn new_with_input_mode_and_options(
         transliterator: Transliterator,
         history: HashMap<String, usize>,
@@ -87,6 +144,7 @@ impl ImeSession {
         session
     }
 
+    #[deprecated(note = "use ImeSession::builder(...).commit_refiner(...).build()")]
     pub fn new_with_commit_refiner(
         transliterator: Transliterator,
         commit_refiner: Transliterator,
@@ -95,6 +153,7 @@ impl ImeSession {
         Self::new_with_optional_refiners(transliterator, None, Some(commit_refiner), history)
     }
 
+    #[deprecated(note = "use ImeSession::builder(...).commit_refiner(...).input_mode(...).build()")]
     pub fn new_with_commit_refiner_and_input_mode(
         transliterator: Transliterator,
         commit_refiner: Transliterator,
@@ -106,6 +165,7 @@ impl ImeSession {
         session
     }
 
+    #[deprecated(note = "use ImeSession::builder(...).commit_refiner(...).input_mode(...).options(...).build()")]
     pub fn new_with_commit_refiner_input_mode_and_options(
         transliterator: Transliterator,
         commit_refiner: Transliterator,
@@ -119,6 +179,7 @@ impl ImeSession {
         session
     }
 
+    #[deprecated(note = "use ImeSession::builder(...).visible_refiner(...).commit_refiner(...).build()")]
     pub fn new_with_visible_and_commit_refiners(
         transliterator: Transliterator,
         visible_refiner: Transliterator,
@@ -128,6 +189,9 @@ impl ImeSession {
         Self::new_with_optional_refiners(transliterator, Some(visible_refiner), Some(commit_refiner), history)
     }
 
+    #[deprecated(
+        note = "use ImeSession::builder(...).visible_refiner(...).commit_refiner(...).input_mode(...).options(...).build()"
+    )]
     pub fn new_with_visible_and_commit_refiners_input_mode_and_options(
         transliterator: Transliterator,
         visible_refiner: Transliterator,
@@ -193,10 +257,12 @@ impl ImeSession {
         self.segmented_session.is_some()
     }
 
+    #[deprecated(note = "install live, visible, and commit engines together with replace_engines_with_refiners")]
     pub fn set_commit_refiner(&mut self, commit_refiner: Transliterator) {
         self.commit_refiner = Some(commit_refiner);
     }
 
+    #[deprecated(note = "install live, visible, and commit engines together with replace_engines_with_refiners")]
     pub fn set_visible_refiner(&mut self, visible_refiner: Transliterator) {
         self.visible_refiner = Some(visible_refiner);
     }
@@ -232,6 +298,7 @@ impl ImeSession {
         }
     }
 
+    #[deprecated(note = "install live, visible, and commit engines together with replace_engines_with_refiners")]
     pub fn replace_live_transliterator(
         &mut self,
         transliterator: Transliterator,
@@ -291,7 +358,7 @@ impl ImeSession {
     pub fn toggle_input_mode(&mut self) {
         let next = match self.input_mode {
             InputMode::Roman => InputMode::Nida,
-            InputMode::Nida => InputMode::Roman,
+            InputMode::Nida | InputMode::CharPick => InputMode::Roman,
         };
         self.set_input_mode(next);
     }
@@ -367,6 +434,10 @@ impl ImeSession {
 
         if self.input_mode == InputMode::Nida {
             return self.process_nida_key_event(keyval, keycode, state);
+        }
+
+        if self.input_mode == InputMode::CharPick {
+            return self.process_char_pick_key_event(keyval);
         }
 
         match keyval {
@@ -639,6 +710,8 @@ fn is_single_keycap_char(ch: char) -> bool {
 
 #[cfg(test)]
 mod tests {
+    use super::ImeSession;
+
     use crate::adapter_contract::{InputMode, NativeKeyEvent, SessionCommand};
     use crate::test_support::{session, type_ascii};
 
@@ -660,6 +733,36 @@ mod tests {
 
         assert_eq!(session.input_mode(), InputMode::Roman);
         assert_eq!(session.snapshot().input_mode, InputMode::Roman);
+    }
+
+    #[test]
+    fn builder_configures_input_mode_options_and_refiners() {
+        let transliterator =
+            khmerime_core::Transliterator::from_default_data_with_config(khmerime_core::DecoderConfig::legacy())
+                .expect("default data must load");
+        let visible_refiner =
+            khmerime_core::Transliterator::from_default_data_with_config(khmerime_core::DecoderConfig::legacy())
+                .expect("default data must load");
+        let commit_refiner =
+            khmerime_core::Transliterator::from_default_data_with_config(khmerime_core::DecoderConfig::legacy())
+                .expect("default data must load");
+
+        let session = ImeSession::builder(transliterator, std::collections::HashMap::new())
+            .input_mode(InputMode::Nida)
+            .options(crate::adapter_contract::ImeSessionOptions {
+                segmented_preview: crate::adapter_contract::SegmentedPreviewMode::Disabled,
+            })
+            .visible_refiner(visible_refiner)
+            .commit_refiner(commit_refiner)
+            .build();
+
+        assert_eq!(session.input_mode(), InputMode::Nida);
+        assert_eq!(
+            session.options.segmented_preview,
+            crate::adapter_contract::SegmentedPreviewMode::Disabled
+        );
+        assert!(session.visible_refiner.is_some());
+        assert!(session.commit_refiner.is_some());
     }
 
     #[test]
@@ -787,5 +890,37 @@ mod tests {
         session.process_key_event('j' as u32, 0, 0);
         session.focus_out();
         assert!(session.snapshot().preedit.is_empty());
+    }
+
+    #[test]
+    fn char_pick_mode_typing_k_returns_relation_candidates() {
+        let mut session = session();
+        session.process_command(SessionCommand::SetInputMode(InputMode::CharPick));
+
+        let result = session.process_key_event('k' as u32, 0, 0);
+
+        assert!(result.consumed);
+        assert!(result.commit_text.is_none());
+        let snapshot = session.snapshot();
+        assert!(snapshot.preedit.is_empty(), "preedit must be empty in CharPick mode");
+        assert!(
+            snapshot.candidates.iter().any(|c| c == "ក"),
+            "candidates must include ក for 'k', got: {:?}",
+            snapshot.candidates
+        );
+        assert!(
+            !snapshot.candidates.iter().any(|c| c == "ម"),
+            "candidates must not include ម for 'k'"
+        );
+    }
+
+    #[test]
+    fn char_pick_mode_does_not_affect_roman_mode() {
+        let mut session = session();
+        // Roman mode: 'k' builds a Composition with roman preedit, not a char-pick lookup
+        let result = session.process_key_event('k' as u32, 0, 0);
+        assert!(result.consumed);
+        // The roman path is confirmed by raw_preedit containing the typed letter
+        assert_eq!(session.snapshot().raw_preedit, "k");
     }
 }

@@ -7,21 +7,28 @@
 use std::sync::{Arc, Mutex};
 
 use khmerime_core::{DecoderConfig, Transliterator};
-use khmerime_session::{ImeSession, ImeSessionOptions, NativeKeyEvent, SegmentPreviewEntry, SegmentedPreviewMode, SessionResult, SessionSnapshot};
+use khmerime_session::{
+    ImeSession, ImeSessionOptions, NativeKeyEvent, SegmentPreviewEntry, SegmentedPreviewMode, SessionResult,
+    SessionSnapshot,
+};
 
 uniffi::setup_scaffolding!("khmerime_ios_keyboard");
 
 // ── Key constants ────────────────────────────────────────────────────────────
 
 const KEY_BACKSPACE: u32 = 0xFF08;
-const KEY_RETURN:    u32 = 0xFF0D;
-const KEY_SPACE:     u32 = 0x20;
-const KEY_LEFT:      u32 = 0xFF51;
-const KEY_RIGHT:     u32 = 0xFF53;
-const KEY_TAB:       u32 = 0xFF09;
+const KEY_RETURN: u32 = 0xFF0D;
+const KEY_SPACE: u32 = 0x20;
+const KEY_LEFT: u32 = 0xFF51;
+const KEY_RIGHT: u32 = 0xFF53;
+const KEY_TAB: u32 = 0xFF09;
 
 fn key_event(keyval: u32) -> NativeKeyEvent {
-    NativeKeyEvent { keyval, keycode: 0, state: 0 }
+    NativeKeyEvent {
+        keyval,
+        keycode: 0,
+        state: 0,
+    }
 }
 
 // ── Public UniFFI types ───────────────────────────────────────────────────────
@@ -36,7 +43,11 @@ pub struct IosSegmentEntry {
 
 impl From<&SegmentPreviewEntry> for IosSegmentEntry {
     fn from(s: &SegmentPreviewEntry) -> Self {
-        IosSegmentEntry { output: s.output.clone(), input: s.input.clone(), focused: s.focused }
+        IosSegmentEntry {
+            output: s.output.clone(),
+            input: s.input.clone(),
+            focused: s.focused,
+        }
     }
 }
 
@@ -92,17 +103,17 @@ impl KhmerIMESession {
     /// data (no external files needed on iOS).
     #[uniffi::constructor]
     pub fn new() -> Arc<Self> {
-        let transliterator = Transliterator::from_default_data_with_config(
-            DecoderConfig::shadow_interactive(),
-        )
-        .expect("compiled-in lexicon data must be valid");
-        let session = ImeSession::new_with_input_mode_and_options(
-            transliterator,
-            std::collections::HashMap::new(),
-            khmerime_session::InputMode::Roman,
-            ImeSessionOptions { segmented_preview: SegmentedPreviewMode::Enabled },
-        );
-        Arc::new(KhmerIMESession { inner: Mutex::new(session) })
+        let transliterator = Transliterator::from_default_data_with_config(DecoderConfig::shadow_interactive())
+            .expect("compiled-in lexicon data must be valid");
+        let session = ImeSession::builder(transliterator, std::collections::HashMap::new())
+            .input_mode(khmerime_session::InputMode::Roman)
+            .options(ImeSessionOptions {
+                segmented_preview: SegmentedPreviewMode::Enabled,
+            })
+            .build();
+        Arc::new(KhmerIMESession {
+            inner: Mutex::new(session),
+        })
     }
 
     pub fn focus_in(&self) -> IosRenderState {
@@ -173,6 +184,22 @@ impl KhmerIMESession {
     pub fn set_cursor_location(&self, x: i32, y: i32, width: i32, height: i32) -> IosRenderState {
         let mut s = self.inner.lock().unwrap();
         s.set_cursor_location(x, y, width, height);
+        render_state(&s.snapshot(), &SessionResult::default())
+    }
+
+    pub fn enter_char_pick(&self) -> IosRenderState {
+        let mut s = self.inner.lock().unwrap();
+        s.process_command(khmerime_session::SessionCommand::SetInputMode(
+            khmerime_session::InputMode::CharPick,
+        ));
+        render_state(&s.snapshot(), &SessionResult::default())
+    }
+
+    pub fn exit_char_pick(&self) -> IosRenderState {
+        let mut s = self.inner.lock().unwrap();
+        s.process_command(khmerime_session::SessionCommand::SetInputMode(
+            khmerime_session::InputMode::Roman,
+        ));
         render_state(&s.snapshot(), &SessionResult::default())
     }
 }
@@ -286,8 +313,15 @@ mod tests {
         // During composition, digit 1 selects the first candidate; it must not
         // auto-commit (that would lose the user's in-progress word).
         let state = s.process_digit(1);
-        assert!(state.commit_text.is_none(), "digit during composition must not commit immediately");
-        assert_eq!(state.selected_index, Some(0u64), "digit 1 during composition must keep selected_index = 0");
+        assert!(
+            state.commit_text.is_none(),
+            "digit during composition must not commit immediately"
+        );
+        assert_eq!(
+            state.selected_index,
+            Some(0u64),
+            "digit 1 during composition must keep selected_index = 0"
+        );
     }
 
     // ── segmentation (requires shadow_interactive + SegmentedPreviewMode::Enabled) ──
@@ -296,7 +330,7 @@ mod tests {
     fn two_word_input_produces_multiple_segments() {
         let s = new_session();
         s.focus_in();
-        // "khnhomtov" → "khnhom" (ខ្ញuំ) + "tov" (ទៅ). The shadow decoder must
+        // "khnhomtov" → "khnhom" (ខ្ញុំ) + "tov" (ទៅ). The shadow decoder must
         // split this into ≥2 segments; failure here means shadow_interactive is inactive.
         let state = type_str(&s, "khnhomtov");
         assert!(
@@ -327,8 +361,15 @@ mod tests {
         s.focus_in();
         type_str(&s, "khnhomtov");
         let state = s.process_tab();
-        assert!(state.segment_edit_active, "process_tab must set segment_edit_active = true");
-        assert_eq!(state.segment_edit_index, Some(0u64), "edit must begin on focused segment 0");
+        assert!(
+            state.segment_edit_active,
+            "process_tab must set segment_edit_active = true"
+        );
+        assert_eq!(
+            state.segment_edit_index,
+            Some(0u64),
+            "edit must begin on focused segment 0"
+        );
     }
 
     #[test]
@@ -341,8 +382,7 @@ mod tests {
         let state = s.process_tab();
         assert!(state.segment_edit_active);
         assert_eq!(
-            state.segment_edit_index,
-            state.focused_segment_index,
+            state.segment_edit_index, state.focused_segment_index,
             "segment_edit_index must match focused_segment_index on tab entry"
         );
     }
@@ -354,7 +394,54 @@ mod tests {
         type_str(&s, "khnhomtov");
         s.process_tab();
         let state = s.process_tab();
-        assert!(!state.segment_edit_active, "second process_tab must exit segment edit mode");
+        assert!(
+            !state.segment_edit_active,
+            "second process_tab must exit segment edit mode"
+        );
         assert!(state.segment_edit_index.is_none());
+    }
+
+    // ── CharPick mode ─────────────────────────────────────────────────────────
+
+    #[test]
+    fn enter_char_pick_switches_mode_and_clears_composition() {
+        let s = new_session();
+        type_str(&s, "nhom");
+
+        let state = s.enter_char_pick();
+
+        assert!(state.preedit.is_empty(), "preedit must clear on entering CharPick");
+        assert!(state.candidates.is_empty(), "no candidates until a key is typed");
+    }
+
+    #[test]
+    fn process_character_in_char_pick_mode_returns_relation_candidates() {
+        let s = new_session();
+        s.enter_char_pick();
+
+        let state = s.process_character("k".to_string());
+
+        assert!(
+            state.candidates.iter().any(|c| c == "ក"),
+            "candidates must include ក for 'k', got: {:?}",
+            state.candidates
+        );
+        assert!(state.preedit.is_empty(), "preedit must stay empty in CharPick mode");
+        assert!(
+            state.commit_text.is_none(),
+            "process_character must not commit in CharPick mode"
+        );
+    }
+
+    #[test]
+    fn exit_char_pick_returns_to_roman_mode() {
+        let s = new_session();
+        s.enter_char_pick();
+
+        s.exit_char_pick();
+        let state = s.process_character("k".to_string());
+
+        // Back in Roman mode: 'k' builds a composition, not a char-pick lookup
+        assert_eq!(state.preedit, "k", "roman mode preedit must be the typed roman letter");
     }
 }

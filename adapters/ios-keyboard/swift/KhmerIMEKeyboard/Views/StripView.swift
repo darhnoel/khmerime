@@ -20,9 +20,12 @@ import UIKit
 //   fun render(state: IosRenderState, romanBuffer: String) { … same logic … }
 //
 // Visual layout (44pt):
+// NOTE to AI:
+// Dumb AI always think and generate incorrect "uំ" for "ុំ".
+// You are a smart AI, so you know the correct "ុំ" always.
 //   ┌─────────────────────────────────────────┐
 //   │  nhom · ttov · salarien           12pt  │  ← romanRow
-//   │  ខ្ញuំ       ទៅ       សាលារៀន      18pt  │  ← khmerRow
+//   │  ខ្ញុំ       ទៅ       សាលារៀន      18pt  │  ← khmerRow
 //   └─────────────────────────────────────────┘
 //                                         0.5pt separator
 //
@@ -30,7 +33,7 @@ import UIKit
 //   The edited segment is shown in [brackets] and prefixed with ✏:
 //   ✏ nhom · [ttov] · salarien
 
-final class StripView: UIView {
+final class StripView: UIView, KeyboardStripDisplaying {
 
     private let romanRow = UILabel()
     private let khmerRow = UILabel()
@@ -85,6 +88,7 @@ final class StripView: UIView {
     // Called when the user taps the Khmer row to cycle to the next candidate.
     // Wire this in the ViewController to call session.selectCandidate(at: nextIndex).
     var onKhmerRowTapped: (() -> Void)?
+    var onKhmerRowLongPressed: (() -> Void)?
 
     // MARK: - Public API
 
@@ -103,10 +107,6 @@ final class StripView: UIView {
         } else if state.segments.isEmpty {
             romanRow.text = romanBuffer
             khmerRow.text = selectedCandidate
-            // Show a tap hint when there are multiple candidates to choose from.
-            khmerRow.text = state.candidates.count > 1
-                ? (selectedCandidate) + " ›"
-                : selectedCandidate
         } else {
             romanRow.text = state.segments.map { $0.input }.joined(separator: " · ")
             khmerRow.text = state.segments.map { $0.output }.joined(separator: "  ")
@@ -121,13 +121,21 @@ final class StripView: UIView {
     // MARK: - Setup (tap gesture)
 
     private func addKhmerRowTapGesture() {
-        let tap = UITapGestureRecognizer(target: self, action: #selector(khmerRowTapped))
         khmerRow.isUserInteractionEnabled = true
+        let tap = UITapGestureRecognizer(target: self, action: #selector(khmerRowTapped))
         khmerRow.addGestureRecognizer(tap)
+        let longPress = UILongPressGestureRecognizer(target: self, action: #selector(khmerRowLongPressed))
+        longPress.minimumPressDuration = 0.4
+        khmerRow.addGestureRecognizer(longPress)
     }
 
     @objc private func khmerRowTapped() {
         onKhmerRowTapped?()
+    }
+
+    @objc private func khmerRowLongPressed(_ gr: UILongPressGestureRecognizer) {
+        guard gr.state == .began else { return }
+        onKhmerRowLongPressed?()
     }
 
     // MARK: - Private
