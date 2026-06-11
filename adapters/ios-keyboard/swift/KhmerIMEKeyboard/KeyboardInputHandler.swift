@@ -75,19 +75,13 @@ final class KeyboardInputHandler {
 
     func textDidChange() {
         // Remove the iOS autocorrect auto-space appended after deleteBackward×N +
-        // insertText(Khmer). documentContextBeforeInput is now fresh.
-        // Two cases depending on whether return was pressed:
-        //   • Strip-tap / space flow: cursor is right after Khmer " " → remove the trailing " "
-        //   • Return flow:            cursor is after Khmer " \n"      → remove " " before "\n"
+        // insertText(Khmer). documentContextBeforeInput is now fresh. A commit
+        // never inserts "\n" in the same tap (⏎ with preedit commits only), so
+        // the auto-space is always the last character when present.
         if pendingAutoSpaceCheck {
             pendingAutoSpaceCheck = false
-            let before = proxy.documentContextBeforeInput ?? ""
-            if before.hasSuffix(" ") {
+            if (proxy.documentContextBeforeInput ?? "").hasSuffix(" ") {
                 proxy.deleteBackward()
-            } else if before.hasSuffix("\n"), String(before.dropLast()).hasSuffix(" ") {
-                proxy.deleteBackward()   // remove \n
-                proxy.deleteBackward()   // remove auto-space
-                proxy.insertText("\n")   // re-insert \n
             }
         }
 
@@ -165,14 +159,18 @@ final class KeyboardInputHandler {
             }
             return
         }
-        commitComposition()
+        // Standard IME contract (like Japanese/Chinese keyboards):
+        //   ⏎ with active preedit  → commit only, no newline (also closes the panel)
+        //   ⏎ with no preedit      → newline
+        if !romanBuffer.isEmpty {
+            commitComposition()
+            return
+        }
         if trailingSpace {
             proxy.deleteBackward()
             trailingSpace = false
         }
         proxy.insertText("\n")
-        // pendingAutoSpaceCheck may be set by commitComposition(); textDidChange()
-        // will detect and remove the unwanted space before the newline.
     }
 
     func backspaceTapped() {

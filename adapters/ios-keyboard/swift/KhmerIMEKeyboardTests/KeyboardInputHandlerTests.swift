@@ -23,7 +23,11 @@ final class KeyboardInputHandlerTests: XCTestCase {
 
     // MARK: - Test B: basic commit
 
-    func test_return_replacesRomanWithKhmer() {
+    // Standard IME contract (like Japanese/Chinese keyboards): ⏎ with an active
+    // preedit COMMITS the composition only — no newline. A second ⏎ (no preedit)
+    // inserts the newline.
+
+    func test_returnWithPreedit_commitsWithoutNewline() {
         let (handler, proxy) = makeHandler()
         type("nhom", into: handler)
 
@@ -34,24 +38,41 @@ final class KeyboardInputHandlerTests: XCTestCase {
             "roman chars must be deleted on commit")
         XCTAssertFalse(proxy.text.isEmpty,
             "committed text must not be empty")
-        let nonKhmerNonNewline = proxy.text.unicodeScalars.filter { scalar in
-            scalar.value != 0x0A && !(0x1780...0x17FF).contains(scalar.value)
-        }
-        XCTAssertTrue(nonKhmerNonNewline.isEmpty,
-            "committed text must contain only Khmer characters and newline, got: \(proxy.text.debugDescription)")
+        XCTAssertFalse(proxy.text.contains("\n"),
+            "⏎ with active preedit must commit only — no newline; got \(proxy.text.debugDescription)")
+        let nonKhmer = proxy.text.unicodeScalars.filter { !(0x1780...0x17FF).contains($0.value) }
+        XCTAssertTrue(nonKhmer.isEmpty,
+            "committed text must contain only Khmer characters, got: \(proxy.text.debugDescription)")
     }
 
-    // returnTapped() must insert "\n" immediately, never deferring to textDidChange().
-    // (Earlier versions deferred it, but textDidChange() fires unreliably mid-operation
-    // on device — e.g. after the first deleteBackward — consuming the flag too early.)
-    func test_return_newlineInsertedDirectlyByReturnTapped() {
+    func test_returnTwice_firstCommitsSecondInsertsNewline() {
         let (handler, proxy) = makeHandler()
         type("nhom", into: handler)
 
-        handler.returnTapped()
+        handler.returnTapped()      // commit (preedit active)
+        handler.textDidChange()
+        handler.returnTapped()      // newline (no preedit)
 
         XCTAssertTrue(proxy.text.hasSuffix("\n"),
-            "newline must be inserted by returnTapped() itself, not deferred to textDidChange()")
+            "second ⏎ with no preedit must insert the newline; got \(proxy.text.debugDescription)")
+        XCTAssertFalse(proxy.text.hasSuffix(" \n"),
+            "no space before the newline; got \(proxy.text.debugDescription)")
+    }
+
+    func test_returnInPanel_commitsAndClosesPanelWithoutNewline() {
+        let (handler, proxy) = makeHandler()
+        type("nhom", into: handler)
+        handler.togglePanel()       // → .panel
+
+        handler.returnTapped()
+        handler.textDidChange()
+
+        XCTAssertEqual(handler.keyboardState, .qwerty,
+            "⏎ in panel must accept the composition and close the panel")
+        XCTAssertFalse(proxy.text.contains("\n"),
+            "⏎ in panel must not insert a newline; got \(proxy.text.debugDescription)")
+        XCTAssertFalse(proxy.text.contains("nhom"),
+            "roman chars must be replaced by Khmer on panel commit")
     }
 
     // MARK: - Test A: no trailing space before newline
@@ -81,14 +102,14 @@ final class KeyboardInputHandlerTests: XCTestCase {
             "return with no composition must insert only a newline")
     }
 
-    func test_returnWithNoSpace_noTrailingSpace() {
+    func test_returnCommit_doesNotIntroduceSpace() {
         let (handler, proxy) = makeHandler()
         type("nhom", into: handler)
-        handler.returnTapped()
+        handler.returnTapped()      // commit only (preedit active)
         handler.textDidChange()
 
         XCTAssertFalse(proxy.text.contains(" "),
-            "return without preceding space must not introduce a space")
+            "⏎ commit must not introduce a space")
     }
 
     // MARK: - Space behavior
@@ -109,8 +130,9 @@ final class KeyboardInputHandlerTests: XCTestCase {
         type("nhom", into: handler)
         handler.spaceTapped()
         type("ttov", into: handler)
-        handler.returnTapped()
+        handler.returnTapped()      // commits ttov (preedit active)
         handler.textDidChange()
+        handler.returnTapped()      // newline (no preedit)
 
         let text = proxy.text
         let newlineIndex = text.lastIndex(of: "\n")!
@@ -125,16 +147,17 @@ final class KeyboardInputHandlerTests: XCTestCase {
 
     func test_commit_removesIOSAutoSpace() {
         // Simulates real device: iOS appends " " after deleteBackward×N + insertText.
-        // returnTapped() inserts "\n" immediately, leaving "Khmer \n" in the proxy.
-        // textDidChange() detects the " \n" pattern and swaps it for "\n".
+        // ⏎ with preedit commits only; textDidChange() removes the auto-space.
+        // A second ⏎ then inserts a clean newline.
         let proxy = MockTextProxy()
         proxy.autoSpaceAfterInsert = true
         let handler = KeyboardInputHandler(proxy: proxy, session: KeyboardSession())
         handler.focusIn()
         type("nhom", into: handler)
 
-        handler.returnTapped()
-        handler.textDidChange()     // fixes "Khmer \n" → "Khmer\n"
+        handler.returnTapped()      // commit (auto-space appended by mock)
+        handler.textDidChange()     // removes auto-space
+        handler.returnTapped()      // newline
 
         XCTAssertFalse(proxy.text.hasSuffix(" \n"),
             "iOS auto-space must be removed before newline; got \(proxy.text.debugDescription)")
