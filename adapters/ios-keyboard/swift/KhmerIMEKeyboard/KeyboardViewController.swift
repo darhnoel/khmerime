@@ -32,11 +32,29 @@ class KeyboardViewController: UIInputViewController {
     private var heightConstraint: NSLayoutConstraint!
 
     var isIPad: Bool { traitCollection.userInterfaceIdiom == .pad }
-    private var baseKeyboardHeight: CGFloat { isIPad ? 320 : 260 }
+    var layoutMetrics: KeyboardLayoutMetrics {
+        KeyboardLayoutMetrics(device: isIPad ? .pad : .phone)
+    }
 
     // Tag shared with KeyboardLayout so every globe button built there can be
     // shown/hidden from viewWillLayoutSubviews without a stored reference list.
     static let globeKeyTag = 999
+
+    private var layerActions: KeyboardLayerActions {
+        KeyboardLayerActions(
+            nextKeyboard: #selector(nextKeyboardTapped),
+            letter: #selector(letterTapped(_:)),
+            symbol: #selector(symbolKeyTapped(_:)),
+            period: #selector(periodTapped),
+            backspace: #selector(backspaceTapped),
+            space: #selector(spaceTapped),
+            returnKey: #selector(returnTapped),
+            togglePanel: #selector(togglePanelTapped),
+            numeric: #selector(numericTapped),
+            symbols: #selector(symbolsTapped),
+            abc: #selector(abcTapped)
+        )
+    }
 
     // MARK: - Views
 
@@ -46,6 +64,7 @@ class KeyboardViewController: UIInputViewController {
     private var numericView:    UIView!
     private var symbolsView:    UIView!
     private var panelBottomRow: UIStackView!
+    private var rootView:       KeyboardRootView!
 
     // MARK: - Lifecycle
 
@@ -68,7 +87,10 @@ class KeyboardViewController: UIInputViewController {
 
     override func viewSafeAreaInsetsDidChange() {
         super.viewSafeAreaInsetsDidChange()
-        heightConstraint.constant = baseKeyboardHeight + view.safeAreaInsets.bottom
+        heightConstraint.constant = KeyboardHostLayout.heightConstant(
+            metrics: layoutMetrics,
+            safeAreaBottom: view.safeAreaInsets.bottom
+        )
     }
 
     override func viewWillLayoutSubviews() {
@@ -85,28 +107,17 @@ class KeyboardViewController: UIInputViewController {
 
     private func wireHandlerCallbacks() {
         handler.onTransition = { [weak self] state in
-            self?.applyTransition(state)
+            self?.rootView.apply(state)
         }
         handler.onRender = { [weak self] state, romanHint in
             guard let self else { return }
-            self.stripView.render(state, romanBuffer: romanHint)
-            switch self.handler.keyboardState {
-            case .panel:
-                self.panelView.render(state)
-            case .charPick:
-                // Only update candidates — do NOT call render() which rebuilds the
-                // chip row from state.segments (empty in charPick) and destroys
-                // the alphabet letter chips the user needs for their next pick.
-                self.panelView.renderCharPickCandidates(state.candidates)
-            default:
-                break
-            }
+            self.rootView.render(state, romanHint: romanHint, keyboardState: self.handler.keyboardState)
         }
         handler.onStripClear = { [weak self] in
-            self?.stripView.clear()
+            self?.rootView.clearStrip()
         }
         handler.onCharPickAlphabet = { [weak self] in
-            self?.panelView.renderCharPickAlphabet()
+            self?.rootView.renderCharPickAlphabet()
         }
     }
 
@@ -140,92 +151,32 @@ class KeyboardViewController: UIInputViewController {
         stripView.onKhmerRowLongPressed = { [weak self] in self?.handler.togglePanel() }
     }
 
-    // MARK: - State Machine (UIKit side)
-
-    private func applyTransition(_ state: KeyboardState) {
-        qwertyView.isHidden  = state != .qwerty
-        numericView.isHidden = state != .numeric
-        symbolsView.isHidden = state != .symbols
-        let inPanel = state == .panel || state == .charPick
-        panelView.isHidden      = !inPanel
-        panelBottomRow.isHidden = !inPanel
-    }
-
     // MARK: - Layout
 
     private func setupLayout() {
-        // Total view height = content area + home indicator (iPhone X: 34pt, others: 0).
-        // Updated in viewSafeAreaInsetsDidChange as orientation/device changes.
-        view.backgroundColor = UIColor.systemGray5
-        heightConstraint = view.heightAnchor.constraint(
-            equalToConstant: baseKeyboardHeight + view.safeAreaInsets.bottom)
-        heightConstraint.priority = UILayoutPriority(999)
-        heightConstraint.isActive = true
+        let hierarchy = KeyboardViewHierarchyBuilder(
+            metrics: layoutMetrics,
+            isIPad: isIPad,
+            target: self,
+            globeKeyTag: Self.globeKeyTag,
+            actions: layerActions
+        ).build(panelDelegate: self)
 
-        let root = UIView()
-        root.backgroundColor = UIColor.systemGray5
-        root.translatesAutoresizingMaskIntoConstraints = false
-        view.addSubview(root)
-        NSLayoutConstraint.activate([
-            root.topAnchor.constraint(equalTo: view.topAnchor),
-            root.leadingAnchor.constraint(equalTo: view.leadingAnchor),
-            root.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            // Stop at safe area so keys don't overlap the home indicator.
-            root.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor),
-        ])
+        stripView = hierarchy.stripView
+        panelView = hierarchy.panelView
+        qwertyView = hierarchy.qwertyView
+        numericView = hierarchy.numericView
+        symbolsView = hierarchy.symbolsView
+        panelBottomRow = hierarchy.panelBottomRow
+        rootView = hierarchy.rootView
 
-        stripView = StripView()
-        stripView.translatesAutoresizingMaskIntoConstraints = false
         setupStripCallbacks()
-
-        panelView = CandidatePanelView()
-        panelView.delegate = self
-        panelView.translatesAutoresizingMaskIntoConstraints = false
-
-        qwertyView  = buildQwertyView()
-        numericView = buildNumericView()
-        symbolsView = buildSymbolsView()
-
-        panelBottomRow = makeBottomRow(leftLabel: "123", leftAction: #selector(numericTapped), includePeriod: true)
-        panelBottomRow.translatesAutoresizingMaskIntoConstraints = false
-
-        for v in [stripView!, qwertyView!, numericView!, symbolsView!, panelView!, panelBottomRow!] {
-            v.translatesAutoresizingMaskIntoConstraints = false
-            root.addSubview(v)
-        }
-
-        NSLayoutConstraint.activate([
-            stripView.topAnchor.constraint(equalTo: root.topAnchor),
-            stripView.leadingAnchor.constraint(equalTo: root.leadingAnchor),
-            stripView.trailingAnchor.constraint(equalTo: root.trailingAnchor),
-            stripView.heightAnchor.constraint(equalToConstant: 44),
-
-            qwertyView.topAnchor.constraint(equalTo: stripView.bottomAnchor),
-            qwertyView.leadingAnchor.constraint(equalTo: root.leadingAnchor),
-            qwertyView.trailingAnchor.constraint(equalTo: root.trailingAnchor),
-            qwertyView.bottomAnchor.constraint(equalTo: root.bottomAnchor),
-
-            numericView.topAnchor.constraint(equalTo: stripView.bottomAnchor),
-            numericView.leadingAnchor.constraint(equalTo: root.leadingAnchor),
-            numericView.trailingAnchor.constraint(equalTo: root.trailingAnchor),
-            numericView.bottomAnchor.constraint(equalTo: root.bottomAnchor),
-
-            symbolsView.topAnchor.constraint(equalTo: stripView.bottomAnchor),
-            symbolsView.leadingAnchor.constraint(equalTo: root.leadingAnchor),
-            symbolsView.trailingAnchor.constraint(equalTo: root.trailingAnchor),
-            symbolsView.bottomAnchor.constraint(equalTo: root.bottomAnchor),
-
-            panelView.topAnchor.constraint(equalTo: stripView.bottomAnchor),
-            panelView.leadingAnchor.constraint(equalTo: root.leadingAnchor),
-            panelView.trailingAnchor.constraint(equalTo: root.trailingAnchor),
-
-            panelBottomRow.topAnchor.constraint(equalTo: panelView.bottomAnchorGuide.topAnchor, constant: 8),
-            panelBottomRow.leadingAnchor.constraint(equalTo: root.leadingAnchor, constant: 3),
-            panelBottomRow.trailingAnchor.constraint(equalTo: root.trailingAnchor, constant: -3),
-            panelBottomRow.heightAnchor.constraint(equalToConstant: 44),
-        ])
-
-        applyTransition(.qwerty)
+        heightConstraint = KeyboardHostLayout.install(
+            rootView: rootView,
+            in: view,
+            metrics: layoutMetrics,
+            safeAreaBottom: view.safeAreaInsets.bottom
+        )
     }
 }
 

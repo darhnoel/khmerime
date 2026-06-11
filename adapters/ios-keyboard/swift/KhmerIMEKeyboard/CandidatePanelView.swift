@@ -77,9 +77,11 @@ private final class CandidateCell: UICollectionViewCell {
 //   │  123  │      space      │  .  │    ⏎     │  ← bottom row (from VC)
 //   └───────────────────────────────────────────┘
 
-final class CandidatePanelView: UIView {
+final class CandidatePanelView: UIView, KeyboardPanelDisplaying {
 
     weak var delegate: CandidatePanelDelegate?
+
+    private let metrics: KeyboardLayoutMetrics
 
     // Exposed so the ViewController can embed the shared bottom row.
     let bottomAnchorGuide = UILayoutGuide()
@@ -108,7 +110,14 @@ final class CandidatePanelView: UIView {
     private var displayCandidates: [String] = []
     private var displaySelectedIndex: Int = 0
 
+    init(metrics: KeyboardLayoutMetrics, frame: CGRect = .zero) {
+        self.metrics = metrics
+        super.init(frame: frame)
+        setup()
+    }
+
     override init(frame: CGRect) {
+        self.metrics = KeyboardLayoutMetrics(device: .phone)
         super.init(frame: frame)
         setup()
     }
@@ -158,7 +167,7 @@ final class CandidatePanelView: UIView {
             chipScroll.topAnchor.constraint(equalTo: topAnchor, constant: 4),
             chipScroll.leadingAnchor.constraint(equalTo: leadingAnchor),
             chipScroll.trailingAnchor.constraint(equalTo: trailingAnchor),
-            chipScroll.heightAnchor.constraint(equalToConstant: 44),
+            chipScroll.heightAnchor.constraint(equalToConstant: metrics.panelChipHeight),
 
             chipSeparator.topAnchor.constraint(equalTo: chipScroll.bottomAnchor),
             chipSeparator.leadingAnchor.constraint(equalTo: leadingAnchor),
@@ -169,7 +178,7 @@ final class CandidatePanelView: UIView {
             candidateCollection.topAnchor.constraint(equalTo: chipSeparator.bottomAnchor),
             candidateCollection.leadingAnchor.constraint(equalTo: leadingAnchor),
             candidateCollection.trailingAnchor.constraint(equalTo: trailingAnchor),
-            candidateCollection.heightAnchor.constraint(equalToConstant: 120),
+            candidateCollection.heightAnchor.constraint(equalToConstant: metrics.panelCandidateHeight),
 
             candidateSeparator.topAnchor.constraint(equalTo: candidateCollection.bottomAnchor),
             candidateSeparator.leadingAnchor.constraint(equalTo: leadingAnchor),

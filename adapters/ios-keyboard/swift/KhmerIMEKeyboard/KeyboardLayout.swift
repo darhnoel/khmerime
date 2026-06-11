@@ -4,8 +4,8 @@ import UIKit
 // ==============
 // Builds the three standard keyboard layers (QWERTY, 123, #+=) and the shared
 // bottom row. All views are purely declarative: they know nothing about the
-// session; user interactions are forwarded to the ViewController via @objc
-// selectors defined in KeyboardViewController.swift.
+// session; user interactions are forwarded to an injected target through
+// selectors owned by KeyboardViewController.swift.
 //
 // Android equivalent
 // ------------------
@@ -27,41 +27,59 @@ import UIKit
 //   #+= row 3:    123 | . , ? ! ' | ⌫
 //   ABC bottom:   ABC | space (flex) | ⏎      (no period: it's in row 3)
 
-extension KeyboardViewController {
+struct KeyboardLayerActions {
+    let nextKeyboard: Selector
+    let letter: Selector
+    let symbol: Selector
+    let period: Selector
+    let backspace: Selector
+    let space: Selector
+    let returnKey: Selector
+    let togglePanel: Selector
+    let numeric: Selector
+    let symbols: Selector
+    let abc: Selector
+}
+
+struct KeyboardLayerFactory {
+    let metrics: KeyboardLayoutMetrics
+    let isIPad: Bool
+    let target: AnyObject
+    let globeKeyTag: Int
+    let actions: KeyboardLayerActions
 
     // MARK: - Adaptive Dimensions
 
-    // Widths scale up on iPad so keys feel more square and match the taller rows.
-    var specialKeyW: CGFloat    { isIPad ? 56 : 42 }
-    var returnKeyW: CGFloat     { isIPad ? 112 : 82 }
-    var wideSpecialKeyW: CGFloat { isIPad ? 72 : 48 }   // #+=, 123 labels (wider text)
+    private var specialKeyW: CGFloat { metrics.specialKeyWidth }
+    private var returnKeyW: CGFloat { metrics.returnKeyWidth }
+    private var wideSpecialKeyW: CGFloat { metrics.wideSpecialKeyWidth }
 
     // MARK: - Standard Layers
 
     func buildQwertyView() -> UIView {
         buildStandardView(rows: [
-            makeLetterRow(["q","w","e","r","t","y","u","i","o","p"]),
-            makeLetterRow(["a","s","d","f","g","h","j","k","l"]),
+            makeLetterRow(["q", "w", "e", "r", "t", "y", "u", "i", "o", "p"]),
+            makeLetterRow(["a", "s", "d", "f", "g", "h", "j", "k", "l"]),
             makeQwertyRow3(),
-            makeBottomRow(leftLabel: "123", leftAction: #selector(numericTapped), includePeriod: true),
+            makeBottomRow(leftLabel: "123", leftAction: actions.numeric, includePeriod: true),
         ])
     }
 
     func buildNumericView() -> UIView {
         buildStandardView(rows: [
-            makeSymbolRow(["1","2","3","4","5","6","7","8","9","0"]),
-            makeSymbolRow(["-","/",":",";","(",")","¥","&","@","\""]),
-            makeSpecialSideRow(leftLabel: "#+=", leftAction: #selector(symbolsTapped), leftWidth: wideSpecialKeyW),
-            makeBottomRow(leftLabel: "ABC", leftAction: #selector(abcTapped), includePeriod: false),
+            makeSymbolRow(["1", "2", "3", "4", "5", "6", "7", "8", "9", "0"]),
+            makeSymbolRow(["-", "/", ":", ";", "(", ")", "¥", "&", "@", "\""]),
+            makeSpecialSideRow(leftLabel: "#+=", leftAction: actions.symbols, leftWidth: wideSpecialKeyW),
+            makeBottomRow(leftLabel: "ABC", leftAction: actions.abc, includePeriod: false),
         ])
     }
 
     func buildSymbolsView() -> UIView {
         buildStandardView(rows: [
-            makeSymbolRow(["[","]","{","}","#","%","^","*","+","="]),
-            makeSymbolRow(["_","\\","|","~","<",">","€","£","¥","•"]),
-            makeSpecialSideRow(leftLabel: "123", leftAction: #selector(numericTapped), leftWidth: wideSpecialKeyW),
-            makeBottomRow(leftLabel: "ABC", leftAction: #selector(abcTapped), includePeriod: false),
+            makeSymbolRow(["[", "]", "{", "}", "#", "%", "^", "*", "+", "="]),
+            makeSymbolRow(["_", "\\", "|", "~", "<", ">", "€", "£", "¥", "•"]),
+            makeSpecialSideRow(leftLabel: "123", leftAction: actions.numeric, leftWidth: wideSpecialKeyW),
+            makeBottomRow(leftLabel: "ABC", leftAction: actions.abc, includePeriod: false),
         ])
     }
 
@@ -76,9 +94,9 @@ extension KeyboardViewController {
         row.spacing = 6
         row.distribution = .fill
 
-        let globeBtn = makeSpecialKey("🌐", action: #selector(nextKeyboardTapped))
+        let globeBtn = makeSpecialKey("🌐", action: actions.nextKeyboard)
         globeBtn.widthAnchor.constraint(equalToConstant: specialKeyW).isActive = true
-        globeBtn.tag = Self.globeKeyTag
+        globeBtn.tag = globeKeyTag
         row.addArrangedSubview(globeBtn)
 
         let leftBtn = makeSpecialKey(leftLabel, action: leftAction)
@@ -86,18 +104,18 @@ extension KeyboardViewController {
         leftBtn.widthAnchor.constraint(equalToConstant: specialKeyW).isActive = true
 
         // Space bar stretches to fill the remaining width.
-        let spaceBtn = makeSpecialKey("space", action: #selector(spaceTapped))
+        let spaceBtn = makeSpecialKey("space", action: actions.space)
         spaceBtn.titleLabel?.font = .systemFont(ofSize: 13)
         spaceBtn.setContentHuggingPriority(.init(rawValue: 1), for: .horizontal)
         spaceBtn.setContentCompressionResistancePriority(.init(rawValue: 1), for: .horizontal)
 
-        let returnBtn = makeSpecialKey("⏎", action: #selector(returnTapped))
+        let returnBtn = makeSpecialKey("⏎", action: actions.returnKey)
         returnBtn.widthAnchor.constraint(equalToConstant: returnKeyW).isActive = true
 
         row.addArrangedSubview(leftBtn)
         row.addArrangedSubview(spaceBtn)
         if includePeriod {
-            let periodBtn = makeSpecialKey(".", action: #selector(periodTapped))
+            let periodBtn = makeSpecialKey(".", action: actions.period)
             periodBtn.widthAnchor.constraint(equalToConstant: specialKeyW).isActive = true
             row.addArrangedSubview(periodBtn)
         }
@@ -113,13 +131,13 @@ extension KeyboardViewController {
         row.spacing = 6
         row.distribution = .fill
 
-        let toggleBtn = makeSpecialKey("💡", action: #selector(togglePanelTapped))
+        let toggleBtn = makeSpecialKey("💡", action: actions.togglePanel)
         toggleBtn.widthAnchor.constraint(equalToConstant: specialKeyW).isActive = true
 
-        let mid = makeLetterRow(["z","x","c","v","b","n","m"])
+        let mid = makeLetterRow(["z", "x", "c", "v", "b", "n", "m"])
         mid.setContentHuggingPriority(.init(rawValue: 1), for: .horizontal)
 
-        let backBtn = makeSpecialKey("⌫", action: #selector(backspaceTapped))
+        let backBtn = makeSpecialKey("⌫", action: actions.backspace)
         backBtn.widthAnchor.constraint(equalToConstant: specialKeyW).isActive = true
 
         row.addArrangedSubview(toggleBtn)
@@ -139,10 +157,10 @@ extension KeyboardViewController {
         leftBtn.titleLabel?.font = .systemFont(ofSize: 13, weight: .medium)
         leftBtn.widthAnchor.constraint(equalToConstant: leftWidth).isActive = true
 
-        let mid = makeSymbolRow([".",",","?","!","'"])
+        let mid = makeSymbolRow([".", ",", "?", "!", "'"])
         mid.setContentHuggingPriority(.init(rawValue: 1), for: .horizontal)
 
-        let backBtn = makeSpecialKey("⌫", action: #selector(backspaceTapped))
+        let backBtn = makeSpecialKey("⌫", action: actions.backspace)
         backBtn.widthAnchor.constraint(equalToConstant: specialKeyW).isActive = true
 
         row.addArrangedSubview(leftBtn)
@@ -173,7 +191,7 @@ extension KeyboardViewController {
         let btn = UIButton(type: .system)
         btn.setTitle(letter.uppercased(), for: .normal)
         KeyStyle.applyLetter(btn, isIPad: isIPad)
-        btn.addTarget(self, action: #selector(letterTapped(_:)), for: .touchUpInside)
+        btn.addTarget(target, action: actions.letter, for: .touchUpInside)
         return btn
     }
 
@@ -181,7 +199,7 @@ extension KeyboardViewController {
         let btn = UIButton(type: .system)
         btn.setTitle(symbol, for: .normal)
         KeyStyle.applySymbol(btn, isIPad: isIPad)
-        btn.addTarget(self, action: #selector(symbolKeyTapped(_:)), for: .touchUpInside)
+        btn.addTarget(target, action: actions.symbol, for: .touchUpInside)
         return btn
     }
 
@@ -189,7 +207,7 @@ extension KeyboardViewController {
         let btn = UIButton(type: .system)
         btn.setTitle(title, for: .normal)
         KeyStyle.applySpecial(btn, isIPad: isIPad)
-        btn.addTarget(self, action: action, for: .touchUpInside)
+        btn.addTarget(target, action: action, for: .touchUpInside)
         return btn
     }
 
@@ -201,15 +219,15 @@ extension KeyboardViewController {
         let container = UIView()
         let stack = UIStackView(arrangedSubviews: rows)
         stack.axis = .vertical
-        stack.spacing = 8
+        stack.spacing = metrics.rowSpacing
         stack.distribution = .fillEqually
         stack.translatesAutoresizingMaskIntoConstraints = false
         container.addSubview(stack)
         NSLayoutConstraint.activate([
-            stack.topAnchor.constraint(equalTo: container.topAnchor, constant: 8),
-            stack.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: 3),
-            stack.trailingAnchor.constraint(equalTo: container.trailingAnchor, constant: -3),
-            stack.bottomAnchor.constraint(equalTo: container.bottomAnchor, constant: -4),
+            stack.topAnchor.constraint(equalTo: container.topAnchor, constant: metrics.keyTopInset),
+            stack.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: metrics.keyHorizontalInset),
+            stack.trailingAnchor.constraint(equalTo: container.trailingAnchor, constant: -metrics.keyHorizontalInset),
+            stack.bottomAnchor.constraint(equalTo: container.bottomAnchor, constant: -metrics.keyBottomInset),
         ])
         return container
     }

@@ -33,7 +33,7 @@ import UIKit
 //   The edited segment is shown in [brackets] and prefixed with ✏:
 //   ✏ nhom · [ttov] · salarien
 
-final class StripView: UIView {
+final class StripView: UIView, KeyboardStripDisplaying {
 
     private let romanRow = UILabel()
     private let khmerRow = UILabel()

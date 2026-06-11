@@ -53,9 +53,18 @@ targets:
     sources:
       - path: KhmerIMEKeyboardTests
       # Share the handler + session source directly (no linking the extension bundle).
+      - path: KhmerIMEKeyboard/CandidatePanelView.swift
+      - path: KhmerIMEKeyboard/KeyboardHostLayout.swift
+      - path: KhmerIMEKeyboard/KeyboardLayout.swift
       - path: KhmerIMEKeyboard/KeyboardInputHandler.swift
+      - path: KhmerIMEKeyboard/KeyStyle.swift
+      - path: KhmerIMEKeyboard/KeyboardViewHierarchyBuilder.swift
+      - path: KhmerIMEKeyboard/KeyboardLayerVisibility.swift
+      - path: KhmerIMEKeyboard/KeyboardLayoutMetrics.swift
+      - path: KhmerIMEKeyboard/KeyboardRootView.swift
       - path: KhmerIMEKeyboard/KeyboardState.swift
       - path: KhmerIMEKeyboard/KeyboardSession.swift
+      - path: KhmerIMEKeyboard/StripView.swift
       - path: KhmerIMEKeyboard/TextProxy.swift
       - path: KhmerIMEKeyboard/Generated/khmerime_ios_keyboard.swift
     settings:
