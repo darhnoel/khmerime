@@ -11,7 +11,9 @@
     <key>CFBundleInfoDictionaryVersion</key>
     <string>6.0</string>
     <key>CFBundleName</key>
-    <string>$(PRODUCT_NAME)</string>
+    <string>Khmer IME</string>
+    <key>CFBundleDisplayName</key>
+    <string>Khmer IME</string>
     <key>CFBundlePackageType</key>
     <string>APPL</string>
     <key>CFBundleShortVersionString</key>
@@ -20,41 +22,23 @@
     <string>1</string>
     <key>LSMinimumSystemVersion</key>
     <string>$(MACOSX_DEPLOYMENT_TARGET)</string>
-    <key>LSUIElement</key>
+    <key>LSBackgroundOnly</key>
     <true/>
-    <key>NSPrincipalClass</key>
+    <!-- IMK registration: these four top-level keys are what make the app
+         appear in System Settings → Keyboard → Input Sources.
+         InputMethodConnectionName must match the name main.swift passes to
+         IMKServer: "<bundle-id>_Connection". -->
+    <key>InputMethodConnectionName</key>
+    <string>com.khmerime.KhmerIMEMacOS_Connection</string>
+    <key>InputMethodServerControllerClass</key>
     <string>KhmerInputController</string>
-    <key>InputMethods</key>
+    <key>TISInputSourceID</key>
+    <string>com.khmerime.KhmerIMEMacOS</string>
+    <key>TISIntendedLanguage</key>
+    <string>km</string>
+    <key>tsInputMethodCharacterRepertoireKey</key>
     <array>
-        <dict>
-            <key>Bundle Identifier</key>
-            <string>com.khmerime.KhmerIMEMacOS</string>
-            <key>Bundle name</key>
-            <string>Khmer IME</string>
-            <key>IMKInputControllerClass</key>
-            <string>KhmerInputController</string>
-            <key>IMKServerControllerClass</key>
-            <string>KhmerInputController</string>
-            <key>ComponentInputModeDict</key>
-            <dict>
-                <key>tsInputModeListKey</key>
-                <dict>
-                    <key>com.khmerime.KhmerIMEMacOS.roman</key>
-                    <dict>
-                        <key>TISInputSourceID</key>
-                        <string>com.khmerime.KhmerIMEMacOS.roman</string>
-                        <key>TISVisibleName</key>
-                        <string>Khmer</string>
-                        <key>tsInputModeAlternateMenuItemNameKey</key>
-                        <string>Khmer</string>
-                    </dict>
-                </dict>
-            </dict>
-            <key>TISInputSourceID</key>
-            <string>com.khmerime.KhmerIMEMacOS.roman</string>
-            <key>TISVisibleName</key>
-            <string>Khmer IME</string>
-        </dict>
+        <string>Khmr</string>
     </array>
 </dict>
 </plist>
