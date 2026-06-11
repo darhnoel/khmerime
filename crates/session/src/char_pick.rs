@@ -49,15 +49,15 @@ fn parse_relations() -> Vec<CharRelationEntry> {
     entries
 }
 
-/// Returns false for entries that cannot stand alone as a selectable character:
-/// - Subscript consonant forms starting with coeng (U+17D2)
-/// - Standalone modifier signs (U+17C6–U+17D1): ំ ះ ៈ ៉ ៊ ់ ៌ ៍ ៎ ៏ ័ ៑
-/// - Khmer punctuation and currency (U+17D4–U+17DD)
+/// Returns false for entries that must not appear in the picker:
+/// - Khmer punctuation and currency (U+17D4–U+17DD), e.g. ។ ៘ ៛
+///
+/// Subscript forms (្ក …) and modifier signs (ំ ៉ …) ARE selectable: they
+/// combine with a previously inserted base consonant, which is exactly how
+/// clusters in names (e.g. ្ត in ឧត្តម) are built in CharPick mode.
 fn is_selectable(text: &str) -> bool {
     match text.chars().next() {
         None => false,
-        Some('\u{17D2}') => false,
-        Some(c) if ('\u{17C6}'..='\u{17D1}').contains(&c) => false,
         Some(c) if ('\u{17D4}'..='\u{17DD}').contains(&c) => false,
         _ => true,
     }
@@ -111,6 +111,17 @@ mod tests {
     }
 
     #[test]
+    fn k_includes_subscript_kak() {
+        // Subscripts are picked after a base consonant to build clusters
+        // (e.g. ត then ្ត for ឧត្តម) — they must be selectable.
+        let candidates = char_pick_candidates('k');
+        assert!(
+            candidates.contains(&"្ក"),
+            "expected ្ក in candidates for 'k', got: {candidates:?}"
+        );
+    }
+
+    #[test]
     fn k_excludes_ma() {
         // ម relates only to [m], never [k]
         let candidates = char_pick_candidates('k');
@@ -125,6 +136,28 @@ mod tests {
         let candidates = char_pick_candidates('h');
         assert!(candidates.contains(&"ខ"), "expected ខ for 'h'");
         assert!(candidates.contains(&"ហ"), "expected ហ for 'h'");
+    }
+
+    #[test]
+    fn m_includes_nikahit_modifier() {
+        // Modifier signs combine with the previous character (e.g. ំ after ុ
+        // for the -om sound) — they must be selectable.
+        let candidates = char_pick_candidates('m');
+        assert!(
+            candidates.contains(&"ំ"),
+            "expected ំ in candidates for 'm', got: {candidates:?}"
+        );
+    }
+
+    #[test]
+    fn l_excludes_punctuation() {
+        // ៘ ("etc." sign) relates to 'l' in the CSV but punctuation must
+        // never appear in the picker.
+        let candidates = char_pick_candidates('l');
+        assert!(
+            !candidates.contains(&"៘"),
+            "៘ must not appear for 'l', got: {candidates:?}"
+        );
     }
 
     #[test]
