@@ -29,6 +29,13 @@ import UIKit
 
 extension KeyboardViewController {
 
+    // MARK: - Adaptive Dimensions
+
+    // Widths scale up on iPad so keys feel more square and match the taller rows.
+    var specialKeyW: CGFloat    { isIPad ? 56 : 42 }
+    var returnKeyW: CGFloat     { isIPad ? 112 : 82 }
+    var wideSpecialKeyW: CGFloat { isIPad ? 72 : 48 }   // #+=, 123 labels (wider text)
+
     // MARK: - Standard Layers
 
     func buildQwertyView() -> UIView {
@@ -44,7 +51,7 @@ extension KeyboardViewController {
         buildStandardView(rows: [
             makeSymbolRow(["1","2","3","4","5","6","7","8","9","0"]),
             makeSymbolRow(["-","/",":",";","(",")","¥","&","@","\""]),
-            makeSpecialSideRow(leftLabel: "#+=", leftAction: #selector(symbolsTapped), leftWidth: 48),
+            makeSpecialSideRow(leftLabel: "#+=", leftAction: #selector(symbolsTapped), leftWidth: wideSpecialKeyW),
             makeBottomRow(leftLabel: "ABC", leftAction: #selector(abcTapped), includePeriod: false),
         ])
     }
@@ -53,7 +60,7 @@ extension KeyboardViewController {
         buildStandardView(rows: [
             makeSymbolRow(["[","]","{","}","#","%","^","*","+","="]),
             makeSymbolRow(["_","\\","|","~","<",">","€","£","¥","•"]),
-            makeSpecialSideRow(leftLabel: "123", leftAction: #selector(numericTapped), leftWidth: 48),
+            makeSpecialSideRow(leftLabel: "123", leftAction: #selector(numericTapped), leftWidth: wideSpecialKeyW),
             makeBottomRow(leftLabel: "ABC", leftAction: #selector(abcTapped), includePeriod: false),
         ])
     }
@@ -61,15 +68,22 @@ extension KeyboardViewController {
     // MARK: - Shared Bottom Row
 
     // Used by QWERTY, the panel, and (without period) by 123 and #+=.
+    // The globe key is always added but hidden when iOS doesn't require us to
+    // show our own switcher (viewWillLayoutSubviews manages show/hide via tag).
     func makeBottomRow(leftLabel: String, leftAction: Selector, includePeriod: Bool) -> UIStackView {
         let row = UIStackView()
         row.axis = .horizontal
         row.spacing = 6
         row.distribution = .fill
 
+        let globeBtn = makeSpecialKey("🌐", action: #selector(nextKeyboardTapped))
+        globeBtn.widthAnchor.constraint(equalToConstant: specialKeyW).isActive = true
+        globeBtn.tag = Self.globeKeyTag
+        row.addArrangedSubview(globeBtn)
+
         let leftBtn = makeSpecialKey(leftLabel, action: leftAction)
         leftBtn.titleLabel?.font = .systemFont(ofSize: 13, weight: .medium)
-        leftBtn.widthAnchor.constraint(equalToConstant: 42).isActive = true
+        leftBtn.widthAnchor.constraint(equalToConstant: specialKeyW).isActive = true
 
         // Space bar stretches to fill the remaining width.
         let spaceBtn = makeSpecialKey("space", action: #selector(spaceTapped))
@@ -78,13 +92,13 @@ extension KeyboardViewController {
         spaceBtn.setContentCompressionResistancePriority(.init(rawValue: 1), for: .horizontal)
 
         let returnBtn = makeSpecialKey("⏎", action: #selector(returnTapped))
-        returnBtn.widthAnchor.constraint(equalToConstant: 82).isActive = true
+        returnBtn.widthAnchor.constraint(equalToConstant: returnKeyW).isActive = true
 
         row.addArrangedSubview(leftBtn)
         row.addArrangedSubview(spaceBtn)
         if includePeriod {
             let periodBtn = makeSpecialKey(".", action: #selector(periodTapped))
-            periodBtn.widthAnchor.constraint(equalToConstant: 42).isActive = true
+            periodBtn.widthAnchor.constraint(equalToConstant: specialKeyW).isActive = true
             row.addArrangedSubview(periodBtn)
         }
         row.addArrangedSubview(returnBtn)
@@ -100,13 +114,13 @@ extension KeyboardViewController {
         row.distribution = .fill
 
         let toggleBtn = makeSpecialKey("💡", action: #selector(togglePanelTapped))
-        toggleBtn.widthAnchor.constraint(equalToConstant: 42).isActive = true
+        toggleBtn.widthAnchor.constraint(equalToConstant: specialKeyW).isActive = true
 
         let mid = makeLetterRow(["z","x","c","v","b","n","m"])
         mid.setContentHuggingPriority(.init(rawValue: 1), for: .horizontal)
 
         let backBtn = makeSpecialKey("⌫", action: #selector(backspaceTapped))
-        backBtn.widthAnchor.constraint(equalToConstant: 42).isActive = true
+        backBtn.widthAnchor.constraint(equalToConstant: specialKeyW).isActive = true
 
         row.addArrangedSubview(toggleBtn)
         row.addArrangedSubview(mid)
@@ -129,7 +143,7 @@ extension KeyboardViewController {
         mid.setContentHuggingPriority(.init(rawValue: 1), for: .horizontal)
 
         let backBtn = makeSpecialKey("⌫", action: #selector(backspaceTapped))
-        backBtn.widthAnchor.constraint(equalToConstant: 42).isActive = true
+        backBtn.widthAnchor.constraint(equalToConstant: specialKeyW).isActive = true
 
         row.addArrangedSubview(leftBtn)
         row.addArrangedSubview(mid)
@@ -158,7 +172,7 @@ extension KeyboardViewController {
     func makeLetterKey(_ letter: String) -> UIButton {
         let btn = UIButton(type: .system)
         btn.setTitle(letter.uppercased(), for: .normal)
-        KeyStyle.applyLetter(btn)
+        KeyStyle.applyLetter(btn, isIPad: isIPad)
         btn.addTarget(self, action: #selector(letterTapped(_:)), for: .touchUpInside)
         return btn
     }
@@ -166,7 +180,7 @@ extension KeyboardViewController {
     func makeSymbolKey(_ symbol: String) -> UIButton {
         let btn = UIButton(type: .system)
         btn.setTitle(symbol, for: .normal)
-        KeyStyle.applySymbol(btn)
+        KeyStyle.applySymbol(btn, isIPad: isIPad)
         btn.addTarget(self, action: #selector(symbolKeyTapped(_:)), for: .touchUpInside)
         return btn
     }
@@ -174,7 +188,7 @@ extension KeyboardViewController {
     func makeSpecialKey(_ title: String, action: Selector) -> UIButton {
         let btn = UIButton(type: .system)
         btn.setTitle(title, for: .normal)
-        KeyStyle.applySpecial(btn)
+        KeyStyle.applySpecial(btn, isIPad: isIPad)
         btn.addTarget(self, action: action, for: .touchUpInside)
         return btn
     }

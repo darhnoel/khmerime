@@ -25,6 +25,19 @@ class KeyboardViewController: UIInputViewController {
 
     private var handler: KeyboardInputHandler!
 
+    // MARK: - Layout
+
+    // Stored so viewSafeAreaInsetsDidChange can update it when the home indicator
+    // appears/disappears (e.g. on iPhone X or on iPad when the bar changes).
+    private var heightConstraint: NSLayoutConstraint!
+
+    var isIPad: Bool { traitCollection.userInterfaceIdiom == .pad }
+    private var baseKeyboardHeight: CGFloat { isIPad ? 320 : 260 }
+
+    // Tag shared with KeyboardLayout so every globe button built there can be
+    // shown/hidden from viewWillLayoutSubviews without a stored reference list.
+    static let globeKeyTag = 999
+
     // MARK: - Views
 
     private var stripView:      StripView!
@@ -51,6 +64,17 @@ class KeyboardViewController: UIInputViewController {
     override func viewWillDisappear(_ animated: Bool) {
         super.viewWillDisappear(animated)
         handler.focusOut()
+    }
+
+    override func viewSafeAreaInsetsDidChange() {
+        super.viewSafeAreaInsetsDidChange()
+        heightConstraint.constant = baseKeyboardHeight + view.safeAreaInsets.bottom
+    }
+
+    override func viewWillLayoutSubviews() {
+        super.viewWillLayoutSubviews()
+        let show = needsInputModeSwitchKey
+        view.allDescendants(tag: Self.globeKeyTag).forEach { $0.isHidden = !show }
     }
 
     override func textDidChange(_ textInput: UITextInput?) {
@@ -87,6 +111,8 @@ class KeyboardViewController: UIInputViewController {
     }
 
     // MARK: - Key Actions (forward to handler)
+
+    @objc func nextKeyboardTapped() { advanceToNextInputMode() }
 
     @objc func letterTapped(_ sender: UIButton) {
         guard let ch = sender.title(for: .normal)?.lowercased(), !ch.isEmpty else { return }
@@ -128,9 +154,13 @@ class KeyboardViewController: UIInputViewController {
     // MARK: - Layout
 
     private func setupLayout() {
-        let h = view.heightAnchor.constraint(equalToConstant: 260)
-        h.priority = UILayoutPriority(999)
-        h.isActive = true
+        // Total view height = content area + home indicator (iPhone X: 34pt, others: 0).
+        // Updated in viewSafeAreaInsetsDidChange as orientation/device changes.
+        view.backgroundColor = UIColor.systemGray5
+        heightConstraint = view.heightAnchor.constraint(
+            equalToConstant: baseKeyboardHeight + view.safeAreaInsets.bottom)
+        heightConstraint.priority = UILayoutPriority(999)
+        heightConstraint.isActive = true
 
         let root = UIView()
         root.backgroundColor = UIColor.systemGray5
@@ -140,7 +170,8 @@ class KeyboardViewController: UIInputViewController {
             root.topAnchor.constraint(equalTo: view.topAnchor),
             root.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             root.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            root.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+            // Stop at safe area so keys don't overlap the home indicator.
+            root.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor),
         ])
 
         stripView = StripView()
@@ -195,6 +226,19 @@ class KeyboardViewController: UIInputViewController {
         ])
 
         applyTransition(.qwerty)
+    }
+}
+
+// MARK: - UIView helper
+
+private extension UIView {
+    func allDescendants(tag: Int) -> [UIView] {
+        var result: [UIView] = []
+        for sv in subviews {
+            if sv.tag == tag { result.append(sv) }
+            result += sv.allDescendants(tag: tag)
+        }
+        return result
     }
 }
 
