@@ -36,7 +36,7 @@ This runs: `cargo build` (arm64 + x86_64) → `lipo` universal → `xcodebuild -
 
 ## Installing (macOS 26 / Tahoe and later)
 
-macOS 26 enforces Gatekeeper on input methods. Ad-hoc signed apps (`-`) are **rejected** — `spctl --add` was removed in Tahoe. You need a real Apple Development certificate (free Apple ID works).
+macOS 26 enforces Gatekeeper on input methods. Ad-hoc signed apps (`-`) are **rejected** — `spctl --add` was removed in Tahoe. A local Apple Development certificate is enough for Xcode to produce a valid signature, but Gatekeeper can still reject the installed input method if the app is not Developer ID signed and notarized.
 
 ### Step 1 — find your Team ID
 
@@ -56,7 +56,15 @@ defaults read com.apple.dt.Xcode IDEProvisioningTeams 2>/dev/null \
 make platform-install-macos DEVELOPMENT_TEAM=AB12CD34EF
 ```
 
-This signs with your "Apple Development" certificate, copies the `.app` to `~/Library/Input Methods/`, strips quarantine, and runs `lsregister`.
+This auto-detects a matching local Apple Development certificate, signs manually, checks Gatekeeper, copies the `.app` to `~/Library/Input Methods/`, strips quarantine, and runs `lsregister`.
+
+If Gatekeeper rejects the signed app, inspect the exact reason:
+
+```bash
+syspolicy_check distribution /tmp/khmerime-macos-build/Build/Products/Release/KhmerIMEMacOS.app
+```
+
+For a Gatekeeper-accepted distribution build, use a Developer ID Application certificate and notarize the app with Apple. Apple documents that [Developer ID signing](https://developer.apple.com/help/account/certificates/create-developer-id-certificates/) plus a notarization ticket lets Gatekeeper verify software distributed outside the Mac App Store.
 
 ### Step 3 — activate
 
@@ -69,6 +77,11 @@ This signs with your "Apple Development" certificate, copies the `.app` to `~/Li
 > ```bash
 > spctl --assess --verbose ~/Library/Input\ Methods/KhmerIMEMacOS.app
 > # Should print: accepted
+> ```
+>
+> You can also run:
+> ```bash
+> make platform-diagnose-macos
 > ```
 
 ## Iterating (after first install)

@@ -21,6 +21,8 @@
 		94F1624D7B89DBA4D8F2D0FA /* KeyvalMappingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 48B3EC3917E6C715FEB3366F /* KeyvalMappingTests.swift */; };
 		9C89A460CD0BDF36460870EB /* KhmerInputHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = 25C32CB26B6C17FADEE7E83B /* KhmerInputHandler.swift */; };
 		B9EA3413E0FC0A0B9C4C9689 /* KhmerInputController.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE03DC1BE74042FC0325CBBC /* KhmerInputController.swift */; };
+		DADF3323C141E54C3F076B48 /* menu_icon.tiff in Resources */ = {isa = PBXBuildFile; fileRef = C6451F340A16C7C6E65F7BFB /* menu_icon.tiff */; };
+		DD00AE9490C58C39F32CBDD2 /* InfoPlist.strings in Resources */ = {isa = PBXBuildFile; fileRef = FE046A1B81EB1D8E423D6094 /* InfoPlist.strings */; };
 		DD09BB017FF83E264C339507 /* KeyvalMapping.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC1EE6C7D9D92C34E90C675A /* KeyvalMapping.swift */; };
 		E70DB6CC4A7767D6AD8BFDC2 /* MockTextClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 59C88769C911B8DDFE14B049 /* MockTextClient.swift */; };
 		EC2428FB69E1256E09DFC3FE /* CandidatePanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 220134C44B7ED4281A57F3FD /* CandidatePanel.swift */; };
@@ -40,7 +42,10 @@
 		A88400333F9BD99944A6736E /* KhmerInputHandlerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KhmerInputHandlerTests.swift; sourceTree = "<group>"; };
 		AE3E4BC1CCF2EEB9A946D40F /* khmerime_macos_imk.modulemap */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.module-map"; path = khmerime_macos_imk.modulemap; sourceTree = "<group>"; };
 		B40F7313D2E03B3A30E76F8A /* KhmerIME.xcframework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcframework; name = KhmerIME.xcframework; path = Frameworks/KhmerIME.xcframework; sourceTree = "<group>"; };
+		B7971F93554C6934213F1C04 /* en */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = en; path = en.lproj/InfoPlist.strings; sourceTree = "<group>"; };
 		BC1EE6C7D9D92C34E90C675A /* KeyvalMapping.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeyvalMapping.swift; sourceTree = "<group>"; };
+		C6451F340A16C7C6E65F7BFB /* menu_icon.tiff */ = {isa = PBXFileReference; lastKnownFileType = image.tiff; path = menu_icon.tiff; sourceTree = "<group>"; };
+		C84062FF1727DFAE5B371156 /* KhmerIMEMacOS.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = KhmerIMEMacOS.entitlements; sourceTree = "<group>"; };
 		CE03DC1BE74042FC0325CBBC /* KhmerInputController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KhmerInputController.swift; sourceTree = "<group>"; };
 		E342FC8BC1323F06EA072A93 /* KhmerIMEMacOSTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = KhmerIMEMacOSTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		EFFA3D153052FAE1B6156BA0 /* KhmerIMEMacOS.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = KhmerIMEMacOS.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -91,11 +96,14 @@
 				220134C44B7ED4281A57F3FD /* CandidatePanel.swift */,
 				73846DF9B141E0908FA644AB /* Info.plist */,
 				BC1EE6C7D9D92C34E90C675A /* KeyvalMapping.swift */,
+				C84062FF1727DFAE5B371156 /* KhmerIMEMacOS.entitlements */,
 				CE03DC1BE74042FC0325CBBC /* KhmerInputController.swift */,
 				25C32CB26B6C17FADEE7E83B /* KhmerInputHandler.swift */,
 				32A66D0A46DAB12529C95E57 /* main.swift */,
+				C6451F340A16C7C6E65F7BFB /* menu_icon.tiff */,
 				56EC2BA43A2EC84898E4E7E2 /* TextClient.swift */,
 				EF6204FBBCAF942E95E88D58 /* Generated */,
+				FE046A1B81EB1D8E423D6094 /* InfoPlist.strings */,
 			);
 			path = KhmerIMEMacOS;
 			sourceTree = "<group>";
@@ -156,6 +164,7 @@
 			buildConfigurationList = 5276B73EE959855A9F86AABF /* Build configuration list for PBXNativeTarget "KhmerIMEMacOS" */;
 			buildPhases = (
 				B9EBA44E465AA97C3396BDD7 /* Sources */,
+				5E9272EDCBBABB248A0A723D /* Resources */,
 				486B52FEAEEA033D112004B2 /* Frameworks */,
 			);
 			buildRules = (
@@ -208,6 +217,18 @@
 		};
 /* End PBXProject section */
 
+/* Begin PBXResourcesBuildPhase section */
+		5E9272EDCBBABB248A0A723D /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				DD00AE9490C58C39F32CBDD2 /* InfoPlist.strings in Resources */,
+				DADF3323C141E54C3F076B48 /* menu_icon.tiff in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
 /* Begin PBXSourcesBuildPhase section */
 		1DA4B8203EDACDB72409A219 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
@@ -238,6 +259,17 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXVariantGroup section */
+		FE046A1B81EB1D8E423D6094 /* InfoPlist.strings */ = {
+			isa = PBXVariantGroup;
+			children = (
+				B7971F93554C6934213F1C04 /* en */,
+			);
+			name = InfoPlist.strings;
+			sourceTree = "<group>";
+		};
+/* End PBXVariantGroup section */
 
 /* Begin XCBuildConfiguration section */
 		1CB09AD7AC0BDB2A52530FF5 /* Debug */ = {
@@ -332,6 +364,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = KhmerIMEMacOS/KhmerIMEMacOS.entitlements;
 				COMBINE_HIDPI_IMAGES = YES;
 				FRAMEWORK_SEARCH_PATHS = (
 					"$(inherited)",
@@ -341,7 +374,7 @@
 				LD_RUNPATH_SEARCH_PATHS = "@loader_path/../Frameworks";
 				MACOSX_DEPLOYMENT_TARGET = 13.0;
 				OTHER_LDFLAGS = "-ObjC";
-				PRODUCT_BUNDLE_IDENTIFIER = com.khmerime.KhmerIMEMacOS;
+				PRODUCT_BUNDLE_IDENTIFIER = com.khmerime.inputmethod.KhmerIMEMacOS;
 				SDKROOT = macosx;
 			};
 			name = Release;
@@ -409,6 +442,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = KhmerIMEMacOS/KhmerIMEMacOS.entitlements;
 				COMBINE_HIDPI_IMAGES = YES;
 				FRAMEWORK_SEARCH_PATHS = (
 					"$(inherited)",
@@ -418,7 +452,7 @@
 				LD_RUNPATH_SEARCH_PATHS = "@loader_path/../Frameworks";
 				MACOSX_DEPLOYMENT_TARGET = 13.0;
 				OTHER_LDFLAGS = "-ObjC";
-				PRODUCT_BUNDLE_IDENTIFIER = com.khmerime.KhmerIMEMacOS;
+				PRODUCT_BUNDLE_IDENTIFIER = com.khmerime.inputmethod.KhmerIMEMacOS;
 				SDKROOT = macosx;
 			};
 			name = Debug;

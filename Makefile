@@ -1,4 +1,4 @@
-.PHONY: help web web-release web-phone desktop stats suggest suggest-wfst suggest-shadow shadow-eval data-split data-build data-check lexicon-editor visualize-lexicon visualize-lexicon-streamlit download-page fmt test test-golden test-ui platform-check platform-check-linux platform-check-android platform-check-ios platform-check-macos platform-check-windows platform-build-ios platform-build-windows platform-install-windows platform-uninstall-windows platform-reinstall-windows platform-smoke-windows-notepad platform-smoke-windows-notepad-python windows-package linux-package ibus-install ibus-uninstall ibus-smoke paper-current paper-current-clean
+.PHONY: help web web-release web-phone desktop stats suggest suggest-wfst suggest-shadow shadow-eval data-split data-build data-check lexicon-editor visualize-lexicon visualize-lexicon-streamlit download-page fmt test test-golden test-ui platform-check platform-check-linux platform-check-android platform-check-ios platform-check-macos platform-check-windows platform-build-ios platform-build-macos platform-diagnose-macos platform-install-macos platform-build-windows platform-install-windows platform-uninstall-windows platform-reinstall-windows platform-smoke-windows-notepad platform-smoke-windows-notepad-python windows-package linux-package ibus-install ibus-uninstall ibus-smoke paper-current paper-current-clean
 
 DX ?= dx
 APP_DIR := apps/dioxus-app
@@ -12,7 +12,7 @@ PAPER_CURRENT_TEX := khmerime_current_implementation_paper.tex
 WINDOWS_TSF_TARGET ?= x86_64-pc-windows-msvc
 WINDOWS_TSF_TARGET_DIR ?= target/windows-tsf
 WINDOWS_TSF_DEV_TARGET_DIR ?= target/windows-tsf-dev
-WINDOWS_TSF_REINSTALL_STAMP ?= $(shell powershell -NoProfile -Command "Get-Date -Format yyyyMMddHHmmss")
+WINDOWS_TSF_REINSTALL_STAMP ?= $(shell if command -v powershell >/dev/null 2>&1; then powershell -NoProfile -Command "Get-Date -Format yyyyMMddHHmmss"; else date +%Y%m%d%H%M%S; fi)
 # Freeze the stamp once per make invocation so all deploy paths match.
 WINDOWS_TSF_REINSTALL_STAMP := $(WINDOWS_TSF_REINSTALL_STAMP)
 WINDOWS_TSF_DEPLOY_DIR ?= target/windows-tsf-deploy/$(WINDOWS_TSF_REINSTALL_STAMP)
@@ -42,8 +42,14 @@ MACOS_LIB_NAME          := libkhmerime_macos_imk.a
 MACOS_BINDGEN_OUT       := $(MACOS_ADAPTER_DIR)/swift/KhmerIMEMacOS/Generated
 MACOS_XCFRAMEWORK_OUT   := $(MACOS_ADAPTER_DIR)/swift/Frameworks/KhmerIME.xcframework
 MACOS_INPUT_METHODS_DIR := $(HOME)/Library/Input\ Methods
+MACOS_BUILD_DIR         := /tmp/khmerime-macos-build
+MACOS_BUILD_APP         := $(MACOS_BUILD_DIR)/Build/Products/Release/KhmerIMEMacOS.app
 # Override with: make platform-install-macos DEVELOPMENT_TEAM=AB12CD34EF
 DEVELOPMENT_TEAM        ?=
+MACOS_DETECTED_CODE_SIGN_IDENTITY := $(if $(DEVELOPMENT_TEAM),$(shell security find-identity -v -p codesigning 2>/dev/null | awk -v team="$(DEVELOPMENT_TEAM)" '/Apple Development:/ && index($$0, "(" team ")") { print $$2; exit }'),)
+# Override with a SHA-1 certificate hash or full identity name when auto-detection is not enough.
+MACOS_CODE_SIGN_IDENTITY ?= $(or $(MACOS_DETECTED_CODE_SIGN_IDENTITY),-)
+MACOS_SIGNING_ARGS      := $(if $(filter -,$(MACOS_CODE_SIGN_IDENTITY)),CODE_SIGN_IDENTITY=- CODE_SIGN_STYLE=Manual,CODE_SIGN_STYLE=Manual CODE_SIGN_IDENTITY=$(MACOS_CODE_SIGN_IDENTITY) $(if $(DEVELOPMENT_TEAM),DEVELOPMENT_TEAM=$(DEVELOPMENT_TEAM),))
 
 help:
 	@printf "%s\n" \
@@ -73,6 +79,7 @@ help:
 	"  make platform-check-<platform>   Check one adapter: linux, android, ios, macos, windows" \
 	"  make platform-build-ios          Build iOS static libs, generate UniFFI Swift bindings, assemble XCFramework" \
 	"  make platform-build-macos        Build macOS static libs, generate UniFFI Swift bindings, assemble XCFramework" \
+	"  make platform-diagnose-macos     Inspect macOS signing, install paths, and Gatekeeper status" \
 	"  make platform-install-macos      Build and install the macOS input method to ~/Library/Input Methods/" \
 	"  make platform-build-windows      Build the Windows TSF DLL target under target/windows-tsf/" \
 	"  make platform-install-windows    Build and register the Windows TSF DLL with regsvr32" \
@@ -228,17 +235,41 @@ platform-build-macos:
 	rm -rf /tmp/khmerime-macos-xcfw-headers /tmp/khmerime-macos-universal
 	cd $(MACOS_ADAPTER_DIR)/swift && xcodegen generate
 
+platform-diagnose-macos:
+	@echo "== Code signing identities =="
+	@security find-identity -v -p codesigning || true
+	@echo
+	@echo "== Xcode provisioning teams =="
+	@defaults read com.apple.dt.Xcode IDEProvisioningTeams 2>/dev/null || echo "No Xcode provisioning teams configured."
+	@echo
+	@echo "== Installed KhmerIME bundles =="
+	@for app in "$(HOME)/Library/Input Methods/KhmerIMEMacOS.app" "/Library/Input Methods/KhmerIMEMacOS.app"; do \
+		if [ -d "$$app" ]; then \
+			echo "found: $$app"; \
+			codesign --verify --deep --strict --verbose=2 "$$app" 2>&1 || true; \
+			spctl --assess --verbose "$$app" 2>&1 || true; \
+		else \
+			echo "missing: $$app"; \
+		fi; \
+	done
+
 platform-install-macos: platform-build-macos
 	xcodebuild -project $(MACOS_ADAPTER_DIR)/swift/KhmerIMEMacOS.xcodeproj \
 		-scheme KhmerIMEMacOS \
 		-configuration Release \
-		-derivedDataPath /tmp/khmerime-macos-build \
-		$(if $(DEVELOPMENT_TEAM),DEVELOPMENT_TEAM=$(DEVELOPMENT_TEAM) CODE_SIGN_STYLE=Automatic,CODE_SIGN_IDENTITY=- CODE_SIGN_STYLE=Manual) \
+		-derivedDataPath $(MACOS_BUILD_DIR) \
+		$(MACOS_SIGNING_ARGS) \
 		-allowProvisioningUpdates \
 		build
+	@if ! spctl --assess --verbose $(MACOS_BUILD_APP); then \
+		echo "error: macOS rejected $(MACOS_BUILD_APP); it will not appear in Input Sources." >&2; \
+		echo "Use 'syspolicy_check distribution $(MACOS_BUILD_APP)' for the exact Gatekeeper reason." >&2; \
+		echo "If the app is signed with Apple Development, a Developer ID + notarized build may still be required." >&2; \
+		exit 1; \
+	fi
 	mkdir -p $(MACOS_INPUT_METHODS_DIR)
 	rm -rf $(MACOS_INPUT_METHODS_DIR)/KhmerIMEMacOS.app
-	cp -r /tmp/khmerime-macos-build/Build/Products/Release/KhmerIMEMacOS.app \
+	cp -r $(MACOS_BUILD_APP) \
 		$(MACOS_INPUT_METHODS_DIR)/KhmerIMEMacOS.app
 	xattr -dr com.apple.quarantine $(MACOS_INPUT_METHODS_DIR)/KhmerIMEMacOS.app 2>/dev/null || true
 	/System/Library/Frameworks/CoreServices.framework/Versions/Current/Frameworks/LaunchServices.framework/Versions/Current/Support/lsregister \

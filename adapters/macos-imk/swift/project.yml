@@ -26,14 +26,20 @@ targets:
           - "**/.gitkeep"
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.khmerime.KhmerIMEMacOS
+        # "inputmethod" must appear in the bundle id — the macOS input-source
+        # scanner silently skips bundles without it (IMK convention).
+        PRODUCT_BUNDLE_IDENTIFIER: com.khmerime.inputmethod.KhmerIMEMacOS
         INFOPLIST_FILE: KhmerIMEMacOS/Info.plist
+        CODE_SIGN_ENTITLEMENTS: KhmerIMEMacOS/KhmerIMEMacOS.entitlements
         LD_RUNPATH_SEARCH_PATHS: "@loader_path/../Frameworks"
         OTHER_LDFLAGS: "-ObjC"
     dependencies:
       - framework: Frameworks/KhmerIME.xcframework
         embed: false
       - sdk: InputMethodKit.framework
+    scheme:
+      testTargets:
+        - KhmerIMEMacOSTests
 
   KhmerIMEMacOSTests:
     type: bundle.unit-test
