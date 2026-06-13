@@ -41,21 +41,6 @@ final class CandidatePanelLayoutTests: XCTestCase {
             "flipped panel must still fit on screen")
     }
 
-    func test_zeroHeightCaretStillClearsTheLine() {
-        // Some hosts report a zero-height caret. The line-clearance drop must be
-        // floored to a minimum line height (18) so the panel can't ride up onto
-        // the typing line when the caret reports no height.
-        let caret = CGRect(x: 200, y: 500, width: 2, height: 0)
-
-        let origin = CandidatePanelLayout.origin(
-            caret: caret, panelSize: panel, screen: screen
-        )
-
-        let panelTop = origin.y + panel.height
-        XCTAssertGreaterThanOrEqual(caret.minY - panelTop, 18,
-            "with a zero-height caret the panel must still drop a full floored line below the caret")
-    }
-
     func test_panelTallerThanFitKeepsTopRowsOnScreen() {
         // Dead zone: caret where the panel fits neither below nor (flipped) above.
         // The final clamp must keep the TOP of the panel (rows 1–9, the selected
@@ -72,40 +57,18 @@ final class CandidatePanelLayoutTests: XCTestCase {
             "the panel top (rows 1–9) must never be clipped off the top of the screen")
     }
 
-    func test_caretAnchorRangeTargetsLastGlyphInsideTheMarkedText() {
-        // Anchor at the LAST glyph (a range INSIDE the marked text), not one past
-        // the end — querying {length, 0} is out of range and the host answers it
-        // with a degenerate origin rect (the left-margin bug).
-        XCTAssertEqual(
-            CandidatePanelLayout.caretAnchorRange(preedit: "nhom"),
-            NSRange(location: 3, length: 1)               // the 'm'
-        )
-        XCTAssertEqual(
-            CandidatePanelLayout.caretAnchorRange(preedit: "f"),
-            NSRange(location: 0, length: 1)               // single glyph
-        )
-        // Empty preedit → the {0,0} insertion point.
-        XCTAssertEqual(
-            CandidatePanelLayout.caretAnchorRange(preedit: ""),
-            NSRange(location: 0, length: 0)
-        )
+    func test_caretAnchorIndexTargetsLastGlyphOfPreedit() {
+        // Anchor on the LAST glyph so the line rect tracks the end of the
+        // composition; an empty preedit uses the index-0 insertion point.
+        XCTAssertEqual(CandidatePanelLayout.caretAnchorIndex(preedit: "nhom"), 3)
+        XCTAssertEqual(CandidatePanelLayout.caretAnchorIndex(preedit: "f"), 0)
+        XCTAssertEqual(CandidatePanelLayout.caretAnchorIndex(preedit: ""), 0)
         // utf16 units: the last code unit of a multi-scalar Khmer cluster.
         let kh = "ខ្ញុំ"
         XCTAssertEqual(
-            CandidatePanelLayout.caretAnchorRange(preedit: kh),
-            NSRange(location: (kh as NSString).length - 1, length: 1)
+            CandidatePanelLayout.caretAnchorIndex(preedit: kh),
+            (kh as NSString).length - 1
         )
-    }
-
-    func test_caretPointSitsAtTrailingEdgeOfLastGlyph() {
-        // The caret is the trailing (right) edge of the last marked glyph, with
-        // zero width, preserving the glyph's vertical extent — so the panel
-        // anchors at the END of the composition where the cursor actually is.
-        let glyph = CGRect(x: 100, y: 500, width: 12, height: 18)
-
-        let caret = CandidatePanelLayout.caretPoint(fromGlyphRect: glyph)
-
-        XCTAssertEqual(caret, CGRect(x: 112, y: 500, width: 0, height: 18))
     }
 
     func test_panelClampsHorizontallyToStayOnScreen() {

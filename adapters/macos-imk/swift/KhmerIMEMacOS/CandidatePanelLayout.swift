@@ -7,17 +7,13 @@ import Foundation
 // No AppKit: takes plain CGRect/CGSize so it is unit-testable without a screen.
 //
 // Cocoa screen coordinates: origin bottom-left, y increases upward. "Below the
-// caret" therefore means a SMALLER y. The panel must never overlap the caret
-// line (that hides what the user is typing), so by default it hangs just under
-// the caret; if there is not enough room above the screen's bottom edge it
-// flips to sit above the caret instead. The result is always clamped to the
-// visible screen so a degenerate caret rect cannot strand it off-screen.
+// caret" therefore means a SMALLER y. The caret rect is the line-height
+// rectangle reported by attributes(forCharacterIndex:lineHeightRectangle:) — a
+// true line rect, so hanging the panel `gap` below its bottom already clears the
+// line. If there is not enough room below, it flips above; the result is clamped
+// to the visible screen so a degenerate rect cannot strand it off-screen.
 
 enum CandidatePanelLayout {
-
-    /// Floor for the line-clearance drop: some hosts report a zero-height caret
-    /// rect, and without a floor the panel would ride back up onto the line.
-    static let minLineHeight: CGFloat = 18
 
     static func origin(
         caret: CGRect,
@@ -25,17 +21,10 @@ enum CandidatePanelLayout {
         screen: CGRect,
         gap: CGFloat = 6
     ) -> CGPoint {
-        // Hang the panel a full line below the caret: drop by the line height as
-        // well as `gap`, because firstRectForCharacterRange: for marked text
-        // anchors the rect at the line's TOP, so subtracting only `gap` leaves
-        // the panel sitting on the typing line. Subtracting the height clears the
-        // whole line (and any Khmer subscripts) regardless of that anchoring.
-        // The height is floored so a zero-height caret can't collapse the drop.
-        let lineHeight = max(caret.height, minLineHeight)
-        let below = caret.minY - lineHeight - gap - panelSize.height
+        // Hang the panel just below the caret line. caret is a real line rect, so
+        // its bottom (minY) is the line's bottom; `gap` below it clears the line.
+        let below = caret.minY - gap - panelSize.height
         // If that pushes the panel off the bottom edge, flip it above the caret.
-        // The top-anchoring quirk needs no compensation here — caret.maxY already
-        // sits above the visual line, so `+ gap` clears it.
         var y = below < screen.minY ? caret.maxY + gap : below
         // Final vertical clamp for the dead zone where the panel fits neither
         // below nor above. Top-biased: the bottom clamp is applied first and the
@@ -49,24 +38,12 @@ enum CandidatePanelLayout {
         return CGPoint(x: x, y: y)
     }
 
-    /// The marked-text range to ask the IMK client for via
-    /// firstRectForCharacterRange:. Targets the LAST glyph of the preedit — a
-    /// range that stays INSIDE the marked text — so the rect tracks the end of
-    /// the composition. Querying one past the end ({length, 0}) is out of range,
-    /// and hosts answer that with a degenerate origin rect (the left-margin bug).
-    /// An empty preedit falls back to the {0,0} insertion point. Length is in
-    /// UTF-16 units, the unit IMK ranges use.
-    static func caretAnchorRange(preedit: String) -> NSRange {
-        let length = (preedit as NSString).length
-        guard length > 0 else { return NSRange(location: 0, length: 0) }
-        return NSRange(location: length - 1, length: 1)
-    }
-
-    /// Collapses the rect of the last marked glyph to a zero-width caret at its
-    /// trailing (right) edge, preserving the glyph's vertical extent. Feeding
-    /// this to `origin(caret:…)` anchors the panel at the end of the composition
-    /// — where the cursor sits — rather than at the glyph's left edge.
-    static func caretPoint(fromGlyphRect glyph: CGRect) -> CGRect {
-        CGRect(x: glyph.maxX, y: glyph.minY, width: 0, height: glyph.height)
+    /// The marked-text character index to ask the IMK client for via
+    /// attributes(forCharacterIndex:lineHeightRectangle:). Targets the LAST glyph
+    /// of the preedit so the line rect tracks the end of the composition (the
+    /// panel follows the caret as the user types). An empty preedit uses index 0,
+    /// the insertion point. Index is in UTF-16 units, the unit IMK uses.
+    static func caretAnchorIndex(preedit: String) -> Int {
+        max(0, (preedit as NSString).length - 1)
     }
 }

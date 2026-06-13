@@ -143,9 +143,10 @@ final class CandidatePanel: NSPanel {
         let origin = CandidatePanelLayout.origin(
             caret: caretRect, panelSize: frame.size, screen: visible
         )
-        // TEMP geometry diagnostics (no user text) — remove before commit.
+        // TEMP geometry diagnostics (no user text) — .notice so log show can
+        // retrieve it; remove before commit.
         Logger(subsystem: "com.khmerime.inputmethod.KhmerIMEMacOS", category: "panel")
-            .debug("[DEBUG-macos-imk-runtime] caret=\(NSStringFromRect(caretRect), privacy: .public) screen=\(NSStringFromRect(visible), privacy: .public) panel=\(NSStringFromSize(self.frame.size), privacy: .public) origin=\(NSStringFromPoint(origin), privacy: .public)")
+            .notice("[DEBUG-macos-imk-runtime] caret=\(NSStringFromRect(caretRect), privacy: .public) screen=\(NSStringFromRect(visible), privacy: .public) panel=\(NSStringFromSize(self.frame.size), privacy: .public) origin=\(NSStringFromPoint(origin), privacy: .public)")
         setFrameOrigin(origin)
         // orderFrontRegardless, not orderFront: the IME runs as a background
         // accessory (LSUIElement) and is never the active app, so orderFront(_:)

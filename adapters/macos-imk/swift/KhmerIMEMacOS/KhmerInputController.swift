@@ -40,19 +40,15 @@ class KhmerInputController: IMKInputController {
             guard let self else { return }
             self.panel.update(state)
             if let input = self.client() {
-                self.logCaretRects(input, preedit: state.preedit)
-                // Anchor on the LAST marked glyph (a range inside the marked
-                // text), then take its trailing edge — so the panel follows the
-                // caret at the end of the composition without querying one past
-                // the end, which hosts answer with a degenerate left-margin rect.
-                let glyphRect = input.firstRect(
-                    forCharacterRange: CandidatePanelLayout.caretAnchorRange(preedit: state.preedit),
-                    actualRange: nil
-                )
-                let caretRect = state.preedit.isEmpty
-                    ? glyphRect   // {0,0} already returns the insertion-point caret
-                    : CandidatePanelLayout.caretPoint(fromGlyphRect: glyphRect)
-                self.panel.show(below: caretRect)
+                // Anchor on the last marked glyph's line-height rectangle — a true
+                // line rect (proper height + baseline), unlike firstRect's
+                // top-anchored marked-text rect. The panel follows the caret as the
+                // composition grows.
+                let index = CandidatePanelLayout.caretAnchorIndex(preedit: state.preedit)
+                var lineRect = NSRect.zero
+                _ = input.attributes(forCharacterIndex: index, lineHeightRectangle: &lineRect)
+                self.logCaretRect(index: index, lineRect: lineRect)
+                self.panel.show(below: lineRect)
             }
         }
         handler.onPanelHide = { [weak self] in
@@ -88,23 +84,12 @@ class KhmerInputController: IMKInputController {
 
     // MARK: - TEMP ground-truth capture (remove with the positioning refactor)
 
-    // Logs the rect every candidate marked-text range returns, so we can see
-    // which range the host answers with the real caret rect instead of a
-    // degenerate origin rect. See docs/refactor-candidate-panel-positioning.md.
-    private func logCaretRects(_ input: IMKTextInput, preedit: String) {
-        let len = (preedit as NSString).length
-        let ranges: [(String, NSRange)] = [
-            ("{0,0}",     NSRange(location: 0, length: 0)),
-            ("{0,len}",   NSRange(location: 0, length: len)),
-            ("{len-1,1}", NSRange(location: max(0, len - 1), length: len > 0 ? 1 : 0)),
-            ("{len,0}",   NSRange(location: len, length: 0)),
-        ]
-        let log = Logger(subsystem: "com.khmerime.inputmethod.KhmerIMEMacOS", category: "anchor")
-        for (label, range) in ranges {
-            var actual = NSRange(location: NSNotFound, length: 0)
-            let rect = input.firstRect(forCharacterRange: range, actualRange: &actual)
-            log.debug("[DEBUG-macos-imk-runtime] preeditLen=\(len) range=\(label, privacy: .public) rect=\(NSStringFromRect(rect), privacy: .public) actual=\(NSStringFromRange(actual), privacy: .public)")
-        }
+    // Logs the line rect attributes(forCharacterIndex:) returns, at .notice level
+    // so `log show` can retrieve it (unlike .debug, which is not persisted).
+    // See docs/refactor-candidate-panel-positioning.md.
+    private func logCaretRect(index: Int, lineRect: NSRect) {
+        Logger(subsystem: "com.khmerime.inputmethod.KhmerIMEMacOS", category: "anchor")
+            .notice("[DEBUG-macos-imk-runtime] index=\(index) lineRect=\(NSStringFromRect(lineRect), privacy: .public)")
     }
 
     // MARK: - Cursor tracking
