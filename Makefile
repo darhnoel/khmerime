@@ -44,22 +44,22 @@ MACOS_XCFRAMEWORK_OUT   := $(MACOS_ADAPTER_DIR)/swift/Frameworks/KhmerIME.xcfram
 MACOS_INPUT_METHODS_DIR := $(HOME)/Library/Input\ Methods
 MACOS_BUILD_DIR         := /tmp/khmerime-macos-build
 MACOS_BUILD_APP         := $(MACOS_BUILD_DIR)/Build/Products/Release/KhmerIMEMacOS.app
+MACOS_ENTITLEMENTS      := $(MACOS_ADAPTER_DIR)/swift/KhmerIMEMacOS/KhmerIMEMacOS.entitlements
 # Verified flow for macOS 26 (Tahoe): the input-source scanner silently ignores
 # bundles that are not Developer ID signed + hardened + notarized + stapled.
 # CODE_SIGN_INJECT_BASE_ENTITLEMENTS=NO is required — without it Xcode injects
 # get-task-allow into the Release signature and notarization rejects the app.
-# Provide the identity hash / team / keychain profile for the current machine:
-#   make platform-reinstall-macos MACOS_CODE_SIGN_IDENTITY=<sha1> MACOS_TEAM_ID=<team>
+# Provide local values in adapters/macos-imk/macos-signing.local.mk, or pass
+# MACOS_SIGNING_CONFIG=/path/to/config.mk for another config file.
+MACOS_SIGNING_CONFIG    ?= $(MACOS_ADAPTER_DIR)/macos-signing.local.mk
 MACOS_CODE_SIGN_IDENTITY ?=
 MACOS_TEAM_ID            ?=
 MACOS_NOTARY_PROFILE     ?= khmerime-notary
+-include $(MACOS_SIGNING_CONFIG)
 MACOS_NOTARIZE_ZIP       := /tmp/khmerime-macos-notarize.zip
 MACOS_LSREGISTER         := /System/Library/Frameworks/CoreServices.framework/Versions/Current/Frameworks/LaunchServices.framework/Versions/Current/Support/lsregister
-MACOS_SIGNING_ARGS      := CODE_SIGN_STYLE=Manual \
-	CODE_SIGN_IDENTITY=$(MACOS_CODE_SIGN_IDENTITY) \
-	DEVELOPMENT_TEAM=$(MACOS_TEAM_ID) \
-	ENABLE_HARDENED_RUNTIME=YES \
-	OTHER_CODE_SIGN_FLAGS=--timestamp \
+MACOS_XCODE_SIGNING_ARGS := CODE_SIGN_STYLE=Manual \
+	CODE_SIGN_IDENTITY=- \
 	CODE_SIGN_INJECT_BASE_ENTITLEMENTS=NO
 
 help:
@@ -273,22 +273,37 @@ platform-install-macos: platform-build-macos
 # XCFramework from platform-build-macos is already in place), notarize,
 # staple, swap the installed copy, and rescan input sources — no logout.
 platform-reinstall-macos:
+	@if [ -z "$(strip $(MACOS_CODE_SIGN_IDENTITY))" ] || [ -z "$(strip $(MACOS_TEAM_ID))" ]; then \
+		echo "error: platform-reinstall-macos requires MACOS_CODE_SIGN_IDENTITY and MACOS_TEAM_ID." >&2; \
+		echo "example: make platform-reinstall-macos MACOS_CODE_SIGN_IDENTITY=<sha1> MACOS_TEAM_ID=<team>" >&2; \
+		exit 2; \
+	elif printf '%s\n%s\n' "$(MACOS_CODE_SIGN_IDENTITY)" "$(MACOS_TEAM_ID)" | grep -q '[<>]'; then \
+		echo "error: replace placeholder values in $(MACOS_SIGNING_CONFIG) before installing." >&2; \
+		exit 2; \
+	fi
 	xcodebuild -project $(MACOS_ADAPTER_DIR)/swift/KhmerIMEMacOS.xcodeproj \
 		-scheme KhmerIMEMacOS \
 		-configuration Release \
 		-derivedDataPath $(MACOS_BUILD_DIR) \
-		$(MACOS_SIGNING_ARGS) \
+		$(MACOS_XCODE_SIGNING_ARGS) \
 		build
+	codesign --force --deep --options runtime --timestamp \
+		--entitlements $(MACOS_ENTITLEMENTS) \
+		--sign $(MACOS_CODE_SIGN_IDENTITY) \
+		$(MACOS_BUILD_APP)
+	codesign --verify --deep --strict --verbose=2 $(MACOS_BUILD_APP)
 	rm -f $(MACOS_NOTARIZE_ZIP)
 	ditto -c -k --keepParent $(MACOS_BUILD_APP) $(MACOS_NOTARIZE_ZIP)
 	xcrun notarytool submit $(MACOS_NOTARIZE_ZIP) --keychain-profile $(MACOS_NOTARY_PROFILE) --wait
 	xcrun stapler staple $(MACOS_BUILD_APP)
 	xcrun stapler validate $(MACOS_BUILD_APP)
+	codesign --verify --deep --strict --verbose=2 $(MACOS_BUILD_APP)
 	spctl --assess --type execute --verbose=2 $(MACOS_BUILD_APP)
 	killall KhmerIMEMacOS 2>/dev/null || true
 	mkdir -p $(MACOS_INPUT_METHODS_DIR)
 	rm -rf $(MACOS_INPUT_METHODS_DIR)/KhmerIMEMacOS.app
 	ditto $(MACOS_BUILD_APP) $(MACOS_INPUT_METHODS_DIR)/KhmerIMEMacOS.app
+	codesign --verify --deep --strict --verbose=2 $(MACOS_INPUT_METHODS_DIR)/KhmerIMEMacOS.app
 	$(MACOS_LSREGISTER) -u $(MACOS_BUILD_APP) >/dev/null 2>&1 || true
 	$(MACOS_LSREGISTER) -f -R -trusted $(MACOS_INPUT_METHODS_DIR)/KhmerIMEMacOS.app
 	rm -f "$$(getconf DARWIN_USER_CACHE_DIR)"com.apple.IntlDataCache.le*

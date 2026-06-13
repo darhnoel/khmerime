@@ -51,6 +51,7 @@ adapters/ios-keyboard/swift/KhmerIMEKeyboard/Generated/
 adapters/ios-keyboard/swift/*.xcodeproj/
 
 # macOS build artifacts and local Xcode state
+adapters/macos-imk/macos-signing.local.mk
 adapters/macos-imk/swift/Frameworks/KhmerIME.xcframework/macos-arm64_x86_64/libkhmerime_macos_imk.a
 adapters/macos-imk/swift/**/xcuserdata/
 adapters/macos-imk/swift/**/*.xcuserdata/

@@ -39,8 +39,12 @@ class KhmerInputController: IMKInputController {
             guard let self else { return }
             self.panel.update(state)
             if let input = self.client() {
+                // Anchor at the END of the marked text so the panel follows the
+                // caret as the user types, instead of staying pinned to where the
+                // composition began. (NSNotFound is a sentinel some clients answer
+                // with a zero rect, which would strand the panel in a corner.)
                 let rect = input.firstRect(
-                    forCharacterRange: NSRange(location: NSNotFound, length: NSNotFound),
+                    forCharacterRange: CandidatePanelLayout.caretQueryRange(preedit: state.preedit),
                     actualRange: nil
                 )
                 self.panel.show(below: rect)
@@ -69,13 +73,11 @@ class KhmerInputController: IMKInputController {
 
     override func handle(_ event: NSEvent!, client sender: Any!) -> Bool {
         guard let event, event.type == .keyDown else { return false }
+        let input = sessionKeyInput(from: event)
         return handler.handleKey(
-            keyval: keyval(
-                forMacKeyCode: UInt16(event.keyCode),
-                unmodifiedCharacters: event.characters(byApplyingModifiers: []) ?? event.characters
-            ),
-            macKeycode: UInt16(event.keyCode),
-            modifierFlags: UInt32(event.modifierFlags.rawValue)
+            keyval: input.keyval,
+            macKeycode: input.keycode,
+            modifierFlags: input.modifierFlags
         )
     }
 

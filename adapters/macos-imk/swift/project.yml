@@ -51,6 +51,7 @@ targets:
       # same recipe as KhmerIMEKeyboardTests on iOS.
       - path: KhmerIMEMacOS/KhmerInputHandler.swift
       - path: KhmerIMEMacOS/CandidateDisplayFormatter.swift
+      - path: KhmerIMEMacOS/CandidatePanelLayout.swift
       - path: KhmerIMEMacOS/TextClient.swift
       - path: KhmerIMEMacOS/KeyvalMapping.swift
       - path: KhmerIMEMacOS/Generated/khmerime_macos_imk.swift

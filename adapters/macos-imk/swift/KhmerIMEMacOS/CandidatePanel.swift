@@ -1,4 +1,5 @@
 import AppKit
+import os
 
 // CandidatePanel
 // ==============
@@ -10,46 +11,59 @@ import AppKit
 //
 // (Khmer spelling reminder: the -om sign is 'ុំ', never Roman 'uំ'.)
 //
-// Layout:
-//   ┌───────────────────────────────────────────┐
-//   │  [ណុំ]   ទៅ   សាលារៀន               44pt │  ← chips row (focused = accent)
-//   ├───────────────────────────────────────────┤
-//   │  ខ្ញុំ  nhom   ញុំ  nhum   ណុំ  ≈  …   44pt │  ← candidates row (selected = accent)
-//   └───────────────────────────────────────────┘
+// Look: frosted glass (NSVisualEffectView) with rounded corners, like a native
+// macOS popover/menu. Candidates are stacked VERTICALLY with 1-based index
+// prefixes, mirroring the IBus vertical lookup table:
 //
-// Positioning: anchored just below the cursor using firstRectForCharacterRange:
-// from the IMKTextInput client. Uses NSWindowStyleMask.nonActivatingPanel so
-// the panel never steals keyboard focus from the host application;
+//   ┌──────────────────────────────┐
+//   │  ណុំ   ទៅ   សាលារៀន          │  ← segment chips (focused = accent)
+//   ├──────────────────────────────┤
+//   │  1  ខ្ញុំ  nhom, nh, khnom     │  ← candidate rows (selected = accent fill)
+//   │  2  ញ៉ុម  nhom, nhhom          │
+//   │  3  ញ៉ុមៗ nhom, nhhom          │
+//   └──────────────────────────────┘
+//
+// Positioning is delegated to CandidatePanelLayout (pure, unit-tested): the
+// panel hangs below the caret, flips above when there is no room, and clamps to
+// the screen — anchored with firstRectForCharacterRange: from the IMK client.
+// Uses NSWindowStyleMask.nonActivatingPanel so it never steals keyboard focus;
 // ignoresMouseEvents makes the display-only contract explicit.
 
 final class CandidatePanel: NSPanel {
 
-    // Chip row
-    private let chipScrollView = NSScrollView()
-    private let chipStack      = NSStackView()
+    // Fixed width, dynamic height (grows with the candidate list).
+    private let panelWidth: CGFloat = 360
+    private let rowHeight: CGFloat = 30
+    private let candidateSpacing: CGFloat = 2
+    private let topInset: CGFloat = 8
+    private let bottomInset: CGFloat = 8
 
-    // Separator
-    private let separator = NSBox()
+    private var rowContentWidth: CGFloat { panelWidth - 16 }
 
-    // Candidate row
-    private let candidateScrollView = NSScrollView()
-    private let candidateStack      = NSStackView()
+    // Frosted-glass backdrop
+    private let effectView = NSVisualEffectView()
+
+    // Vertical root: segment strip, separator, candidate list
+    private let rootStack      = NSStackView()
+    private let segmentStack   = NSStackView()
+    private let separator      = NSBox()
+    private let candidateStack = NSStackView()
 
     // MARK: - Init
 
     init() {
-        let frame = NSRect(x: 0, y: 0, width: 480, height: 92)
+        let frame = NSRect(x: 0, y: 0, width: 360, height: 120)
         super.init(
             contentRect: frame,
             styleMask: [.nonactivatingPanel, .borderless],
             backing: .buffered,
             defer: false
         )
-        isFloatingPanel  = true
-        level            = .floating
-        isOpaque         = false
-        backgroundColor  = NSColor.windowBackgroundColor
-        hasShadow        = true
+        isFloatingPanel    = true
+        level              = .floating
+        isOpaque           = false
+        backgroundColor    = .clear
+        hasShadow          = true
         ignoresMouseEvents = true
         collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
         setupUI()
@@ -58,134 +72,171 @@ final class CandidatePanel: NSPanel {
     // MARK: - UI setup
 
     private func setupUI() {
-        guard let cv = contentView else { return }
-        cv.wantsLayer = true
-        cv.layer?.cornerRadius = 8
-        cv.layer?.masksToBounds = true
+        // ── Frosted glass content view ───────────────────────────────────────
+        effectView.material        = .menu          // native frosted-menu look
+        effectView.blendingMode    = .behindWindow  // blurs the desktop behind
+        effectView.state           = .active
+        effectView.wantsLayer      = true
+        effectView.layer?.cornerRadius  = 10
+        effectView.layer?.masksToBounds = true
+        effectView.layer?.borderWidth   = 0.5
+        effectView.layer?.borderColor   = NSColor.separatorColor.cgColor
+        contentView = effectView
 
-        // ── Chip scroll ──────────────────────────────────────────────────────
-        chipScrollView.hasHorizontalScroller       = false
-        chipScrollView.hasVerticalScroller         = false
-        chipScrollView.horizontalScrollElasticity  = .allowed
-        chipScrollView.drawsBackground             = false
-        chipScrollView.translatesAutoresizingMaskIntoConstraints = false
+        // ── Segment chips (horizontal phrase preview) ────────────────────────
+        segmentStack.orientation  = .horizontal
+        segmentStack.spacing      = 6
+        segmentStack.alignment    = .centerY
+        segmentStack.edgeInsets   = NSEdgeInsets(top: 0, left: 8, bottom: 0, right: 8)
+        segmentStack.translatesAutoresizingMaskIntoConstraints = false
 
-        chipStack.orientation   = .horizontal
-        chipStack.spacing       = 8
-        chipStack.alignment     = .centerY
-        chipStack.distribution  = .gravityAreas
-        chipStack.translatesAutoresizingMaskIntoConstraints = false
-        chipScrollView.documentView = chipStack
-
-        // ── Separator ────────────────────────────────────────────────────────
         separator.boxType = .separator
         separator.translatesAutoresizingMaskIntoConstraints = false
 
-        // ── Candidate scroll ─────────────────────────────────────────────────
-        candidateScrollView.hasHorizontalScroller      = false
-        candidateScrollView.hasVerticalScroller        = false
-        candidateScrollView.horizontalScrollElasticity = .allowed
-        candidateScrollView.drawsBackground            = false
-        candidateScrollView.translatesAutoresizingMaskIntoConstraints = false
-
-        candidateStack.orientation  = .horizontal
-        candidateStack.spacing      = 6
-        candidateStack.alignment    = .centerY
-        candidateStack.distribution = .gravityAreas
+        // ── Candidate list (vertical, IBus-style) ────────────────────────────
+        candidateStack.orientation = .vertical
+        candidateStack.spacing     = candidateSpacing
+        candidateStack.alignment   = .leading
+        candidateStack.edgeInsets  = NSEdgeInsets(top: 0, left: 4, bottom: 0, right: 4)
         candidateStack.translatesAutoresizingMaskIntoConstraints = false
-        candidateScrollView.documentView = candidateStack
 
-        for v in [chipScrollView, separator, candidateScrollView] as [NSView] {
-            cv.addSubview(v)
-        }
+        // ── Root ──────────────────────────────────────────────────────────────
+        rootStack.orientation = .vertical
+        rootStack.spacing     = 6
+        rootStack.alignment   = .leading
+        rootStack.translatesAutoresizingMaskIntoConstraints = false
+        rootStack.addArrangedSubview(segmentStack)
+        rootStack.addArrangedSubview(separator)
+        rootStack.addArrangedSubview(candidateStack)
 
+        effectView.addSubview(rootStack)
         NSLayoutConstraint.activate([
-            chipScrollView.topAnchor.constraint(equalTo: cv.topAnchor),
-            chipScrollView.leadingAnchor.constraint(equalTo: cv.leadingAnchor),
-            chipScrollView.trailingAnchor.constraint(equalTo: cv.trailingAnchor),
-            chipScrollView.heightAnchor.constraint(equalToConstant: 44),
-
-            separator.topAnchor.constraint(equalTo: chipScrollView.bottomAnchor),
-            separator.leadingAnchor.constraint(equalTo: cv.leadingAnchor),
-            separator.trailingAnchor.constraint(equalTo: cv.trailingAnchor),
-
-            candidateScrollView.topAnchor.constraint(equalTo: separator.bottomAnchor),
-            candidateScrollView.leadingAnchor.constraint(equalTo: cv.leadingAnchor),
-            candidateScrollView.trailingAnchor.constraint(equalTo: cv.trailingAnchor),
-            candidateScrollView.bottomAnchor.constraint(equalTo: cv.bottomAnchor),
-            candidateScrollView.heightAnchor.constraint(equalToConstant: 44),
+            rootStack.topAnchor.constraint(equalTo: effectView.topAnchor, constant: topInset),
+            rootStack.leadingAnchor.constraint(equalTo: effectView.leadingAnchor, constant: 4),
+            rootStack.trailingAnchor.constraint(equalTo: effectView.trailingAnchor, constant: -4),
+            rootStack.bottomAnchor.constraint(equalTo: effectView.bottomAnchor, constant: -bottomInset),
+            separator.widthAnchor.constraint(equalToConstant: rowContentWidth),
         ])
     }
 
     // MARK: - Public API
 
     func update(_ state: MacosRenderState) {
-        rebuildChips(state.segments)
+        rebuildSegments(state.segments)
         let selectedIdx = state.selectedIndex.map { Int($0) } ?? 0
-        rebuildCandidates(
-            CandidateDisplayFormatter.displayEntries(
-                candidates: state.candidates,
-                metadata: state.candidateDisplay
-            ),
-            selectedIndex: selectedIdx
+        let entries = CandidateDisplayFormatter.displayEntries(
+            candidates: state.candidates,
+            metadata: state.candidateDisplay
         )
+        rebuildCandidates(entries, selectedIndex: selectedIdx)
+
+        let hasSegments = !state.segments.isEmpty
+        segmentStack.isHidden = !hasSegments
+        separator.isHidden    = !hasSegments
+        resizeToFit(hasSegments: hasSegments, candidateCount: entries.count)
     }
 
-    func show(below cursorRect: NSRect) {
-        let origin = NSPoint(
-            x: cursorRect.origin.x,
-            y: cursorRect.origin.y - frame.height - 4
+    func show(below caretRect: NSRect) {
+        let screen = NSScreen.screens.first(where: { $0.frame.contains(caretRect.origin) })
+            ?? NSScreen.main
+        let visible = screen?.visibleFrame ?? caretRect
+        let origin = CandidatePanelLayout.origin(
+            caret: caretRect, panelSize: frame.size, screen: visible
         )
+        // TEMP geometry diagnostics (no user text) — remove before commit.
+        Logger(subsystem: "com.khmerime.inputmethod.KhmerIMEMacOS", category: "panel")
+            .debug("[DEBUG-macos-imk-runtime] caret=\(NSStringFromRect(caretRect), privacy: .public) screen=\(NSStringFromRect(visible), privacy: .public) panel=\(NSStringFromSize(self.frame.size), privacy: .public) origin=\(NSStringFromPoint(origin), privacy: .public)")
         setFrameOrigin(origin)
-        if !isVisible { orderFront(nil) }
+        // orderFrontRegardless, not orderFront: the IME runs as a background
+        // accessory (LSUIElement) and is never the active app, so orderFront(_:)
+        // would be ignored and the panel would never appear.
+        if !isVisible { orderFrontRegardless() }
     }
 
     func hide() {
         orderOut(nil)
     }
 
-    // MARK: - Chip row
+    // MARK: - Sizing
 
-    private func rebuildChips(_ segments: [MacosSegmentEntry]) {
-        chipStack.arrangedSubviews.forEach { $0.removeFromSuperview() }
+    private func resizeToFit(hasSegments: Bool, candidateCount: Int) {
+        let segH: CGFloat = hasSegments ? rowHeight : 0
+        let sepH: CGFloat = hasSegments ? (rootStack.spacing * 2 + 1) : 0
+        let rows = max(candidateCount, 1)
+        let listH = CGFloat(rows) * rowHeight + CGFloat(rows - 1) * candidateSpacing
+        let total = topInset + bottomInset + segH + sepH + listH
+        setContentSize(NSSize(width: panelWidth, height: total))
+    }
+
+    // MARK: - Segment chips
+
+    private func rebuildSegments(_ segments: [MacosSegmentEntry]) {
+        segmentStack.arrangedSubviews.forEach { $0.removeFromSuperview() }
         for seg in segments {
-            chipStack.addArrangedSubview(makeChip(seg))
+            segmentStack.addArrangedSubview(makeChip(seg))
         }
-        chipScrollView.documentView?.frame.size.width =
-            max(chipScrollView.frame.width, chipStack.fittingSize.width + 16)
     }
 
     private func makeChip(_ seg: MacosSegmentEntry) -> NSView {
         let label = makeLabel(seg.output)
         label.font = .systemFont(ofSize: 15, weight: seg.focused ? .semibold : .regular)
         label.textColor = seg.focused ? .controlAccentColor : .labelColor
-        label.layer?.backgroundColor = seg.focused
-            ? NSColor.controlAccentColor.withAlphaComponent(0.15).cgColor
-            : NSColor.controlBackgroundColor.cgColor
-        label.layer?.cornerRadius = 10
+        label.drawsBackground = true
+        label.backgroundColor = seg.focused
+            ? NSColor.controlAccentColor.withAlphaComponent(0.15)
+            : .clear
+        label.wantsLayer = true
+        label.layer?.cornerRadius = 6
         return label
     }
 
-    // MARK: - Candidate row
+    // MARK: - Candidate rows
 
     private func rebuildCandidates(_ candidates: [MacosCandidateDisplayEntry], selectedIndex: Int) {
         candidateStack.arrangedSubviews.forEach { $0.removeFromSuperview() }
         for (i, entry) in candidates.enumerated() {
-            candidateStack.addArrangedSubview(makeCandidate(entry, selected: i == selectedIndex))
+            candidateStack.addArrangedSubview(
+                makeCandidateRow(index: i + 1, entry: entry, selected: i == selectedIndex)
+            )
         }
-        candidateScrollView.documentView?.frame.size.width =
-            max(candidateScrollView.frame.width, candidateStack.fittingSize.width + 16)
     }
 
-    private func makeCandidate(_ entry: MacosCandidateDisplayEntry, selected: Bool) -> NSView {
-        let label = makeLabel(CandidateDisplayFormatter.displayText(for: entry))
-        label.font = .systemFont(ofSize: 16, weight: selected ? .semibold : .medium)
-        label.textColor = selected ? .controlAccentColor : .labelColor
-        label.layer?.backgroundColor = selected
-            ? NSColor.controlAccentColor.withAlphaComponent(0.1).cgColor
+    private func makeCandidateRow(index: Int, entry: MacosCandidateDisplayEntry, selected: Bool) -> NSView {
+        let row = NSView()
+        row.wantsLayer = true
+        row.translatesAutoresizingMaskIntoConstraints = false
+        row.layer?.cornerRadius = 5
+        row.layer?.backgroundColor = selected
+            ? NSColor.controlAccentColor.cgColor
             : NSColor.clear.cgColor
-        label.layer?.cornerRadius = 6
-        return label
+
+        // 1-based index prefix (IBus shows 1–9; blank past 9).
+        let idxLabel = makeLabel(index <= 9 ? "\(index)" : "")
+        idxLabel.font = .monospacedDigitSystemFont(ofSize: 12, weight: .regular)
+        idxLabel.textColor = selected ? .white : .secondaryLabelColor
+
+        let textLabel = makeLabel(CandidateDisplayFormatter.displayText(for: entry))
+        textLabel.font = .systemFont(ofSize: 15, weight: selected ? .semibold : .regular)
+        textLabel.textColor = selected ? .white : .labelColor
+        textLabel.lineBreakMode = .byTruncatingTail
+        textLabel.cell?.usesSingleLineMode = true
+
+        let h = NSStackView(views: [idxLabel, textLabel])
+        h.orientation = .horizontal
+        h.spacing = 8
+        h.alignment = .firstBaseline
+        h.translatesAutoresizingMaskIntoConstraints = false
+        row.addSubview(h)
+
+        NSLayoutConstraint.activate([
+            row.widthAnchor.constraint(equalToConstant: rowContentWidth),
+            row.heightAnchor.constraint(equalToConstant: rowHeight),
+            idxLabel.widthAnchor.constraint(equalToConstant: 16),
+            h.leadingAnchor.constraint(equalTo: row.leadingAnchor, constant: 8),
+            h.trailingAnchor.constraint(lessThanOrEqualTo: row.trailingAnchor, constant: -8),
+            h.centerYAnchor.constraint(equalTo: row.centerYAnchor),
+        ])
+        return row
     }
 
     // MARK: - Label factory
@@ -193,7 +244,6 @@ final class CandidatePanel: NSPanel {
     private func makeLabel(_ text: String) -> NSTextField {
         let label = NSTextField(labelWithString: text)
         label.wantsLayer = true
-        label.alignment = .center
         label.translatesAutoresizingMaskIntoConstraints = false
         return label
     }

@@ -1,3 +1,4 @@
+import AppKit
 import Carbon.HIToolbox
 import Foundation
 
@@ -27,4 +28,23 @@ func keyval(forMacKeyCode keyCode: UInt16, unmodifiedCharacters: String?) -> UIn
     default:
         return unmodifiedCharacters?.unicodeScalars.first?.value ?? 0
     }
+}
+
+// Derives the (keyval, keycode, modifierFlags) the Rust session consumes from a
+// key NSEvent. Uses `charactersIgnoringModifiers`, which reflects Shift/CapsLock
+// but ignores Command/Control/Option — so '?' (Shift+/) becomes keyval 0x3F and
+// 'N' (Shift+n) becomes 0x4E, while Cmd/Ctrl/Option stay modifier flags instead
+// of turning the keyval into a control code or accented character. (Using the
+// base, shift-stripped character here would lose '?', uppercase, and every other
+// shifted key.)
+func sessionKeyInput(from event: NSEvent) -> (keyval: UInt32, keycode: UInt16, modifierFlags: UInt32) {
+    let keyCode = UInt16(event.keyCode)
+    return (
+        keyval: keyval(
+            forMacKeyCode: keyCode,
+            unmodifiedCharacters: event.charactersIgnoringModifiers ?? event.characters
+        ),
+        keycode: keyCode,
+        modifierFlags: UInt32(event.modifierFlags.rawValue)
+    )
 }

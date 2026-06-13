@@ -52,11 +52,13 @@ defaults read com.apple.dt.Xcode IDEProvisioningTeams 2>/dev/null \
 ### Step 2 — build and install
 
 ```bash
-# From repo root — replace both values with your Developer ID certificate hash and Team ID:
-make platform-install-macos MACOS_CODE_SIGN_IDENTITY=<sha1> MACOS_TEAM_ID=AB12CD34EF
+# From repo root:
+cp adapters/macos-imk/macos-signing.example.mk adapters/macos-imk/macos-signing.local.mk
+open -e adapters/macos-imk/macos-signing.local.mk
+make platform-install-macos
 ```
 
-This signs manually, notarizes, staples the notarization ticket, checks Gatekeeper, copies the `.app` to `~/Library/Input Methods/`, and runs `lsregister`.
+Fill `macos-signing.local.mk` with your Developer ID Application certificate SHA-1 and Team ID. The local file is git-ignored. The install signs manually, notarizes, staples the notarization ticket, checks Gatekeeper, copies the `.app` to `~/Library/Input Methods/`, and runs `lsregister`.
 
 If Gatekeeper rejects the signed app, inspect the exact reason:
 
@@ -89,7 +91,7 @@ For a Gatekeeper-accepted distribution build, use a Developer ID Application cer
 ```bash
 # Rebuild Rust + Swift, reinstall, re-register — no re-login needed for code changes
 # (the system restarts the daemon automatically on next input focus):
-make platform-install-macos MACOS_CODE_SIGN_IDENTITY=<sha1> MACOS_TEAM_ID=AB12CD34EF
+make platform-install-macos
 ```
 
 Force-restart the daemon if changes don't take effect:
