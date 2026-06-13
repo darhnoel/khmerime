@@ -1,5 +1,6 @@
 import Cocoa
 import InputMethodKit
+import os
 
 // KhmerInputController
 // ====================
@@ -39,6 +40,7 @@ class KhmerInputController: IMKInputController {
             guard let self else { return }
             self.panel.update(state)
             if let input = self.client() {
+                self.logCaretRects(input, preedit: state.preedit)
                 // Anchor at the END of the marked text so the panel follows the
                 // caret as the user types, instead of staying pinned to where the
                 // composition began. (NSNotFound is a sentinel some clients answer
@@ -79,6 +81,27 @@ class KhmerInputController: IMKInputController {
             macKeycode: input.keycode,
             modifierFlags: input.modifierFlags
         )
+    }
+
+    // MARK: - TEMP ground-truth capture (remove with the positioning refactor)
+
+    // Logs the rect every candidate marked-text range returns, so we can see
+    // which range the host answers with the real caret rect instead of a
+    // degenerate origin rect. See docs/refactor-candidate-panel-positioning.md.
+    private func logCaretRects(_ input: IMKTextInput, preedit: String) {
+        let len = (preedit as NSString).length
+        let ranges: [(String, NSRange)] = [
+            ("{0,0}",     NSRange(location: 0, length: 0)),
+            ("{0,len}",   NSRange(location: 0, length: len)),
+            ("{len-1,1}", NSRange(location: max(0, len - 1), length: len > 0 ? 1 : 0)),
+            ("{len,0}",   NSRange(location: len, length: 0)),
+        ]
+        let log = Logger(subsystem: "com.khmerime.inputmethod.KhmerIMEMacOS", category: "anchor")
+        for (label, range) in ranges {
+            var actual = NSRange(location: NSNotFound, length: 0)
+            let rect = input.firstRect(forCharacterRange: range, actualRange: &actual)
+            log.debug("[DEBUG-macos-imk-runtime] preeditLen=\(len) range=\(label, privacy: .public) rect=\(NSStringFromRect(rect), privacy: .public) actual=\(NSStringFromRange(actual), privacy: .public)")
+        }
     }
 
     // MARK: - Cursor tracking
