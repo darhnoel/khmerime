@@ -10,6 +10,7 @@ fetch-data = []
 no-search-index = []
 
 [dependencies]
+khmerime_config = { path = "../khmerime_config" }
 serde = { version = "1", features = ["derive"] }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]

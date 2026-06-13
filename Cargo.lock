@@ -2598,12 +2598,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "khmerime_config"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "tempfile",
+ "toml",
+]
+
+[[package]]
 name = "khmerime_core"
 version = "0.1.0"
 dependencies = [
  "bincode",
  "blake3",
  "js-sys",
+ "khmerime_config",
  "serde",
  "wasm-bindgen-futures",
  "web-sys",

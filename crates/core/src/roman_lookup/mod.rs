@@ -11,6 +11,7 @@ use crate::composer::ComposerTable;
 use crate::decoder::{
     DecoderConfig, DecoderManager, DecoderMode, LegacyDecoder, ShadowObservation, WeightedSpanDecoder,
 };
+use khmerime_config::{normalize_pack_key, LexiconPack};
 
 #[cfg(not(target_arch = "wasm32"))]
 #[allow(dead_code)]
@@ -553,6 +554,29 @@ mod tests {
         assert_eq!(suggestions.get(1).map(String::as_str), Some("តែ"));
         assert!(suggestions.iter().any(|candidate| candidate == "តើ"));
         assert_eq!(suggestions.last().map(String::as_str), Some("te"));
+    }
+
+    #[test]
+    fn lexicon_packs_overlay_exact_matches_before_base_lexicon() {
+        let transliterator = Transliterator::from_tsv_str("komputer\tកុំព្យូទ័រ\n").unwrap();
+        let personal = khmerime_config::LexiconPack {
+            id: "personal".to_owned(),
+            version: "1".to_owned(),
+            entries: HashMap::from([("komputer".to_owned(), vec!["កំព្យូទ័រខ្ញុំ".to_owned()])]),
+        };
+        let tech_terms = khmerime_config::LexiconPack {
+            id: "tech-terms".to_owned(),
+            version: "1".to_owned(),
+            entries: HashMap::from([("komputer".to_owned(), vec!["កំព្យូទ័របច្ចេកទេស".to_owned()])]),
+        };
+
+        let suggestions =
+            transliterator.suggest_with_lexicon_packs("Kom-Puter", &HashMap::new(), &[personal, tech_terms]);
+
+        assert_eq!(
+            suggestions.iter().take(3).map(String::as_str).collect::<Vec<_>>(),
+            vec!["កំព្យូទ័រខ្ញុំ", "កំព្យូទ័របច្ចេកទេស", "កុំព្យូទ័រ"]
+        );
     }
 
     #[test]

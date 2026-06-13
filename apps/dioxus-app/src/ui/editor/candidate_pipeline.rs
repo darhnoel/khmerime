@@ -1,7 +1,9 @@
 use std::collections::{HashMap, HashSet};
 
 use dioxus::prelude::*;
-use roman_lookup::{normalize_visible_suggestions, DecoderMode, ShadowObservation, Transliterator};
+use roman_lookup::{
+    normalize_pack_key, normalize_visible_suggestions, DecoderMode, LexiconPack, ShadowObservation, Transliterator,
+};
 
 use crate::{engine, CompositionMark, SuggestionPopup};
 
@@ -118,10 +120,17 @@ fn spawn_shadow_refinement(mut state: EditorSignals, value: String, token: Strin
             next_segmented.as_ref(),
             state.segmented_refine_mode(),
         );
-        let (visible, user_keys) = merge_with_user_dictionary(&token, &state.user_dictionary(), &visible, 15);
+        let packs = personal_lexicon_packs(state.user_dictionary());
+        let visible = normalize_visible_suggestions(Transliterator::merge_lexicon_packs(
+            &token,
+            &history_shadow,
+            &packs,
+            &visible,
+        ));
+        let user_items = Transliterator::lexicon_pack_exact_matches(&token, &packs);
         let (recommended_indices, mut roman_variant_hints) =
             recommended_indices_and_roman_hints(engine(DecoderMode::Legacy), &token, &visible);
-        decorate_user_dictionary_hints(&visible, &user_keys, &mut roman_variant_hints);
+        decorate_user_dictionary_hints(&visible, &user_items, &mut roman_variant_hints);
 
         state.shadow_debug.set(Some(observation));
         state.segmented_session.set(next_segmented);
@@ -355,7 +364,9 @@ async fn update_transliteration_candidates(
 
     let history_snapshot = state.history();
     let legacy = engine(DecoderMode::Legacy);
-    let legacy_items = legacy.suggest(&token, &history_snapshot);
+    let packs = personal_lexicon_packs(state.user_dictionary());
+    let legacy_items =
+        normalize_visible_suggestions(legacy.suggest_with_lexicon_packs(&token, &history_snapshot, &packs));
     if candidate_request_is_stale(state, request_id, &value) {
         return;
     }
@@ -364,9 +375,10 @@ async fn update_transliteration_candidates(
     state.shadow_debug.set(None);
     state.segmented_session.set(None);
     state.segmented_refine_mode.set(false);
-    let (items, user_keys) = merge_with_user_dictionary(&token, &state.user_dictionary(), &legacy_items, 15);
+    let user_items = Transliterator::lexicon_pack_exact_matches(&token, &packs);
+    let items = legacy_items.clone();
     let (recommended_indices, mut roman_variant_hints) = recommended_indices_and_roman_hints(legacy, &token, &items);
-    decorate_user_dictionary_hints(&items, &user_keys, &mut roman_variant_hints);
+    decorate_user_dictionary_hints(&items, &user_items, &mut roman_variant_hints);
     let preserve_selection = preserve_transliteration_selection(state, &token);
     let Some((popup_position, composition_mark)) = resolve_candidate_overlay(
         state,
@@ -440,30 +452,13 @@ fn apply_visible_candidates(mut state: EditorSignals, items: Vec<String>, preser
     state.suggestions.set(items);
 }
 
-fn merge_with_user_dictionary(
-    token: &str,
-    user_dictionary: &HashMap<String, Vec<String>>,
-    fallback: &[String],
-    limit: usize,
-) -> (Vec<String>, HashSet<String>) {
-    let user_items = user_dictionary_exact_matches(token, user_dictionary);
+fn decorate_user_dictionary_hints(items: &[String], user_items: &[String], hints: &mut HashMap<usize, Vec<String>>) {
     let user_keys = user_items
         .iter()
         .map(|item| normalized_suggestion_key(item))
-        .collect::<HashSet<_>>();
-    (
-        normalize_visible_suggestions(merge_suggestion_lists(&user_items, fallback, limit)),
-        user_keys,
-    )
-}
-
-fn decorate_user_dictionary_hints(
-    items: &[String],
-    user_keys: &HashSet<String>,
-    hints: &mut HashMap<usize, Vec<String>>,
-) {
+        .collect::<Vec<_>>();
     for (index, item) in items.iter().enumerate() {
-        if user_keys.contains(&normalized_suggestion_key(item)) {
+        if user_keys.iter().any(|key| key == &normalized_suggestion_key(item)) {
             let hint = hints.entry(index).or_default();
             if !hint.iter().any(|label| label == "saved") {
                 hint.insert(0, "saved".to_owned());
@@ -472,28 +467,20 @@ fn decorate_user_dictionary_hints(
     }
 }
 
-fn user_dictionary_exact_matches(token: &str, user_dictionary: &HashMap<String, Vec<String>>) -> Vec<String> {
-    let key = normalize_user_dictionary_key(token);
-    if key.is_empty() {
-        return Vec::new();
+fn personal_lexicon_packs(user_dictionary: HashMap<String, Vec<String>>) -> Vec<LexiconPack> {
+    if user_dictionary.is_empty() {
+        Vec::new()
+    } else {
+        vec![LexiconPack {
+            id: "personal".to_owned(),
+            version: "1".to_owned(),
+            entries: user_dictionary,
+        }]
     }
-    let mut values = user_dictionary.get(&key).cloned().unwrap_or_default();
-    values.dedup();
-    values
 }
 
 pub(super) fn normalize_user_dictionary_key(input: &str) -> String {
-    input
-        .trim()
-        .chars()
-        .filter_map(|ch| {
-            if ch.is_ascii_alphanumeric() || ch == '_' {
-                Some(ch.to_ascii_lowercase())
-            } else {
-                None
-            }
-        })
-        .collect()
+    normalize_pack_key(input)
 }
 
 pub(super) fn choose_visible_suggestions(
