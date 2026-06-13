@@ -9,7 +9,13 @@ fn installer_dry_run_verifies_gatekeeper_before_copying_app() {
         .expect("repo root exists");
 
     let output = Command::new("make")
-        .args(["-n", "platform-install-macos", "DEVELOPMENT_TEAM=TESTTEAM"])
+        .args([
+            "-n",
+            "platform-install-macos",
+            "MACOS_TEAM_ID=TESTTEAM",
+            "MACOS_CODE_SIGN_IDENTITY=ABCDEF123456",
+            "MACOS_NOTARY_PROFILE=test-notary",
+        ])
         .current_dir(&repo_root)
         .output()
         .expect("make dry-run can be executed");
@@ -23,12 +29,22 @@ fn installer_dry_run_verifies_gatekeeper_before_copying_app() {
 
     let stdout = String::from_utf8_lossy(&output.stdout);
     let gatekeeper_check = stdout
-        .find("spctl --assess --verbose /tmp/khmerime-macos-build/Build/Products/Release/KhmerIMEMacOS.app")
+        .find("spctl --assess --type execute --verbose=2 /tmp/khmerime-macos-build/Build/Products/Release/KhmerIMEMacOS.app")
         .expect("installer should assess the built app with Gatekeeper");
+    let notarize_submit = stdout
+        .find("xcrun notarytool submit /tmp/khmerime-macos-notarize.zip --keychain-profile test-notary --wait")
+        .expect("installer should submit the app for notarization before Gatekeeper assessment");
+    let staple_validate = stdout
+        .find("xcrun stapler validate /tmp/khmerime-macos-build/Build/Products/Release/KhmerIMEMacOS.app")
+        .expect("installer should validate the stapled notarization ticket");
     let install_copy = stdout
-        .find("cp -r /tmp/khmerime-macos-build/Build/Products/Release/KhmerIMEMacOS.app")
-        .expect("installer should copy the built app into Input Methods");
+        .find("ditto /tmp/khmerime-macos-build/Build/Products/Release/KhmerIMEMacOS.app")
+        .expect("installer should copy the built app into Input Methods with ditto");
 
+    assert!(
+        notarize_submit < staple_validate && staple_validate < gatekeeper_check,
+        "Gatekeeper assessment must happen after notarization and stapling\n{stdout}"
+    );
     assert!(
         gatekeeper_check < install_copy,
         "Gatekeeper assessment must happen before installing the app\n{stdout}"
@@ -46,7 +62,7 @@ fn installer_dry_run_uses_manual_signing_identity_when_provided() {
         .args([
             "-n",
             "platform-install-macos",
-            "DEVELOPMENT_TEAM=TESTTEAM",
+            "MACOS_TEAM_ID=TESTTEAM",
             "MACOS_CODE_SIGN_IDENTITY=ABCDEF123456",
         ])
         .current_dir(&repo_root)

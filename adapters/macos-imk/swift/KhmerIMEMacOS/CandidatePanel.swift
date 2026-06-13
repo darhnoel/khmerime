@@ -14,7 +14,7 @@ import AppKit
 //   ┌───────────────────────────────────────────┐
 //   │  [ណុំ]   ទៅ   សាលារៀន               44pt │  ← chips row (focused = accent)
 //   ├───────────────────────────────────────────┤
-//   │  ខ្ញុំ   ញុំ   ណុំ   ណ៉ំ  …            44pt │  ← candidates row (selected = accent)
+//   │  ខ្ញុំ  nhom   ញុំ  nhum   ណុំ  ≈  …   44pt │  ← candidates row (selected = accent)
 //   └───────────────────────────────────────────┘
 //
 // Positioning: anchored just below the cursor using firstRectForCharacterRange:
@@ -122,7 +122,13 @@ final class CandidatePanel: NSPanel {
     func update(_ state: MacosRenderState) {
         rebuildChips(state.segments)
         let selectedIdx = state.selectedIndex.map { Int($0) } ?? 0
-        rebuildCandidates(state.candidates, selectedIndex: selectedIdx)
+        rebuildCandidates(
+            CandidateDisplayFormatter.displayEntries(
+                candidates: state.candidates,
+                metadata: state.candidateDisplay
+            ),
+            selectedIndex: selectedIdx
+        )
     }
 
     func show(below cursorRect: NSRect) {
@@ -162,18 +168,18 @@ final class CandidatePanel: NSPanel {
 
     // MARK: - Candidate row
 
-    private func rebuildCandidates(_ candidates: [String], selectedIndex: Int) {
+    private func rebuildCandidates(_ candidates: [MacosCandidateDisplayEntry], selectedIndex: Int) {
         candidateStack.arrangedSubviews.forEach { $0.removeFromSuperview() }
-        for (i, text) in candidates.enumerated() {
-            candidateStack.addArrangedSubview(makeCandidate(text, selected: i == selectedIndex))
+        for (i, entry) in candidates.enumerated() {
+            candidateStack.addArrangedSubview(makeCandidate(entry, selected: i == selectedIndex))
         }
         candidateScrollView.documentView?.frame.size.width =
             max(candidateScrollView.frame.width, candidateStack.fittingSize.width + 16)
     }
 
-    private func makeCandidate(_ text: String, selected: Bool) -> NSView {
-        let label = makeLabel(text)
-        label.font = .systemFont(ofSize: 18, weight: selected ? .semibold : .medium)
+    private func makeCandidate(_ entry: MacosCandidateDisplayEntry, selected: Bool) -> NSView {
+        let label = makeLabel(CandidateDisplayFormatter.displayText(for: entry))
+        label.font = .systemFont(ofSize: 16, weight: selected ? .semibold : .medium)
         label.textColor = selected ? .controlAccentColor : .labelColor
         label.layer?.backgroundColor = selected
             ? NSColor.controlAccentColor.withAlphaComponent(0.1).cgColor

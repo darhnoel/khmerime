@@ -73,7 +73,7 @@ use std::time::Duration;
 
 use khmerime_core::{DecoderConfig, Transliterator};
 use khmerime_session::{
-    ImeSession, ImeSessionOptions, NativeKeyEvent, SegmentPreviewEntry,
+    CandidateDisplayEntry, ImeSession, ImeSessionOptions, NativeKeyEvent, SegmentPreviewEntry,
     SegmentedPreviewMode, SessionResult, SessionSnapshot,
 };
 
@@ -112,6 +112,28 @@ impl From<&SegmentPreviewEntry> for MacosSegmentEntry {
     }
 }
 
+/// Display metadata for one visible candidate.
+///
+/// `roman_hints` are exact roman keys for the candidate. If this list is empty,
+/// Swift should render the candidate with a derived marker rather than inventing
+/// a hint.
+#[derive(Clone, Debug, Default, PartialEq, Eq, uniffi::Record)]
+pub struct MacosCandidateDisplayEntry {
+    pub output: String,
+    pub recommended: bool,
+    pub roman_hints: Vec<String>,
+}
+
+impl From<&CandidateDisplayEntry> for MacosCandidateDisplayEntry {
+    fn from(entry: &CandidateDisplayEntry) -> Self {
+        MacosCandidateDisplayEntry {
+            output: entry.output.clone(),
+            recommended: entry.recommended,
+            roman_hints: entry.roman_hints.clone(),
+        }
+    }
+}
+
 /// Render state returned to Swift after every session call.
 ///
 /// `preedit` is always the raw roman string (e.g. "khnhomtov") — Swift puts this
@@ -120,6 +142,7 @@ impl From<&SegmentPreviewEntry> for MacosSegmentEntry {
 #[derive(Clone, Debug, Default, PartialEq, Eq, uniffi::Record)]
 pub struct MacosRenderState {
     pub candidates: Vec<String>,
+    pub candidate_display: Vec<MacosCandidateDisplayEntry>,
     pub selected_index: Option<u64>,
     /// Raw roman preedit — used as marked text content (see ADR-0003).
     pub preedit: String,
@@ -139,6 +162,11 @@ pub struct MacosRenderState {
 fn render_state(snapshot: &SessionSnapshot, result: &SessionResult, ready: bool) -> MacosRenderState {
     MacosRenderState {
         candidates: snapshot.candidates.clone(),
+        candidate_display: snapshot
+            .candidate_display
+            .iter()
+            .map(MacosCandidateDisplayEntry::from)
+            .collect(),
         selected_index: snapshot.selected_index.map(|i| i as u64),
         preedit: snapshot.raw_preedit.clone(),
         segments: snapshot.segment_preview.iter().map(MacosSegmentEntry::from).collect(),

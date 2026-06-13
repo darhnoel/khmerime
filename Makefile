@@ -1,4 +1,4 @@
-.PHONY: help web web-release web-phone desktop stats suggest suggest-wfst suggest-shadow shadow-eval data-split data-build data-check lexicon-editor visualize-lexicon visualize-lexicon-streamlit download-page fmt test test-golden test-ui platform-check platform-check-linux platform-check-android platform-check-ios platform-check-macos platform-check-windows platform-build-ios platform-build-macos platform-diagnose-macos platform-install-macos platform-build-windows platform-install-windows platform-uninstall-windows platform-reinstall-windows platform-smoke-windows-notepad platform-smoke-windows-notepad-python windows-package linux-package ibus-install ibus-uninstall ibus-smoke paper-current paper-current-clean
+.PHONY: help web web-release web-phone desktop stats suggest suggest-wfst suggest-shadow shadow-eval data-split data-build data-check lexicon-editor visualize-lexicon visualize-lexicon-streamlit download-page fmt test test-golden test-ui platform-check platform-check-linux platform-check-android platform-check-ios platform-check-macos platform-check-windows platform-build-ios platform-build-macos platform-diagnose-macos platform-install-macos platform-reinstall-macos platform-build-windows platform-install-windows platform-uninstall-windows platform-reinstall-windows platform-smoke-windows-notepad platform-smoke-windows-notepad-python windows-package linux-package ibus-install ibus-uninstall ibus-smoke paper-current paper-current-clean
 
 DX ?= dx
 APP_DIR := apps/dioxus-app
@@ -44,12 +44,23 @@ MACOS_XCFRAMEWORK_OUT   := $(MACOS_ADAPTER_DIR)/swift/Frameworks/KhmerIME.xcfram
 MACOS_INPUT_METHODS_DIR := $(HOME)/Library/Input\ Methods
 MACOS_BUILD_DIR         := /tmp/khmerime-macos-build
 MACOS_BUILD_APP         := $(MACOS_BUILD_DIR)/Build/Products/Release/KhmerIMEMacOS.app
-# Override with: make platform-install-macos DEVELOPMENT_TEAM=AB12CD34EF
-DEVELOPMENT_TEAM        ?=
-MACOS_DETECTED_CODE_SIGN_IDENTITY := $(if $(DEVELOPMENT_TEAM),$(shell security find-identity -v -p codesigning 2>/dev/null | awk -v team="$(DEVELOPMENT_TEAM)" '/Apple Development:/ && index($$0, "(" team ")") { print $$2; exit }'),)
-# Override with a SHA-1 certificate hash or full identity name when auto-detection is not enough.
-MACOS_CODE_SIGN_IDENTITY ?= $(or $(MACOS_DETECTED_CODE_SIGN_IDENTITY),-)
-MACOS_SIGNING_ARGS      := $(if $(filter -,$(MACOS_CODE_SIGN_IDENTITY)),CODE_SIGN_IDENTITY=- CODE_SIGN_STYLE=Manual,CODE_SIGN_STYLE=Manual CODE_SIGN_IDENTITY=$(MACOS_CODE_SIGN_IDENTITY) $(if $(DEVELOPMENT_TEAM),DEVELOPMENT_TEAM=$(DEVELOPMENT_TEAM),))
+# Verified flow for macOS 26 (Tahoe): the input-source scanner silently ignores
+# bundles that are not Developer ID signed + hardened + notarized + stapled.
+# CODE_SIGN_INJECT_BASE_ENTITLEMENTS=NO is required — without it Xcode injects
+# get-task-allow into the Release signature and notarization rejects the app.
+# Provide the identity hash / team / keychain profile for the current machine:
+#   make platform-reinstall-macos MACOS_CODE_SIGN_IDENTITY=<sha1> MACOS_TEAM_ID=<team>
+MACOS_CODE_SIGN_IDENTITY ?=
+MACOS_TEAM_ID            ?=
+MACOS_NOTARY_PROFILE     ?= khmerime-notary
+MACOS_NOTARIZE_ZIP       := /tmp/khmerime-macos-notarize.zip
+MACOS_LSREGISTER         := /System/Library/Frameworks/CoreServices.framework/Versions/Current/Frameworks/LaunchServices.framework/Versions/Current/Support/lsregister
+MACOS_SIGNING_ARGS      := CODE_SIGN_STYLE=Manual \
+	CODE_SIGN_IDENTITY=$(MACOS_CODE_SIGN_IDENTITY) \
+	DEVELOPMENT_TEAM=$(MACOS_TEAM_ID) \
+	ENABLE_HARDENED_RUNTIME=YES \
+	OTHER_CODE_SIGN_FLAGS=--timestamp \
+	CODE_SIGN_INJECT_BASE_ENTITLEMENTS=NO
 
 help:
 	@printf "%s\n" \
@@ -80,7 +91,8 @@ help:
 	"  make platform-build-ios          Build iOS static libs, generate UniFFI Swift bindings, assemble XCFramework" \
 	"  make platform-build-macos        Build macOS static libs, generate UniFFI Swift bindings, assemble XCFramework" \
 	"  make platform-diagnose-macos     Inspect macOS signing, install paths, and Gatekeeper status" \
-	"  make platform-install-macos      Build and install the macOS input method to ~/Library/Input Methods/" \
+	"  make platform-install-macos      Full build (Rust + app), notarize, install to ~/Library/Input Methods/" \
+	"  make platform-reinstall-macos    Fast loop: rebuild app only, notarize, swap install, rescan (no logout)" \
 	"  make platform-build-windows      Build the Windows TSF DLL target under target/windows-tsf/" \
 	"  make platform-install-windows    Build and register the Windows TSF DLL with regsvr32" \
 	"  make platform-uninstall-windows  Unregister the Windows TSF DLL with regsvr32 /u" \
@@ -253,28 +265,36 @@ platform-diagnose-macos:
 		fi; \
 	done
 
+# Full install: rebuild Rust libs + XCFramework first, then the app flow below.
 platform-install-macos: platform-build-macos
+	$(MAKE) platform-reinstall-macos
+
+# Fast loop for Swift/asset-only changes: rebuild the app (assumes the
+# XCFramework from platform-build-macos is already in place), notarize,
+# staple, swap the installed copy, and rescan input sources — no logout.
+platform-reinstall-macos:
 	xcodebuild -project $(MACOS_ADAPTER_DIR)/swift/KhmerIMEMacOS.xcodeproj \
 		-scheme KhmerIMEMacOS \
 		-configuration Release \
 		-derivedDataPath $(MACOS_BUILD_DIR) \
 		$(MACOS_SIGNING_ARGS) \
-		-allowProvisioningUpdates \
 		build
-	@if ! spctl --assess --verbose $(MACOS_BUILD_APP); then \
-		echo "error: macOS rejected $(MACOS_BUILD_APP); it will not appear in Input Sources." >&2; \
-		echo "Use 'syspolicy_check distribution $(MACOS_BUILD_APP)' for the exact Gatekeeper reason." >&2; \
-		echo "If the app is signed with Apple Development, a Developer ID + notarized build may still be required." >&2; \
-		exit 1; \
-	fi
+	rm -f $(MACOS_NOTARIZE_ZIP)
+	ditto -c -k --keepParent $(MACOS_BUILD_APP) $(MACOS_NOTARIZE_ZIP)
+	xcrun notarytool submit $(MACOS_NOTARIZE_ZIP) --keychain-profile $(MACOS_NOTARY_PROFILE) --wait
+	xcrun stapler staple $(MACOS_BUILD_APP)
+	xcrun stapler validate $(MACOS_BUILD_APP)
+	spctl --assess --type execute --verbose=2 $(MACOS_BUILD_APP)
+	killall KhmerIMEMacOS 2>/dev/null || true
 	mkdir -p $(MACOS_INPUT_METHODS_DIR)
 	rm -rf $(MACOS_INPUT_METHODS_DIR)/KhmerIMEMacOS.app
-	cp -r $(MACOS_BUILD_APP) \
-		$(MACOS_INPUT_METHODS_DIR)/KhmerIMEMacOS.app
-	xattr -dr com.apple.quarantine $(MACOS_INPUT_METHODS_DIR)/KhmerIMEMacOS.app 2>/dev/null || true
-	/System/Library/Frameworks/CoreServices.framework/Versions/Current/Frameworks/LaunchServices.framework/Versions/Current/Support/lsregister \
-		-f -R -trusted $(MACOS_INPUT_METHODS_DIR)/KhmerIMEMacOS.app
-	@echo "Done. Log out and back in, then add 'Khmer IME' in System Settings → Keyboard → Input Sources."
+	ditto $(MACOS_BUILD_APP) $(MACOS_INPUT_METHODS_DIR)/KhmerIMEMacOS.app
+	$(MACOS_LSREGISTER) -u $(MACOS_BUILD_APP) >/dev/null 2>&1 || true
+	$(MACOS_LSREGISTER) -f -R -trusted $(MACOS_INPUT_METHODS_DIR)/KhmerIMEMacOS.app
+	rm -f "$$(getconf DARWIN_USER_CACHE_DIR)"com.apple.IntlDataCache.le*
+	killall TextInputSwitcher TextInputMenuAgent imklaunchagent 2>/dev/null || true
+	swift scripts/platforms/macos/imk/tis_check.swift
+	@echo "Reinstalled — no logout needed. Add/keep 'Khmer IME' in System Settings → Keyboard → Input Sources."
 
 platform-build-windows:
 	cargo build -p khmerime_windows_tsf --target $(WINDOWS_TSF_TARGET) --target-dir $(WINDOWS_TSF_TARGET_DIR)

@@ -56,6 +56,32 @@ final class KhmerInputHandlerTests: XCTestCase {
             "nothing may be committed while composing")
     }
 
+    func test_spaceSelectsNextCandidateAndEnterCommitsVisibleChoice() {
+        let (handler, client) = makeHandler()
+        var updated: MacosRenderState?
+        handler.onPanelUpdate = { updated = $0 }
+        type("jea", into: handler)
+        let before = updated
+
+        let consumedSpace = handler.handleKey(keyval: 0x20, macKeycode: 0, modifierFlags: 0)
+        let afterSpace = updated
+
+        XCTAssertTrue(consumedSpace, "Space must be consumed while candidate UI is active")
+        XCTAssertEqual(client.text, "", "Space must select/cycle, not commit or insert a literal space")
+        XCTAssertEqual(client.markedText, "jea", "raw roman preedit must remain marked while selecting")
+        XCTAssertEqual(before?.selectedIndex, 0)
+        XCTAssertEqual(afterSpace?.selectedIndex, 1)
+        guard let selectedIndex = afterSpace?.selectedIndex,
+              let selected = afterSpace?.candidates[Int(selectedIndex)] else {
+            return XCTFail("Space must leave a visible selected candidate")
+        }
+
+        _ = handler.handleKey(keyval: 0xFF0D, macKeycode: 0, modifierFlags: 0)
+
+        XCTAssertEqual(client.text, selected,
+            "Enter must commit the visible candidate selected by Space")
+    }
+
     func test_commit_insertsTextBeforeClearingMarkedText() {
         // IMK contract: insertText must reach the client before the marked
         // text is cleared, otherwise the host briefly shows neither.

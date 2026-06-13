@@ -210,6 +210,18 @@ fn session_exposes_candidate_display_metadata() {
     let s = session();
     let state = type_str(&s, "jea");
     assert!(!state.candidates.is_empty(), "typing 'jea' must produce at least one candidate");
+    assert_eq!(
+        state.candidate_display.len(),
+        state.candidates.len(),
+        "candidate display metadata must align one-to-one with visible candidates"
+    );
+    assert!(
+        state
+            .candidate_display
+            .iter()
+            .any(|entry| entry.recommended && entry.roman_hints.iter().any(|hint| hint == "jea")),
+        "candidate display metadata must expose the recommended candidate and exact roman hint"
+    );
     assert_eq!(state.selected_index, Some(0), "first candidate should be pre-selected");
     assert!(!state.preedit.is_empty());
 }

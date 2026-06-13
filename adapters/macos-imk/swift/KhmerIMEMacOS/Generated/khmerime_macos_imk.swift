@@ -841,6 +841,67 @@ public func FfiConverterTypeMacosIMKSession_lower(_ value: MacosImkSession) -> U
 
 
 /**
+ * Display metadata for one visible candidate.
+ *
+ * `roman_hints` are exact roman keys for the candidate. If this list is empty,
+ * Swift should render the candidate with a derived marker rather than inventing
+ * a hint.
+ */
+public struct MacosCandidateDisplayEntry: Equatable, Hashable {
+    public var output: String
+    public var recommended: Bool
+    public var romanHints: [String]
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(output: String, recommended: Bool, romanHints: [String]) {
+        self.output = output
+        self.recommended = recommended
+        self.romanHints = romanHints
+    }
+}
+
+#if compiler(>=6)
+extension MacosCandidateDisplayEntry: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeMacosCandidateDisplayEntry: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> MacosCandidateDisplayEntry {
+        return
+            try MacosCandidateDisplayEntry(
+                output: FfiConverterString.read(from: &buf),
+                recommended: FfiConverterBool.read(from: &buf),
+                romanHints: FfiConverterSequenceString.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: MacosCandidateDisplayEntry, into buf: inout [UInt8]) {
+        FfiConverterString.write(value.output, into: &buf)
+        FfiConverterBool.write(value.recommended, into: &buf)
+        FfiConverterSequenceString.write(value.romanHints, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeMacosCandidateDisplayEntry_lift(_ buf: RustBuffer) throws -> MacosCandidateDisplayEntry {
+    return try FfiConverterTypeMacosCandidateDisplayEntry.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeMacosCandidateDisplayEntry_lower(_ value: MacosCandidateDisplayEntry) -> RustBuffer {
+    return FfiConverterTypeMacosCandidateDisplayEntry.lower(value)
+}
+
+
+/**
  * Render state returned to Swift after every session call.
  *
  * `preedit` is always the raw roman string (e.g. "khnhomtov") — Swift puts this
@@ -849,6 +910,7 @@ public func FfiConverterTypeMacosIMKSession_lower(_ value: MacosImkSession) -> U
  */
 public struct MacosRenderState: Equatable, Hashable {
     public var candidates: [String]
+    public var candidateDisplay: [MacosCandidateDisplayEntry]
     public var selectedIndex: UInt64?
     /**
      * Raw roman preedit — used as marked text content (see ADR-0003).
@@ -874,7 +936,7 @@ public struct MacosRenderState: Equatable, Hashable {
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
-    public init(candidates: [String], selectedIndex: UInt64?, 
+    public init(candidates: [String], candidateDisplay: [MacosCandidateDisplayEntry], selectedIndex: UInt64?,
         /**
          * Raw roman preedit — used as marked text content (see ADR-0003).
          */preedit: String, segments: [MacosSegmentEntry], focusedSegmentIndex: UInt64?, 
@@ -889,6 +951,7 @@ public struct MacosRenderState: Equatable, Hashable {
          * True when the session consumed the key event (Swift returns true from handle(_:client:)).
          */consumed: Bool) {
         self.candidates = candidates
+        self.candidateDisplay = candidateDisplay
         self.selectedIndex = selectedIndex
         self.preedit = preedit
         self.segments = segments
@@ -917,6 +980,7 @@ public struct FfiConverterTypeMacosRenderState: FfiConverterRustBuffer {
         return
             try MacosRenderState(
                 candidates: FfiConverterSequenceString.read(from: &buf), 
+                candidateDisplay: FfiConverterSequenceTypeMacosCandidateDisplayEntry.read(from: &buf),
                 selectedIndex: FfiConverterOptionUInt64.read(from: &buf), 
                 preedit: FfiConverterString.read(from: &buf), 
                 segments: FfiConverterSequenceTypeMacosSegmentEntry.read(from: &buf), 
@@ -931,6 +995,7 @@ public struct FfiConverterTypeMacosRenderState: FfiConverterRustBuffer {
 
     public static func write(_ value: MacosRenderState, into buf: inout [UInt8]) {
         FfiConverterSequenceString.write(value.candidates, into: &buf)
+        FfiConverterSequenceTypeMacosCandidateDisplayEntry.write(value.candidateDisplay, into: &buf)
         FfiConverterOptionUInt64.write(value.selectedIndex, into: &buf)
         FfiConverterString.write(value.preedit, into: &buf)
         FfiConverterSequenceTypeMacosSegmentEntry.write(value.segments, into: &buf)
@@ -1088,6 +1153,31 @@ fileprivate struct FfiConverterSequenceString: FfiConverterRustBuffer {
         seq.reserveCapacity(Int(len))
         for _ in 0 ..< len {
             seq.append(try FfiConverterString.read(from: &buf))
+        }
+        return seq
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+fileprivate struct FfiConverterSequenceTypeMacosCandidateDisplayEntry: FfiConverterRustBuffer {
+    typealias SwiftType = [MacosCandidateDisplayEntry]
+
+    public static func write(_ value: [MacosCandidateDisplayEntry], into buf: inout [UInt8]) {
+        let len = Int32(value.count)
+        writeInt(&buf, len)
+        for item in value {
+            FfiConverterTypeMacosCandidateDisplayEntry.write(item, into: &buf)
+        }
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> [MacosCandidateDisplayEntry] {
+        let len: Int32 = try readInt(&buf)
+        var seq = [MacosCandidateDisplayEntry]()
+        seq.reserveCapacity(Int(len))
+        for _ in 0 ..< len {
+            seq.append(try FfiConverterTypeMacosCandidateDisplayEntry.read(from: &buf))
         }
         return seq
     }

@@ -12,8 +12,8 @@ import Foundation
 //   2. preedit       → client.setMarkedText
 //   3. panel content → onPanelUpdate / onPanelHide callbacks
 //
-// All candidate/segment interaction is keyboard-driven (arrows, digits, Tab,
-// Enter) and interpreted by the session — the panel is display-only.
+// All candidate/segment interaction is keyboard-driven (arrows, Space, digits,
+// Tab, Enter) and interpreted by the session — the panel is display-only.
 
 final class KhmerInputHandler {
 
