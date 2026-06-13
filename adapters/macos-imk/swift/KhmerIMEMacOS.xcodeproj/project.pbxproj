@@ -7,60 +7,60 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		1865012BB7F7B12B2C682E3F /* TextClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 56EC2BA43A2EC84898E4E7E2 /* TextClient.swift */; };
-		2B4B1C916EDDA7445C66C8BD /* KeyvalMapping.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC1EE6C7D9D92C34E90C675A /* KeyvalMapping.swift */; };
-		2CDAFFF71E2B1CA6C76B56DD /* TextClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 56EC2BA43A2EC84898E4E7E2 /* TextClient.swift */; };
-		42D3A8D31FF571C34CE8E10D /* KhmerInputHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = 25C32CB26B6C17FADEE7E83B /* KhmerInputHandler.swift */; };
+		1615AB181FF5CBAF0DEF6E08 /* CandidateDisplayFormatter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 178C34B499D80AB92D8EFA90 /* CandidateDisplayFormatter.swift */; };
+		23268B15B80B6C108879CEB7 /* KeyvalMappingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C52A71DF4E1F3E0D48BE8350 /* KeyvalMappingTests.swift */; };
+		2ED088DEC90FD9B28F49719C /* CandidateDisplayFormatter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 178C34B499D80AB92D8EFA90 /* CandidateDisplayFormatter.swift */; };
+		31B96BE180925960D292BAFC /* CandidatePanelLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A914CABE1C88EB2C18B3175 /* CandidatePanelLayout.swift */; };
+		430BB9E04EB02F1A828C52E0 /* SessionKeyInputTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 86F50051225330ADAFB35E7B /* SessionKeyInputTests.swift */; };
 		4545A2067120C511583A95BE /* khmerime_macos_imk.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7BC91497F223E75831370986 /* khmerime_macos_imk.swift */; };
-		48201FE7AEBCA9F79114E006 /* CandidatePanelLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = C8D1EE6C3468A5B7BB4E76F5 /* CandidatePanelLayout.swift */; };
-		4BDAF897B331C4FF8B4F3D36 /* CandidateDisplayFormatter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28C96BBE712A0F113A596727 /* CandidateDisplayFormatter.swift */; };
+		4613C32094B2FDACEC4FCAD5 /* TextClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 12619A32D62F19FE29F8AE2F /* TextClient.swift */; };
 		54E4E2494B1E79878A7FBA69 /* khmerime_macos_imk.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7BC91497F223E75831370986 /* khmerime_macos_imk.swift */; };
+		5A497019ACAFA4E6F72D00CB /* CandidatePanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A25824151087CEC2D071627A /* CandidatePanel.swift */; };
 		60908A1D8D2755B69612A563 /* main.swift in Sources */ = {isa = PBXBuildFile; fileRef = 32A66D0A46DAB12529C95E57 /* main.swift */; };
+		64BFD5EDE4D2C6556B959857 /* MockTextClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6299ABA33630D01F98809344 /* MockTextClient.swift */; };
 		69C0A3292ACA99FDC1C7C84A /* InputMethodKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 7A394B0ADEBBF1DB340B1EEE /* InputMethodKit.framework */; };
-		6B56DA06D50DCCD17643B526 /* KhmerInputHandlerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A88400333F9BD99944A6736E /* KhmerInputHandlerTests.swift */; };
-		7288D0CD9B0AE5E7D9206903 /* CandidateDisplayFormatter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28C96BBE712A0F113A596727 /* CandidateDisplayFormatter.swift */; };
-		776AEE2CE6E7A43DD3F09701 /* CandidateDisplayFormatterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FED4EDC0EB42CD89C3F45F9C /* CandidateDisplayFormatterTests.swift */; };
+		6C4A582DABD745D594470C13 /* CandidatePanelLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A914CABE1C88EB2C18B3175 /* CandidatePanelLayout.swift */; };
+		78EBB6F1861E6E866CE6EAB6 /* KeyvalMapping.swift in Sources */ = {isa = PBXBuildFile; fileRef = 37C503D580D40EF9E2D4026B /* KeyvalMapping.swift */; };
 		7FD088DCFF42588AB3A3153B /* KhmerIME.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = B40F7313D2E03B3A30E76F8A /* KhmerIME.xcframework */; };
 		869376998C564D5797ABC15D /* KhmerIME.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = B40F7313D2E03B3A30E76F8A /* KhmerIME.xcframework */; };
-		94F1624D7B89DBA4D8F2D0FA /* KeyvalMappingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 48B3EC3917E6C715FEB3366F /* KeyvalMappingTests.swift */; };
-		9C89A460CD0BDF36460870EB /* KhmerInputHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = 25C32CB26B6C17FADEE7E83B /* KhmerInputHandler.swift */; };
-		B9EA3413E0FC0A0B9C4C9689 /* KhmerInputController.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE03DC1BE74042FC0325CBBC /* KhmerInputController.swift */; };
-		D50F69A203231305B570646C /* CandidatePanelLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = C8D1EE6C3468A5B7BB4E76F5 /* CandidatePanelLayout.swift */; };
+		8F203F71E0EC31532FC75DDD /* KhmerInputController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 82375434640D703669840951 /* KhmerInputController.swift */; };
+		96B5F4CD1BB3035064C44BC4 /* CandidateDisplayFormatterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 41B4E4D4F6AEC92A275429FB /* CandidateDisplayFormatterTests.swift */; };
+		977C4C4C9B059F5666E16C5B /* TextClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 12619A32D62F19FE29F8AE2F /* TextClient.swift */; };
+		B427CA72C506A3A19CC1FA8F /* KhmerInputHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA2A7CD79DD30209AB8F2AC2 /* KhmerInputHandler.swift */; };
 		DADF3323C141E54C3F076B48 /* menu_icon.tiff in Resources */ = {isa = PBXBuildFile; fileRef = C6451F340A16C7C6E65F7BFB /* menu_icon.tiff */; };
 		DD00AE9490C58C39F32CBDD2 /* InfoPlist.strings in Resources */ = {isa = PBXBuildFile; fileRef = FE046A1B81EB1D8E423D6094 /* InfoPlist.strings */; };
-		DD09BB017FF83E264C339507 /* KeyvalMapping.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC1EE6C7D9D92C34E90C675A /* KeyvalMapping.swift */; };
-		DF9DC06919A41D420C4C4ACF /* SessionKeyInputTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8C2D01A2FC733BD15A83E16E /* SessionKeyInputTests.swift */; };
-		E0B54A47F4D30B62086C98A1 /* CandidatePanelLayoutTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B623DD170C5C79C5A4327180 /* CandidatePanelLayoutTests.swift */; };
-		E70DB6CC4A7767D6AD8BFDC2 /* MockTextClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 59C88769C911B8DDFE14B049 /* MockTextClient.swift */; };
-		EC2428FB69E1256E09DFC3FE /* CandidatePanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 220134C44B7ED4281A57F3FD /* CandidatePanel.swift */; };
+		E61FC94E594B47B77C18FC55 /* KhmerInputHandlerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3C4C2E443F7BF570F522B5C4 /* KhmerInputHandlerTests.swift */; };
+		F263103027D79110ECBA8E2B /* KeyvalMapping.swift in Sources */ = {isa = PBXBuildFile; fileRef = 37C503D580D40EF9E2D4026B /* KeyvalMapping.swift */; };
+		F3561352E9098D653B153FEC /* CandidatePanelLayoutTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 95F5AF48C666E39180F4730A /* CandidatePanelLayoutTests.swift */; };
+		F6D8737A9DF38DD677D024D6 /* KhmerInputHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA2A7CD79DD30209AB8F2AC2 /* KhmerInputHandler.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
-		220134C44B7ED4281A57F3FD /* CandidatePanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CandidatePanel.swift; sourceTree = "<group>"; };
-		25C32CB26B6C17FADEE7E83B /* KhmerInputHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KhmerInputHandler.swift; sourceTree = "<group>"; };
-		28C96BBE712A0F113A596727 /* CandidateDisplayFormatter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CandidateDisplayFormatter.swift; sourceTree = "<group>"; };
+		0A914CABE1C88EB2C18B3175 /* CandidatePanelLayout.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CandidatePanelLayout.swift; sourceTree = "<group>"; };
+		12619A32D62F19FE29F8AE2F /* TextClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TextClient.swift; sourceTree = "<group>"; };
+		178C34B499D80AB92D8EFA90 /* CandidateDisplayFormatter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CandidateDisplayFormatter.swift; sourceTree = "<group>"; };
 		32A66D0A46DAB12529C95E57 /* main.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = main.swift; sourceTree = "<group>"; };
+		37C503D580D40EF9E2D4026B /* KeyvalMapping.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeyvalMapping.swift; sourceTree = "<group>"; };
+		3C4C2E443F7BF570F522B5C4 /* KhmerInputHandlerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KhmerInputHandlerTests.swift; sourceTree = "<group>"; };
 		402F03B27E50519DE3E56ED5 /* khmerime_macos_imkFFI.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = khmerime_macos_imkFFI.h; sourceTree = "<group>"; };
-		48B3EC3917E6C715FEB3366F /* KeyvalMappingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeyvalMappingTests.swift; sourceTree = "<group>"; };
-		56EC2BA43A2EC84898E4E7E2 /* TextClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TextClient.swift; sourceTree = "<group>"; };
-		59C88769C911B8DDFE14B049 /* MockTextClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MockTextClient.swift; sourceTree = "<group>"; };
+		41B4E4D4F6AEC92A275429FB /* CandidateDisplayFormatterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CandidateDisplayFormatterTests.swift; sourceTree = "<group>"; };
+		6299ABA33630D01F98809344 /* MockTextClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MockTextClient.swift; sourceTree = "<group>"; };
 		73846DF9B141E0908FA644AB /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		7A394B0ADEBBF1DB340B1EEE /* InputMethodKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = InputMethodKit.framework; path = System/Library/Frameworks/InputMethodKit.framework; sourceTree = SDKROOT; };
 		7BC91497F223E75831370986 /* khmerime_macos_imk.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = khmerime_macos_imk.swift; sourceTree = "<group>"; };
-		8C2D01A2FC733BD15A83E16E /* SessionKeyInputTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionKeyInputTests.swift; sourceTree = "<group>"; };
-		A88400333F9BD99944A6736E /* KhmerInputHandlerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KhmerInputHandlerTests.swift; sourceTree = "<group>"; };
+		82375434640D703669840951 /* KhmerInputController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KhmerInputController.swift; sourceTree = "<group>"; };
+		86F50051225330ADAFB35E7B /* SessionKeyInputTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionKeyInputTests.swift; sourceTree = "<group>"; };
+		95F5AF48C666E39180F4730A /* CandidatePanelLayoutTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CandidatePanelLayoutTests.swift; sourceTree = "<group>"; };
+		A25824151087CEC2D071627A /* CandidatePanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CandidatePanel.swift; sourceTree = "<group>"; };
 		AE3E4BC1CCF2EEB9A946D40F /* khmerime_macos_imk.modulemap */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.module-map"; path = khmerime_macos_imk.modulemap; sourceTree = "<group>"; };
 		B40F7313D2E03B3A30E76F8A /* KhmerIME.xcframework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcframework; name = KhmerIME.xcframework; path = Frameworks/KhmerIME.xcframework; sourceTree = "<group>"; };
-		B623DD170C5C79C5A4327180 /* CandidatePanelLayoutTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CandidatePanelLayoutTests.swift; sourceTree = "<group>"; };
 		B7971F93554C6934213F1C04 /* en */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = en; path = en.lproj/InfoPlist.strings; sourceTree = "<group>"; };
-		BC1EE6C7D9D92C34E90C675A /* KeyvalMapping.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeyvalMapping.swift; sourceTree = "<group>"; };
+		C52A71DF4E1F3E0D48BE8350 /* KeyvalMappingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeyvalMappingTests.swift; sourceTree = "<group>"; };
 		C6451F340A16C7C6E65F7BFB /* menu_icon.tiff */ = {isa = PBXFileReference; lastKnownFileType = image.tiff; path = menu_icon.tiff; sourceTree = "<group>"; };
 		C84062FF1727DFAE5B371156 /* KhmerIMEMacOS.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = KhmerIMEMacOS.entitlements; sourceTree = "<group>"; };
-		C8D1EE6C3468A5B7BB4E76F5 /* CandidatePanelLayout.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CandidatePanelLayout.swift; sourceTree = "<group>"; };
-		CE03DC1BE74042FC0325CBBC /* KhmerInputController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KhmerInputController.swift; sourceTree = "<group>"; };
 		E342FC8BC1323F06EA072A93 /* KhmerIMEMacOSTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = KhmerIMEMacOSTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		EA2A7CD79DD30209AB8F2AC2 /* KhmerInputHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KhmerInputHandler.swift; sourceTree = "<group>"; };
 		EFFA3D153052FAE1B6156BA0 /* KhmerIMEMacOS.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = KhmerIMEMacOS.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		FED4EDC0EB42CD89C3F45F9C /* CandidateDisplayFormatterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CandidateDisplayFormatterTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -84,6 +84,38 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		140A0384899CA75E06310222 /* Layout */ = {
+			isa = PBXGroup;
+			children = (
+				95F5AF48C666E39180F4730A /* CandidatePanelLayoutTests.swift */,
+			);
+			path = Layout;
+			sourceTree = "<group>";
+		};
+		32B3EC99FC3CD79214DE4052 /* Controller */ = {
+			isa = PBXGroup;
+			children = (
+				82375434640D703669840951 /* KhmerInputController.swift */,
+			);
+			path = Controller;
+			sourceTree = "<group>";
+		};
+		4018C69DB80DEA871C57D2C1 /* Layout */ = {
+			isa = PBXGroup;
+			children = (
+				0A914CABE1C88EB2C18B3175 /* CandidatePanelLayout.swift */,
+			);
+			path = Layout;
+			sourceTree = "<group>";
+		};
+		4067B8DFA7BE93AEFB18FC11 /* Views */ = {
+			isa = PBXGroup;
+			children = (
+				41B4E4D4F6AEC92A275429FB /* CandidateDisplayFormatterTests.swift */,
+			);
+			path = Views;
+			sourceTree = "<group>";
+		};
 		64367B22A7589FD718DD0845 /* Products */ = {
 			isa = PBXGroup;
 			children = (
@@ -91,6 +123,26 @@
 				E342FC8BC1323F06EA072A93 /* KhmerIMEMacOSTests.xctest */,
 			);
 			name = Products;
+			sourceTree = "<group>";
+		};
+		67471B7E56A7994284CAE068 /* Input */ = {
+			isa = PBXGroup;
+			children = (
+				C52A71DF4E1F3E0D48BE8350 /* KeyvalMappingTests.swift */,
+				3C4C2E443F7BF570F522B5C4 /* KhmerInputHandlerTests.swift */,
+				6299ABA33630D01F98809344 /* MockTextClient.swift */,
+				86F50051225330ADAFB35E7B /* SessionKeyInputTests.swift */,
+			);
+			path = Input;
+			sourceTree = "<group>";
+		};
+		694EEE21D1F24658005D9A48 /* Views */ = {
+			isa = PBXGroup;
+			children = (
+				178C34B499D80AB92D8EFA90 /* CandidateDisplayFormatter.swift */,
+				A25824151087CEC2D071627A /* CandidatePanel.swift */,
+			);
+			path = Views;
 			sourceTree = "<group>";
 		};
 		74966360CBB4ECA4D85C34E6 /* Frameworks */ = {
@@ -105,19 +157,16 @@
 		7D35880E3312998C634843FC /* KhmerIMEMacOS */ = {
 			isa = PBXGroup;
 			children = (
-				28C96BBE712A0F113A596727 /* CandidateDisplayFormatter.swift */,
-				220134C44B7ED4281A57F3FD /* CandidatePanel.swift */,
-				C8D1EE6C3468A5B7BB4E76F5 /* CandidatePanelLayout.swift */,
 				73846DF9B141E0908FA644AB /* Info.plist */,
-				BC1EE6C7D9D92C34E90C675A /* KeyvalMapping.swift */,
 				C84062FF1727DFAE5B371156 /* KhmerIMEMacOS.entitlements */,
-				CE03DC1BE74042FC0325CBBC /* KhmerInputController.swift */,
-				25C32CB26B6C17FADEE7E83B /* KhmerInputHandler.swift */,
 				32A66D0A46DAB12529C95E57 /* main.swift */,
 				C6451F340A16C7C6E65F7BFB /* menu_icon.tiff */,
-				56EC2BA43A2EC84898E4E7E2 /* TextClient.swift */,
+				32B3EC99FC3CD79214DE4052 /* Controller */,
 				EF6204FBBCAF942E95E88D58 /* Generated */,
 				FE046A1B81EB1D8E423D6094 /* InfoPlist.strings */,
+				FAB24F20B074104B35ABC74A /* Input */,
+				4018C69DB80DEA871C57D2C1 /* Layout */,
+				694EEE21D1F24658005D9A48 /* Views */,
 			);
 			path = KhmerIMEMacOS;
 			sourceTree = "<group>";
@@ -145,14 +194,21 @@
 		F7DEC519E1A6527D6B208A67 /* KhmerIMEMacOSTests */ = {
 			isa = PBXGroup;
 			children = (
-				FED4EDC0EB42CD89C3F45F9C /* CandidateDisplayFormatterTests.swift */,
-				B623DD170C5C79C5A4327180 /* CandidatePanelLayoutTests.swift */,
-				48B3EC3917E6C715FEB3366F /* KeyvalMappingTests.swift */,
-				A88400333F9BD99944A6736E /* KhmerInputHandlerTests.swift */,
-				59C88769C911B8DDFE14B049 /* MockTextClient.swift */,
-				8C2D01A2FC733BD15A83E16E /* SessionKeyInputTests.swift */,
+				67471B7E56A7994284CAE068 /* Input */,
+				140A0384899CA75E06310222 /* Layout */,
+				4067B8DFA7BE93AEFB18FC11 /* Views */,
 			);
 			path = KhmerIMEMacOSTests;
+			sourceTree = "<group>";
+		};
+		FAB24F20B074104B35ABC74A /* Input */ = {
+			isa = PBXGroup;
+			children = (
+				37C503D580D40EF9E2D4026B /* KeyvalMapping.swift */,
+				EA2A7CD79DD30209AB8F2AC2 /* KhmerInputHandler.swift */,
+				12619A32D62F19FE29F8AE2F /* TextClient.swift */,
+			);
+			path = Input;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -251,17 +307,17 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				4BDAF897B331C4FF8B4F3D36 /* CandidateDisplayFormatter.swift in Sources */,
-				776AEE2CE6E7A43DD3F09701 /* CandidateDisplayFormatterTests.swift in Sources */,
-				D50F69A203231305B570646C /* CandidatePanelLayout.swift in Sources */,
-				E0B54A47F4D30B62086C98A1 /* CandidatePanelLayoutTests.swift in Sources */,
-				DD09BB017FF83E264C339507 /* KeyvalMapping.swift in Sources */,
-				94F1624D7B89DBA4D8F2D0FA /* KeyvalMappingTests.swift in Sources */,
-				42D3A8D31FF571C34CE8E10D /* KhmerInputHandler.swift in Sources */,
-				6B56DA06D50DCCD17643B526 /* KhmerInputHandlerTests.swift in Sources */,
-				E70DB6CC4A7767D6AD8BFDC2 /* MockTextClient.swift in Sources */,
-				DF9DC06919A41D420C4C4ACF /* SessionKeyInputTests.swift in Sources */,
-				2CDAFFF71E2B1CA6C76B56DD /* TextClient.swift in Sources */,
+				1615AB181FF5CBAF0DEF6E08 /* CandidateDisplayFormatter.swift in Sources */,
+				96B5F4CD1BB3035064C44BC4 /* CandidateDisplayFormatterTests.swift in Sources */,
+				31B96BE180925960D292BAFC /* CandidatePanelLayout.swift in Sources */,
+				F3561352E9098D653B153FEC /* CandidatePanelLayoutTests.swift in Sources */,
+				78EBB6F1861E6E866CE6EAB6 /* KeyvalMapping.swift in Sources */,
+				23268B15B80B6C108879CEB7 /* KeyvalMappingTests.swift in Sources */,
+				F6D8737A9DF38DD677D024D6 /* KhmerInputHandler.swift in Sources */,
+				E61FC94E594B47B77C18FC55 /* KhmerInputHandlerTests.swift in Sources */,
+				64BFD5EDE4D2C6556B959857 /* MockTextClient.swift in Sources */,
+				430BB9E04EB02F1A828C52E0 /* SessionKeyInputTests.swift in Sources */,
+				4613C32094B2FDACEC4FCAD5 /* TextClient.swift in Sources */,
 				4545A2067120C511583A95BE /* khmerime_macos_imk.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -270,13 +326,13 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				7288D0CD9B0AE5E7D9206903 /* CandidateDisplayFormatter.swift in Sources */,
-				EC2428FB69E1256E09DFC3FE /* CandidatePanel.swift in Sources */,
-				48201FE7AEBCA9F79114E006 /* CandidatePanelLayout.swift in Sources */,
-				2B4B1C916EDDA7445C66C8BD /* KeyvalMapping.swift in Sources */,
-				B9EA3413E0FC0A0B9C4C9689 /* KhmerInputController.swift in Sources */,
-				9C89A460CD0BDF36460870EB /* KhmerInputHandler.swift in Sources */,
-				1865012BB7F7B12B2C682E3F /* TextClient.swift in Sources */,
+				2ED088DEC90FD9B28F49719C /* CandidateDisplayFormatter.swift in Sources */,
+				5A497019ACAFA4E6F72D00CB /* CandidatePanel.swift in Sources */,
+				6C4A582DABD745D594470C13 /* CandidatePanelLayout.swift in Sources */,
+				F263103027D79110ECBA8E2B /* KeyvalMapping.swift in Sources */,
+				8F203F71E0EC31532FC75DDD /* KhmerInputController.swift in Sources */,
+				B427CA72C506A3A19CC1FA8F /* KhmerInputHandler.swift in Sources */,
+				977C4C4C9B059F5666E16C5B /* TextClient.swift in Sources */,
 				54E4E2494B1E79878A7FBA69 /* khmerime_macos_imk.swift in Sources */,
 				60908A1D8D2755B69612A563 /* main.swift in Sources */,
 			);

@@ -49,11 +49,11 @@ targets:
       - path: KhmerIMEMacOSTests
       # Share handler + session sources directly (no linking the app bundle) —
       # same recipe as KhmerIMEKeyboardTests on iOS.
-      - path: KhmerIMEMacOS/KhmerInputHandler.swift
-      - path: KhmerIMEMacOS/CandidateDisplayFormatter.swift
-      - path: KhmerIMEMacOS/CandidatePanelLayout.swift
-      - path: KhmerIMEMacOS/TextClient.swift
-      - path: KhmerIMEMacOS/KeyvalMapping.swift
+      - path: KhmerIMEMacOS/Input/KhmerInputHandler.swift
+      - path: KhmerIMEMacOS/Views/CandidateDisplayFormatter.swift
+      - path: KhmerIMEMacOS/Layout/CandidatePanelLayout.swift
+      - path: KhmerIMEMacOS/Input/TextClient.swift
+      - path: KhmerIMEMacOS/Input/KeyvalMapping.swift
       - path: KhmerIMEMacOS/Generated/khmerime_macos_imk.swift
     settings:
       base:

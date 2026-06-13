@@ -110,11 +110,22 @@ All 27 protocol tests run on macOS without Xcode (pure Rust).
 
 ## Key Files
 
-| File | Purpose |
+| Path | Purpose |
 |------|---------|
+| **Rust layer** | |
 | `src/lib.rs` | UniFFI-exported `MacosIMKSession` and `MacosRenderState` |
-| `swift/KhmerIMEMacOS/KhmerInputController.swift` | IMKInputController subclass — key handling, render loop |
-| `swift/KhmerIMEMacOS/CandidatePanel.swift` | Non-activating NSPanel for segments + candidates |
+| **Swift — Controller** | |
+| `swift/KhmerIMEMacOS/Controller/KhmerInputController.swift` | IMKInputController subclass — key handling, render loop |
+| **Swift — Input** | |
+| `swift/KhmerIMEMacOS/Input/KhmerInputHandler.swift` | IMK key-event dispatch to Rust session |
+| `swift/KhmerIMEMacOS/Input/KeyvalMapping.swift` | macOS→X11 keysym conversion |
+| `swift/KhmerIMEMacOS/Input/TextClient.swift` | Wraps IMK client protocol for the Rust bridge |
+| **Swift — Layout** | |
+| `swift/KhmerIMEMacOS/Layout/CandidatePanelLayout.swift` | Geometry: on-screen candidate panel placement |
+| **Swift — Views** | |
+| `swift/KhmerIMEMacOS/Views/CandidatePanel.swift` | Non-activating NSPanel for segments + candidates |
+| `swift/KhmerIMEMacOS/Views/CandidateDisplayFormatter.swift` | Roman Hint rendering for candidate cells |
+| **Swift — root** | |
 | `swift/KhmerIMEMacOS/main.swift` | IMKServer bootstrap, NSApplication.run() |
 | `swift/KhmerIMEMacOS/Info.plist` | Bundle metadata, TIS registration keys |
 | `swift/project.yml` | xcodegen spec |
