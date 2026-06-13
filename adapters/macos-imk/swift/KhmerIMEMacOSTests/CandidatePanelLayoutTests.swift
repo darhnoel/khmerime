@@ -112,6 +112,17 @@ final class CandidatePanelLayoutTests: XCTestCase {
         )
     }
 
+    func test_caretPointSitsAtTrailingEdgeOfLastGlyph() {
+        // The caret is the trailing (right) edge of the last marked glyph, with
+        // zero width, preserving the glyph's vertical extent — so the panel
+        // anchors at the END of the composition where the cursor actually is.
+        let glyph = CGRect(x: 100, y: 500, width: 12, height: 18)
+
+        let caret = CandidatePanelLayout.caretPoint(fromGlyphRect: glyph)
+
+        XCTAssertEqual(caret, CGRect(x: 112, y: 500, width: 0, height: 18))
+    }
+
     func test_panelClampsHorizontallyToStayOnScreen() {
         // Caret near the right edge: aligning the panel's left with the caret
         // would overflow the right edge, so it must shift left to stay on screen.

@@ -71,4 +71,12 @@ enum CandidatePanelLayout {
         guard length > 0 else { return NSRange(location: 0, length: 0) }
         return NSRange(location: length - 1, length: 1)
     }
+
+    /// Collapses the rect of the last marked glyph to a zero-width caret at its
+    /// trailing (right) edge, preserving the glyph's vertical extent. Feeding
+    /// this to `origin(caret:…)` anchors the panel at the end of the composition
+    /// — where the cursor sits — rather than at the glyph's left edge.
+    static func caretPoint(fromGlyphRect glyph: CGRect) -> CGRect {
+        CGRect(x: glyph.maxX, y: glyph.minY, width: 0, height: glyph.height)
+    }
 }
