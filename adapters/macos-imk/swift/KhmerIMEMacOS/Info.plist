@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleDevelopmentRegion</key>
+    <string>en</string>
+    <key>CFBundleExecutable</key>
+    <string>$(EXECUTABLE_NAME)</string>
+    <key>CFBundleIdentifier</key>
+    <string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+    <key>CFBundleInfoDictionaryVersion</key>
+    <string>6.0</string>
+    <key>CFBundleName</key>
+    <string>Khmer IME</string>
+    <key>CFBundleDisplayName</key>
+    <string>Khmer IME</string>
+    <key>CFBundlePackageType</key>
+    <string>APPL</string>
+    <key>CFBundleShortVersionString</key>
+    <string>1.0</string>
+    <key>CFBundleVersion</key>
+    <string>1</string>
+    <key>LSMinimumSystemVersion</key>
+    <string>$(MACOSX_DEPLOYMENT_TARGET)</string>
+    <!-- LSUIElement (accessory app: no Dock icon / menu bar) is correct for an
+         IME. LSBackgroundOnly must NOT be set: a background-only process has no
+         window-server access and cannot show the candidate NSPanel. -->
+    <key>LSUIElement</key>
+    <true/>
+    <key>NSPrincipalClass</key>
+    <string>NSApplication</string>
+    <key>tsInputMethodIconFileKey</key>
+    <string>menu_icon.tiff</string>
+    <!-- IMK registration, modeled on Apple's own input methods
+         (/System/Library/Input Methods/TamilIM.app). Four pieces:
+         1. InputMethodConnectionName — must match the IMKServer name in
+            main.swift: "<bundle-id>_Connection"
+         2. InputMethodServerControllerClass — our IMKInputController subclass
+         3. TISInputSourceID — the parent input method's source ID; TIS
+            silently ignores the whole bundle without it. Third-party IDs
+            must be prefixed by the bundle identifier.
+         4. ComponentInputModeDict — the input MODES; each mode's dictionary
+            key must EQUAL its TISInputSourceID (TamilIM convention). -->
+    <key>InputMethodConnectionName</key>
+    <string>com.khmerime.inputmethod.KhmerIMEMacOS_Connection</string>
+    <key>InputMethodServerControllerClass</key>
+    <string>KhmerInputController</string>
+    <key>TISInputSourceID</key>
+    <string>com.khmerime.inputmethod.KhmerIMEMacOS</string>
+    <key>TISIntendedLanguage</key>
+    <string>km</string>
+    <key>tsInputMethodCharacterRepertoireKey</key>
+    <array>
+        <string>Khmr</string>
+    </array>
+    <key>ComponentInputModeDict</key>
+    <dict>
+        <key>tsInputModeListKey</key>
+        <dict>
+            <key>com.khmerime.inputmethod.KhmerIMEMacOS.roman</key>
+            <dict>
+                <key>TISInputSourceID</key>
+                <string>com.khmerime.inputmethod.KhmerIMEMacOS.roman</string>
+                <key>TISIntendedLanguage</key>
+                <string>km</string>
+                <key>tsInputModeDefaultStateKey</key>
+                <true/>
+                <key>tsInputModeIsVisibleKey</key>
+                <true/>
+                <key>tsInputModeMenuIconFileKey</key>
+                <string>menu_icon.tiff</string>
+                <key>tsInputModePaletteIconFileKey</key>
+                <string>menu_icon.tiff</string>
+                <key>tsInputModePrimaryInScriptKey</key>
+                <true/>
+                <key>tsInputModeScriptKey</key>
+                <string>smUnicodeScript</string>
+            </dict>
+        </dict>
+        <key>tsVisibleInputModeOrderedArrayKey</key>
+        <array>
+            <string>com.khmerime.inputmethod.KhmerIMEMacOS.roman</string>
+        </array>
+    </dict>
+</dict>
+</plist>

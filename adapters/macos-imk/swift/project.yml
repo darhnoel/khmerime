@@ -1,0 +1,65 @@
+name: KhmerIMEMacOS
+options:
+  bundleIdPrefix: com.khmerime
+  deploymentTarget:
+    macOS: "13.0"
+
+settings:
+  base:
+    SWIFT_VERSION: "5.0"
+    MACOSX_DEPLOYMENT_TARGET: "13.0"
+    # Signing: replace DEVELOPMENT_TEAM with your 10-char team ID for device builds.
+    # Use "-" for ad-hoc local development.
+    CODE_SIGN_STYLE: Manual
+    CODE_SIGN_IDENTITY: "-"
+    DEVELOPMENT_TEAM: ""
+
+targets:
+
+  KhmerIMEMacOS:
+    type: application
+    platform: macOS
+    deploymentTarget: "13.0"
+    sources:
+      - path: KhmerIMEMacOS
+        excludes:
+          - "**/.gitkeep"
+    settings:
+      base:
+        # "inputmethod" must appear in the bundle id — the macOS input-source
+        # scanner silently skips bundles without it (IMK convention).
+        PRODUCT_BUNDLE_IDENTIFIER: com.khmerime.inputmethod.KhmerIMEMacOS
+        INFOPLIST_FILE: KhmerIMEMacOS/Info.plist
+        CODE_SIGN_ENTITLEMENTS: KhmerIMEMacOS/KhmerIMEMacOS.entitlements
+        LD_RUNPATH_SEARCH_PATHS: "@loader_path/../Frameworks"
+        OTHER_LDFLAGS: "-ObjC"
+    dependencies:
+      - framework: Frameworks/KhmerIME.xcframework
+        embed: false
+      - sdk: InputMethodKit.framework
+    scheme:
+      testTargets:
+        - KhmerIMEMacOSTests
+
+  KhmerIMEMacOSTests:
+    type: bundle.unit-test
+    platform: macOS
+    deploymentTarget: "13.0"
+    sources:
+      - path: KhmerIMEMacOSTests
+      # Share handler + session sources directly (no linking the app bundle) —
+      # same recipe as KhmerIMEKeyboardTests on iOS.
+      - path: KhmerIMEMacOS/KhmerInputHandler.swift
+      - path: KhmerIMEMacOS/CandidateDisplayFormatter.swift
+      - path: KhmerIMEMacOS/CandidatePanelLayout.swift
+      - path: KhmerIMEMacOS/TextClient.swift
+      - path: KhmerIMEMacOS/KeyvalMapping.swift
+      - path: KhmerIMEMacOS/Generated/khmerime_macos_imk.swift
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.khmerime.KhmerIMEMacOSTests
+        GENERATE_INFOPLIST_FILE: YES
+        OTHER_LDFLAGS: "-ObjC"
+    dependencies:
+      - framework: Frameworks/KhmerIME.xcframework
+        embed: false

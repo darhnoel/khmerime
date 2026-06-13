@@ -1,4 +1,4 @@
-.PHONY: help web web-release web-phone desktop stats suggest suggest-wfst suggest-shadow shadow-eval data-split data-build data-check lexicon-editor visualize-lexicon visualize-lexicon-streamlit download-page fmt test test-golden test-ui platform-check platform-check-linux platform-check-android platform-check-ios platform-check-macos platform-check-windows platform-build-ios platform-build-windows platform-install-windows platform-uninstall-windows platform-reinstall-windows platform-smoke-windows-notepad platform-smoke-windows-notepad-python windows-package linux-package ibus-install ibus-uninstall ibus-smoke paper-current paper-current-clean
+.PHONY: help web web-release web-phone desktop stats suggest suggest-wfst suggest-shadow shadow-eval data-split data-build data-check lexicon-editor visualize-lexicon visualize-lexicon-streamlit download-page fmt test test-golden test-ui platform-check platform-check-linux platform-check-android platform-check-ios platform-check-macos platform-check-windows platform-build-ios platform-build-macos platform-diagnose-macos platform-install-macos platform-reinstall-macos platform-build-windows platform-install-windows platform-uninstall-windows platform-reinstall-windows platform-smoke-windows-notepad platform-smoke-windows-notepad-python windows-package linux-package ibus-install ibus-uninstall ibus-smoke paper-current paper-current-clean
 
 DX ?= dx
 APP_DIR := apps/dioxus-app
@@ -12,7 +12,7 @@ PAPER_CURRENT_TEX := khmerime_current_implementation_paper.tex
 WINDOWS_TSF_TARGET ?= x86_64-pc-windows-msvc
 WINDOWS_TSF_TARGET_DIR ?= target/windows-tsf
 WINDOWS_TSF_DEV_TARGET_DIR ?= target/windows-tsf-dev
-WINDOWS_TSF_REINSTALL_STAMP ?= $(shell powershell -NoProfile -Command "Get-Date -Format yyyyMMddHHmmss")
+WINDOWS_TSF_REINSTALL_STAMP ?= $(shell if command -v powershell >/dev/null 2>&1; then powershell -NoProfile -Command "Get-Date -Format yyyyMMddHHmmss"; else date +%Y%m%d%H%M%S; fi)
 # Freeze the stamp once per make invocation so all deploy paths match.
 WINDOWS_TSF_REINSTALL_STAMP := $(WINDOWS_TSF_REINSTALL_STAMP)
 WINDOWS_TSF_DEPLOY_DIR ?= target/windows-tsf-deploy/$(WINDOWS_TSF_REINSTALL_STAMP)
@@ -34,6 +34,33 @@ IOS_XCFRAMEWORK_OUT := $(IOS_ADAPTER_DIR)/swift/Frameworks/KhmerIME.xcframework
 IOS_SIM_ID          ?= FDED48C6-BFCE-4666-BA4C-F279438340A7
 IOS_SIM_BUNDLE_ID   := com.khmerime.KhmerIME
 IOS_SIM_APP         := $(HOME)/Library/Developer/Xcode/DerivedData/KhmerIME-*/Build/Products/Debug-iphonesimulator/KhmerIME.app
+
+MACOS_ADAPTER_DIR       := adapters/macos-imk
+MACOS_TARGET            := aarch64-apple-darwin
+MACOS_TARGET_X86        := x86_64-apple-darwin
+MACOS_LIB_NAME          := libkhmerime_macos_imk.a
+MACOS_BINDGEN_OUT       := $(MACOS_ADAPTER_DIR)/swift/KhmerIMEMacOS/Generated
+MACOS_XCFRAMEWORK_OUT   := $(MACOS_ADAPTER_DIR)/swift/Frameworks/KhmerIME.xcframework
+MACOS_INPUT_METHODS_DIR := $(HOME)/Library/Input\ Methods
+MACOS_BUILD_DIR         := /tmp/khmerime-macos-build
+MACOS_BUILD_APP         := $(MACOS_BUILD_DIR)/Build/Products/Release/KhmerIMEMacOS.app
+MACOS_ENTITLEMENTS      := $(MACOS_ADAPTER_DIR)/swift/KhmerIMEMacOS/KhmerIMEMacOS.entitlements
+# Verified flow for macOS 26 (Tahoe): the input-source scanner silently ignores
+# bundles that are not Developer ID signed + hardened + notarized + stapled.
+# CODE_SIGN_INJECT_BASE_ENTITLEMENTS=NO is required — without it Xcode injects
+# get-task-allow into the Release signature and notarization rejects the app.
+# Provide local values in adapters/macos-imk/macos-signing.local.mk, or pass
+# MACOS_SIGNING_CONFIG=/path/to/config.mk for another config file.
+MACOS_SIGNING_CONFIG    ?= $(MACOS_ADAPTER_DIR)/macos-signing.local.mk
+MACOS_CODE_SIGN_IDENTITY ?=
+MACOS_TEAM_ID            ?=
+MACOS_NOTARY_PROFILE     ?= khmerime-notary
+-include $(MACOS_SIGNING_CONFIG)
+MACOS_NOTARIZE_ZIP       := /tmp/khmerime-macos-notarize.zip
+MACOS_LSREGISTER         := /System/Library/Frameworks/CoreServices.framework/Versions/Current/Frameworks/LaunchServices.framework/Versions/Current/Support/lsregister
+MACOS_XCODE_SIGNING_ARGS := CODE_SIGN_STYLE=Manual \
+	CODE_SIGN_IDENTITY=- \
+	CODE_SIGN_INJECT_BASE_ENTITLEMENTS=NO
 
 help:
 	@printf "%s\n" \
@@ -62,6 +89,10 @@ help:
 	"  make platform-check              Check all native platform adapter crates" \
 	"  make platform-check-<platform>   Check one adapter: linux, android, ios, macos, windows" \
 	"  make platform-build-ios          Build iOS static libs, generate UniFFI Swift bindings, assemble XCFramework" \
+	"  make platform-build-macos        Build macOS static libs, generate UniFFI Swift bindings, assemble XCFramework" \
+	"  make platform-diagnose-macos     Inspect macOS signing, install paths, and Gatekeeper status" \
+	"  make platform-install-macos      Full build (Rust + app), notarize, install to ~/Library/Input Methods/" \
+	"  make platform-reinstall-macos    Fast loop: rebuild app only, notarize, swap install, rescan (no logout)" \
 	"  make platform-build-windows      Build the Windows TSF DLL target under target/windows-tsf/" \
 	"  make platform-install-windows    Build and register the Windows TSF DLL with regsvr32" \
 	"  make platform-uninstall-windows  Unregister the Windows TSF DLL with regsvr32 /u" \
@@ -186,6 +217,99 @@ platform-build-ios:
 		-output $(IOS_XCFRAMEWORK_OUT)
 	rm -rf /tmp/khmerime-xcfw-headers
 	cd $(IOS_ADAPTER_DIR)/swift && xcodegen generate
+
+platform-build-macos:
+	cargo build -p khmerime_macos_imk --target $(MACOS_TARGET) --release
+	cargo build -p khmerime_macos_imk --target $(MACOS_TARGET_X86) --release
+	mkdir -p $(MACOS_BINDGEN_OUT)
+	cargo run -p khmerime_macos_imk --bin uniffi-bindgen -- \
+		--swift-sources target/$(MACOS_TARGET)/release/$(MACOS_LIB_NAME) $(MACOS_BINDGEN_OUT)
+	cargo run -p khmerime_macos_imk --bin uniffi-bindgen -- \
+		--headers target/$(MACOS_TARGET)/release/$(MACOS_LIB_NAME) $(MACOS_BINDGEN_OUT)
+	cargo run -p khmerime_macos_imk --bin uniffi-bindgen -- \
+		--modulemap target/$(MACOS_TARGET)/release/$(MACOS_LIB_NAME) $(MACOS_BINDGEN_OUT)
+	# lipo arm64 + x86_64 into a single universal static lib before xcframework
+	mkdir -p /tmp/khmerime-macos-universal
+	lipo -create \
+		target/$(MACOS_TARGET)/release/$(MACOS_LIB_NAME) \
+		target/$(MACOS_TARGET_X86)/release/$(MACOS_LIB_NAME) \
+		-output /tmp/khmerime-macos-universal/$(MACOS_LIB_NAME)
+	mkdir -p /tmp/khmerime-macos-xcfw-headers
+	cp $(MACOS_BINDGEN_OUT)/khmerime_macos_imkFFI.h /tmp/khmerime-macos-xcfw-headers/
+	cp $(MACOS_BINDGEN_OUT)/khmerime_macos_imk.modulemap /tmp/khmerime-macos-xcfw-headers/module.modulemap
+	sed -i '' 's/^module khmerime_macos_imk {/module khmerime_macos_imkFFI {/' /tmp/khmerime-macos-xcfw-headers/module.modulemap
+	mkdir -p $(MACOS_ADAPTER_DIR)/swift/Frameworks
+	rm -rf $(MACOS_XCFRAMEWORK_OUT)
+	xcodebuild -create-xcframework \
+		-library /tmp/khmerime-macos-universal/$(MACOS_LIB_NAME) \
+		-headers /tmp/khmerime-macos-xcfw-headers \
+		-output $(MACOS_XCFRAMEWORK_OUT)
+	rm -rf /tmp/khmerime-macos-xcfw-headers /tmp/khmerime-macos-universal
+	cd $(MACOS_ADAPTER_DIR)/swift && xcodegen generate
+
+platform-diagnose-macos:
+	@echo "== Code signing identities =="
+	@security find-identity -v -p codesigning || true
+	@echo
+	@echo "== Xcode provisioning teams =="
+	@defaults read com.apple.dt.Xcode IDEProvisioningTeams 2>/dev/null || echo "No Xcode provisioning teams configured."
+	@echo
+	@echo "== Installed KhmerIME bundles =="
+	@for app in "$(HOME)/Library/Input Methods/KhmerIMEMacOS.app" "/Library/Input Methods/KhmerIMEMacOS.app"; do \
+		if [ -d "$$app" ]; then \
+			echo "found: $$app"; \
+			codesign --verify --deep --strict --verbose=2 "$$app" 2>&1 || true; \
+			spctl --assess --verbose "$$app" 2>&1 || true; \
+		else \
+			echo "missing: $$app"; \
+		fi; \
+	done
+
+# Full install: rebuild Rust libs + XCFramework first, then the app flow below.
+platform-install-macos: platform-build-macos
+	$(MAKE) platform-reinstall-macos
+
+# Fast loop for Swift/asset-only changes: rebuild the app (assumes the
+# XCFramework from platform-build-macos is already in place), notarize,
+# staple, swap the installed copy, and rescan input sources — no logout.
+platform-reinstall-macos:
+	@if [ -z "$(strip $(MACOS_CODE_SIGN_IDENTITY))" ] || [ -z "$(strip $(MACOS_TEAM_ID))" ]; then \
+		echo "error: platform-reinstall-macos requires MACOS_CODE_SIGN_IDENTITY and MACOS_TEAM_ID." >&2; \
+		echo "example: make platform-reinstall-macos MACOS_CODE_SIGN_IDENTITY=<sha1> MACOS_TEAM_ID=<team>" >&2; \
+		exit 2; \
+	elif printf '%s\n%s\n' "$(MACOS_CODE_SIGN_IDENTITY)" "$(MACOS_TEAM_ID)" | grep -q '[<>]'; then \
+		echo "error: replace placeholder values in $(MACOS_SIGNING_CONFIG) before installing." >&2; \
+		exit 2; \
+	fi
+	xcodebuild -project $(MACOS_ADAPTER_DIR)/swift/KhmerIMEMacOS.xcodeproj \
+		-scheme KhmerIMEMacOS \
+		-configuration Release \
+		-derivedDataPath $(MACOS_BUILD_DIR) \
+		$(MACOS_XCODE_SIGNING_ARGS) \
+		build
+	codesign --force --deep --options runtime --timestamp \
+		--entitlements $(MACOS_ENTITLEMENTS) \
+		--sign $(MACOS_CODE_SIGN_IDENTITY) \
+		$(MACOS_BUILD_APP)
+	codesign --verify --deep --strict --verbose=2 $(MACOS_BUILD_APP)
+	rm -f $(MACOS_NOTARIZE_ZIP)
+	ditto -c -k --keepParent $(MACOS_BUILD_APP) $(MACOS_NOTARIZE_ZIP)
+	xcrun notarytool submit $(MACOS_NOTARIZE_ZIP) --keychain-profile $(MACOS_NOTARY_PROFILE) --wait
+	xcrun stapler staple $(MACOS_BUILD_APP)
+	xcrun stapler validate $(MACOS_BUILD_APP)
+	codesign --verify --deep --strict --verbose=2 $(MACOS_BUILD_APP)
+	spctl --assess --type execute --verbose=2 $(MACOS_BUILD_APP)
+	killall KhmerIMEMacOS 2>/dev/null || true
+	mkdir -p $(MACOS_INPUT_METHODS_DIR)
+	rm -rf $(MACOS_INPUT_METHODS_DIR)/KhmerIMEMacOS.app
+	ditto $(MACOS_BUILD_APP) $(MACOS_INPUT_METHODS_DIR)/KhmerIMEMacOS.app
+	codesign --verify --deep --strict --verbose=2 $(MACOS_INPUT_METHODS_DIR)/KhmerIMEMacOS.app
+	$(MACOS_LSREGISTER) -u $(MACOS_BUILD_APP) >/dev/null 2>&1 || true
+	$(MACOS_LSREGISTER) -f -R -trusted $(MACOS_INPUT_METHODS_DIR)/KhmerIMEMacOS.app
+	rm -f "$$(getconf DARWIN_USER_CACHE_DIR)"com.apple.IntlDataCache.le*
+	killall TextInputSwitcher TextInputMenuAgent imklaunchagent 2>/dev/null || true
+	swift scripts/platforms/macos/imk/tis_check.swift
+	@echo "Reinstalled — no logout needed. Add/keep 'Khmer IME' in System Settings → Keyboard → Input Sources."
 
 platform-build-windows:
 	cargo build -p khmerime_windows_tsf --target $(WINDOWS_TSF_TARGET) --target-dir $(WINDOWS_TSF_TARGET_DIR)

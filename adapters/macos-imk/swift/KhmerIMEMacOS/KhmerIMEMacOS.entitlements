@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <!-- macOS requires third-party input methods to be sandboxed; the Tahoe
+         input-source scanner silently skips unsandboxed bundles. -->
+    <key>com.apple.security.app-sandbox</key>
+    <true/>
+    <!-- A sandboxed process cannot register a global mach service; IMKServer
+         needs this exception for the connection name in Info.plist. -->
+    <key>com.apple.security.temporary-exception.mach-register.global-name</key>
+    <string>com.khmerime.inputmethod.KhmerIMEMacOS_Connection</string>
+</dict>
+</plist>

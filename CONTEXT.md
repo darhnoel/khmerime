@@ -40,6 +40,10 @@ _Avoid_: composition text (ambiguous with **Composition**), inline Khmer preview
 The visible Khmer choices for the active **Composition** or focused **Segmented Session** segment. In romanization mode, the Candidate List should remain visible even when there is only one obvious choice, because it tells the user what Enter will commit while the inline **Preedit** stays roman.
 _Avoid_: suggestions (too broad), inline candidates
 
+**Roman Hint**:
+The exact romanized key or keys displayed beside a Khmer candidate to show why that candidate is available. Roman Hints are display metadata for the **Candidate List**; they do not replace the raw roman **Preedit** and do not change the **Commit Text**. If no exact Roman Hint exists for a candidate, the UI must not invent one; it should show a derived marker instead.
+_Avoid_: invented hint, transliteration label, candidate subtitle
+
 **Commit Text**:
 The confirmed text sent to the host application when the user confirms. In romanization mode, Enter is the normal confirmation key; Space and digit keys select candidates or segments during an active **Composition**. Commit text is normally Khmer, selected from candidates, a **Segmented Session**, or the **Commit Refiner**; it may fall back to roman text when no Khmer output is available.
 _Avoid_: output text, submission
