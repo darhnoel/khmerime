@@ -41,15 +41,18 @@ class KhmerInputController: IMKInputController {
             self.panel.update(state)
             if let input = self.client() {
                 self.logCaretRects(input, preedit: state.preedit)
-                // Anchor at the END of the marked text so the panel follows the
-                // caret as the user types, instead of staying pinned to where the
-                // composition began. (NSNotFound is a sentinel some clients answer
-                // with a zero rect, which would strand the panel in a corner.)
-                let rect = input.firstRect(
-                    forCharacterRange: CandidatePanelLayout.caretQueryRange(preedit: state.preedit),
+                // Anchor on the LAST marked glyph (a range inside the marked
+                // text), then take its trailing edge — so the panel follows the
+                // caret at the end of the composition without querying one past
+                // the end, which hosts answer with a degenerate left-margin rect.
+                let glyphRect = input.firstRect(
+                    forCharacterRange: CandidatePanelLayout.caretAnchorRange(preedit: state.preedit),
                     actualRange: nil
                 )
-                self.panel.show(below: rect)
+                let caretRect = state.preedit.isEmpty
+                    ? glyphRect   // {0,0} already returns the insertion-point caret
+                    : CandidatePanelLayout.caretPoint(fromGlyphRect: glyphRect)
+                self.panel.show(below: caretRect)
             }
         }
         handler.onPanelHide = { [weak self] in

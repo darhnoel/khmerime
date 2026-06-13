@@ -72,21 +72,6 @@ final class CandidatePanelLayoutTests: XCTestCase {
             "the panel top (rows 1–9) must never be clipped off the top of the screen")
     }
 
-    func test_caretAnchorsAtEndOfPreedit_soPanelFollowsCursor() {
-        // The caret sits at the END of the marked text, so the panel must query
-        // the rect there — not at offset 0, which stays pinned to where the
-        // composition began and makes the panel look stuck while typing.
-        XCTAssertEqual(
-            CandidatePanelLayout.caretQueryRange(preedit: "nhom"),
-            NSRange(location: 4, length: 0)
-        )
-        // utf16 count, not Character count: a Khmer cluster spans several units.
-        XCTAssertEqual(
-            CandidatePanelLayout.caretQueryRange(preedit: "ខ្ញុំ"),
-            NSRange(location: ("ខ្ញុំ" as NSString).length, length: 0)
-        )
-    }
-
     func test_caretAnchorRangeTargetsLastGlyphInsideTheMarkedText() {
         // Anchor at the LAST glyph (a range INSIDE the marked text), not one past
         // the end — querying {length, 0} is out of range and the host answers it

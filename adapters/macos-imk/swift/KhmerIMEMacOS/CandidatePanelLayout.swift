@@ -50,16 +50,6 @@ enum CandidatePanelLayout {
     }
 
     /// The marked-text range to ask the IMK client for via
-    /// firstRectForCharacterRange:. The caret sits at the END of the preedit, so
-    /// anchoring there makes the panel follow the cursor while typing instead of
-    /// staying pinned to where composition began. Length is in UTF-16 units (the
-    /// unit IMK ranges use), which is why a multi-scalar Khmer cluster counts as
-    /// more than one.
-    static func caretQueryRange(preedit: String) -> NSRange {
-        NSRange(location: (preedit as NSString).length, length: 0)
-    }
-
-    /// The marked-text range to ask the IMK client for via
     /// firstRectForCharacterRange:. Targets the LAST glyph of the preedit — a
     /// range that stays INSIDE the marked text — so the rect tracks the end of
     /// the composition. Querying one past the end ({length, 0}) is out of range,
