@@ -87,6 +87,31 @@ final class CandidatePanelLayoutTests: XCTestCase {
         )
     }
 
+    func test_caretAnchorRangeTargetsLastGlyphInsideTheMarkedText() {
+        // Anchor at the LAST glyph (a range INSIDE the marked text), not one past
+        // the end — querying {length, 0} is out of range and the host answers it
+        // with a degenerate origin rect (the left-margin bug).
+        XCTAssertEqual(
+            CandidatePanelLayout.caretAnchorRange(preedit: "nhom"),
+            NSRange(location: 3, length: 1)               // the 'm'
+        )
+        XCTAssertEqual(
+            CandidatePanelLayout.caretAnchorRange(preedit: "f"),
+            NSRange(location: 0, length: 1)               // single glyph
+        )
+        // Empty preedit → the {0,0} insertion point.
+        XCTAssertEqual(
+            CandidatePanelLayout.caretAnchorRange(preedit: ""),
+            NSRange(location: 0, length: 0)
+        )
+        // utf16 units: the last code unit of a multi-scalar Khmer cluster.
+        let kh = "ខ្ញុំ"
+        XCTAssertEqual(
+            CandidatePanelLayout.caretAnchorRange(preedit: kh),
+            NSRange(location: (kh as NSString).length - 1, length: 1)
+        )
+    }
+
     func test_panelClampsHorizontallyToStayOnScreen() {
         // Caret near the right edge: aligning the panel's left with the caret
         // would overflow the right edge, so it must shift left to stay on screen.

@@ -58,4 +58,17 @@ enum CandidatePanelLayout {
     static func caretQueryRange(preedit: String) -> NSRange {
         NSRange(location: (preedit as NSString).length, length: 0)
     }
+
+    /// The marked-text range to ask the IMK client for via
+    /// firstRectForCharacterRange:. Targets the LAST glyph of the preedit — a
+    /// range that stays INSIDE the marked text — so the rect tracks the end of
+    /// the composition. Querying one past the end ({length, 0}) is out of range,
+    /// and hosts answer that with a degenerate origin rect (the left-margin bug).
+    /// An empty preedit falls back to the {0,0} insertion point. Length is in
+    /// UTF-16 units, the unit IMK ranges use.
+    static func caretAnchorRange(preedit: String) -> NSRange {
+        let length = (preedit as NSString).length
+        guard length > 0 else { return NSRange(location: 0, length: 0) }
+        return NSRange(location: length - 1, length: 1)
+    }
 }
