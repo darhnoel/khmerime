@@ -5,8 +5,9 @@ import Carbon.HIToolbox
 // SessionKeyInputTests
 // ====================
 // The boundary that turns a key NSEvent into the (keyval, keycode, modifierFlags)
-// tuple the Rust session consumes. Shift must be reflected in the keyval so that
-// '?' (Shift+/) reaches the session as 0x3F, not the base key '/' (0x2F).
+// tuple the Rust session consumes. sessionKeyInput uses event.characters (not
+// charactersIgnoringModifiers) because macOS strips Shift from symbol keys in
+// charactersIgnoringModifiers — Shift+/ gives "/" not "?", Shift+1 gives "1" not "!".
 
 final class SessionKeyInputTests: XCTestCase {
 
@@ -26,12 +27,23 @@ final class SessionKeyInputTests: XCTestCase {
     }
 
     func test_shiftSlash_yieldsQuestionMarkKeyval() {
-        // Shift+/ produces '?'; the session must receive 0x3F, not '/' 0x2F.
+        // macOS sets charactersIgnoringModifiers="/" for Shift+/ (Shift stripped from symbols).
+        // sessionKeyInput must use event.characters="?" instead.
         let event = keyDown(
             keyCode: kVK_ANSI_Slash,
-            characters: "?", charactersIgnoringModifiers: "?", flags: .shift
+            characters: "?", charactersIgnoringModifiers: "/", flags: .shift
         )
         XCTAssertEqual(sessionKeyInput(from: event).keyval, 0x3F)
+    }
+
+    func test_shiftDigit_yieldsShiftedCharKeyval() {
+        // macOS sets charactersIgnoringModifiers="1" for Shift+1 (Shift stripped from symbols).
+        // sessionKeyInput must use event.characters="!" instead.
+        let event = keyDown(
+            keyCode: kVK_ANSI_1,
+            characters: "!", charactersIgnoringModifiers: "1", flags: .shift
+        )
+        XCTAssertEqual(sessionKeyInput(from: event).keyval, UInt32(("!" as UnicodeScalar).value))
     }
 
     func test_plainLetter_yieldsItsScalar() {

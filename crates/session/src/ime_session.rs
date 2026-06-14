@@ -699,7 +699,10 @@ impl ImeSession {
         if self.segmented_session.is_some() {
             return false;
         }
-        self.candidates.len() == 1
+        // 0 candidates → commit the raw char (e.g. '?', '!')
+        // 1 candidate  → commit the single Khmer mapping (e.g. '1' → '១')
+        // 2+ candidates → leave in preedit for user to choose
+        self.candidates.len() <= 1
     }
 }
 
@@ -776,10 +779,7 @@ pub(crate) fn recompute_segment_ranges_and_raw(session: &mut SegmentedSession) -
 }
 
 fn is_single_keycap_char(ch: char) -> bool {
-    matches!(
-        ch,
-        '0'..='9' | '!' | '@' | '"' | '#' | '$' | '%' | '^' | '&' | '*' | '\'' | '(' | ')' | '~' | '='
-    )
+    ch.is_ascii_graphic() && !ch.is_ascii_alphabetic()
 }
 
 #[cfg(test)]
