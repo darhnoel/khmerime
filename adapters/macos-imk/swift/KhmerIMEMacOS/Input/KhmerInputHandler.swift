@@ -97,12 +97,13 @@ final class KhmerInputHandler {
         // Both halves matter: skipping the empty call strands the last character in
         // the client, while sending it on every render — including keys that never
         // composed — spams clients that track marked state and wedges the picky ones
-        // (Notes stops accepting input). So: write while marking, and write the empty
-        // string only on the marked → unmarked transition.
+        // (Notes stops accepting input). `preeditChanged` (stamped in Rust by comparing
+        // against the previous preedit) gates it to the transitions that matter: write
+        // while composing, and write the empty string only on the marked → unmarked edge.
         if !state.preedit.isEmpty {
             client.setMarkedText(state.preedit)
             hasMarkedText = true
-        } else if hasMarkedText {
+        } else if hasMarkedText && state.preeditChanged {
             client.setMarkedText("")
             hasMarkedText = false
         }

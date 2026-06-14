@@ -198,6 +198,10 @@ pub struct MacosRenderState {
     pub is_ready: bool,
     /// True when the session consumed the key event (Swift returns true from handle(_:client:)).
     pub consumed: bool,
+    /// True when `preedit` differs from the previous call's value.
+    /// Swift calls `setMarkedText` only when this is true, avoiding spurious IPC on
+    /// non-composing keys while still clearing marked text when preedit goes empty.
+    pub preedit_changed: bool,
 }
 
 fn render_state(snapshot: &SessionSnapshot, result: &SessionResult, ready: bool) -> MacosRenderState {
@@ -217,6 +221,7 @@ fn render_state(snapshot: &SessionSnapshot, result: &SessionResult, ready: bool)
         segment_edit_index: snapshot.segment_edit_index.map(|i| i as u64),
         is_ready: ready,
         consumed: result.consumed,
+        preedit_changed: false, // stamped by with_session after comparing prev_preedit
     }
 }
 
@@ -236,6 +241,9 @@ pub struct MacosIMKSession {
     // Bumped on every keystroke. A lock-free refine captures it at snapshot and re-checks at
     // apply, so a refinement made stale by newer typing is dropped instead of clobbering.
     generation: AtomicU64,
+    /// Tracks the preedit from the previous call so `with_session` can set
+    /// `preedit_changed` without an extra snapshot allocation per key event.
+    prev_preedit: Mutex<String>,
 }
 
 #[uniffi::export]
@@ -251,6 +259,7 @@ impl MacosIMKSession {
             inner: Mutex::new(None),
             ready: Arc::new((Mutex::new(false), Condvar::new())),
             generation: AtomicU64::new(0),
+            prev_preedit: Mutex::new(String::new()),
         });
         let s = session.clone();
         std::thread::spawn(move || {
@@ -294,7 +303,7 @@ impl MacosIMKSession {
 
     /// `activateServer:` — IMK controller became active for a text client.
     pub fn activate(&self) -> MacosRenderState {
-        self.with_session(|s| {
+        self.with_render(|s| {
             s.focus_in();
             render_state(&s.snapshot(), &SessionResult::default(), true)
         })
@@ -302,7 +311,7 @@ impl MacosIMKSession {
 
     /// `deactivateServer:` — IMK controller lost the text client.
     pub fn deactivate(&self) -> MacosRenderState {
-        self.with_session(|s| {
+        self.with_render(|s| {
             s.focus_out();
             render_state(&s.snapshot(), &SessionResult::default(), true)
         })
@@ -310,7 +319,7 @@ impl MacosIMKSession {
 
     /// `commitComposition:` / Escape — discard composition without committing.
     pub fn cancel_composition(&self) -> MacosRenderState {
-        self.with_session(|s| {
+        self.with_render(|s| {
             s.reset();
             render_state(&s.snapshot(), &SessionResult::default(), true)
         })
@@ -337,7 +346,7 @@ impl MacosIMKSession {
             _ => 0,
         };
 
-        self.with_session(|s| {
+        self.with_render(|s| {
             if page_direction != 0 {
                 let snapshot = s.snapshot();
                 let len = snapshot.candidates.len();
@@ -370,7 +379,7 @@ impl MacosIMKSession {
 
     /// Cursor position changed — update candidate panel anchor.
     pub fn set_cursor_location(&self, x: i32, y: i32, width: i32, height: i32) -> MacosRenderState {
-        self.with_session(|s| {
+        self.with_render(|s| {
             s.set_cursor_location(x, y, width, height);
             render_state(&s.snapshot(), &SessionResult::default(), true)
         })
@@ -381,7 +390,7 @@ impl MacosIMKSession {
     /// the current composition and no candidate has been manually selected.
     /// Ignored (no-op) when a segmented session is already active.
     pub fn refine_composition(&self, raw_preedit: String) -> MacosRenderState {
-        self.with_session(|s| {
+        self.with_render(|s| {
             s.apply_refined_candidate(&raw_preedit);
             render_state(&s.snapshot(), &SessionResult::default(), true)
         })
@@ -404,7 +413,7 @@ impl MacosIMKSession {
 
     /// Input mode toggle (Roman ↔ NIDA). Clears composition.
     pub fn toggle_input_mode(&self) -> MacosRenderState {
-        self.with_session(|s| {
+        self.with_render(|s| {
             s.toggle_input_mode();
             render_state(&s.snapshot(), &SessionResult::default(), true)
         })
@@ -427,6 +436,21 @@ impl MacosIMKSession {
             Some(session) => f(session),
             None => T::default(),
         }
+    }
+
+    /// `with_session` for the render-returning entry points, stamping `preedit_changed` by
+    /// comparing against the previous call's preedit. Swift calls `setMarkedText` only when this
+    /// is true — clearing marked text when the preedit goes empty (the backspace-on-last-char fix)
+    /// without spurious IPC on non-composing keys.
+    fn with_render<F>(&self, f: F) -> MacosRenderState
+    where
+        F: FnOnce(&mut ImeSession) -> MacosRenderState,
+    {
+        let mut state = self.with_session(f);
+        let mut prev = self.prev_preedit.lock().unwrap();
+        state.preedit_changed = state.preedit != *prev;
+        *prev = state.preedit.clone();
+        state
     }
 
     /// Run the model visible refine WITHOUT holding the session lock across the model.

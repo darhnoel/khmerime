@@ -172,6 +172,19 @@ final class KhmerInputHandlerTests: XCTestCase {
             "marked text must be cleared AFTER the commit insert; ops: \(client.ops)")
     }
 
+    // MARK: - Backspace / marked text lifecycle
+
+    func test_backspaceLastChar_clearsMarkedText() {
+        let (handler, client) = makeHandler()
+        type("k", into: handler)
+        XCTAssertEqual(client.markedText, "k")
+
+        _ = handler.handleKey(keyval: 0xFF08, macKeycode: 0, modifierFlags: 0) // Backspace
+
+        XCTAssertEqual(client.markedText, "",
+            "backspace on last char must clear marked text — preeditChanged must fire on empty transition")
+    }
+
     // MARK: - Panel callbacks (display-only panel: handler decides show/hide)
 
     func test_typing_firesPanelUpdateWithCandidates() {
