@@ -2590,7 +2590,11 @@ dependencies = [
 name = "khmerime_android_ime"
 version = "0.1.0"
 dependencies = [
+ "jni 0.21.1",
+ "khmerime_core",
  "khmerime_session",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]
