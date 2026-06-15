@@ -321,18 +321,11 @@ final class CandidatePanelView: UIView, KeyboardPanelDisplaying {
     // MARK: - Button factories (CharPick alphabet)
 
     private func makeLetterChip(_ letter: String) -> UIButton {
-        var config = UIButton.Configuration.plain()
-        config.title = letter
-        config.baseForegroundColor = .label
-        config.contentInsets = NSDirectionalEdgeInsets(top: 6, leading: 10, bottom: 6, trailing: 10)
-        config.titleTextAttributesTransformer = UIConfigurationTextAttributesTransformer { attrs in
-            var a = attrs
-            a.font = UIFont.systemFont(ofSize: 16, weight: .medium)
-            return a
-        }
-        config.background.backgroundColor = UIColor.systemGray5
-        config.background.cornerRadius = 12
-        let btn = UIButton(configuration: config)
+        let btn = GlassKeyButton(frame: .zero)
+        btn.setTitle(letter, for: .normal)
+        KeyStyle.applyLetter(btn)
+        btn.titleLabel?.font = .systemFont(ofSize: 16, weight: .medium)
+        btn.contentEdgeInsets = UIEdgeInsets(top: 6, left: 10, bottom: 6, right: 10)
         // UITapGestureRecognizer is not blocked by the parent UIScrollView's
         // delaysContentTouches / canCancelContentTouches settings, so it fires
         // reliably while still allowing the scroll view to scroll.
@@ -350,9 +343,7 @@ final class CandidatePanelView: UIView, KeyboardPanelDisplaying {
 
     @objc private func charPickLetterTapped(_ sender: UITapGestureRecognizer) {
         guard let btn = sender.view as? UIButton,
-              // Configuration-based buttons store their title in config.title,
-              // not in the legacy title(for:) slot — that always returns nil here.
-              let title = btn.configuration?.title,
+              let title = btn.title(for: .normal),
               let letter = title.lowercased().first else { return }
         delegate?.candidatePanel(self, didTapCharPickLetter: letter)
     }
