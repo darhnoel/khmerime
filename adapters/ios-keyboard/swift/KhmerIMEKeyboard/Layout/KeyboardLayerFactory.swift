@@ -36,6 +36,7 @@ struct KeyboardLayerActions {
     let space: Selector
     let returnKey: Selector
     let togglePanel: Selector
+    let toggleEnglish: Selector
     let numeric: Selector
     let symbols: Selector
     let abc: Selector
@@ -46,6 +47,7 @@ struct KeyboardLayerFactory {
     let isIPad: Bool
     let target: AnyObject
     let globeKeyTag: Int
+    let enKeyTag: Int
     let actions: KeyboardLayerActions
 
     // MARK: - Adaptive Dimensions
@@ -98,6 +100,12 @@ struct KeyboardLayerFactory {
         globeBtn.widthAnchor.constraint(equalToConstant: specialKeyW).isActive = true
         globeBtn.tag = globeKeyTag
         row.addArrangedSubview(globeBtn)
+
+        let enBtn = makeSpecialKey("EN", action: actions.toggleEnglish)
+        enBtn.titleLabel?.font = .systemFont(ofSize: 13, weight: .medium)
+        enBtn.widthAnchor.constraint(equalToConstant: specialKeyW).isActive = true
+        enBtn.tag = enKeyTag
+        row.addArrangedSubview(enBtn)
 
         let leftBtn = makeSpecialKey(leftLabel, action: leftAction)
         leftBtn.titleLabel?.font = .systemFont(ofSize: 13, weight: .medium)
