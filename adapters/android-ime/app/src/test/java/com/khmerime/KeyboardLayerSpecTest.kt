@@ -47,10 +47,10 @@ class KeyboardLayerSpecTest {
     }
 
     @Test
-    fun nextKeyboardKeyUsesEn() {
+    fun englishToggleKeyUsesEn() {
         KeyboardLayer.entries.forEach { layer ->
-            val key = allKeys(layer).find { it.action == KeyboardKeyAction.NextKeyboard }
-            assertEquals("Next keyboard key in $layer must use En", "En", key?.label)
+            val key = allKeys(layer).find { it.action == KeyboardKeyAction.ToggleEnglish }
+            assertEquals("English toggle key in $layer must use En", "En", key?.label)
         }
     }
 

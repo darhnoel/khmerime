@@ -4,4 +4,5 @@ enum class KeyboardState {
     Qwerty,
     Panel,
     SuggestCharacter,
+    English,
 }

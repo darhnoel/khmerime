@@ -54,4 +54,22 @@ class KeyViewStyleTest {
         val key = KeyboardKey("💡", KeyboardKeyAction.TogglePanel)
         assertTrue("TogglePanel is an action key", KeyViewStyle.isAction(key))
     }
+
+    @Test
+    fun englishToggleIsAnActionKey() {
+        val key = KeyboardKey("En", KeyboardKeyAction.ToggleEnglish)
+        assertTrue("ToggleEnglish is an action key", KeyViewStyle.isAction(key))
+    }
+
+    @Test
+    fun englishToggleHasSameWeightAsOtherActionKeys() {
+        val en = KeyboardKey("En", KeyboardKeyAction.ToggleEnglish)
+        val backspace = KeyboardKey("⌫", KeyboardKeyAction.Backspace)
+        assertEquals(
+            "ToggleEnglish must have same weight as Backspace",
+            KeyViewStyle.weightFor(backspace),
+            KeyViewStyle.weightFor(en),
+            0f,
+        )
+    }
 }

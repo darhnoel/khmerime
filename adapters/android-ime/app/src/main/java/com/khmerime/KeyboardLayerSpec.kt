@@ -10,6 +10,7 @@ enum class KeyboardKeyAction {
     Insert,
     NextKeyboard,
     TogglePanel,
+    ToggleEnglish,
     Backspace,
     Space,
     Return,
@@ -33,7 +34,7 @@ object KeyboardLayerSpec {
                 letters("zxcvbnm") +
                 special("⌫", KeyboardKeyAction.Backspace),
             listOf(
-                special("En", KeyboardKeyAction.NextKeyboard),
+                special("En", KeyboardKeyAction.ToggleEnglish),
                 special("123", KeyboardKeyAction.SwitchToNumeric),
                 special("space", KeyboardKeyAction.Space),
                 KeyboardKey(".", KeyboardKeyAction.Insert),
@@ -48,7 +49,7 @@ object KeyboardLayerSpec {
                 inserts(listOf(".", ",", "?", "!", "'")) +
                 special("⌫", KeyboardKeyAction.Backspace),
             listOf(
-                special("En", KeyboardKeyAction.NextKeyboard),
+                special("En", KeyboardKeyAction.ToggleEnglish),
                 special("ABC", KeyboardKeyAction.SwitchToQwerty),
                 special("space", KeyboardKeyAction.Space),
                 special("↵", KeyboardKeyAction.Return),
@@ -62,7 +63,7 @@ object KeyboardLayerSpec {
                 inserts(listOf(".", ",", "?", "!", "'")) +
                 special("⌫", KeyboardKeyAction.Backspace),
             listOf(
-                special("En", KeyboardKeyAction.NextKeyboard),
+                special("En", KeyboardKeyAction.ToggleEnglish),
                 special("ABC", KeyboardKeyAction.SwitchToQwerty),
                 special("space", KeyboardKeyAction.Space),
                 special("↵", KeyboardKeyAction.Return),

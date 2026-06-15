@@ -67,6 +67,52 @@ class KeyboardPresentationSpecTest {
     }
 
     @Test
+    fun preeditIsEmptyInEnglishMode() {
+        val state = KhmerRenderState(candidates = emptyList(), preedit = "hi")
+        assertEquals(
+            "preedit must be empty in English mode",
+            "",
+            KeyboardPresentationSpec.preeditText(KeyboardState.English, state),
+        )
+    }
+
+    @Test
+    fun englishToggleIsActiveWhenStateIsEnglish() {
+        val key = KeyboardKey("En", KeyboardKeyAction.ToggleEnglish)
+        assertTrue(
+            "En key must be active when state is English",
+            KeyboardPresentationSpec.isKeyActive(key, KeyboardState.English),
+        )
+    }
+
+    @Test
+    fun englishToggleIsInactiveWhenStateIsQwerty() {
+        val key = KeyboardKey("En", KeyboardKeyAction.ToggleEnglish)
+        assertFalse(
+            "En key must be inactive when state is Qwerty",
+            KeyboardPresentationSpec.isKeyActive(key, KeyboardState.Qwerty),
+        )
+    }
+
+    @Test
+    fun panelToggleIsActiveViaIsKeyActiveWhenStateIsSuggestCharacter() {
+        val key = KeyboardKey("✦", KeyboardKeyAction.TogglePanel)
+        assertTrue(
+            "✦ key must be active via isKeyActive when state is SuggestCharacter",
+            KeyboardPresentationSpec.isKeyActive(key, KeyboardState.SuggestCharacter),
+        )
+    }
+
+    @Test
+    fun insertKeyIsNeverActiveViaIsKeyActive() {
+        val key = KeyboardKey("A", KeyboardKeyAction.Insert, "a")
+        assertFalse(
+            "Insert key must never be active",
+            KeyboardPresentationSpec.isKeyActive(key, KeyboardState.English),
+        )
+    }
+
+    @Test
     fun selectedCandidateIndexReturnsNullWhenNoneSelected() {
         val state = KhmerRenderState(candidates = listOf("ក", "ខ"), selectedIndex = null)
         assertNull(

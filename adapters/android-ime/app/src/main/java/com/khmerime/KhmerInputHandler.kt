@@ -40,6 +40,10 @@ class KhmerInputHandler(
     // ── Key actions ───────────────────────────────────────────────────────────
 
     fun sendChar(ch: String) {
+        if (keyboardState == KeyboardState.English) {
+            proxy.insertText(ch)
+            return
+        }
         if (keyboardState == KeyboardState.SuggestCharacter) {
             render(session.processCharacter(ch))
             return
@@ -59,6 +63,10 @@ class KhmerInputHandler(
     }
 
     fun sendBackspace() {
+        if (keyboardState == KeyboardState.English) {
+            proxy.deleteBackward()
+            return
+        }
         trailingSpace = false
         if (keyboardState == KeyboardState.SuggestCharacter) {
             val current = lastState
@@ -78,12 +86,20 @@ class KhmerInputHandler(
     }
 
     fun sendSpace() {
+        if (keyboardState == KeyboardState.English) {
+            proxy.insertText(" ")
+            return
+        }
         commitComposition()
         proxy.insertText(" ")
         trailingSpace = true
     }
 
     fun sendReturn() {
+        if (keyboardState == KeyboardState.English) {
+            proxy.insertText("\n")
+            return
+        }
         if (keyboardState == KeyboardState.SuggestCharacter) {
             selectCandidate(0)
             return
@@ -107,7 +123,8 @@ class KhmerInputHandler(
                 lastState = null
                 transitionTo(KeyboardState.Qwerty)
             }
-            KeyboardState.Qwerty -> {
+            KeyboardState.Qwerty,
+            KeyboardState.English -> {
                 repeat(romanBuffer.length) { proxy.deleteBackward() }
                 romanBuffer = ""
                 trailingSpace = false
@@ -120,6 +137,18 @@ class KhmerInputHandler(
     }
 
     fun togglePanel() = toggleSuggestCharacter()
+
+    fun toggleEnglish() {
+        when (keyboardState) {
+            KeyboardState.English -> transitionTo(KeyboardState.Qwerty)
+            else -> {
+                session.processEnter()
+                romanBuffer = ""
+                trailingSpace = false
+                transitionTo(KeyboardState.English)
+            }
+        }
+    }
 
     fun selectCandidate(index: Int) {
         if (keyboardState == KeyboardState.SuggestCharacter) {

@@ -10,7 +10,7 @@ class GlassKeyViewFactory(
         GlassKeyView(
             context = context,
             key = key,
-            isActive = KeyboardPresentationSpec.isToggleActive(key, keyboardState),
+            isActive = KeyboardPresentationSpec.isKeyActive(key, keyboardState),
             onClick = onClick,
         )
 }

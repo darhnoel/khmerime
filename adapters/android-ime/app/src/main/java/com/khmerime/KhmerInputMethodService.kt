@@ -153,6 +153,7 @@ class KhmerInputMethodService : InputMethodService() {
             KeyboardKeyAction.SwitchToNumeric -> renderKeyboardLayer(KeyboardLayer.Numeric)
             KeyboardKeyAction.SwitchToSymbols -> renderKeyboardLayer(KeyboardLayer.Symbols)
             KeyboardKeyAction.TogglePanel -> handler?.toggleSuggestCharacter()
+            KeyboardKeyAction.ToggleEnglish -> handler?.toggleEnglish()
             KeyboardKeyAction.NextKeyboard -> Unit
         }
     }
@@ -160,11 +161,7 @@ class KhmerInputMethodService : InputMethodService() {
     private fun Int.dp(): Int = (this * resources.displayMetrics.density).toInt()
 
     private fun renderKeyboardState(state: KeyboardState) {
-        when (state) {
-            KeyboardState.Qwerty -> renderKeyboardLayer(KeyboardPresentationSpec.keyboardLayerForState(state))
-            KeyboardState.Panel -> renderKeyboardLayer(KeyboardPresentationSpec.keyboardLayerForState(state))
-            KeyboardState.SuggestCharacter -> renderKeyboardLayer(KeyboardPresentationSpec.keyboardLayerForState(state))
-        }
+        renderKeyboardLayer(KeyboardPresentationSpec.keyboardLayerForState(state))
     }
 
     private fun resetSuggestCharacterSuggestions() {

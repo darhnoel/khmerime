@@ -5,6 +5,7 @@ object KeyViewStyle {
         KeyboardKeyAction.Space -> 4f
         KeyboardKeyAction.Return -> 1.4f
         KeyboardKeyAction.TogglePanel,
+        KeyboardKeyAction.ToggleEnglish,
         KeyboardKeyAction.Backspace,
         KeyboardKeyAction.NextKeyboard,
         KeyboardKeyAction.SwitchToQwerty,

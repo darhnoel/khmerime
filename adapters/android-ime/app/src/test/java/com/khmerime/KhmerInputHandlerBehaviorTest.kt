@@ -188,6 +188,126 @@ class KhmerInputHandlerBehaviorTest {
         assertEquals("backspace must shorten text by one char", "n", textField.text)
     }
 
+    // ── English mode ──────────────────────────────────────────────────────────
+
+    @Test
+    fun toggleEnglishSwitchesToEnglishMode() {
+        val (handler, _) = makeHandler()
+
+        handler.toggleEnglish()
+
+        assertEquals(
+            "toggleEnglish must switch to English mode",
+            KeyboardState.English,
+            handler.keyboardState,
+        )
+    }
+
+    @Test
+    fun toggleEnglishTwiceReturnsToQwerty() {
+        val (handler, _) = makeHandler()
+
+        handler.toggleEnglish()
+        handler.toggleEnglish()
+
+        assertEquals(
+            "second toggleEnglish must return to Qwerty",
+            KeyboardState.Qwerty,
+            handler.keyboardState,
+        )
+    }
+
+    @Test
+    fun typingInEnglishModeInsertsCharactersDirectlyWithoutRomanization() {
+        val (handler, textField) = makeHandler()
+        handler.toggleEnglish()
+
+        type("nhom", into = handler)
+
+        assertEquals(
+            "chars in English mode must go directly to field, not be romanized",
+            "nhom",
+            textField.text,
+        )
+    }
+
+    @Test
+    fun backspaceInEnglishModeDeletesDirectly() {
+        val (handler, textField) = makeHandler()
+        handler.toggleEnglish()
+        type("ab", into = handler)
+
+        handler.sendBackspace()
+
+        assertEquals(
+            "backspace in English mode must delete one char from field",
+            "a",
+            textField.text,
+        )
+    }
+
+    @Test
+    fun spaceInEnglishModeInsertsSpaceDirectly() {
+        val (handler, textField) = makeHandler()
+        handler.toggleEnglish()
+        type("hi", into = handler)
+
+        handler.sendSpace()
+
+        assertEquals(
+            "space in English mode must insert space without Khmer commit",
+            "hi ",
+            textField.text,
+        )
+    }
+
+    @Test
+    fun returnInEnglishModeInsertsNewlineDirectly() {
+        val (handler, textField) = makeHandler()
+        handler.toggleEnglish()
+
+        handler.sendReturn()
+
+        assertEquals(
+            "return in English mode must insert newline directly",
+            "\n",
+            textField.text,
+        )
+    }
+
+    @Test
+    fun enteringEnglishModeWithPendingRomanLeavesTextInField() {
+        val (handler, textField) = makeHandler()
+        type("in", into = handler)
+        val textBeforeToggle = textField.text
+
+        handler.toggleEnglish()
+
+        assertEquals(
+            "entering English mode must leave existing text untouched",
+            textBeforeToggle,
+            textField.text,
+        )
+        assertEquals(KeyboardState.English, handler.keyboardState)
+    }
+
+    @Test
+    fun exitingEnglishModeKeepsTextInField() {
+        val (handler, textField) = makeHandler()
+        handler.toggleEnglish()
+        type("invite", into = handler)
+        val textBeforeExit = textField.text
+
+        handler.toggleEnglish()
+
+        assertEquals(
+            "exiting English mode must leave existing text untouched",
+            textBeforeExit,
+            textField.text,
+        )
+        assertEquals(KeyboardState.Qwerty, handler.keyboardState)
+    }
+
     @Test
     fun returnWithCompositionCommitsKhmerText() {
         val (handler, textField) = makeHandler()
