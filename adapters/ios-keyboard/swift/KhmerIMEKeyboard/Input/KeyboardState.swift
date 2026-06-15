@@ -6,10 +6,10 @@
 //
 // Transitions:
 //   qwerty ⇄ numeric ⇄ symbols     (123 / #+= / ABC layer keys)
-//   qwerty → panel                  (💡 when composition is active)
-//   panel  → qwerty                 (💡 dismiss, or candidate committed)
-//   qwerty → charPick               (💡 when no composition is active)
-//   charPick → qwerty               (💡 dismiss, or ⌫ from alphabet)
+//   qwerty → panel                  (✦ when composition is active)
+//   panel  → qwerty                 (✦ dismiss, or candidate committed)
+//   qwerty → charPick               (✦ when no composition is active)
+//   charPick → qwerty               (✦ dismiss, or ⌫ from alphabet)
 
 enum KeyboardState {
     case qwerty

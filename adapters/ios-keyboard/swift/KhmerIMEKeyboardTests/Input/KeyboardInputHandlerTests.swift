@@ -190,7 +190,7 @@ final class KeyboardInputHandlerTests: XCTestCase {
         handler.togglePanel()
 
         XCTAssertEqual(handler.keyboardState, .panel,
-            "💡 with active composition must enter panel state")
+            "✦ with active composition must enter panel state")
     }
 
     // Regression: onRender must fire AFTER transition so the VC can pass state
@@ -219,7 +219,7 @@ final class KeyboardInputHandlerTests: XCTestCase {
         handler.togglePanel()   // → .qwerty
 
         XCTAssertEqual(handler.keyboardState, .qwerty,
-            "second 💡 tap must dismiss panel and return to qwerty")
+            "second ✦ tap must dismiss panel and return to qwerty")
     }
 
     func test_togglePanel_withoutComposition_transitionsToCharPick() {
@@ -228,7 +228,7 @@ final class KeyboardInputHandlerTests: XCTestCase {
         handler.togglePanel()
 
         XCTAssertEqual(handler.keyboardState, .charPick,
-            "💡 with no composition must enter charPick mode")
+            "✦ with no composition must enter charPick mode")
     }
 
     func test_onTransition_firedForEveryStateChange() {
@@ -407,5 +407,111 @@ final class KeyboardInputHandlerTests: XCTestCase {
             XCTAssertTrue((0x1780...0x17FF).contains(last.value),
                 "char before newline must be Khmer, not space or deleted; got \(text.debugDescription)")
         }
+    }
+
+    // MARK: - English mode
+
+    func test_toggleEnglish_setsIsEnglishMode() {
+        let (handler, _) = makeHandler()
+        handler.toggleEnglish()
+        XCTAssertTrue(handler.isEnglishMode)
+    }
+
+    func test_toggleEnglish_twice_clearsIsEnglishMode() {
+        let (handler, _) = makeHandler()
+        handler.toggleEnglish()
+        handler.toggleEnglish()
+        XCTAssertFalse(handler.isEnglishMode)
+    }
+
+    func test_toggleEnglish_firesOnEnglishModeChanged() {
+        let (handler, _) = makeHandler()
+        var received: [Bool] = []
+        handler.onEnglishModeChanged = { received.append($0) }
+
+        handler.toggleEnglish()
+        handler.toggleEnglish()
+
+        XCTAssertEqual(received, [true, false])
+    }
+
+    func test_sendChar_inEnglishMode_insertsDirectlyWithoutKhmerProcessing() {
+        let (handler, proxy) = makeHandler()
+        handler.toggleEnglish()
+
+        handler.sendChar("a")
+
+        XCTAssertEqual(proxy.text, "a",
+            "English mode must insert roman directly; got \(proxy.text.debugDescription)")
+    }
+
+    func test_backspace_inEnglishMode_deletesDirectly() {
+        let (handler, proxy) = makeHandler()
+        handler.toggleEnglish()
+        handler.sendChar("a")
+
+        handler.backspaceTapped()
+
+        XCTAssertEqual(proxy.text, "")
+    }
+
+    func test_space_inEnglishMode_insertsSpace() {
+        let (handler, proxy) = makeHandler()
+        handler.toggleEnglish()
+
+        handler.spaceTapped()
+
+        XCTAssertEqual(proxy.text, " ")
+    }
+
+    func test_return_inEnglishMode_insertsNewline() {
+        let (handler, proxy) = makeHandler()
+        handler.toggleEnglish()
+
+        handler.returnTapped()
+
+        XCTAssertEqual(proxy.text, "\n")
+    }
+
+    func test_isEnglishMode_persistsAfterSwitchLayer() {
+        let (handler, _) = makeHandler()
+        handler.toggleEnglish()
+
+        handler.switchLayer(to: .numeric)
+
+        XCTAssertTrue(handler.isEnglishMode,
+            "switching layer must not clear English mode")
+    }
+
+    func test_sendChar_onNumericLayer_inEnglishMode_insertsDirectly() {
+        let (handler, proxy) = makeHandler()
+        handler.toggleEnglish()
+        handler.switchLayer(to: .numeric)
+
+        handler.sendChar("1")
+
+        XCTAssertEqual(proxy.text, "1",
+            "English mode must bypass Rust session even on numeric layer")
+    }
+
+    func test_toggleEnglish_whileComposing_leavesRomanInProxy() {
+        let (handler, proxy) = makeHandler()
+        type("ka", into: handler)
+        let romanInProxy = proxy.text   // "ka" speculatively in the field
+
+        handler.toggleEnglish()
+
+        XCTAssertTrue(proxy.text.hasSuffix(romanInProxy),
+            "EN toggle must not delete roman text from proxy; got \(proxy.text.debugDescription)")
+    }
+
+    func test_togglePanel_fromEnglishMode_clearsEnglishMode() {
+        let (handler, _) = makeHandler()
+        handler.toggleEnglish()
+
+        handler.togglePanel()   // no composition in English mode → charPick
+
+        XCTAssertFalse(handler.isEnglishMode,
+            "✦ must exit English mode")
     }
 }

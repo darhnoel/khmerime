@@ -8,11 +8,9 @@ settings:
   base:
     SWIFT_VERSION: "5.0"
     IPHONEOS_DEPLOYMENT_TARGET: "16.0"
-    # Signing: use "-" for ad-hoc (no Apple account needed, simulator only).
-    # For device builds, configure signing directly in Xcode (do not edit here).
-    CODE_SIGN_STYLE: Manual
-    CODE_SIGN_IDENTITY: "-"
-    DEVELOPMENT_TEAM: ""
+    CODE_SIGN_STYLE: Automatic
+    CODE_SIGN_IDENTITY: "Apple Development"
+    DEVELOPMENT_TEAM: "9289LTXAT7"
 
 schemes:
   KhmerIME:
@@ -28,6 +26,7 @@ schemes:
   KhmerIMEKeyboardTests:
     build:
       targets:
+        KhmerIMEKeyboard: all
         KhmerIMEKeyboardTests: test
     test:
       targets:
@@ -82,8 +81,12 @@ targets:
       - path: KhmerIMEKeyboard/Layout/KeyboardLayoutMetrics.swift
       - path: KhmerIMEKeyboard/Layout/KeyboardViewHierarchyBuilder.swift
       - path: KhmerIMEKeyboard/Views/CandidatePanelView.swift
+      - path: KhmerIMEKeyboard/Views/GlassColorSpec.swift
+      - path: KhmerIMEKeyboard/Views/GlassKeyPressAnimator.swift
+      - path: KhmerIMEKeyboard/Views/GlassKeyView.swift
       - path: KhmerIMEKeyboard/Views/KeyboardRootView.swift
       - path: KhmerIMEKeyboard/Views/KeyStyle.swift
+      - path: KhmerIMEKeyboard/Views/StripPresentationSpec.swift
       - path: KhmerIMEKeyboard/Views/StripView.swift
       - path: KhmerIMEKeyboard/Generated/khmerime_ios_keyboard.swift
     settings:

@@ -13,6 +13,7 @@ final class KeyboardLayerFactoryTests: XCTestCase {
             isIPad: false,
             target: target,
             globeKeyTag: 42,
+            enKeyTag: 43,
             actions: ActionTarget.actions
         )
     }
@@ -24,8 +25,8 @@ final class KeyboardLayerFactoryTests: XCTestCase {
         XCTAssertEqual(rows.count, 4)
         XCTAssertEqual(buttonTitles(in: rows[0]), ["Q", "W", "E", "R", "T", "Y", "U", "I", "O", "P"])
         XCTAssertEqual(buttonTitles(in: rows[1]), ["A", "S", "D", "F", "G", "H", "J", "K", "L"])
-        XCTAssertEqual(buttonTitles(in: rows[2]), ["💡", "Z", "X", "C", "V", "B", "N", "M", "⌫"])
-        XCTAssertEqual(buttonTitles(in: rows[3]), ["🌐", "123", "space", ".", "⏎"])
+        XCTAssertEqual(buttonTitles(in: rows[2]), ["✦", "Z", "X", "C", "V", "B", "N", "M", "⌫"])
+        XCTAssertEqual(buttonTitles(in: rows[3]), ["🌐", "EN", "123", "space", ".", "⏎"])
     }
 
     func test_numericAndSymbolsLayersBuildExpectedModeSwitchRows() {
@@ -33,21 +34,44 @@ final class KeyboardLayerFactoryTests: XCTestCase {
         let symbolsRows = standardRows(in: factory.buildSymbolsView())
 
         XCTAssertEqual(buttonTitles(in: numericRows[2]), ["#+=", ".", ",", "?", "!", "'", "⌫"])
-        XCTAssertEqual(buttonTitles(in: numericRows[3]), ["🌐", "ABC", "space", "⏎"])
+        XCTAssertEqual(buttonTitles(in: numericRows[3]), ["🌐", "EN", "ABC", "space", "⏎"])
         XCTAssertEqual(buttonTitles(in: symbolsRows[2]), ["123", ".", ",", "?", "!", "'", "⌫"])
-        XCTAssertEqual(buttonTitles(in: symbolsRows[3]), ["🌐", "ABC", "space", "⏎"])
+        XCTAssertEqual(buttonTitles(in: symbolsRows[3]), ["🌐", "EN", "ABC", "space", "⏎"])
     }
 
-    func test_bottomRowTagsGlobeAndWiresActionsToTarget() {
+    func test_bottomRowTagsGlobeAndEnAndWiresActionsToTarget() {
         let row = factory.makeBottomRow(leftLabel: "123", leftAction: ActionTarget.actions.numeric, includePeriod: true)
         let buttons = row.arrangedSubviews.compactMap { $0 as? UIButton }
 
-        XCTAssertEqual(buttons.first?.tag, 42)
+        XCTAssertEqual(buttons[0].tag, 42, "globe must carry globeKeyTag")
+        XCTAssertEqual(buttons[1].tag, 43, "EN must carry enKeyTag")
         XCTAssertEqual(actionNames(on: buttons[0]), ["nextKeyboardTapped"])
-        XCTAssertEqual(actionNames(on: buttons[1]), ["numericTapped"])
-        XCTAssertEqual(actionNames(on: buttons[2]), ["spaceTapped"])
-        XCTAssertEqual(actionNames(on: buttons[3]), ["periodTapped"])
-        XCTAssertEqual(actionNames(on: buttons[4]), ["returnTapped"])
+        XCTAssertEqual(actionNames(on: buttons[1]), ["toggleEnglishTapped"])
+        XCTAssertEqual(actionNames(on: buttons[2]), ["numericTapped"])
+        XCTAssertEqual(actionNames(on: buttons[3]), ["spaceTapped"])
+        XCTAssertEqual(actionNames(on: buttons[4]), ["periodTapped"])
+        XCTAssertEqual(actionNames(on: buttons[5]), ["returnTapped"])
+    }
+
+    func test_letterAndSymbolKeysUseNativeButtonsWithNativeFonts() {
+        let letter = factory.makeLetterKey("k")
+        let symbol = factory.makeSymbolKey("១")
+
+        XCTAssertEqual(letter.buttonType, .custom)
+        XCTAssertEqual(symbol.buttonType, .custom)
+        XCTAssertEqual(letter.title(for: .normal), "K")
+        XCTAssertEqual(symbol.title(for: .normal), "១")
+        XCTAssertEqual(letter.titleLabel?.font.pointSize, 17)
+        XCTAssertEqual(symbol.titleLabel?.font.pointSize, 17)
+    }
+
+    func test_keyCornerRadiusFollowsAndroidGlassProportionAfterLayout() {
+        let letter = factory.makeLetterKey("k")
+
+        letter.frame = CGRect(x: 0, y: 0, width: 32, height: 44)
+        letter.layoutIfNeeded()
+
+        XCTAssertEqual(letter.layer.cornerRadius, 44 * 0.22, accuracy: 0.01)
     }
 
     private func standardRows(in layer: UIView) -> [UIView] {
@@ -59,9 +83,7 @@ final class KeyboardLayerFactoryTests: XCTestCase {
     }
 
     private func buttonTitles(in view: UIView) -> [String] {
-        if let button = view as? UIButton {
-            return [button.title(for: .normal) ?? ""]
-        }
+        if let button = view as? UIButton { return [button.title(for: .normal) ?? ""] }
         guard let stack = view as? UIStackView else { return [] }
         return stack.arrangedSubviews.flatMap(buttonTitles)
     }
@@ -81,6 +103,7 @@ private final class ActionTarget: NSObject {
         space: #selector(spaceTapped),
         returnKey: #selector(returnTapped),
         togglePanel: #selector(togglePanelTapped),
+        toggleEnglish: #selector(toggleEnglishTapped),
         numeric: #selector(numericTapped),
         symbols: #selector(symbolsTapped),
         abc: #selector(abcTapped)
@@ -94,6 +117,7 @@ private final class ActionTarget: NSObject {
     @objc func spaceTapped() {}
     @objc func returnTapped() {}
     @objc func togglePanelTapped() {}
+    @objc func toggleEnglishTapped() {}
     @objc func numericTapped() {}
     @objc func symbolsTapped() {}
     @objc func abcTapped() {}

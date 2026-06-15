@@ -39,6 +39,7 @@ final class KeyboardInputHandler {
     // MARK: - State
 
     private(set) var keyboardState: KeyboardState = .qwerty
+    private(set) var isEnglishMode = false
     private var romanBuffer = ""
     private var trailingSpace = false
     private(set) var lastState: IosRenderState?
@@ -54,6 +55,7 @@ final class KeyboardInputHandler {
     var onRender: ((_ state: IosRenderState, _ romanHint: String) -> Void)?
     var onStripClear: (() -> Void)?
     var onCharPickAlphabet: (() -> Void)?
+    var onEnglishModeChanged: ((Bool) -> Void)?
 
     // MARK: - Init
 
@@ -99,10 +101,29 @@ final class KeyboardInputHandler {
         }
     }
 
+    // MARK: - English Mode Toggle
+
+    func toggleEnglish() {
+        if isEnglishMode {
+            isEnglishMode = false
+        } else {
+            _ = session.sendReturn()    // reset Rust session; roman text stays in proxy as-is
+            romanBuffer = ""
+            trailingSpace = false
+            onStripClear?()
+            isEnglishMode = true
+        }
+        onEnglishModeChanged?(isEnglishMode)
+    }
+
     // MARK: - Character Input
 
     func sendChar(_ ch: String) {
         guard keyboardState != .charPick else { return }
+        if isEnglishMode {
+            proxy.insertText(ch)
+            return
+        }
         trailingSpace = false
         proxy.insertText(ch)
         romanBuffer += ch
@@ -142,12 +163,20 @@ final class KeyboardInputHandler {
     }
 
     func spaceTapped() {
+        if isEnglishMode {
+            proxy.insertText(" ")
+            return
+        }
         commitComposition()
         proxy.insertText(" ")
         trailingSpace = true
     }
 
     func returnTapped() {
+        if isEnglishMode {
+            proxy.insertText("\n")
+            return
+        }
         if keyboardState == .charPick {
             if let current = lastState, !current.candidates.isEmpty {
                 proxy.insertText(current.candidates[0])
@@ -174,6 +203,10 @@ final class KeyboardInputHandler {
     }
 
     func backspaceTapped() {
+        if isEnglishMode {
+            proxy.deleteBackward()
+            return
+        }
         trailingSpace = false
         if keyboardState == .charPick {
             if let current = lastState, !current.candidates.isEmpty {
@@ -197,6 +230,10 @@ final class KeyboardInputHandler {
     // MARK: - Panel / Layer Switches
 
     func togglePanel() {
+        if isEnglishMode {
+            isEnglishMode = false
+            onEnglishModeChanged?(false)
+        }
         switch keyboardState {
         case .panel:
             transition(to: .qwerty)

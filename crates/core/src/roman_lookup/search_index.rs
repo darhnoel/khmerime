@@ -12,10 +12,18 @@ pub(super) enum SearchIndex {
 
 impl SearchIndex {
     pub(super) fn new(items: &[String], use_levenshtein: bool, gsize_l: usize, gsize_u: usize) -> Self {
-        if use_symspell_search_index() {
-            return Self::SymSpell(SymSpellIndex::new(items, use_levenshtein, 2));
+        #[cfg(feature = "no-search-index")]
+        {
+            let _ = (items, use_levenshtein, gsize_l, gsize_u, DEFAULT_LEGACY_FUZZY_INDEX);
+            return Self::Ngram(NgramSearchIndex::empty());
         }
-        Self::Ngram(NgramSearchIndex::new(items, use_levenshtein, gsize_l, gsize_u))
+        #[cfg(not(feature = "no-search-index"))]
+        {
+            if use_symspell_search_index() {
+                return Self::SymSpell(SymSpellIndex::new(items, use_levenshtein, 2));
+            }
+            Self::Ngram(NgramSearchIndex::new(items, use_levenshtein, gsize_l, gsize_u))
+        }
     }
 
     pub(super) fn get(&self, query: &str, threshold: f64) -> Option<Vec<(f64, String)>> {
@@ -26,6 +34,7 @@ impl SearchIndex {
     }
 }
 
+#[cfg(not(feature = "no-search-index"))]
 fn use_symspell_search_index() -> bool {
     #[cfg(not(target_arch = "wasm32"))]
     {
@@ -61,6 +70,7 @@ struct SymSpellItem {
 }
 
 impl SymSpellIndex {
+    #[cfg(not(feature = "no-search-index"))]
     fn new(items: &[String], use_levenshtein: bool, max_edit_distance: usize) -> Self {
         let mut index = Self {
             use_levenshtein,
@@ -77,6 +87,7 @@ impl SymSpellIndex {
         index
     }
 
+    #[cfg(not(feature = "no-search-index"))]
     fn add(&mut self, item: &str) {
         let normalized = normalize(item);
         if self.exact.contains_key(&normalized) {
@@ -208,6 +219,19 @@ pub(super) struct NgramSearchIndex {
 }
 
 impl NgramSearchIndex {
+    #[cfg(feature = "no-search-index")]
+    fn empty() -> Self {
+        Self {
+            gsize_l: 2,
+            gsize_u: 3,
+            use_levenshtein: false,
+            exact: HashMap::new(),
+            grams: HashMap::new(),
+            items: BTreeMap::new(),
+        }
+    }
+
+    #[cfg(not(feature = "no-search-index"))]
     fn new(items: &[String], use_levenshtein: bool, gsize_l: usize, gsize_u: usize) -> Self {
         let mut index = Self {
             gsize_l,
@@ -225,6 +249,7 @@ impl NgramSearchIndex {
         index
     }
 
+    #[cfg(not(feature = "no-search-index"))]
     fn add(&mut self, item: &str) {
         let normalized = normalize(item);
         if self.exact.contains_key(&normalized) {
@@ -236,6 +261,7 @@ impl NgramSearchIndex {
         self.exact.insert(normalized, item.to_owned());
     }
 
+    #[cfg(not(feature = "no-search-index"))]
     fn add_with_size(&mut self, normalized: &str, size: usize) {
         let grams = ngram_counts(&normalized, size);
         let rows = self.items.entry(size).or_insert_with(Vec::new);

@@ -10,6 +10,7 @@ final class KeyboardViewHierarchyBuilderTests: XCTestCase {
             isIPad: false,
             target: target,
             globeKeyTag: 99,
+            enKeyTag: 98,
             actions: ActionTarget.actions
         ).build(panelDelegate: delegate)
 
@@ -45,6 +46,7 @@ private final class ActionTarget: NSObject {
         space: #selector(spaceTapped),
         returnKey: #selector(returnTapped),
         togglePanel: #selector(togglePanelTapped),
+        toggleEnglish: #selector(toggleEnglishTapped),
         numeric: #selector(numericTapped),
         symbols: #selector(symbolsTapped),
         abc: #selector(abcTapped)
@@ -58,6 +60,7 @@ private final class ActionTarget: NSObject {
     @objc func spaceTapped() {}
     @objc func returnTapped() {}
     @objc func togglePanelTapped() {}
+    @objc func toggleEnglishTapped() {}
     @objc func numericTapped() {}
     @objc func symbolsTapped() {}
     @objc func abcTapped() {}

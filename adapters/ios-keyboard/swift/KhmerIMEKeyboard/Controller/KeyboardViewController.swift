@@ -13,10 +13,10 @@ import UIKit
 //
 // Keyboard states
 // ---------------
-//   .qwerty    Default roman-input view. 💡 in shift slot, 123/space/./⏎ bottom.
+//   .qwerty    Default roman-input view. ✦ in shift slot, 123/space/./⏎ bottom.
 //   .numeric   123 layer: 1–0, punctuation, #+=, ABC/space/⏎.
 //   .symbols   #+= layer: []{}#%^*+=, currencies, 123/space/⏎.
-//   .panel     💡 candidate panel: chips + candidates + bottom row.
+//   .panel     ✦ candidate panel: chips + candidates + bottom row.
 //   .charPick  CharPick mode: panel visible with A–Z chip row + candidate collection.
 
 class KeyboardViewController: UIInputViewController {
@@ -36,9 +36,10 @@ class KeyboardViewController: UIInputViewController {
         KeyboardLayoutMetrics(device: isIPad ? .pad : .phone)
     }
 
-    // Tag shared with KeyboardLayout so every globe button built there can be
-    // shown/hidden from viewWillLayoutSubviews without a stored reference list.
+    // Tags shared with KeyboardLayerFactory: globe and EN occupy the same slot
+    // (Option B) — exactly one is visible at a time based on needsInputModeSwitchKey.
     static let globeKeyTag = 999
+    static let enKeyTag    = 998
 
     private var layerActions: KeyboardLayerActions {
         KeyboardLayerActions(
@@ -50,6 +51,7 @@ class KeyboardViewController: UIInputViewController {
             space: #selector(spaceTapped),
             returnKey: #selector(returnTapped),
             togglePanel: #selector(togglePanelTapped),
+            toggleEnglish: #selector(toggleEnglishTapped),
             numeric: #selector(numericTapped),
             symbols: #selector(symbolsTapped),
             abc: #selector(abcTapped)
@@ -97,6 +99,7 @@ class KeyboardViewController: UIInputViewController {
         super.viewWillLayoutSubviews()
         let show = needsInputModeSwitchKey
         view.allDescendants(tag: Self.globeKeyTag).forEach { $0.isHidden = !show }
+        view.allDescendants(tag: Self.enKeyTag).forEach { $0.isHidden = show }
     }
 
     override func textDidChange(_ textInput: UITextInput?) {
@@ -119,11 +122,18 @@ class KeyboardViewController: UIInputViewController {
         handler.onCharPickAlphabet = { [weak self] in
             self?.rootView.renderCharPickAlphabet()
         }
+        handler.onEnglishModeChanged = { [weak self] isEnglish in
+            guard let self else { return }
+            self.view.allDescendants(tag: Self.enKeyTag)
+                .compactMap { $0 as? GlassKeyButton }
+                .forEach { $0.isGlassActive = isEnglish }
+        }
     }
 
     // MARK: - Key Actions (forward to handler)
 
-    @objc func nextKeyboardTapped() { advanceToNextInputMode() }
+    @objc func nextKeyboardTapped()    { advanceToNextInputMode() }
+    @objc func toggleEnglishTapped()   { handler.toggleEnglish() }
 
     @objc func letterTapped(_ sender: UIButton) {
         guard let ch = sender.title(for: .normal)?.lowercased(), !ch.isEmpty else { return }
@@ -159,6 +169,7 @@ class KeyboardViewController: UIInputViewController {
             isIPad: isIPad,
             target: self,
             globeKeyTag: Self.globeKeyTag,
+            enKeyTag: Self.enKeyTag,
             actions: layerActions
         ).build(panelDelegate: self)
 

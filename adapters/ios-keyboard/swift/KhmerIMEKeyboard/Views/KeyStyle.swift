@@ -1,56 +1,112 @@
 import UIKit
 
-// KeyStyle
-// ========
-// Shared visual styling for all key buttons across every keyboard layer.
-//
-// Android equivalent
-// ------------------
-// Define a set of drawable resources in res/drawable/ and a Kotlin helper
-// object that applies them. The three variants (letter, symbol, special)
-// correspond to the same three button types on Android:
-//
-//   object KeyStyle {
-//       fun applyLetter(btn: Button) { … }   // white background, 17sp
-//       fun applySymbol(btn: Button) { … }   // white background, 17sp
-//       fun applySpecial(btn: Button) { … }  // grey background, 15sp medium
-//   }
-//
-// Visual guide:
-//   Letter / Symbol keys:  white bg, 5pt radius, 1pt bottom shadow
-//   Special keys (⌫ 💡 123 space ⏎ …): systemGray3 bg, same radius + shadow
+final class GlassKeyButton: UIButton {
+    var isGlassActive = false {
+        didSet { updateGlassAppearance() }
+    }
+
+    private var pressAnimator: GlassKeyPressAnimator?
+
+    private lazy var blurView: UIVisualEffectView = {
+        let v = UIVisualEffectView(effect: UIBlurEffect(style: .systemUltraThinMaterial))
+        v.isUserInteractionEnabled = false
+        insertSubview(v, at: 0)
+        return v
+    }()
+
+    // Inject a synchronous runner for testing before any touch event fires.
+    func configureForTesting(runner: @escaping AnimatorRunner) {
+        pressAnimator = GlassKeyPressAnimator(onUpdate: applySquish(_:), runner: runner)
+    }
+
+    override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
+        super.touchesBegan(touches, with: event)
+        ensurePressAnimator().press()
+    }
+
+    override func touchesEnded(_ touches: Set<UITouch>, with event: UIEvent?) {
+        super.touchesEnded(touches, with: event)
+        ensurePressAnimator().release()
+    }
+
+    override func touchesCancelled(_ touches: Set<UITouch>, with event: UIEvent?) {
+        super.touchesCancelled(touches, with: event)
+        ensurePressAnimator().release()
+    }
+
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        updateBlurViewLayout()
+        updateGlassAppearance()
+    }
+
+    override func traitCollectionDidChange(_ previousTraitCollection: UITraitCollection?) {
+        super.traitCollectionDidChange(previousTraitCollection)
+        updateGlassAppearance()
+    }
+
+    private func ensurePressAnimator() -> GlassKeyPressAnimator {
+        if let existing = pressAnimator { return existing }
+        let animator = GlassKeyPressAnimator(onUpdate: applySquish(_:))
+        pressAnimator = animator
+        return animator
+    }
+
+    private func applySquish(_ squish: CGFloat) {
+        let scale = 1 - squish * 0.08
+        transform = CGAffineTransform(scaleX: scale, y: scale)
+    }
+
+    private func updateBlurViewLayout() {
+        let radius = GlassColorSpec.keyCornerRadius(height: bounds.height)
+        blurView.frame = bounds
+        blurView.layer.cornerRadius = radius
+        blurView.clipsToBounds = true
+    }
+
+    private func updateGlassAppearance() {
+        KeyStyle.updateGlassAppearance(self, isActive: isGlassActive)
+    }
+}
 
 enum KeyStyle {
 
-    // MARK: - Public
-
     static func applyLetter(_ btn: UIButton, isIPad: Bool = false) {
-        apply(btn, white: true, isIPad: isIPad)
+        applyGlass(btn, isIPad: isIPad)
         btn.titleLabel?.font = .systemFont(ofSize: isIPad ? 20 : 17)
-        btn.setTitleColor(.black, for: .normal)
+        btn.setTitleColor(.label, for: .normal)
     }
 
     static func applySymbol(_ btn: UIButton, isIPad: Bool = false) {
-        apply(btn, white: true, isIPad: isIPad)
+        applyGlass(btn, isIPad: isIPad)
         btn.titleLabel?.font = .systemFont(ofSize: isIPad ? 20 : 17)
-        btn.setTitleColor(.black, for: .normal)
+        btn.setTitleColor(.label, for: .normal)
     }
 
-    static func applySpecial(_ btn: UIButton, isIPad: Bool = false) {
-        apply(btn, white: false, isIPad: isIPad)
+    static func applySpecial(_ btn: UIButton, isIPad: Bool = false, isActive: Bool = false) {
+        if let glassButton = btn as? GlassKeyButton {
+            glassButton.isGlassActive = isActive
+        }
+        applyGlass(btn, isIPad: isIPad)
         btn.titleLabel?.font = .systemFont(ofSize: isIPad ? 17 : 15, weight: .medium)
-        btn.setTitleColor(.black, for: .normal)
     }
 
-    // MARK: - Private
-
-    private static func apply(_ btn: UIButton, white: Bool, isIPad: Bool) {
-        btn.backgroundColor = white ? .white : UIColor.systemGray3
-        btn.layer.cornerRadius = isIPad ? 8 : 5
-        btn.layer.shadowColor = UIColor(white: 0, alpha: 1).cgColor
-        btn.layer.shadowOpacity = 0.25
-        btn.layer.shadowOffset = CGSize(width: 0, height: 1)
-        btn.layer.shadowRadius = 0
+    private static func applyGlass(_ btn: UIButton, isIPad _: Bool) {
+        updateGlassAppearance(btn, isActive: (btn as? GlassKeyButton)?.isGlassActive ?? false)
+        btn.layer.borderWidth = 1
+        btn.layer.shadowOpacity = 0
         btn.layer.masksToBounds = false
+    }
+
+    fileprivate static func updateGlassAppearance(_ btn: UIButton, isActive: Bool) {
+        let isDark = btn.traitCollection.userInterfaceStyle == .dark
+        // Active state uses flat opaque fill so EN/✦ buttons stand out clearly.
+        // Inactive state is transparent — the blurView behind provides glass depth.
+        btn.backgroundColor = isActive
+            ? GlassColorSpec.toggleActiveBackground(isDark: isDark)
+            : .clear
+        btn.setTitleColor(isActive ? GlassColorSpec.toggleActiveTextColor() : .label, for: .normal)
+        btn.layer.cornerRadius = GlassColorSpec.keyCornerRadius(height: btn.bounds.height)
+        btn.layer.borderColor = GlassColorSpec.borderColor(isDark: isDark).cgColor
     }
 }

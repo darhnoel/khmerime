@@ -15,6 +15,7 @@ struct KeyboardViewHierarchyBuilder {
     let isIPad: Bool
     let target: AnyObject
     let globeKeyTag: Int
+    let enKeyTag: Int
     let actions: KeyboardLayerActions
 
     func build(panelDelegate: CandidatePanelDelegate?) -> KeyboardViewHierarchy {
@@ -30,6 +31,7 @@ struct KeyboardViewHierarchyBuilder {
             isIPad: isIPad,
             target: target,
             globeKeyTag: globeKeyTag,
+            enKeyTag: enKeyTag,
             actions: actions
         )
         let qwertyView = layerFactory.buildQwertyView()

@@ -9,7 +9,7 @@ protocol CandidatePanelDelegate: AnyObject {
     func candidatePanel(_ panel: CandidatePanelView, didRequestEditAt index: Int)
     /// User tapped a candidate to select it for the focused segment.
     func candidatePanel(_ panel: CandidatePanelView, didSelectCandidateAt index: Int)
-    /// User tapped 💡 to dismiss the panel and return to the QWERTY view.
+    /// User tapped ✦ to dismiss the panel and return to the QWERTY view.
     func candidatePanelDidDismiss(_ panel: CandidatePanelView)
     /// User tapped the CharPick entry button (ក) in the word candidate panel.
     func candidatePanelDidEnterCharPick(_ panel: CandidatePanelView)
@@ -53,10 +53,13 @@ private final class CandidateCell: UICollectionViewCell {
     func configure(text: String, selected: Bool) {
         label.text = text
         label.font = .systemFont(ofSize: 20, weight: selected ? .semibold : .medium)
-        label.textColor = selected ? .systemBlue : .label
-        contentView.backgroundColor = selected ? UIColor.systemBlue.withAlphaComponent(0.08) : .white
-        contentView.layer.borderWidth = selected ? 1.5 : 0
-        contentView.layer.borderColor = selected ? UIColor.systemBlue.cgColor : UIColor.clear.cgColor
+        label.textColor = .label
+        let isDark = traitCollection.userInterfaceStyle == .dark
+        contentView.backgroundColor = selected
+            ? GlassColorSpec.selectedCandidateBackground(isDark: isDark)
+            : GlassColorSpec.backgroundColor(isDark: isDark)
+        contentView.layer.borderWidth = GlassColorSpec.candidateBorderWidth()
+        contentView.layer.borderColor = GlassColorSpec.borderColor(isDark: isDark).cgColor
     }
 }
 
@@ -64,15 +67,15 @@ private final class CandidateCell: UICollectionViewCell {
 
 // CandidatePanelView
 // ==================
-// Full-replacement view for the key-rows area, shown when the user taps 💡.
+// Full-replacement view for the key-rows area, shown when the user taps ✦.
 // The strip (StripView) remains above it at all times.
 //
 // Layout (replaces key rows; strip stays above):
 //   ┌───────────────────────────────────────────┐
-//   │  [💡]  [ណុំ ✏]  [ទៅ ✏]  [សាលារៀន ✏]  44pt │  ← chips (scrollable h)
+//   │  [✦]  [ណុំ ✏]  [ទៅ ✏]  [សាលារៀន ✏]  44pt │  ← chips (scrollable h)
 //   ├───────────────────────────────────────────┤
 //   │  ខ្ញុំ   ញុំ   ណុំ                        │
-//   │  ណ៉ំ    ណ     …                  120pt  │  ← candidates (wrapped, scrollable v)
+//   │  ណ៉ំ    ណ     …           adaptive height │  ← candidates (wrapped, scrollable v)
 //   ├───────────────────────────────────────────┤
 //   │  123  │      space      │  .  │    ⏎     │  ← bottom row (from VC)
 //   └───────────────────────────────────────────┘
@@ -100,7 +103,7 @@ final class CandidatePanelView: UIView, KeyboardPanelDisplaying {
         layout.minimumLineSpacing = 6
         layout.sectionInset = UIEdgeInsets(top: 6, left: 8, bottom: 6, right: 8)
         let cv = UICollectionView(frame: .zero, collectionViewLayout: layout)
-        cv.backgroundColor = UIColor.systemGray6
+        cv.backgroundColor = .clear
         cv.showsVerticalScrollIndicator = true
         cv.showsHorizontalScrollIndicator = false
         cv.translatesAutoresizingMaskIntoConstraints = false
@@ -129,7 +132,7 @@ final class CandidatePanelView: UIView, KeyboardPanelDisplaying {
     private func setup() {
         // Chip scroll
         chipScroll.showsHorizontalScrollIndicator = false
-        chipScroll.backgroundColor = .systemBackground
+        chipScroll.backgroundColor = .clear
         chipScroll.translatesAutoresizingMaskIntoConstraints = false
 
         chipStack.axis = .horizontal
@@ -217,7 +220,7 @@ final class CandidatePanelView: UIView, KeyboardPanelDisplaying {
     /// Clears any displayed candidates.
     func renderCharPickAlphabet() {
         chipStack.arrangedSubviews.forEach { $0.removeFromSuperview() }
-        chipStack.addArrangedSubview(makeSpecialButton("💡", action: #selector(dismissTapped)))
+        chipStack.addArrangedSubview(makeSpecialButton("✦", action: #selector(dismissTapped)))
         for letter in Self.charPickLetters {
             chipStack.addArrangedSubview(makeLetterChip(String(letter).uppercased()))
         }
@@ -230,7 +233,7 @@ final class CandidatePanelView: UIView, KeyboardPanelDisplaying {
 
     private func rebuildChips(_ segments: [IosSegmentEntry]) {
         chipStack.arrangedSubviews.forEach { $0.removeFromSuperview() }
-        chipStack.addArrangedSubview(makeSpecialButton("💡", action: #selector(dismissTapped)))
+        chipStack.addArrangedSubview(makeSpecialButton("✦", action: #selector(dismissTapped)))
         // CharPick entry button — lets the user discard the current composition
         // and switch to individual character picking.
         chipStack.addArrangedSubview(makeSpecialButton("ក…", action: #selector(enterCharPickTapped)))
@@ -256,15 +259,20 @@ final class CandidatePanelView: UIView, KeyboardPanelDisplaying {
 
         var chipConfig = UIButton.Configuration.plain()
         chipConfig.title = text
-        chipConfig.baseForegroundColor = focused ? .systemBlue : .label
+        chipConfig.baseForegroundColor = .label
         chipConfig.contentInsets = NSDirectionalEdgeInsets(top: 6, leading: 12, bottom: 6, trailing: 12)
         chipConfig.titleTextAttributesTransformer = UIConfigurationTextAttributesTransformer { attrs in
             var a = attrs
             a.font = UIFont.systemFont(ofSize: 16, weight: focused ? .semibold : .regular)
             return a
         }
-        chipConfig.background.backgroundColor = focused ? UIColor.systemBlue.withAlphaComponent(0.12) : UIColor.systemGray5
+        let isDark = UITraitCollection.current.userInterfaceStyle == .dark
+        chipConfig.background.backgroundColor = focused
+            ? GlassColorSpec.selectedCandidateBackground(isDark: isDark)
+            : GlassColorSpec.backgroundColor(isDark: isDark)
         chipConfig.background.cornerRadius = 12
+        chipConfig.background.strokeWidth = GlassColorSpec.candidateBorderWidth()
+        chipConfig.background.strokeColor = GlassColorSpec.borderColor(isDark: isDark)
         let chip = UIButton(configuration: chipConfig)
         chip.tag = index
         chip.addTarget(self, action: #selector(chipTapped(_:)), for: .touchUpInside)
@@ -295,11 +303,10 @@ final class CandidatePanelView: UIView, KeyboardPanelDisplaying {
     }
 
     private func makeSpecialButton(_ title: String, action: Selector) -> UIButton {
-        let btn = UIButton(type: .system)
+        let btn = GlassKeyButton(frame: .zero)
         btn.setTitle(title, for: .normal)
         btn.titleLabel?.font = .systemFont(ofSize: 15, weight: .medium)
-        btn.setTitleColor(.black, for: .normal)
-        KeyStyle.applySpecial(btn)
+        KeyStyle.applySpecial(btn, isActive: title == "✦")
         btn.addTarget(self, action: action, for: .touchUpInside)
         return btn
     }
@@ -314,18 +321,11 @@ final class CandidatePanelView: UIView, KeyboardPanelDisplaying {
     // MARK: - Button factories (CharPick alphabet)
 
     private func makeLetterChip(_ letter: String) -> UIButton {
-        var config = UIButton.Configuration.plain()
-        config.title = letter
-        config.baseForegroundColor = .label
-        config.contentInsets = NSDirectionalEdgeInsets(top: 6, leading: 10, bottom: 6, trailing: 10)
-        config.titleTextAttributesTransformer = UIConfigurationTextAttributesTransformer { attrs in
-            var a = attrs
-            a.font = UIFont.systemFont(ofSize: 16, weight: .medium)
-            return a
-        }
-        config.background.backgroundColor = UIColor.systemGray5
-        config.background.cornerRadius = 12
-        let btn = UIButton(configuration: config)
+        let btn = GlassKeyButton(frame: .zero)
+        btn.setTitle(letter, for: .normal)
+        KeyStyle.applyLetter(btn)
+        btn.titleLabel?.font = .systemFont(ofSize: 16, weight: .medium)
+        btn.contentEdgeInsets = UIEdgeInsets(top: 6, left: 10, bottom: 6, right: 10)
         // UITapGestureRecognizer is not blocked by the parent UIScrollView's
         // delaysContentTouches / canCancelContentTouches settings, so it fires
         // reliably while still allowing the scroll view to scroll.
@@ -343,9 +343,7 @@ final class CandidatePanelView: UIView, KeyboardPanelDisplaying {
 
     @objc private func charPickLetterTapped(_ sender: UITapGestureRecognizer) {
         guard let btn = sender.view as? UIButton,
-              // Configuration-based buttons store their title in config.title,
-              // not in the legacy title(for:) slot — that always returns nil here.
-              let title = btn.configuration?.title,
+              let title = btn.title(for: .normal),
               let letter = title.lowercased().first else { return }
         delegate?.candidatePanel(self, didTapCharPickLetter: letter)
     }

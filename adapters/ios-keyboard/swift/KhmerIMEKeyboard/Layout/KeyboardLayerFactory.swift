@@ -20,7 +20,7 @@ import UIKit
 // Key row anatomy:
 //   QWERTY row 1: q w e r t y u i o p       (10 letter keys, fillEqually)
 //   QWERTY row 2:   a s d f g h j k l       (9 letter keys, fillEqually, inset)
-//   QWERTY row 3: 💡 z x c v b n m ⌫        (special | letters | special)
+//   QWERTY row 3: ✦ z x c v b n m ⌫        (special | letters | special)
 //   Bottom row:   123 | space (flex) | . | ⏎
 //
 //   123 row 3:    #+= | . , ? ! ' | ⌫
@@ -36,6 +36,7 @@ struct KeyboardLayerActions {
     let space: Selector
     let returnKey: Selector
     let togglePanel: Selector
+    let toggleEnglish: Selector
     let numeric: Selector
     let symbols: Selector
     let abc: Selector
@@ -46,6 +47,7 @@ struct KeyboardLayerFactory {
     let isIPad: Bool
     let target: AnyObject
     let globeKeyTag: Int
+    let enKeyTag: Int
     let actions: KeyboardLayerActions
 
     // MARK: - Adaptive Dimensions
@@ -99,6 +101,12 @@ struct KeyboardLayerFactory {
         globeBtn.tag = globeKeyTag
         row.addArrangedSubview(globeBtn)
 
+        let enBtn = makeSpecialKey("EN", action: actions.toggleEnglish)
+        enBtn.titleLabel?.font = .systemFont(ofSize: 13, weight: .medium)
+        enBtn.widthAnchor.constraint(equalToConstant: specialKeyW).isActive = true
+        enBtn.tag = enKeyTag
+        row.addArrangedSubview(enBtn)
+
         let leftBtn = makeSpecialKey(leftLabel, action: leftAction)
         leftBtn.titleLabel?.font = .systemFont(ofSize: 13, weight: .medium)
         leftBtn.widthAnchor.constraint(equalToConstant: specialKeyW).isActive = true
@@ -131,7 +139,7 @@ struct KeyboardLayerFactory {
         row.spacing = 6
         row.distribution = .fill
 
-        let toggleBtn = makeSpecialKey("💡", action: actions.togglePanel)
+        let toggleBtn = makeSpecialKey("✦", action: actions.togglePanel)
         toggleBtn.widthAnchor.constraint(equalToConstant: specialKeyW).isActive = true
 
         let mid = makeLetterRow(["z", "x", "c", "v", "b", "n", "m"])
@@ -188,7 +196,7 @@ struct KeyboardLayerFactory {
     }
 
     func makeLetterKey(_ letter: String) -> UIButton {
-        let btn = UIButton(type: .system)
+        let btn = GlassKeyButton(frame: .zero)
         btn.setTitle(letter.uppercased(), for: .normal)
         KeyStyle.applyLetter(btn, isIPad: isIPad)
         btn.addTarget(target, action: actions.letter, for: .touchUpInside)
@@ -196,7 +204,7 @@ struct KeyboardLayerFactory {
     }
 
     func makeSymbolKey(_ symbol: String) -> UIButton {
-        let btn = UIButton(type: .system)
+        let btn = GlassKeyButton(frame: .zero)
         btn.setTitle(symbol, for: .normal)
         KeyStyle.applySymbol(btn, isIPad: isIPad)
         btn.addTarget(target, action: actions.symbol, for: .touchUpInside)
@@ -204,7 +212,7 @@ struct KeyboardLayerFactory {
     }
 
     func makeSpecialKey(_ title: String, action: Selector) -> UIButton {
-        let btn = UIButton(type: .system)
+        let btn = GlassKeyButton(frame: .zero)
         btn.setTitle(title, for: .normal)
         KeyStyle.applySpecial(btn, isIPad: isIPad)
         btn.addTarget(target, action: action, for: .touchUpInside)

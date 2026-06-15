@@ -54,18 +54,11 @@ fn parse_relations() -> Vec<CharRelationEntry> {
     entries
 }
 
-/// Returns false for entries that must not appear in the picker:
-/// - Khmer punctuation and currency (U+17D4–U+17DD), e.g. ។ ៘ ៛
-///
-/// Subscript forms (្ក …) and modifier signs (ំ ៉ …) ARE selectable: they
-/// combine with a previously inserted base consonant, which is exactly how
-/// clusters in names (e.g. ្ត in ឧត្តម) are built in CharPick mode.
+/// An entry is selectable if it is non-empty. Editorial control lives in the
+/// CSV: if a character has a relation entry, the CSV author decided it belongs
+/// in the picker.
 fn is_selectable(text: &str) -> bool {
-    match text.chars().next() {
-        None => false,
-        Some(c) if ('\u{17D4}'..='\u{17DD}').contains(&c) => false,
-        _ => true,
-    }
+    !text.is_empty()
 }
 
 /// Returns all Khmer characters whose relation list contains `letter`.
@@ -119,13 +112,14 @@ mod tests {
     }
 
     #[test]
-    fn k_includes_subscript_kak() {
+    fn k_includes_subscript_kho() {
         // Subscripts are picked after a base consonant to build clusters
         // (e.g. ត then ្ត for ឧត្តម) — they must be selectable.
+        // ្ឃ is the subscript form mapped to [g,k,h] in the CSV.
         let candidates = char_pick_candidates('k');
         assert!(
-            candidates.contains(&"្ក"),
-            "expected ្ក in candidates for 'k', got: {candidates:?}"
+            candidates.contains(&"្ឃ"),
+            "expected ្ឃ in candidates for 'k', got: {candidates:?}"
         );
     }
 
@@ -158,13 +152,23 @@ mod tests {
     }
 
     #[test]
-    fn l_excludes_punctuation() {
-        // ៘ ("etc." sign) relates to 'l' in the CSV but punctuation must
-        // never appear in the picker.
+    fn l_includes_punctuation_when_csv_maps_it() {
+        // ៘ ("etc." sign) is mapped to [a,l] in the CSV — the CSV author
+        // decides what appears; is_selectable no longer blocks any non-empty entry.
         let candidates = char_pick_candidates('l');
         assert!(
-            !candidates.contains(&"៘"),
-            "៘ must not appear for 'l', got: {candidates:?}"
+            candidates.contains(&"៘"),
+            "៘ must appear for 'l' since CSV maps it there, got: {candidates:?}"
+        );
+    }
+
+    #[test]
+    fn a_includes_lek_too_when_csv_maps_it() {
+        // ៗ (U+17D7, lek too) is mapped to [a] in the CSV.
+        let candidates = char_pick_candidates('a');
+        assert!(
+            candidates.contains(&"ៗ"),
+            "ៗ must appear for 'a' since CSV maps it there, got: {candidates:?}"
         );
     }
 

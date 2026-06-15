@@ -39,8 +39,25 @@ struct KeyboardLayoutMetrics {
         keyTopInset = 8
         keyBottomInset = 4
         panelChipHeight = 44
-        panelCandidateHeight = 120
         panelBottomRowTopSpacing = 8
-        panelBottomRowHeight = 44
+
+        let keyAreaHeight = baseKeyboardHeight - stripHeight
+        let standardRowHeight = (
+            keyAreaHeight
+            - keyTopInset
+            - keyBottomInset
+            - (rowSpacing * 3)
+        ) / 4
+        let standardBottomRowTop = keyTopInset + (standardRowHeight + rowSpacing) * 3
+
+        panelBottomRowHeight = standardRowHeight
+        panelCandidateHeight = (
+            standardBottomRowTop
+            - 4
+            - panelChipHeight
+            - 0.5
+            - 0.5
+            - panelBottomRowTopSpacing
+        )
     }
 }
