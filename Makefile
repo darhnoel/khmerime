@@ -1,4 +1,4 @@
-.PHONY: help web web-release web-phone desktop stats suggest suggest-wfst suggest-shadow shadow-eval data-split data-build data-check lexicon-editor visualize-lexicon visualize-lexicon-streamlit download-page fmt test test-golden test-ui platform-check platform-check-linux platform-check-android platform-check-ios platform-check-macos platform-check-windows platform-build-ios platform-test-ios platform-install-ios-sim platform-reinstall-ios-sim platform-build-macos platform-diagnose-macos platform-install-macos platform-reinstall-macos platform-build-windows platform-install-windows platform-uninstall-windows platform-reinstall-windows platform-smoke-windows-notepad platform-smoke-windows-notepad-python windows-package linux-package ibus-install ibus-uninstall ibus-smoke paper-current paper-current-clean platform-test-android platform-build-android android-adb-device platform-install-android platform-reinstall-android setup-hooks
+.PHONY: help web web-release web-phone desktop stats suggest suggest-wfst suggest-shadow shadow-eval data-split data-build data-check lexicon-editor visualize-lexicon visualize-lexicon-streamlit download-page fmt test test-golden test-ui platform-check platform-check-linux platform-check-android platform-check-ios platform-check-macos platform-check-windows platform-build-ios platform-test-ios platform-install-ios-sim platform-reinstall-ios-sim platform-install-ios-device platform-reinstall-ios-device platform-build-macos platform-diagnose-macos platform-install-macos platform-reinstall-macos platform-build-windows platform-install-windows platform-uninstall-windows platform-reinstall-windows platform-smoke-windows-notepad platform-smoke-windows-notepad-python windows-package linux-package ibus-install ibus-uninstall ibus-smoke paper-current paper-current-clean platform-test-android platform-build-android android-adb-device platform-install-android platform-reinstall-android setup-hooks
 
 DX ?= dx
 APP_DIR := apps/dioxus-app
@@ -106,6 +106,8 @@ help:
 	"  make platform-build-ios          Build iOS static libs, generate UniFFI Swift bindings, assemble XCFramework" \
 	"  make platform-install-ios-sim    Full build (Rust + app) then install to simulator" \
 	"  make platform-reinstall-ios-sim  Fast loop: rebuild Swift app only, reinstall on simulator" \
+	"  make platform-install-ios-device Full build (Rust + app) then install to connected iPhone" \
+	"  make platform-reinstall-ios-device Fast loop: rebuild Swift app only, install to connected iPhone" \
 	"  make platform-build-macos        Build macOS static libs, generate UniFFI Swift bindings, assemble XCFramework" \
 	"  make platform-diagnose-macos     Inspect macOS signing, install paths, and Gatekeeper status" \
 	"  make platform-install-macos      Full build (Rust + app), notarize, install to ~/Library/Input Methods/" \
@@ -236,6 +238,19 @@ platform-reinstall-ios-sim:
 	xcrun simctl install $(IOS_SIM_ID) $(IOS_SIM_APP)
 	open -a Simulator
 	@echo "Installed. In Simulator: Settings → General → Keyboard → Keyboards → Add New Keyboard → KhmerIME"
+
+# Full install to a connected physical device: build Rust xcframework first, then build + install.
+platform-install-ios-device: platform-build-ios
+	$(MAKE) platform-reinstall-ios-device
+
+# Fast loop: rebuild Swift app only and install to connected physical device.
+platform-reinstall-ios-device:
+	xcodegen generate --spec $(IOS_ADAPTER_DIR)/swift/project.yml --project $(IOS_ADAPTER_DIR)/swift
+	xcodebuild build \
+		-project $(IOS_XCPROJECT) \
+		-scheme $(IOS_APP_SCHEME) \
+		-destination 'generic/platform=iOS'
+	@echo "Installed. On device: Settings → General → Keyboard → Keyboards → Add New Keyboard → KhmerIME"
 
 platform-test-android:
 	cargo build -p khmerime_android_ime
