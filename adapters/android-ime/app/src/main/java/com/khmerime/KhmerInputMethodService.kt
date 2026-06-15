@@ -1,7 +1,9 @@
 package com.khmerime
 
+import android.graphics.Color
+import android.graphics.drawable.ColorDrawable
 import android.inputmethodservice.InputMethodService
-import android.view.ContextThemeWrapper
+import android.os.Build
 import android.view.Gravity
 import android.view.View
 import android.view.inputmethod.EditorInfo
@@ -29,6 +31,7 @@ class KhmerInputMethodService : InputMethodService() {
 
     private val session = KhmerImeSession()
     private var handler: KhmerInputHandler? = null
+    private val keyViewFactory: KeyViewFactory = GlassKeyViewFactory()
 
     private var candidateStrip: LinearLayout? = null
     private var keyboardLayer: LinearLayout? = null
@@ -59,7 +62,9 @@ class KhmerInputMethodService : InputMethodService() {
     // ── View creation ──────────────────────────────────────────────────────────
 
     override fun onCreateInputView(): View {
+        applyWindowBlur()
         val root = layoutInflater.inflate(R.layout.keyboard, null)
+        root.setBackgroundColor(Color.TRANSPARENT)
         preeditBar = root.findViewById(R.id.preedit_bar)
         candidateStrip = root.findViewById(R.id.candidate_strip)
         keyboardLayer = root.findViewById(R.id.keyboard_layer)
@@ -67,6 +72,15 @@ class KhmerInputMethodService : InputMethodService() {
         applySystemBottomSpacing(root)
         renderKeyboardLayer(KeyboardLayer.Qwerty)
         return root
+    }
+
+    private fun applyWindowBlur() {
+        val win = window?.window ?: return
+        win.setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
+        if (Build.VERSION.SDK_INT >= 31) {
+            val radiusPx = (20 * resources.displayMetrics.density).toInt()
+            win.setBackgroundBlurRadius(radiusPx)
+        }
     }
 
     private fun applySystemBottomSpacing(root: View) {
@@ -112,44 +126,19 @@ class KhmerInputMethodService : InputMethodService() {
                 }
             }
             keys.forEach { key ->
-                row.addView(makeKeyButton(key))
+                val view = keyViewFactory.makeKeyView(this, key) { handleKey(key) }
+                view.layoutParams = LinearLayout.LayoutParams(
+                    0,
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    KeyViewStyle.weightFor(key),
+                ).apply {
+                    marginStart = 2.dp()
+                    marginEnd = 2.dp()
+                }
+                row.addView(view)
             }
             container.addView(row)
         }
-    }
-
-    private fun makeKeyButton(key: KeyboardKey): Button {
-        val style = if (key.action == KeyboardKeyAction.Insert) {
-            R.style.KeyButton
-        } else {
-            R.style.ActionButton
-        }
-        return Button(ContextThemeWrapper(this, style)).apply {
-            text = key.label
-            isAllCaps = false
-            textSize = if (key.label.length > 1) 13f else 16f
-            setOnClickListener { handleKey(key) }
-            layoutParams = LinearLayout.LayoutParams(
-                0,
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                keyWeight(key),
-            ).apply {
-                marginStart = 2.dp()
-                marginEnd = 2.dp()
-            }
-        }
-    }
-
-    private fun keyWeight(key: KeyboardKey): Float = when (key.action) {
-        KeyboardKeyAction.Space -> 4f
-        KeyboardKeyAction.Return -> 1.4f
-        KeyboardKeyAction.TogglePanel,
-        KeyboardKeyAction.Backspace,
-        KeyboardKeyAction.NextKeyboard,
-        KeyboardKeyAction.SwitchToQwerty,
-        KeyboardKeyAction.SwitchToNumeric,
-        KeyboardKeyAction.SwitchToSymbols -> 1.3f
-        KeyboardKeyAction.Insert -> 1f
     }
 
     private fun handleKey(key: KeyboardKey) {
