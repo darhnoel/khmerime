@@ -1,4 +1,4 @@
-.PHONY: help web web-release web-phone desktop stats suggest suggest-wfst suggest-shadow shadow-eval data-split data-build data-check lexicon-editor visualize-lexicon visualize-lexicon-streamlit download-page fmt test test-golden test-ui platform-check platform-check-linux platform-check-android platform-check-ios platform-check-macos platform-check-windows platform-build-ios platform-build-macos platform-diagnose-macos platform-install-macos platform-reinstall-macos platform-build-windows platform-install-windows platform-uninstall-windows platform-reinstall-windows platform-smoke-windows-notepad platform-smoke-windows-notepad-python windows-package linux-package ibus-install ibus-uninstall ibus-smoke paper-current paper-current-clean platform-test-android platform-build-android android-adb-device platform-install-android platform-reinstall-android setup-hooks
+.PHONY: help web web-release web-phone desktop stats suggest suggest-wfst suggest-shadow shadow-eval data-split data-build data-check lexicon-editor visualize-lexicon visualize-lexicon-streamlit download-page fmt test test-golden test-ui platform-check platform-check-linux platform-check-android platform-check-ios platform-check-macos platform-check-windows platform-build-ios platform-test-ios platform-build-macos platform-diagnose-macos platform-install-macos platform-reinstall-macos platform-build-windows platform-install-windows platform-uninstall-windows platform-reinstall-windows platform-smoke-windows-notepad platform-smoke-windows-notepad-python windows-package linux-package ibus-install ibus-uninstall ibus-smoke paper-current paper-current-clean platform-test-android platform-build-android android-adb-device platform-install-android platform-reinstall-android setup-hooks
 
 DX ?= dx
 APP_DIR := apps/dioxus-app
@@ -102,6 +102,7 @@ help:
 	"  make platform-build-android     Cross-compile Rust via cargo-ndk (ANDROID_ABI=arm64-v8a) + assemble debug APK" \
 	"  make platform-install-android   Build and adb install the debug APK, enable the IME on connected device" \
 	"  make platform-reinstall-android Fast loop: rebuild Rust + APK, reinstall on connected device" \
+	"  make platform-test-ios           Run iOS XCTest suite on the simulator (IOS_SIM_ID=...)" \
 	"  make platform-build-ios          Build iOS static libs, generate UniFFI Swift bindings, assemble XCFramework" \
 	"  make platform-build-macos        Build macOS static libs, generate UniFFI Swift bindings, assemble XCFramework" \
 	"  make platform-diagnose-macos     Inspect macOS signing, install paths, and Gatekeeper status" \
@@ -209,6 +210,15 @@ platform-check-windows:
 
 # Build the host dylib (used by JVM unit tests) then run Gradle unit tests.
 # No Android device or emulator is required.
+IOS_XCPROJECT       := $(IOS_ADAPTER_DIR)/swift/KhmerIME.xcodeproj
+IOS_TEST_SCHEME     := KhmerIMEKeyboardTests
+
+platform-test-ios:
+	xcodebuild test \
+		-project $(IOS_XCPROJECT) \
+		-scheme $(IOS_TEST_SCHEME) \
+		-destination 'platform=iOS Simulator,id=$(IOS_SIM_ID)'
+
 platform-test-android:
 	cargo build -p khmerime_android_ime
 	cd $(ANDROID_ADAPTER_DIR) && JAVA_HOME="$(ANDROID_JAVA_HOME)" PATH="$(ANDROID_JAVA_HOME)/bin:$(PATH)" ./gradlew :app:testDebugUnitTest

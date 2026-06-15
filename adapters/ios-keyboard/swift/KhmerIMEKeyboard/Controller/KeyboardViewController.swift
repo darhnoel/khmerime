@@ -13,10 +13,10 @@ import UIKit
 //
 // Keyboard states
 // ---------------
-//   .qwerty    Default roman-input view. 💡 in shift slot, 123/space/./⏎ bottom.
+//   .qwerty    Default roman-input view. ✦ in shift slot, 123/space/./⏎ bottom.
 //   .numeric   123 layer: 1–0, punctuation, #+=, ABC/space/⏎.
 //   .symbols   #+= layer: []{}#%^*+=, currencies, 123/space/⏎.
-//   .panel     💡 candidate panel: chips + candidates + bottom row.
+//   .panel     ✦ candidate panel: chips + candidates + bottom row.
 //   .charPick  CharPick mode: panel visible with A–Z chip row + candidate collection.
 
 class KeyboardViewController: UIInputViewController {

@@ -11,7 +11,9 @@ enum KeyboardHostLayout {
         metrics: KeyboardLayoutMetrics,
         safeAreaBottom: CGFloat
     ) -> NSLayoutConstraint {
-        hostView.backgroundColor = UIColor.systemGray5
+        hostView.backgroundColor = UIColor { traits in
+            GlassColorSpec.keyboardBackground(isDark: traits.userInterfaceStyle == .dark)
+        }
 
         let heightConstraint = hostView.heightAnchor.constraint(
             equalToConstant: heightConstant(metrics: metrics, safeAreaBottom: safeAreaBottom)

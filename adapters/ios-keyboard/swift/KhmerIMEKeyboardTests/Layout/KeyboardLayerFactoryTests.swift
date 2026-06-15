@@ -24,7 +24,7 @@ final class KeyboardLayerFactoryTests: XCTestCase {
         XCTAssertEqual(rows.count, 4)
         XCTAssertEqual(buttonTitles(in: rows[0]), ["Q", "W", "E", "R", "T", "Y", "U", "I", "O", "P"])
         XCTAssertEqual(buttonTitles(in: rows[1]), ["A", "S", "D", "F", "G", "H", "J", "K", "L"])
-        XCTAssertEqual(buttonTitles(in: rows[2]), ["💡", "Z", "X", "C", "V", "B", "N", "M", "⌫"])
+        XCTAssertEqual(buttonTitles(in: rows[2]), ["✦", "Z", "X", "C", "V", "B", "N", "M", "⌫"])
         XCTAssertEqual(buttonTitles(in: rows[3]), ["🌐", "123", "space", ".", "⏎"])
     }
 
@@ -50,6 +50,18 @@ final class KeyboardLayerFactoryTests: XCTestCase {
         XCTAssertEqual(actionNames(on: buttons[4]), ["returnTapped"])
     }
 
+    func test_letterAndSymbolKeysUseNativeButtonsWithNativeFonts() {
+        let letter = factory.makeLetterKey("k")
+        let symbol = factory.makeSymbolKey("១")
+
+        XCTAssertEqual(letter.buttonType, .custom)
+        XCTAssertEqual(symbol.buttonType, .custom)
+        XCTAssertEqual(letter.title(for: .normal), "K")
+        XCTAssertEqual(symbol.title(for: .normal), "១")
+        XCTAssertEqual(letter.titleLabel?.font.pointSize, 17)
+        XCTAssertEqual(symbol.titleLabel?.font.pointSize, 17)
+    }
+
     private func standardRows(in layer: UIView) -> [UIView] {
         guard let stack = layer.subviews.compactMap({ $0 as? UIStackView }).first else {
             XCTFail("Expected layer to contain a vertical stack")
@@ -59,9 +71,7 @@ final class KeyboardLayerFactoryTests: XCTestCase {
     }
 
     private func buttonTitles(in view: UIView) -> [String] {
-        if let button = view as? UIButton {
-            return [button.title(for: .normal) ?? ""]
-        }
+        if let button = view as? UIButton { return [button.title(for: .normal) ?? ""] }
         guard let stack = view as? UIStackView else { return [] }
         return stack.arrangedSubviews.flatMap(buttonTitles)
     }

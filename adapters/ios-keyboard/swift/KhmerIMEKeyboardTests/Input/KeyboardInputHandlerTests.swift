@@ -190,7 +190,7 @@ final class KeyboardInputHandlerTests: XCTestCase {
         handler.togglePanel()
 
         XCTAssertEqual(handler.keyboardState, .panel,
-            "💡 with active composition must enter panel state")
+            "✦ with active composition must enter panel state")
     }
 
     // Regression: onRender must fire AFTER transition so the VC can pass state
@@ -219,7 +219,7 @@ final class KeyboardInputHandlerTests: XCTestCase {
         handler.togglePanel()   // → .qwerty
 
         XCTAssertEqual(handler.keyboardState, .qwerty,
-            "second 💡 tap must dismiss panel and return to qwerty")
+            "second ✦ tap must dismiss panel and return to qwerty")
     }
 
     func test_togglePanel_withoutComposition_transitionsToCharPick() {
@@ -228,7 +228,7 @@ final class KeyboardInputHandlerTests: XCTestCase {
         handler.togglePanel()
 
         XCTAssertEqual(handler.keyboardState, .charPick,
-            "💡 with no composition must enter charPick mode")
+            "✦ with no composition must enter charPick mode")
     }
 
     func test_onTransition_firedForEveryStateChange() {
