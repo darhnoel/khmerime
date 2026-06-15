@@ -1,0 +1,15 @@
+#!/bin/sh
+# Enforce Conventional Commits format: type(scope): description
+# Valid types: feat, fix, docs, chore, refactor, test, wip, style, perf, ci, build
+msg=$(cat "$1")
+pattern='^(feat|fix|docs|chore|refactor|test|wip|style|perf|ci|build)(\([a-zA-Z0-9_-]+\))?: .+'
+if ! echo "$msg" | grep -qE "$pattern"; then
+    echo "commit-msg: message does not follow Conventional Commits format."
+    echo "  Expected: type(scope): description"
+    echo "  Examples: feat(android-ime): add JNI bridge"
+    echo "            chore: add pre-commit hooks"
+    echo "  Valid types: feat fix docs chore refactor test wip style perf ci build"
+    echo ""
+    echo "  Your message: $msg"
+    exit 1
+fi

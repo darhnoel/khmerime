@@ -1,4 +1,4 @@
-.PHONY: help web web-release web-phone desktop stats suggest suggest-wfst suggest-shadow shadow-eval data-split data-build data-check lexicon-editor visualize-lexicon visualize-lexicon-streamlit download-page fmt test test-golden test-ui platform-check platform-check-linux platform-check-android platform-check-ios platform-check-macos platform-check-windows platform-build-ios platform-build-macos platform-diagnose-macos platform-install-macos platform-reinstall-macos platform-build-windows platform-install-windows platform-uninstall-windows platform-reinstall-windows platform-smoke-windows-notepad platform-smoke-windows-notepad-python windows-package linux-package ibus-install ibus-uninstall ibus-smoke paper-current paper-current-clean
+.PHONY: help web web-release web-phone desktop stats suggest suggest-wfst suggest-shadow shadow-eval data-split data-build data-check lexicon-editor visualize-lexicon visualize-lexicon-streamlit download-page fmt test test-golden test-ui platform-check platform-check-linux platform-check-android platform-check-ios platform-check-macos platform-check-windows platform-build-ios platform-build-macos platform-diagnose-macos platform-install-macos platform-reinstall-macos platform-build-windows platform-install-windows platform-uninstall-windows platform-reinstall-windows platform-smoke-windows-notepad platform-smoke-windows-notepad-python windows-package linux-package ibus-install ibus-uninstall ibus-smoke paper-current paper-current-clean platform-test-android platform-build-android android-adb-device platform-install-android platform-reinstall-android setup-hooks
 
 DX ?= dx
 APP_DIR := apps/dioxus-app
@@ -58,6 +58,16 @@ MACOS_NOTARY_PROFILE     ?= khmerime-notary
 -include $(MACOS_SIGNING_CONFIG)
 MACOS_NOTARIZE_ZIP       := /tmp/khmerime-macos-notarize.zip
 MACOS_LSREGISTER         := /System/Library/Frameworks/CoreServices.framework/Versions/Current/Frameworks/LaunchServices.framework/Versions/Current/Support/lsregister
+
+ANDROID_ADAPTER_DIR  := adapters/android-ime
+ANDROID_ABI         ?= arm64-v8a
+ANDROID_JNI_LIBS    := $(ANDROID_ADAPTER_DIR)/app/src/main/jniLibs
+ANDROID_APK         := $(ANDROID_ADAPTER_DIR)/app/build/outputs/apk/debug/app-debug.apk
+ANDROID_PACKAGE     := com.khmerime.debug
+ANDROID_IME_SERVICE := $(ANDROID_PACKAGE)/com.khmerime.service.KhmerInputMethodService
+ANDROID_LEGACY_PACKAGE := com.example.khmerime
+# Android Studio bundles a JDK at this path on macOS. Override if your JDK is elsewhere.
+ANDROID_JAVA_HOME   ?= /Applications/Android Studio.app/Contents/jbr/Contents/Home
 MACOS_XCODE_SIGNING_ARGS := CODE_SIGN_STYLE=Manual \
 	CODE_SIGN_IDENTITY=- \
 	CODE_SIGN_INJECT_BASE_ENTITLEMENTS=NO
@@ -88,6 +98,10 @@ help:
 	"  make test-ui                     Run the browser/UI Python test file" \
 	"  make platform-check              Check all native platform adapter crates" \
 	"  make platform-check-<platform>   Check one adapter: linux, android, ios, macos, windows" \
+	"  make platform-test-android       Run Android JVM unit tests on the host machine (no device needed)" \
+	"  make platform-build-android     Cross-compile Rust via cargo-ndk (ANDROID_ABI=arm64-v8a) + assemble debug APK" \
+	"  make platform-install-android   Build and adb install the debug APK, enable the IME on connected device" \
+	"  make platform-reinstall-android Fast loop: rebuild Rust + APK, reinstall on connected device" \
 	"  make platform-build-ios          Build iOS static libs, generate UniFFI Swift bindings, assemble XCFramework" \
 	"  make platform-build-macos        Build macOS static libs, generate UniFFI Swift bindings, assemble XCFramework" \
 	"  make platform-diagnose-macos     Inspect macOS signing, install paths, and Gatekeeper status" \
@@ -106,6 +120,8 @@ help:
 	"  make ibus-smoke                  Run bridge + IBus discovery smoke checks" \
 	"  make paper-current               Build the current implementation paper PDF" \
 	"  make paper-current-clean         Remove LaTeX build byproducts from the paper folder" \
+	"" \
+	"  make setup-hooks                 Activate .githooks/ for this clone (run once after git clone)" \
 	"" \
 	"Read docs/development.md for the workflow and command details."
 
@@ -190,6 +206,43 @@ platform-check-macos:
 
 platform-check-windows:
 	cargo check -p khmerime_windows_tsf
+
+# Build the host dylib (used by JVM unit tests) then run Gradle unit tests.
+# No Android device or emulator is required.
+platform-test-android:
+	cargo build -p khmerime_android_ime
+	cd $(ANDROID_ADAPTER_DIR) && JAVA_HOME="$(ANDROID_JAVA_HOME)" PATH="$(ANDROID_JAVA_HOME)/bin:$(PATH)" ./gradlew :app:testDebugUnitTest
+
+# Cross-compile Rust for the device ABI via cargo-ndk, then assemble the APK.
+# Prerequisites: cargo install cargo-ndk && rustup target add aarch64-linux-android
+# Override ABI with: make platform-build-android ANDROID_ABI=x86_64
+platform-build-android:
+	cargo ndk -t $(ANDROID_ABI) -o $(ANDROID_JNI_LIBS) build -p khmerime_android_ime
+	cd $(ANDROID_ADAPTER_DIR) && JAVA_HOME="$(ANDROID_JAVA_HOME)" PATH="$(ANDROID_JAVA_HOME)/bin:$(PATH)" ./gradlew :app:assembleDebug
+
+android-adb-device:
+	@adb get-state >/dev/null 2>&1 || { \
+		echo "No Android device/emulator found. Start an emulator or connect a USB-debugging device, then run: adb devices" >&2; \
+		exit 1; \
+	}
+
+# Build, install on the connected device, and enable the IME.
+# Requires: adb in PATH and a connected device/emulator with USB debugging enabled.
+platform-install-android: android-adb-device platform-build-android
+	-adb uninstall $(ANDROID_LEGACY_PACKAGE) >/dev/null 2>&1
+	adb install -r $(ANDROID_APK)
+	adb shell ime enable $(ANDROID_IME_SERVICE)
+	adb shell ime set $(ANDROID_IME_SERVICE)
+	@echo "Installed. Tap any text field on the device to open KhmerIME."
+
+# Fast loop: rebuild Rust + APK and reinstall (assumes cargo-ndk already set up).
+platform-reinstall-android: android-adb-device
+	cargo ndk -t $(ANDROID_ABI) -o $(ANDROID_JNI_LIBS) build -p khmerime_android_ime
+	cd $(ANDROID_ADAPTER_DIR) && JAVA_HOME="$(ANDROID_JAVA_HOME)" PATH="$(ANDROID_JAVA_HOME)/bin:$(PATH)" ./gradlew :app:assembleDebug
+	-adb uninstall $(ANDROID_LEGACY_PACKAGE) >/dev/null 2>&1
+	adb install -r $(ANDROID_APK)
+	adb shell ime enable $(ANDROID_IME_SERVICE)
+	adb shell ime set $(ANDROID_IME_SERVICE)
 
 platform-build-ios:
 	cargo build -p khmerime_ios_keyboard --target $(IOS_TARGET_DEVICE) --release
@@ -356,3 +409,9 @@ paper-current:
 
 paper-current-clean:
 	rm -f $(PAPER_CURRENT_DIR)/*.aux $(PAPER_CURRENT_DIR)/*.log $(PAPER_CURRENT_DIR)/*.out
+
+# Configure git to use the tracked hooks in .githooks/.
+# Run once per clone. The pre-commit hook blocks accidental .so commits.
+setup-hooks:
+	git config core.hooksPath .githooks
+	@echo "Git hooks activated. Pre-commit will now block .so files from being staged."

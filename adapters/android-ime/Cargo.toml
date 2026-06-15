@@ -5,6 +5,11 @@ edition = "2021"
 
 [lib]
 path = "src/lib.rs"
+crate-type = ["cdylib"]
 
 [dependencies]
+jni = "0.21"
 khmerime_session = { path = "../../crates/session" }
+khmerime_core = { path = "../../crates/core" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
