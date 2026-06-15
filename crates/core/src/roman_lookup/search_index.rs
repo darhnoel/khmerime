@@ -14,7 +14,7 @@ impl SearchIndex {
     pub(super) fn new(items: &[String], use_levenshtein: bool, gsize_l: usize, gsize_u: usize) -> Self {
         #[cfg(feature = "no-search-index")]
         {
-            let _ = (items, use_levenshtein, gsize_l, gsize_u);
+            let _ = (items, use_levenshtein, gsize_l, gsize_u, DEFAULT_LEGACY_FUZZY_INDEX);
             return Self::Ngram(NgramSearchIndex::empty());
         }
         #[cfg(not(feature = "no-search-index"))]
@@ -34,6 +34,7 @@ impl SearchIndex {
     }
 }
 
+#[cfg(not(feature = "no-search-index"))]
 fn use_symspell_search_index() -> bool {
     #[cfg(not(target_arch = "wasm32"))]
     {
@@ -69,6 +70,7 @@ struct SymSpellItem {
 }
 
 impl SymSpellIndex {
+    #[cfg(not(feature = "no-search-index"))]
     fn new(items: &[String], use_levenshtein: bool, max_edit_distance: usize) -> Self {
         let mut index = Self {
             use_levenshtein,
@@ -85,6 +87,7 @@ impl SymSpellIndex {
         index
     }
 
+    #[cfg(not(feature = "no-search-index"))]
     fn add(&mut self, item: &str) {
         let normalized = normalize(item);
         if self.exact.contains_key(&normalized) {
@@ -216,6 +219,7 @@ pub(super) struct NgramSearchIndex {
 }
 
 impl NgramSearchIndex {
+    #[cfg(feature = "no-search-index")]
     fn empty() -> Self {
         Self {
             gsize_l: 2,
@@ -227,6 +231,7 @@ impl NgramSearchIndex {
         }
     }
 
+    #[cfg(not(feature = "no-search-index"))]
     fn new(items: &[String], use_levenshtein: bool, gsize_l: usize, gsize_u: usize) -> Self {
         let mut index = Self {
             gsize_l,
@@ -244,6 +249,7 @@ impl NgramSearchIndex {
         index
     }
 
+    #[cfg(not(feature = "no-search-index"))]
     fn add(&mut self, item: &str) {
         let normalized = normalize(item);
         if self.exact.contains_key(&normalized) {
@@ -255,6 +261,7 @@ impl NgramSearchIndex {
         self.exact.insert(normalized, item.to_owned());
     }
 
+    #[cfg(not(feature = "no-search-index"))]
     fn add_with_size(&mut self, normalized: &str, size: usize) {
         let grams = ngram_counts(&normalized, size);
         let rows = self.items.entry(size).or_insert_with(Vec::new);
