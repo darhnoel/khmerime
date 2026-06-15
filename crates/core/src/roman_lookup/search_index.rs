@@ -12,10 +12,18 @@ pub(super) enum SearchIndex {
 
 impl SearchIndex {
     pub(super) fn new(items: &[String], use_levenshtein: bool, gsize_l: usize, gsize_u: usize) -> Self {
-        if use_symspell_search_index() {
-            return Self::SymSpell(SymSpellIndex::new(items, use_levenshtein, 2));
+        #[cfg(feature = "no-search-index")]
+        {
+            let _ = (items, use_levenshtein, gsize_l, gsize_u);
+            return Self::Ngram(NgramSearchIndex::empty());
         }
-        Self::Ngram(NgramSearchIndex::new(items, use_levenshtein, gsize_l, gsize_u))
+        #[cfg(not(feature = "no-search-index"))]
+        {
+            if use_symspell_search_index() {
+                return Self::SymSpell(SymSpellIndex::new(items, use_levenshtein, 2));
+            }
+            Self::Ngram(NgramSearchIndex::new(items, use_levenshtein, gsize_l, gsize_u))
+        }
     }
 
     pub(super) fn get(&self, query: &str, threshold: f64) -> Option<Vec<(f64, String)>> {
@@ -208,6 +216,17 @@ pub(super) struct NgramSearchIndex {
 }
 
 impl NgramSearchIndex {
+    fn empty() -> Self {
+        Self {
+            gsize_l: 2,
+            gsize_u: 3,
+            use_levenshtein: false,
+            exact: HashMap::new(),
+            grams: HashMap::new(),
+            items: BTreeMap::new(),
+        }
+    }
+
     fn new(items: &[String], use_levenshtein: bool, gsize_l: usize, gsize_u: usize) -> Self {
         let mut index = Self {
             gsize_l,

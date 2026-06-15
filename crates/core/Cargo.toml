@@ -7,6 +7,7 @@ edition = "2021"
 default = []
 wfst-decoder = []
 fetch-data = []
+no-search-index = []
 
 [dependencies]
 serde = { version = "1", features = ["derive"] }

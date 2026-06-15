@@ -12,6 +12,6 @@ name = "uniffi-bindgen"
 path = "src/bin/uniffi-bindgen.rs"
 
 [dependencies]
-khmerime_core    = { path = "../../crates/core" }
+khmerime_core    = { path = "../../crates/core", features = ["no-search-index"] }
 khmerime_session = { path = "../../crates/session" }
 uniffi = { version = "0.31", features = ["cli"] }
