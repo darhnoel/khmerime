@@ -8,12 +8,12 @@
 use std::collections::HashMap;
 
 use jni::objects::{JObject, JString};
-use jni::sys::{jlong, jstring};
+use jni::sys::{jint, jlong, jstring};
 use jni::JNIEnv;
 use khmerime_core::{DecoderConfig, Transliterator};
 use khmerime_session::{
-    ImeSession, ImeSessionOptions, InputMode, NativeKeyEvent, SegmentedPreviewMode,
-    SessionResult, SessionSnapshot,
+    ImeSession, ImeSessionOptions, InputMode, NativeKeyEvent, SegmentPreviewEntry, SegmentedPreviewMode,
+    SessionCommand, SessionResult, SessionSnapshot,
 };
 use serde::Serialize;
 
@@ -37,7 +37,28 @@ struct RenderState {
     candidates: Vec<String>,
     selected_index: Option<u64>,
     preedit: String,
+    segments: Vec<SegmentEntry>,
+    focused_segment_index: Option<u64>,
     commit_text: Option<String>,
+    segment_edit_active: bool,
+    segment_edit_index: Option<u64>,
+}
+
+#[derive(Serialize)]
+struct SegmentEntry {
+    output: String,
+    input: String,
+    focused: bool,
+}
+
+impl From<&SegmentPreviewEntry> for SegmentEntry {
+    fn from(segment: &SegmentPreviewEntry) -> Self {
+        SegmentEntry {
+            output: segment.output.clone(),
+            input: segment.input.clone(),
+            focused: segment.focused,
+        }
+    }
 }
 
 fn make_render_state(snapshot: &SessionSnapshot, result: &SessionResult) -> RenderState {
@@ -45,7 +66,11 @@ fn make_render_state(snapshot: &SessionSnapshot, result: &SessionResult) -> Rend
         candidates: snapshot.candidates.clone(),
         selected_index: snapshot.selected_index.map(|i| i as u64),
         preedit: snapshot.preedit.clone(),
+        segments: snapshot.segment_preview.iter().map(SegmentEntry::from).collect(),
+        focused_segment_index: snapshot.focused_segment_index.map(|i| i as u64),
         commit_text: result.commit_text.clone(),
+        segment_edit_active: snapshot.segment_edit_active,
+        segment_edit_index: snapshot.segment_edit_index.map(|i| i as u64),
     }
 }
 
@@ -197,4 +222,39 @@ pub extern "C" fn Java_com_khmerime_KhmerImeSession_nativeProcessTab(
     let s = unsafe { session_mut(handle) };
     let result = s.process_native_key_event(key_event(KEY_TAB));
     render_json(&mut env, &s.snapshot(), &result)
+}
+
+#[no_mangle]
+pub extern "C" fn Java_com_khmerime_KhmerImeSession_nativeProcessDigit(
+    mut env: JNIEnv,
+    _obj: JObject,
+    handle: jlong,
+    n: jint,
+) -> jstring {
+    let s = unsafe { session_mut(handle) };
+    let digit = n.clamp(0, 9) as u32;
+    let result = s.process_native_key_event(key_event(b'0' as u32 + digit));
+    render_json(&mut env, &s.snapshot(), &result)
+}
+
+#[no_mangle]
+pub extern "C" fn Java_com_khmerime_KhmerImeSession_nativeEnterCharPick(
+    mut env: JNIEnv,
+    _obj: JObject,
+    handle: jlong,
+) -> jstring {
+    let s = unsafe { session_mut(handle) };
+    s.process_command(SessionCommand::SetInputMode(InputMode::CharPick));
+    render_json(&mut env, &s.snapshot(), &SessionResult::default())
+}
+
+#[no_mangle]
+pub extern "C" fn Java_com_khmerime_KhmerImeSession_nativeExitCharPick(
+    mut env: JNIEnv,
+    _obj: JObject,
+    handle: jlong,
+) -> jstring {
+    let s = unsafe { session_mut(handle) };
+    s.process_command(SessionCommand::SetInputMode(InputMode::Roman));
+    render_json(&mut env, &s.snapshot(), &SessionResult::default())
 }

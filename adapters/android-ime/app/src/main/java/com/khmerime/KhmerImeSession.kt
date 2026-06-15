@@ -24,6 +24,9 @@ class KhmerImeSession {
     fun processLeft(): KhmerRenderState = parse(nativeProcessLeft(nativeHandle))
     fun processRight(): KhmerRenderState = parse(nativeProcessRight(nativeHandle))
     fun processTab(): KhmerRenderState = parse(nativeProcessTab(nativeHandle))
+    fun processDigit(n: Int): KhmerRenderState = parse(nativeProcessDigit(nativeHandle, n))
+    fun enterCharPick(): KhmerRenderState = parse(nativeEnterCharPick(nativeHandle))
+    fun exitCharPick(): KhmerRenderState = parse(nativeExitCharPick(nativeHandle))
 
     private external fun nativeCreate(): Long
     private external fun nativeDestroy(handle: Long)
@@ -36,6 +39,9 @@ class KhmerImeSession {
     private external fun nativeProcessLeft(handle: Long): String
     private external fun nativeProcessRight(handle: Long): String
     private external fun nativeProcessTab(handle: Long): String
+    private external fun nativeProcessDigit(handle: Long, n: Int): String
+    private external fun nativeEnterCharPick(handle: Long): String
+    private external fun nativeExitCharPick(handle: Long): String
 
     companion object {
         init {

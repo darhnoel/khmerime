@@ -69,6 +69,116 @@ class KhmerInputHandlerBehaviorTest {
     }
 
     @Test
+    fun suggestCharacterModeWithCompositionDiscardsRomanText() {
+        val (handler, textField) = makeHandler()
+        type("nhom", into = handler)
+
+        handler.toggleSuggestCharacter()
+
+        assertEquals(
+            "💡 with active composition must enter Suggest Character mode",
+            KeyboardState.SuggestCharacter,
+            handler.keyboardState,
+        )
+        assertEquals(
+            "entering Suggest Character mode must discard active roman composition",
+            "",
+            textField.text,
+        )
+
+        handler.toggleSuggestCharacter()
+
+        assertEquals(
+            "second 💡 tap must return to QWERTY",
+            KeyboardState.Qwerty,
+            handler.keyboardState,
+        )
+    }
+
+    @Test
+    fun suggestCharacterModeUsesQwertyKeysToRenderCharacterCandidatesWithoutEditingText() {
+        val (handler, textField) = makeHandler()
+
+        handler.toggleSuggestCharacter()
+        val textBeforeSuggestCharacter = textField.text
+        var renderedCandidates: List<String> = emptyList()
+        handler.onRender = { state -> renderedCandidates = state.candidates }
+
+        handler.sendChar("k")
+
+        assertEquals(
+            "💡 must enter Suggest Character mode",
+            KeyboardState.SuggestCharacter,
+            handler.keyboardState,
+        )
+        assertEquals(
+            "QWERTY keys in Suggest Character mode must not insert roman chars",
+            textBeforeSuggestCharacter,
+            textField.text,
+        )
+        assertTrue(
+            "QWERTY key k in Suggest Character mode must render Khmer candidates; got $renderedCandidates",
+            renderedCandidates.contains("ក"),
+        )
+    }
+
+    @Test
+    fun suggestCharacterKeyRenderHappensWhileInSuggestCharacterState() {
+        val (handler, _) = makeHandler()
+        handler.toggleSuggestCharacter()
+
+        var stateAtRenderTime: KeyboardState? = null
+        var renderedCandidates: List<String> = emptyList()
+        handler.onRender = { state ->
+            stateAtRenderTime = handler.keyboardState
+            renderedCandidates = state.candidates
+        }
+
+        handler.sendChar("k")
+
+        assertEquals(
+            "QWERTY key render must happen while keyboardState is SuggestCharacter",
+            KeyboardState.SuggestCharacter,
+            stateAtRenderTime,
+        )
+        assertTrue(
+            "Suggest Character candidates for k must include ក; got $renderedCandidates",
+            renderedCandidates.contains("ក"),
+        )
+    }
+
+    @Test
+    fun suggestCharacterCandidateSelectionInsertsKhmerAndResetsSuggestions() {
+        val (handler, textField) = makeHandler()
+        handler.toggleSuggestCharacter()
+        handler.sendChar("k")
+
+        var resetCount = 0
+        handler.onSuggestCharacterReset = { resetCount += 1 }
+
+        handler.selectCandidate(0)
+
+        assertFalse(
+            "selecting a Suggest Character candidate must insert text into the text field",
+            textField.text.isEmpty(),
+        )
+        assertTrue(
+            "inserted text must be Khmer Unicode; got '${textField.text}'",
+            textField.text.all { it.code in 0x1780..0x17FF },
+        )
+        assertEquals(
+            "Suggest Character selection must reset suggestions",
+            1,
+            resetCount,
+        )
+        assertEquals(
+            "Suggest Character candidate selection keeps Suggest Character mode on",
+            KeyboardState.SuggestCharacter,
+            handler.keyboardState,
+        )
+    }
+
+    @Test
     fun backspaceDeletesRomanPreeditCharacter() {
         val (handler, textField) = makeHandler()
         type("nh", into = handler)

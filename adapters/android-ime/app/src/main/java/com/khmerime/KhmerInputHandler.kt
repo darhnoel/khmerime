@@ -18,8 +18,14 @@ class KhmerInputHandler(
 
     private var romanBuffer = ""
     private var trailingSpace = false
+    private var lastState: KhmerRenderState? = null
+
+    var keyboardState: KeyboardState = KeyboardState.Qwerty
+        private set
 
     var onRender: ((KhmerRenderState) -> Unit)? = null
+    var onTransition: ((KeyboardState) -> Unit)? = null
+    var onSuggestCharacterReset: (() -> Unit)? = null
 
     // ── Lifecycle ─────────────────────────────────────────────────────────────
 
@@ -34,6 +40,11 @@ class KhmerInputHandler(
     // ── Key actions ───────────────────────────────────────────────────────────
 
     fun sendChar(ch: String) {
+        if (keyboardState == KeyboardState.SuggestCharacter) {
+            render(session.processCharacter(ch))
+            return
+        }
+        if (keyboardState == KeyboardState.Panel) transitionTo(KeyboardState.Qwerty)
         trailingSpace = false
         proxy.insertText(ch)
         romanBuffer += ch
@@ -49,6 +60,18 @@ class KhmerInputHandler(
 
     fun sendBackspace() {
         trailingSpace = false
+        if (keyboardState == KeyboardState.SuggestCharacter) {
+            val current = lastState
+            if (current != null && current.candidates.isNotEmpty()) {
+                session.enterCharPick()
+                lastState = null
+                onSuggestCharacterReset?.invoke()
+                transitionTo(KeyboardState.SuggestCharacter)
+            } else {
+                proxy.deleteBackward()
+            }
+            return
+        }
         if (romanBuffer.isNotEmpty()) romanBuffer = romanBuffer.dropLast(1)
         proxy.deleteBackward()
         render(session.processBackspace())
@@ -61,6 +84,10 @@ class KhmerInputHandler(
     }
 
     fun sendReturn() {
+        if (keyboardState == KeyboardState.SuggestCharacter) {
+            selectCandidate(0)
+            return
+        }
         if (romanBuffer.isNotEmpty()) {
             commitComposition()
             return
@@ -72,19 +99,66 @@ class KhmerInputHandler(
         proxy.insertText("\n")
     }
 
+    fun toggleSuggestCharacter() {
+        when (keyboardState) {
+            KeyboardState.Panel -> transitionTo(KeyboardState.Qwerty)
+            KeyboardState.SuggestCharacter -> {
+                session.exitCharPick()
+                lastState = null
+                transitionTo(KeyboardState.Qwerty)
+            }
+            KeyboardState.Qwerty -> {
+                repeat(romanBuffer.length) { proxy.deleteBackward() }
+                romanBuffer = ""
+                trailingSpace = false
+                session.enterCharPick()
+                lastState = null
+                transitionTo(KeyboardState.SuggestCharacter)
+                onSuggestCharacterReset?.invoke()
+            }
+        }
+    }
+
+    fun togglePanel() = toggleSuggestCharacter()
+
+    fun selectCandidate(index: Int) {
+        if (keyboardState == KeyboardState.SuggestCharacter) {
+            lastState?.candidates?.getOrNull(index)?.let { proxy.insertText(it) }
+            session.enterCharPick()
+            lastState = null
+            onSuggestCharacterReset?.invoke()
+            transitionTo(KeyboardState.SuggestCharacter)
+            return
+        }
+        render(session.processDigit(index + 1))
+    }
+
     // ── Private ───────────────────────────────────────────────────────────────
 
     private fun commitComposition() {
+        if (keyboardState == KeyboardState.SuggestCharacter) return
         val state = session.processEnter()
-        val khmer = state.commitText ?: ""
+        val khmer = if (state.segments.isEmpty()) {
+            state.commitText ?: ""
+        } else {
+            state.segments.joinToString(separator = "") { it.output }
+        }
         repeat(romanBuffer.length) { proxy.deleteBackward() }
         if (khmer.isNotEmpty()) proxy.insertText(khmer)
         romanBuffer = ""
         trailingSpace = false
         render(state)
+        if (keyboardState == KeyboardState.Panel) transitionTo(KeyboardState.Qwerty)
     }
 
     private fun render(state: KhmerRenderState) {
+        lastState = state
         onRender?.invoke(state)
+    }
+
+    private fun transitionTo(state: KeyboardState) {
+        if (keyboardState == state) return
+        keyboardState = state
+        onTransition?.invoke(state)
     }
 }

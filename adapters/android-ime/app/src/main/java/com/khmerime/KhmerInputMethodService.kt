@@ -44,6 +44,8 @@ class KhmerInputMethodService : InputMethodService() {
         val proxy = InputConnectionProxy(ic)
         handler = KhmerInputHandler(proxy, session).also { h ->
             h.onRender = ::renderState
+            h.onTransition = ::renderKeyboardState
+            h.onSuggestCharacterReset = ::resetSuggestCharacterSuggestions
             h.focusIn()
         }
     }
@@ -159,32 +161,38 @@ class KhmerInputMethodService : InputMethodService() {
             KeyboardKeyAction.SwitchToQwerty -> renderKeyboardLayer(KeyboardLayer.Qwerty)
             KeyboardKeyAction.SwitchToNumeric -> renderKeyboardLayer(KeyboardLayer.Numeric)
             KeyboardKeyAction.SwitchToSymbols -> renderKeyboardLayer(KeyboardLayer.Symbols)
-            KeyboardKeyAction.TogglePanel -> Unit
+            KeyboardKeyAction.TogglePanel -> handler?.toggleSuggestCharacter()
             KeyboardKeyAction.NextKeyboard -> Unit
         }
     }
 
     private fun Int.dp(): Int = (this * resources.displayMetrics.density).toInt()
 
+    private fun renderKeyboardState(state: KeyboardState) {
+        when (state) {
+            KeyboardState.Qwerty -> renderKeyboardLayer(KeyboardPresentationSpec.keyboardLayerForState(state))
+            KeyboardState.Panel -> renderKeyboardLayer(KeyboardPresentationSpec.keyboardLayerForState(state))
+            KeyboardState.SuggestCharacter -> renderKeyboardLayer(KeyboardPresentationSpec.keyboardLayerForState(state))
+        }
+    }
+
+    private fun resetSuggestCharacterSuggestions() {
+        preeditBar?.text = ""
+        candidateStrip?.removeAllViews()
+    }
+
     // ── Render ─────────────────────────────────────────────────────────────────
 
     private fun renderState(state: KhmerRenderState) {
-        preeditBar?.text = state.preedit
+        val keyboardState = handler?.keyboardState
+        preeditBar?.text = KeyboardPresentationSpec.preeditText(keyboardState, state)
 
         val strip = candidateStrip ?: return
         strip.removeAllViews()
-        state.candidates.forEachIndexed { index, candidate ->
+        KeyboardPresentationSpec.suggestionCandidates(state).forEachIndexed { index, candidate ->
             val btn = Button(this).apply {
                 text = candidate
-                setOnClickListener {
-                    // Select candidate: delete roman buffer, insert Khmer candidate
-                    currentInputConnection?.let { ic ->
-                        val proxy = InputConnectionProxy(ic)
-                        repeat(state.preedit.length) { proxy.deleteBackward() }
-                        proxy.insertText(candidate)
-                    }
-                    this@KhmerInputMethodService.handler?.focusIn()
-                }
+                setOnClickListener { this@KhmerInputMethodService.handler?.selectCandidate(index) }
                 textSize = 16f
             }
             strip.addView(btn)

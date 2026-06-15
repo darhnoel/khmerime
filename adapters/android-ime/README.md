@@ -4,6 +4,9 @@ Android keyboard adapter that bridges `KhmerInputHandler` (Kotlin) to the shared
 Rust `ImeSession` via JNI. Works like the iOS keyboard: romanization input builds
 a preedit, candidates appear above the keyboard, and Enter commits Khmer text.
 
+See [`ubiquitous_language.md`](./ubiquitous_language.md) for Android-specific
+keyboard terminology and platform decisions.
+
 ## Quick start
 
 ```bash
@@ -38,7 +41,8 @@ app/src/test/java/com/khmerime/
 ```
 
 The visible QWERTY, numeric, and symbol rows are aligned with the iOS keyboard.
-The iOS 💡 panel and CharPick state machine are not yet fully implemented on Android.
+Android keeps candidates in the suggestion bar and reserves the keyboard area for
+keys and modes.
 
 ## Tests
 
