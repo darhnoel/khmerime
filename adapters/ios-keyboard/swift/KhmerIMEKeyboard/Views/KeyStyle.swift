@@ -5,6 +5,28 @@ final class GlassKeyButton: UIButton {
         didSet { updateGlassAppearance() }
     }
 
+    private var pressAnimator: GlassKeyPressAnimator?
+
+    // Inject a synchronous runner for testing before any touch event fires.
+    func configureForTesting(runner: @escaping AnimatorRunner) {
+        pressAnimator = GlassKeyPressAnimator(onUpdate: applySquish(_:), runner: runner)
+    }
+
+    override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
+        super.touchesBegan(touches, with: event)
+        ensurePressAnimator().press()
+    }
+
+    override func touchesEnded(_ touches: Set<UITouch>, with event: UIEvent?) {
+        super.touchesEnded(touches, with: event)
+        ensurePressAnimator().release()
+    }
+
+    override func touchesCancelled(_ touches: Set<UITouch>, with event: UIEvent?) {
+        super.touchesCancelled(touches, with: event)
+        ensurePressAnimator().release()
+    }
+
     override func layoutSubviews() {
         super.layoutSubviews()
         updateGlassAppearance()
@@ -13,6 +35,18 @@ final class GlassKeyButton: UIButton {
     override func traitCollectionDidChange(_ previousTraitCollection: UITraitCollection?) {
         super.traitCollectionDidChange(previousTraitCollection)
         updateGlassAppearance()
+    }
+
+    private func ensurePressAnimator() -> GlassKeyPressAnimator {
+        if let existing = pressAnimator { return existing }
+        let animator = GlassKeyPressAnimator(onUpdate: applySquish(_:))
+        pressAnimator = animator
+        return animator
+    }
+
+    private func applySquish(_ squish: CGFloat) {
+        let scale = 1 - squish * 0.08
+        transform = CGAffineTransform(scaleX: scale, y: scale)
     }
 
     private func updateGlassAppearance() {

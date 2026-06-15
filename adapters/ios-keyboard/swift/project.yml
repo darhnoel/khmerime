@@ -28,6 +28,7 @@ schemes:
   KhmerIMEKeyboardTests:
     build:
       targets:
+        KhmerIMEKeyboard: all
         KhmerIMEKeyboardTests: test
     test:
       targets:
