@@ -62,4 +62,41 @@ class GlassColorSpecTest {
             GlassColorSpec.blurRadiusPx(density = 1f) > 0f,
         )
     }
+
+    @Test
+    fun selectedCandidateBackgroundHasHigherAlphaThanRegularInDarkMode() {
+        val regular = GlassColorSpec.backgroundColor(isDark = true)
+        val selected = GlassColorSpec.selectedCandidateBackground(isDark = true)
+        assertTrue(
+            "selected pill must be more opaque than regular; regular=${regular.alpha()} selected=${selected.alpha()}",
+            selected.alpha() > regular.alpha(),
+        )
+    }
+
+    @Test
+    fun selectedCandidateBackgroundHasHigherAlphaThanRegularInLightMode() {
+        val regular = GlassColorSpec.backgroundColor(isDark = false)
+        val selected = GlassColorSpec.selectedCandidateBackground(isDark = false)
+        assertTrue(
+            "selected pill must be more opaque than regular; regular=${regular.alpha()} selected=${selected.alpha()}",
+            selected.alpha() > regular.alpha(),
+        )
+    }
+
+    @Test
+    fun selectedCandidateBackgroundIsNotFullyOpaque() {
+        val selected = GlassColorSpec.selectedCandidateBackground(isDark = true)
+        assertTrue(
+            "selected pill must stay translucent (glass effect), got alpha=${selected.alpha()}",
+            selected.alpha() < 255,
+        )
+    }
+
+    @Test
+    fun candidateBorderWidthIsWiderThanKeyBorderWidth() {
+        assertTrue(
+            "candidate border must be visually obvious (> 1dp equivalent)",
+            GlassColorSpec.candidateBorderWidth() > 1f,
+        )
+    }
 }

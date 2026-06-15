@@ -2,6 +2,7 @@ package com.khmerime
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -35,6 +36,35 @@ class KeyboardPresentationSpecTest {
         assertFalse(
             "Android does not replace the keyboard layer with candidate panels",
             KeyboardPresentationSpec.renderStateReplacesKeyboardLayer(KeyboardState.Panel),
+        )
+    }
+
+    @Test
+    fun selectedCandidateIndexReturnsNullWhenNoneSelected() {
+        val state = KhmerRenderState(candidates = listOf("ក", "ខ"), selectedIndex = null)
+        assertNull(
+            "selectedCandidateIndex must be null when session has no selection",
+            KeyboardPresentationSpec.selectedCandidateIndex(state),
+        )
+    }
+
+    @Test
+    fun selectedCandidateIndexReturnsIntFromState() {
+        val state = KhmerRenderState(candidates = listOf("ក", "ខ"), selectedIndex = 1)
+        assertEquals(
+            "selectedCandidateIndex must reflect session selectedIndex",
+            1 as Int?,
+            KeyboardPresentationSpec.selectedCandidateIndex(state),
+        )
+    }
+
+    @Test
+    fun selectedCandidateIndexZeroIsDistinctFromNull() {
+        val state = KhmerRenderState(candidates = listOf("ក", "ខ"), selectedIndex = 0)
+        assertEquals(
+            "selectedIndex 0 must return 0, not null",
+            0 as Int?,
+            KeyboardPresentationSpec.selectedCandidateIndex(state),
         )
     }
 }

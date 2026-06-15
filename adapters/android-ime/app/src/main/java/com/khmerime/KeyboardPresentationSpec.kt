@@ -9,6 +9,8 @@ object KeyboardPresentationSpec {
     fun renderStateReplacesKeyboardLayer(keyboardState: KeyboardState?): Boolean =
         false
 
+    fun selectedCandidateIndex(state: KhmerRenderState): Int? = state.selectedIndex
+
     fun keyboardLayerForState(keyboardState: KeyboardState?): KeyboardLayer = when (keyboardState) {
         KeyboardState.SuggestCharacter,
         KeyboardState.Qwerty,

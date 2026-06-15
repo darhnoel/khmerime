@@ -7,6 +7,11 @@ object GlassColorSpec {
     fun borderColor(isDark: Boolean): Int =
         if (isDark) argb(60, 255, 255, 255) else argb(40, 0, 0, 0)
 
+    fun selectedCandidateBackground(isDark: Boolean): Int =
+        if (isDark) argb(235, 110, 110, 124) else argb(245, 210, 215, 225)
+
+    fun candidateBorderWidth(): Float = 1.5f
+
     fun blurRadiusPx(density: Float): Float = 12f * density
 
     private fun argb(a: Int, r: Int, g: Int, b: Int): Int =

@@ -29,15 +29,15 @@ object KeyboardLayerSpec {
         KeyboardLayer.Qwerty -> listOf(
             letters("qwertyuiop"),
             letters("asdfghjkl"),
-            listOf(special("💡", KeyboardKeyAction.TogglePanel)) +
+            listOf(special("✦", KeyboardKeyAction.TogglePanel)) +
                 letters("zxcvbnm") +
                 special("⌫", KeyboardKeyAction.Backspace),
             listOf(
-                special("🌐", KeyboardKeyAction.NextKeyboard),
+                special("En", KeyboardKeyAction.NextKeyboard),
                 special("123", KeyboardKeyAction.SwitchToNumeric),
                 special("space", KeyboardKeyAction.Space),
                 KeyboardKey(".", KeyboardKeyAction.Insert),
-                special("⏎", KeyboardKeyAction.Return),
+                special("↵", KeyboardKeyAction.Return),
             ),
         )
 
@@ -48,10 +48,10 @@ object KeyboardLayerSpec {
                 inserts(listOf(".", ",", "?", "!", "'")) +
                 special("⌫", KeyboardKeyAction.Backspace),
             listOf(
-                special("🌐", KeyboardKeyAction.NextKeyboard),
+                special("En", KeyboardKeyAction.NextKeyboard),
                 special("ABC", KeyboardKeyAction.SwitchToQwerty),
                 special("space", KeyboardKeyAction.Space),
-                special("⏎", KeyboardKeyAction.Return),
+                special("↵", KeyboardKeyAction.Return),
             ),
         )
 
@@ -62,10 +62,10 @@ object KeyboardLayerSpec {
                 inserts(listOf(".", ",", "?", "!", "'")) +
                 special("⌫", KeyboardKeyAction.Backspace),
             listOf(
-                special("🌐", KeyboardKeyAction.NextKeyboard),
+                special("En", KeyboardKeyAction.NextKeyboard),
                 special("ABC", KeyboardKeyAction.SwitchToQwerty),
                 special("space", KeyboardKeyAction.Space),
-                special("⏎", KeyboardKeyAction.Return),
+                special("↵", KeyboardKeyAction.Return),
             ),
         )
     }

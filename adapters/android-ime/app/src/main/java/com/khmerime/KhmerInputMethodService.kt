@@ -7,7 +7,6 @@ import android.os.Build
 import android.view.Gravity
 import android.view.View
 import android.view.inputmethod.EditorInfo
-import android.widget.Button
 import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.core.view.ViewCompat
@@ -178,13 +177,26 @@ class KhmerInputMethodService : InputMethodService() {
 
         val strip = candidateStrip ?: return
         strip.removeAllViews()
+        val selectedIndex = KeyboardPresentationSpec.selectedCandidateIndex(state)
         KeyboardPresentationSpec.suggestionCandidates(state).forEachIndexed { index, candidate ->
-            val btn = Button(this).apply {
-                text = candidate
-                setOnClickListener { this@KhmerInputMethodService.handler?.selectCandidate(index) }
-                textSize = 16f
+            val chip = SuggestionChipView(
+                context = this,
+                text = candidate,
+                isSelected = index == selectedIndex,
+                onClick = { handler?.selectCandidate(index) },
+            ).apply {
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.WRAP_CONTENT,
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                ).apply {
+                    marginStart = 4.dp()
+                    marginEnd = 4.dp()
+                    topMargin = 4.dp()
+                    bottomMargin = 4.dp()
+                    width = 80.dp()
+                }
             }
-            strip.addView(btn)
+            strip.addView(chip)
         }
     }
 }
