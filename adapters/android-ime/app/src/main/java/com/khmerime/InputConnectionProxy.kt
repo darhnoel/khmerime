@@ -1,4 +1,4 @@
-package com.example.khmerime
+package com.khmerime
 
 import android.view.inputmethod.InputConnection
 
@@ -6,7 +6,7 @@ import android.view.inputmethod.InputConnection
 // ====================
 // Wraps a live InputConnection so KhmerInputHandler can insert and delete text
 // without knowing about the Android framework. Implements the same TextProxy
-// interface used by MockTextProxy in tests.
+// interface used by InMemoryTextProxy in tests.
 
 class InputConnectionProxy(private val ic: InputConnection) : TextProxy {
 

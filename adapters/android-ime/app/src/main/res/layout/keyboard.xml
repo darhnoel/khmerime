@@ -31,84 +31,20 @@
             android:layout_height="match_parent" />
     </HorizontalScrollView>
 
-    <!-- Row 1: q w e r t y u i o p ⌫ -->
     <LinearLayout
-        android:orientation="horizontal"
+        android:id="@+id/keyboard_layer"
+        android:orientation="vertical"
         android:layout_width="match_parent"
-        android:layout_height="46dp"
-        android:layout_marginTop="4dp"
-        android:layout_marginStart="2dp"
-        android:layout_marginEnd="2dp">
-
-        <Button android:tag="q" style="@style/KeyButton" android:text="q" android:layout_weight="1" android:layout_width="0dp" android:layout_height="match_parent" />
-        <Button android:tag="w" style="@style/KeyButton" android:text="w" android:layout_weight="1" android:layout_width="0dp" android:layout_height="match_parent" />
-        <Button android:tag="e" style="@style/KeyButton" android:text="e" android:layout_weight="1" android:layout_width="0dp" android:layout_height="match_parent" />
-        <Button android:tag="r" style="@style/KeyButton" android:text="r" android:layout_weight="1" android:layout_width="0dp" android:layout_height="match_parent" />
-        <Button android:tag="t" style="@style/KeyButton" android:text="t" android:layout_weight="1" android:layout_width="0dp" android:layout_height="match_parent" />
-        <Button android:tag="y" style="@style/KeyButton" android:text="y" android:layout_weight="1" android:layout_width="0dp" android:layout_height="match_parent" />
-        <Button android:tag="u" style="@style/KeyButton" android:text="u" android:layout_weight="1" android:layout_width="0dp" android:layout_height="match_parent" />
-        <Button android:tag="i" style="@style/KeyButton" android:text="i" android:layout_weight="1" android:layout_width="0dp" android:layout_height="match_parent" />
-        <Button android:tag="o" style="@style/KeyButton" android:text="o" android:layout_weight="1" android:layout_width="0dp" android:layout_height="match_parent" />
-        <Button android:tag="p" style="@style/KeyButton" android:text="p" android:layout_weight="1" android:layout_width="0dp" android:layout_height="match_parent" />
-        <Button android:id="@+id/key_backspace" style="@style/ActionButton" android:text="⌫" android:layout_weight="1.5" android:layout_width="0dp" android:layout_height="match_parent" />
-    </LinearLayout>
-
-    <!-- Row 2: a s d f g h j k l ⏎ -->
-    <LinearLayout
-        android:orientation="horizontal"
-        android:layout_width="match_parent"
-        android:layout_height="46dp"
-        android:layout_marginTop="4dp"
-        android:layout_marginStart="2dp"
-        android:layout_marginEnd="2dp">
-
-        <Button android:tag="a" style="@style/KeyButton" android:text="a" android:layout_weight="1" android:layout_width="0dp" android:layout_height="match_parent" />
-        <Button android:tag="s" style="@style/KeyButton" android:text="s" android:layout_weight="1" android:layout_width="0dp" android:layout_height="match_parent" />
-        <Button android:tag="d" style="@style/KeyButton" android:text="d" android:layout_weight="1" android:layout_width="0dp" android:layout_height="match_parent" />
-        <Button android:tag="f" style="@style/KeyButton" android:text="f" android:layout_weight="1" android:layout_width="0dp" android:layout_height="match_parent" />
-        <Button android:tag="g" style="@style/KeyButton" android:text="g" android:layout_weight="1" android:layout_width="0dp" android:layout_height="match_parent" />
-        <Button android:tag="h" style="@style/KeyButton" android:text="h" android:layout_weight="1" android:layout_width="0dp" android:layout_height="match_parent" />
-        <Button android:tag="j" style="@style/KeyButton" android:text="j" android:layout_weight="1" android:layout_width="0dp" android:layout_height="match_parent" />
-        <Button android:tag="k" style="@style/KeyButton" android:text="k" android:layout_weight="1" android:layout_width="0dp" android:layout_height="match_parent" />
-        <Button android:tag="l" style="@style/KeyButton" android:text="l" android:layout_weight="1" android:layout_width="0dp" android:layout_height="match_parent" />
-        <Button android:id="@+id/key_enter" style="@style/ActionButton" android:text="⏎" android:layout_weight="1.5" android:layout_width="0dp" android:layout_height="match_parent" />
-    </LinearLayout>
-
-    <!-- Row 3: z x c v b n m -->
-    <LinearLayout
-        android:orientation="horizontal"
-        android:layout_width="match_parent"
-        android:layout_height="46dp"
-        android:layout_marginTop="4dp"
-        android:layout_marginStart="2dp"
-        android:layout_marginEnd="2dp">
-
-        <Button android:tag="z" style="@style/KeyButton" android:text="z" android:layout_weight="1" android:layout_width="0dp" android:layout_height="match_parent" />
-        <Button android:tag="x" style="@style/KeyButton" android:text="x" android:layout_weight="1" android:layout_width="0dp" android:layout_height="match_parent" />
-        <Button android:tag="c" style="@style/KeyButton" android:text="c" android:layout_weight="1" android:layout_width="0dp" android:layout_height="match_parent" />
-        <Button android:tag="v" style="@style/KeyButton" android:text="v" android:layout_weight="1" android:layout_width="0dp" android:layout_height="match_parent" />
-        <Button android:tag="b" style="@style/KeyButton" android:text="b" android:layout_weight="1" android:layout_width="0dp" android:layout_height="match_parent" />
-        <Button android:tag="n" style="@style/KeyButton" android:text="n" android:layout_weight="1" android:layout_width="0dp" android:layout_height="match_parent" />
-        <Button android:tag="m" style="@style/KeyButton" android:text="m" android:layout_weight="1" android:layout_width="0dp" android:layout_height="match_parent" />
-    </LinearLayout>
-
-    <!-- Row 4: space -->
-    <LinearLayout
-        android:orientation="horizontal"
-        android:layout_width="match_parent"
-        android:layout_height="46dp"
+        android:layout_height="216dp"
         android:layout_marginTop="4dp"
         android:layout_marginBottom="8dp"
         android:layout_marginStart="2dp"
         android:layout_marginEnd="2dp">
-
-        <Button
-            android:id="@+id/key_space"
-            style="@style/ActionButton"
-            android:text="@string/key_space"
-            android:layout_weight="1"
-            android:layout_width="0dp"
-            android:layout_height="match_parent" />
     </LinearLayout>
+
+    <View
+        android:id="@+id/system_bottom_spacer"
+        android:layout_width="match_parent"
+        android:layout_height="12dp" />
 
 </LinearLayout>

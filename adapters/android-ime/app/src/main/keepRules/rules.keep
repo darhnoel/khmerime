@@ -1,4 +1,4 @@
 # Keep JNI native methods on KhmerImeSession so R8 does not rename or strip them.
--keepclassmembers class com.example.khmerime.KhmerImeSession {
+-keepclassmembers class com.khmerime.KhmerImeSession {
     private native *;
 }

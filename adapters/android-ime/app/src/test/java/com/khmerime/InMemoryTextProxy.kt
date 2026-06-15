@@ -1,6 +1,6 @@
-package com.example.khmerime
+package com.khmerime
 
-class MockTextProxy : TextProxy {
+class InMemoryTextProxy : TextProxy {
 
     private val buffer = StringBuilder()
 

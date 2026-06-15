@@ -1,4 +1,4 @@
-package com.example.khmerime
+package com.khmerime
 
 // KhmerInputHandler
 // =================
@@ -17,6 +17,7 @@ class KhmerInputHandler(
 ) {
 
     private var romanBuffer = ""
+    private var trailingSpace = false
 
     var onRender: ((KhmerRenderState) -> Unit)? = null
 
@@ -33,6 +34,7 @@ class KhmerInputHandler(
     // ── Key actions ───────────────────────────────────────────────────────────
 
     fun sendChar(ch: String) {
+        trailingSpace = false
         proxy.insertText(ch)
         romanBuffer += ch
         val state = session.processCharacter(ch)
@@ -46,6 +48,7 @@ class KhmerInputHandler(
     }
 
     fun sendBackspace() {
+        trailingSpace = false
         if (romanBuffer.isNotEmpty()) romanBuffer = romanBuffer.dropLast(1)
         proxy.deleteBackward()
         render(session.processBackspace())
@@ -54,12 +57,17 @@ class KhmerInputHandler(
     fun sendSpace() {
         commitComposition()
         proxy.insertText(" ")
+        trailingSpace = true
     }
 
     fun sendReturn() {
         if (romanBuffer.isNotEmpty()) {
             commitComposition()
             return
+        }
+        if (trailingSpace) {
+            proxy.deleteBackward()
+            trailingSpace = false
         }
         proxy.insertText("\n")
     }
@@ -72,6 +80,7 @@ class KhmerInputHandler(
         repeat(romanBuffer.length) { proxy.deleteBackward() }
         if (khmer.isNotEmpty()) proxy.insertText(khmer)
         romanBuffer = ""
+        trailingSpace = false
         render(state)
     }
 

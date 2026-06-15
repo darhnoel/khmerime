@@ -1,4 +1,4 @@
-package com.example.khmerime
+package com.khmerime
 
 import com.google.gson.annotations.SerializedName
 

@@ -1,7 +1,7 @@
 //! Android IME adapter – JNI bridge.
 //!
 //! Every `#[no_mangle]` function corresponds to a `private external fun` on
-//! `com.example.khmerime.KhmerImeSession`. The `ImeSession` is heap-allocated
+//! `com.khmerime.KhmerImeSession`. The `ImeSession` is heap-allocated
 //! via `Box::into_raw`; Kotlin stores the address as a `Long` (nativeHandle).
 //! All session state lives in Rust; Kotlin never inspects it directly.
 
@@ -79,7 +79,7 @@ unsafe fn session_mut(handle: jlong) -> &'static mut ImeSession {
 // ── JNI exports ───────────────────────────────────────────────────────────────
 
 #[no_mangle]
-pub extern "C" fn Java_com_example_khmerime_KhmerImeSession_nativeCreate(
+pub extern "C" fn Java_com_khmerime_KhmerImeSession_nativeCreate(
     _env: JNIEnv,
     _obj: JObject,
 ) -> jlong {
@@ -87,7 +87,7 @@ pub extern "C" fn Java_com_example_khmerime_KhmerImeSession_nativeCreate(
 }
 
 #[no_mangle]
-pub extern "C" fn Java_com_example_khmerime_KhmerImeSession_nativeDestroy(
+pub extern "C" fn Java_com_khmerime_KhmerImeSession_nativeDestroy(
     _env: JNIEnv,
     _obj: JObject,
     handle: jlong,
@@ -98,7 +98,7 @@ pub extern "C" fn Java_com_example_khmerime_KhmerImeSession_nativeDestroy(
 }
 
 #[no_mangle]
-pub extern "C" fn Java_com_example_khmerime_KhmerImeSession_nativeFocusIn(
+pub extern "C" fn Java_com_khmerime_KhmerImeSession_nativeFocusIn(
     mut env: JNIEnv,
     _obj: JObject,
     handle: jlong,
@@ -109,7 +109,7 @@ pub extern "C" fn Java_com_example_khmerime_KhmerImeSession_nativeFocusIn(
 }
 
 #[no_mangle]
-pub extern "C" fn Java_com_example_khmerime_KhmerImeSession_nativeFocusOut(
+pub extern "C" fn Java_com_khmerime_KhmerImeSession_nativeFocusOut(
     mut env: JNIEnv,
     _obj: JObject,
     handle: jlong,
@@ -120,7 +120,7 @@ pub extern "C" fn Java_com_example_khmerime_KhmerImeSession_nativeFocusOut(
 }
 
 #[no_mangle]
-pub extern "C" fn Java_com_example_khmerime_KhmerImeSession_nativeProcessCharacter(
+pub extern "C" fn Java_com_khmerime_KhmerImeSession_nativeProcessCharacter(
     mut env: JNIEnv,
     _obj: JObject,
     handle: jlong,
@@ -134,7 +134,7 @@ pub extern "C" fn Java_com_example_khmerime_KhmerImeSession_nativeProcessCharact
 }
 
 #[no_mangle]
-pub extern "C" fn Java_com_example_khmerime_KhmerImeSession_nativeProcessBackspace(
+pub extern "C" fn Java_com_khmerime_KhmerImeSession_nativeProcessBackspace(
     mut env: JNIEnv,
     _obj: JObject,
     handle: jlong,
@@ -145,7 +145,7 @@ pub extern "C" fn Java_com_example_khmerime_KhmerImeSession_nativeProcessBackspa
 }
 
 #[no_mangle]
-pub extern "C" fn Java_com_example_khmerime_KhmerImeSession_nativeProcessSpace(
+pub extern "C" fn Java_com_khmerime_KhmerImeSession_nativeProcessSpace(
     mut env: JNIEnv,
     _obj: JObject,
     handle: jlong,
@@ -156,7 +156,7 @@ pub extern "C" fn Java_com_example_khmerime_KhmerImeSession_nativeProcessSpace(
 }
 
 #[no_mangle]
-pub extern "C" fn Java_com_example_khmerime_KhmerImeSession_nativeProcessEnter(
+pub extern "C" fn Java_com_khmerime_KhmerImeSession_nativeProcessEnter(
     mut env: JNIEnv,
     _obj: JObject,
     handle: jlong,
@@ -167,7 +167,7 @@ pub extern "C" fn Java_com_example_khmerime_KhmerImeSession_nativeProcessEnter(
 }
 
 #[no_mangle]
-pub extern "C" fn Java_com_example_khmerime_KhmerImeSession_nativeProcessLeft(
+pub extern "C" fn Java_com_khmerime_KhmerImeSession_nativeProcessLeft(
     mut env: JNIEnv,
     _obj: JObject,
     handle: jlong,
@@ -178,7 +178,7 @@ pub extern "C" fn Java_com_example_khmerime_KhmerImeSession_nativeProcessLeft(
 }
 
 #[no_mangle]
-pub extern "C" fn Java_com_example_khmerime_KhmerImeSession_nativeProcessRight(
+pub extern "C" fn Java_com_khmerime_KhmerImeSession_nativeProcessRight(
     mut env: JNIEnv,
     _obj: JObject,
     handle: jlong,
@@ -189,7 +189,7 @@ pub extern "C" fn Java_com_example_khmerime_KhmerImeSession_nativeProcessRight(
 }
 
 #[no_mangle]
-pub extern "C" fn Java_com_example_khmerime_KhmerImeSession_nativeProcessTab(
+pub extern "C" fn Java_com_khmerime_KhmerImeSession_nativeProcessTab(
     mut env: JNIEnv,
     _obj: JObject,
     handle: jlong,

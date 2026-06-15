@@ -20,20 +20,25 @@ workflow including one-time NDK setup.
 ## Structure
 
 ```
-src/lib.rs                          Rust JNI bridge (10 #[no_mangle] exports)
-app/src/main/java/com/example/khmerime/
+src/lib.rs                          Rust JNI bridge (11 #[no_mangle] exports)
+app/src/main/java/com/khmerime/
   KhmerImeSession.kt                JNI wrapper, loads native lib, parses JSON render state
   KhmerInputHandler.kt              Roman buffer + commit logic (unit-testable)
   TextProxy.kt                      Interface: insertText / deleteBackward
   InputConnectionProxy.kt           Live TextProxy backed by InputConnection
+  KeyboardLayerSpec.kt              QWERTY/123/symbol rows matched to the iOS keyboard
   KhmerInputMethodService.kt        InputMethodService subclass, wires keys + render
 app/src/main/res/
-  layout/keyboard.xml               QWERTY rows + preedit bar + candidate strip
+  layout/keyboard.xml               Preedit bar + candidate strip + keyboard layer host
   xml/method.xml                    IME subtype declaration (locale: km)
-app/src/test/java/com/example/khmerime/
-  KhmerInputHandlerTest.kt          5 JVM unit tests (real Rust session + MockTextProxy)
-  MockTextProxy.kt                  In-memory TextProxy for tests
+app/src/test/java/com/khmerime/
+  KeyboardLayerSpecTest.kt          Layout-row parity tests against the iOS keyboard contract
+  KhmerInputHandlerBehaviorTest.kt  JVM behavior tests (real Rust session + in-memory TextProxy)
+  InMemoryTextProxy.kt              In-memory TextProxy for tests
 ```
+
+The visible QWERTY, numeric, and symbol rows are aligned with the iOS keyboard.
+The iOS 💡 panel and CharPick state machine are not yet fully implemented on Android.
 
 ## Tests
 
@@ -44,6 +49,9 @@ at `target/debug/` so Gradle finds the dylib automatically.
 ```bash
 make platform-test-android
 ```
+
+Release builds use the production application ID `com.khmerime`; debug builds add
+the `.debug` suffix so development installs can live beside a release install.
 
 ## Building for a device
 

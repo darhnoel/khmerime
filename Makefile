@@ -1,4 +1,4 @@
-.PHONY: help web web-release web-phone desktop stats suggest suggest-wfst suggest-shadow shadow-eval data-split data-build data-check lexicon-editor visualize-lexicon visualize-lexicon-streamlit download-page fmt test test-golden test-ui platform-check platform-check-linux platform-check-android platform-check-ios platform-check-macos platform-check-windows platform-build-ios platform-build-macos platform-diagnose-macos platform-install-macos platform-reinstall-macos platform-build-windows platform-install-windows platform-uninstall-windows platform-reinstall-windows platform-smoke-windows-notepad platform-smoke-windows-notepad-python windows-package linux-package ibus-install ibus-uninstall ibus-smoke paper-current paper-current-clean platform-test-android platform-build-android platform-install-android platform-reinstall-android setup-hooks
+.PHONY: help web web-release web-phone desktop stats suggest suggest-wfst suggest-shadow shadow-eval data-split data-build data-check lexicon-editor visualize-lexicon visualize-lexicon-streamlit download-page fmt test test-golden test-ui platform-check platform-check-linux platform-check-android platform-check-ios platform-check-macos platform-check-windows platform-build-ios platform-build-macos platform-diagnose-macos platform-install-macos platform-reinstall-macos platform-build-windows platform-install-windows platform-uninstall-windows platform-reinstall-windows platform-smoke-windows-notepad platform-smoke-windows-notepad-python windows-package linux-package ibus-install ibus-uninstall ibus-smoke paper-current paper-current-clean platform-test-android platform-build-android android-adb-device platform-install-android platform-reinstall-android setup-hooks
 
 DX ?= dx
 APP_DIR := apps/dioxus-app
@@ -63,7 +63,9 @@ ANDROID_ADAPTER_DIR  := adapters/android-ime
 ANDROID_ABI         ?= arm64-v8a
 ANDROID_JNI_LIBS    := $(ANDROID_ADAPTER_DIR)/app/src/main/jniLibs
 ANDROID_APK         := $(ANDROID_ADAPTER_DIR)/app/build/outputs/apk/debug/app-debug.apk
-ANDROID_PACKAGE     := com.example.khmerime
+ANDROID_PACKAGE     := com.khmerime.debug
+ANDROID_IME_SERVICE := $(ANDROID_PACKAGE)/com.khmerime.KhmerInputMethodService
+ANDROID_LEGACY_PACKAGE := com.example.khmerime
 # Android Studio bundles a JDK at this path on macOS. Override if your JDK is elsewhere.
 ANDROID_JAVA_HOME   ?= /Applications/Android Studio.app/Contents/jbr/Contents/Home
 MACOS_XCODE_SIGNING_ARGS := CODE_SIGN_STYLE=Manual \
@@ -218,19 +220,29 @@ platform-build-android:
 	cargo ndk -t $(ANDROID_ABI) -o $(ANDROID_JNI_LIBS) build -p khmerime_android_ime
 	cd $(ANDROID_ADAPTER_DIR) && JAVA_HOME="$(ANDROID_JAVA_HOME)" PATH="$(ANDROID_JAVA_HOME)/bin:$(PATH)" ./gradlew :app:assembleDebug
 
+android-adb-device:
+	@adb get-state >/dev/null 2>&1 || { \
+		echo "No Android device/emulator found. Start an emulator or connect a USB-debugging device, then run: adb devices" >&2; \
+		exit 1; \
+	}
+
 # Build, install on the connected device, and enable the IME.
 # Requires: adb in PATH and a connected device/emulator with USB debugging enabled.
-platform-install-android: platform-build-android
+platform-install-android: android-adb-device platform-build-android
+	-adb uninstall $(ANDROID_LEGACY_PACKAGE) >/dev/null 2>&1
 	adb install -r $(ANDROID_APK)
-	adb shell ime enable $(ANDROID_PACKAGE)/.KhmerInputMethodService
-	adb shell ime set $(ANDROID_PACKAGE)/.KhmerInputMethodService
+	adb shell ime enable $(ANDROID_IME_SERVICE)
+	adb shell ime set $(ANDROID_IME_SERVICE)
 	@echo "Installed. Tap any text field on the device to open KhmerIME."
 
 # Fast loop: rebuild Rust + APK and reinstall (assumes cargo-ndk already set up).
-platform-reinstall-android:
+platform-reinstall-android: android-adb-device
 	cargo ndk -t $(ANDROID_ABI) -o $(ANDROID_JNI_LIBS) build -p khmerime_android_ime
 	cd $(ANDROID_ADAPTER_DIR) && JAVA_HOME="$(ANDROID_JAVA_HOME)" PATH="$(ANDROID_JAVA_HOME)/bin:$(PATH)" ./gradlew :app:assembleDebug
+	-adb uninstall $(ANDROID_LEGACY_PACKAGE) >/dev/null 2>&1
 	adb install -r $(ANDROID_APK)
+	adb shell ime enable $(ANDROID_IME_SERVICE)
+	adb shell ime set $(ANDROID_IME_SERVICE)
 
 platform-build-ios:
 	cargo build -p khmerime_ios_keyboard --target $(IOS_TARGET_DEVICE) --release
