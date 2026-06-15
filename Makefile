@@ -1,4 +1,4 @@
-.PHONY: help web web-release web-phone desktop stats suggest suggest-wfst suggest-shadow shadow-eval data-split data-build data-check lexicon-editor visualize-lexicon visualize-lexicon-streamlit download-page fmt test test-golden test-ui platform-check platform-check-linux platform-check-android platform-check-ios platform-check-macos platform-check-windows platform-build-ios platform-test-ios platform-build-macos platform-diagnose-macos platform-install-macos platform-reinstall-macos platform-build-windows platform-install-windows platform-uninstall-windows platform-reinstall-windows platform-smoke-windows-notepad platform-smoke-windows-notepad-python windows-package linux-package ibus-install ibus-uninstall ibus-smoke paper-current paper-current-clean platform-test-android platform-build-android android-adb-device platform-install-android platform-reinstall-android setup-hooks
+.PHONY: help web web-release web-phone desktop stats suggest suggest-wfst suggest-shadow shadow-eval data-split data-build data-check lexicon-editor visualize-lexicon visualize-lexicon-streamlit download-page fmt test test-golden test-ui platform-check platform-check-linux platform-check-android platform-check-ios platform-check-macos platform-check-windows platform-build-ios platform-test-ios platform-install-ios-sim platform-reinstall-ios-sim platform-build-macos platform-diagnose-macos platform-install-macos platform-reinstall-macos platform-build-windows platform-install-windows platform-uninstall-windows platform-reinstall-windows platform-smoke-windows-notepad platform-smoke-windows-notepad-python windows-package linux-package ibus-install ibus-uninstall ibus-smoke paper-current paper-current-clean platform-test-android platform-build-android android-adb-device platform-install-android platform-reinstall-android setup-hooks
 
 DX ?= dx
 APP_DIR := apps/dioxus-app
@@ -31,7 +31,7 @@ IOS_TARGET_SIM      := aarch64-apple-ios-sim
 IOS_LIB_NAME        := libkhmerime_ios_keyboard.a
 IOS_BINDGEN_OUT     := $(IOS_ADAPTER_DIR)/swift/KhmerIMEKeyboard/Generated
 IOS_XCFRAMEWORK_OUT := $(IOS_ADAPTER_DIR)/swift/Frameworks/KhmerIME.xcframework
-IOS_SIM_ID          ?= FDED48C6-BFCE-4666-BA4C-F279438340A7
+IOS_SIM_ID          ?= $(shell xcrun simctl list devices available | grep 'iPhone' | head -1 | sed 's/.*(\([A-F0-9-]*\)).*/\1/')
 IOS_SIM_BUNDLE_ID   := com.khmerime.KhmerIME
 IOS_SIM_APP         := $(HOME)/Library/Developer/Xcode/DerivedData/KhmerIME-*/Build/Products/Debug-iphonesimulator/KhmerIME.app
 
@@ -104,6 +104,8 @@ help:
 	"  make platform-reinstall-android Fast loop: rebuild Rust + APK, reinstall on connected device" \
 	"  make platform-test-ios           Run iOS XCTest suite on the simulator (IOS_SIM_ID=...)" \
 	"  make platform-build-ios          Build iOS static libs, generate UniFFI Swift bindings, assemble XCFramework" \
+	"  make platform-install-ios-sim    Full build (Rust + app) then install to simulator" \
+	"  make platform-reinstall-ios-sim  Fast loop: rebuild Swift app only, reinstall on simulator" \
 	"  make platform-build-macos        Build macOS static libs, generate UniFFI Swift bindings, assemble XCFramework" \
 	"  make platform-diagnose-macos     Inspect macOS signing, install paths, and Gatekeeper status" \
 	"  make platform-install-macos      Full build (Rust + app), notarize, install to ~/Library/Input Methods/" \
@@ -212,12 +214,28 @@ platform-check-windows:
 # No Android device or emulator is required.
 IOS_XCPROJECT       := $(IOS_ADAPTER_DIR)/swift/KhmerIME.xcodeproj
 IOS_TEST_SCHEME     := KhmerIMEKeyboardTests
+IOS_APP_SCHEME      := KhmerIME
 
 platform-test-ios:
 	xcodebuild test \
 		-project $(IOS_XCPROJECT) \
 		-scheme $(IOS_TEST_SCHEME) \
 		-destination 'platform=iOS Simulator,id=$(IOS_SIM_ID)'
+
+# Full install: build Rust xcframework first, then build + install the app.
+platform-install-ios-sim: platform-build-ios
+	$(MAKE) platform-reinstall-ios-sim
+
+# Fast loop: rebuild Swift app only (assumes xcframework already built) and install.
+platform-reinstall-ios-sim:
+	xcodebuild build \
+		-project $(IOS_XCPROJECT) \
+		-scheme $(IOS_APP_SCHEME) \
+		-destination 'platform=iOS Simulator,id=$(IOS_SIM_ID)'
+	xcrun simctl boot $(IOS_SIM_ID) 2>/dev/null || true
+	xcrun simctl install $(IOS_SIM_ID) $(IOS_SIM_APP)
+	open -a Simulator
+	@echo "Installed. In Simulator: Settings → General → Keyboard → Keyboards → Add New Keyboard → KhmerIME"
 
 platform-test-android:
 	cargo build -p khmerime_android_ime
