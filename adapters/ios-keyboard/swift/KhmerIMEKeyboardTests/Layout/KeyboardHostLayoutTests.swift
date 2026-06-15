@@ -11,7 +11,7 @@ final class KeyboardHostLayoutTests: XCTestCase {
 
         XCTAssertTrue(host.subviews.contains(root))
         XCTAssertFalse(root.translatesAutoresizingMaskIntoConstraints)
-        XCTAssertNotNil(host.backgroundColor, "host must have a background color")
+        XCTAssertEqual(host.backgroundColor, .clear, "host must be transparent so key blur views capture app content")
         XCTAssertTrue(heightConstraint.isActive)
         XCTAssertEqual(heightConstraint.priority, UILayoutPriority(999))
         XCTAssertEqual(heightConstraint.constant, metrics.baseKeyboardHeight + 12)

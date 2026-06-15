@@ -31,9 +31,7 @@ final class StripView: UIView, KeyboardStripDisplaying {
     // MARK: - Setup
 
     private func setup() {
-        backgroundColor = UIColor { traits in
-            GlassColorSpec.keyboardBackground(isDark: traits.userInterfaceStyle == .dark)
-        }
+        backgroundColor = .clear
 
         romanRow.font = .systemFont(ofSize: 12)
         romanRow.textColor = .secondaryLabel

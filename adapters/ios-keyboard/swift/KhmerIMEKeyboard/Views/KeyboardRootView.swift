@@ -40,9 +40,7 @@ final class KeyboardRootView: UIView {
         self.panelBottomRow = panelBottomRow
         super.init(frame: .zero)
 
-        backgroundColor = UIColor { traits in
-            GlassColorSpec.keyboardBackground(isDark: traits.userInterfaceStyle == .dark)
-        }
+        backgroundColor = .clear
         for view in [stripView, qwertyView, numericView, symbolsView, panelView, panelBottomRow] {
             view.translatesAutoresizingMaskIntoConstraints = false
             addSubview(view)

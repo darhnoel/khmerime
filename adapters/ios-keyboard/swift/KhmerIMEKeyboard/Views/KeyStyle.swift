@@ -7,6 +7,13 @@ final class GlassKeyButton: UIButton {
 
     private var pressAnimator: GlassKeyPressAnimator?
 
+    private lazy var blurView: UIVisualEffectView = {
+        let v = UIVisualEffectView(effect: UIBlurEffect(style: .systemUltraThinMaterial))
+        v.isUserInteractionEnabled = false
+        insertSubview(v, at: 0)
+        return v
+    }()
+
     // Inject a synchronous runner for testing before any touch event fires.
     func configureForTesting(runner: @escaping AnimatorRunner) {
         pressAnimator = GlassKeyPressAnimator(onUpdate: applySquish(_:), runner: runner)
@@ -29,6 +36,7 @@ final class GlassKeyButton: UIButton {
 
     override func layoutSubviews() {
         super.layoutSubviews()
+        updateBlurViewLayout()
         updateGlassAppearance()
     }
 
@@ -47,6 +55,13 @@ final class GlassKeyButton: UIButton {
     private func applySquish(_ squish: CGFloat) {
         let scale = 1 - squish * 0.08
         transform = CGAffineTransform(scaleX: scale, y: scale)
+    }
+
+    private func updateBlurViewLayout() {
+        let radius = GlassColorSpec.keyCornerRadius(height: bounds.height)
+        blurView.frame = bounds
+        blurView.layer.cornerRadius = radius
+        blurView.clipsToBounds = true
     }
 
     private func updateGlassAppearance() {
@@ -85,9 +100,11 @@ enum KeyStyle {
 
     fileprivate static func updateGlassAppearance(_ btn: UIButton, isActive: Bool) {
         let isDark = btn.traitCollection.userInterfaceStyle == .dark
+        // Active state uses flat opaque fill so EN/✦ buttons stand out clearly.
+        // Inactive state is transparent — the blurView behind provides glass depth.
         btn.backgroundColor = isActive
             ? GlassColorSpec.toggleActiveBackground(isDark: isDark)
-            : GlassColorSpec.backgroundColor(isDark: isDark)
+            : .clear
         btn.setTitleColor(isActive ? GlassColorSpec.toggleActiveTextColor() : .label, for: .normal)
         btn.layer.cornerRadius = GlassColorSpec.keyCornerRadius(height: btn.bounds.height)
         btn.layer.borderColor = GlassColorSpec.borderColor(isDark: isDark).cgColor

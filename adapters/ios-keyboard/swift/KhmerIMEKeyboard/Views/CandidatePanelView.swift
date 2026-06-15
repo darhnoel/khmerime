@@ -103,9 +103,7 @@ final class CandidatePanelView: UIView, KeyboardPanelDisplaying {
         layout.minimumLineSpacing = 6
         layout.sectionInset = UIEdgeInsets(top: 6, left: 8, bottom: 6, right: 8)
         let cv = UICollectionView(frame: .zero, collectionViewLayout: layout)
-        cv.backgroundColor = UIColor { traits in
-            GlassColorSpec.backgroundColor(isDark: traits.userInterfaceStyle == .dark)
-        }
+        cv.backgroundColor = .clear
         cv.showsVerticalScrollIndicator = true
         cv.showsHorizontalScrollIndicator = false
         cv.translatesAutoresizingMaskIntoConstraints = false
@@ -134,9 +132,7 @@ final class CandidatePanelView: UIView, KeyboardPanelDisplaying {
     private func setup() {
         // Chip scroll
         chipScroll.showsHorizontalScrollIndicator = false
-        chipScroll.backgroundColor = UIColor { traits in
-            GlassColorSpec.backgroundColor(isDark: traits.userInterfaceStyle == .dark)
-        }
+        chipScroll.backgroundColor = .clear
         chipScroll.translatesAutoresizingMaskIntoConstraints = false
 
         chipStack.axis = .horizontal

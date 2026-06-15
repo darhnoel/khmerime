@@ -11,9 +11,8 @@ enum KeyboardHostLayout {
         metrics: KeyboardLayoutMetrics,
         safeAreaBottom: CGFloat
     ) -> NSLayoutConstraint {
-        hostView.backgroundColor = UIColor { traits in
-            GlassColorSpec.keyboardBackground(isDark: traits.userInterfaceStyle == .dark)
-        }
+        // Transparent so UIVisualEffectView on each key blurs the app content below.
+        hostView.backgroundColor = .clear
 
         let heightConstraint = hostView.heightAnchor.constraint(
             equalToConstant: heightConstant(metrics: metrics, safeAreaBottom: safeAreaBottom)
