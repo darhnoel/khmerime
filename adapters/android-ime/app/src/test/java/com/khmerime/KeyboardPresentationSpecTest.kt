@@ -66,6 +66,90 @@ class KeyboardPresentationSpecTest {
         )
     }
 
+    // ── Strip display logic ────────────────────────────────────────────────────
+
+    private fun seg(input: String, output: String, focused: Boolean = false) =
+        KhmerSegmentEntry(output = output, input = input, focused = focused)
+
+    @Test
+    fun romanRowTextShowsRomanBufferWhenNoSegments() {
+        val state = KhmerRenderState(candidates = listOf("ខ្ញុំ"), preedit = "nhom")
+        assertEquals(
+            "roman row must show romanBuffer when no segments",
+            "nhom",
+            KeyboardPresentationSpec.romanRowText(state, romanBuffer = "nhom"),
+        )
+    }
+
+    @Test
+    fun romanRowTextShowsJoinedInputsWhenSegmentsPresent() {
+        val state = KhmerRenderState(
+            segments = listOf(seg("nhom", "ខ្ញុំ"), seg("ttov", "ទៅ")),
+        )
+        assertEquals(
+            "roman row must join segment inputs with ·",
+            "nhom · ttov",
+            KeyboardPresentationSpec.romanRowText(state, romanBuffer = ""),
+        )
+    }
+
+    @Test
+    fun romanRowTextShowsEditIndicatorWhenSegmentEditActive() {
+        val state = KhmerRenderState(
+            segments = listOf(seg("nhom", "ខ្ញុំ"), seg("ttov", "ទៅ")),
+            segmentEditActive = true,
+            segmentEditIndex = 1,
+        )
+        assertEquals(
+            "roman row must show ✏ with bracket around edited segment",
+            "✏ nhom · [ttov]",
+            KeyboardPresentationSpec.romanRowText(state, romanBuffer = ""),
+        )
+    }
+
+    @Test
+    fun segmentKhmerTextsReturnsEmptyListWhenNoSegments() {
+        val state = KhmerRenderState(candidates = listOf("ខ្ញុំ"), selectedIndex = 0)
+        assertTrue(
+            "segmentKhmerTexts must return empty list when no segments",
+            KeyboardPresentationSpec.segmentKhmerTexts(state).isEmpty(),
+        )
+    }
+
+    @Test
+    fun segmentKhmerTextsReturnsOutputsPerSegment() {
+        val state = KhmerRenderState(
+            segments = listOf(seg("nhom", "ខ្ញុំ"), seg("ttov", "ទៅ")),
+        )
+        assertEquals(
+            "segmentKhmerTexts must return one Khmer string per segment",
+            listOf("ខ្ញុំ", "ទៅ"),
+            KeyboardPresentationSpec.segmentKhmerTexts(state),
+        )
+    }
+
+    @Test
+    fun focusedSegmentIndexReturnsNullWhenNoSegments() {
+        val state = KhmerRenderState()
+        assertNull(
+            "focusedSegmentIndex must be null when there are no segments",
+            KeyboardPresentationSpec.focusedSegmentIndex(state),
+        )
+    }
+
+    @Test
+    fun focusedSegmentIndexReturnsIndexFromState() {
+        val state = KhmerRenderState(
+            segments = listOf(seg("nhom", "ខ្ញុំ"), seg("ttov", "ទៅ")),
+            focusedSegmentIndex = 1,
+        )
+        assertEquals(
+            "focusedSegmentIndex must reflect state.focusedSegmentIndex",
+            1 as Int?,
+            KeyboardPresentationSpec.focusedSegmentIndex(state),
+        )
+    }
+
     @Test
     fun preeditIsEmptyInEnglishMode() {
         val state = KhmerRenderState(candidates = emptyList(), preedit = "hi")

@@ -8,7 +8,6 @@ import android.view.Gravity
 import android.view.View
 import android.view.inputmethod.EditorInfo
 import android.widget.LinearLayout
-import android.widget.TextView
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 
@@ -33,7 +32,7 @@ class KhmerInputMethodService : InputMethodService() {
 
     private var candidateStrip: LinearLayout? = null
     private var keyboardLayer: LinearLayout? = null
-    private var preeditBar: TextView? = null
+    private var preeditStrip: PreeditStripView? = null
     private var systemBottomSpacer: View? = null
     private var currentLayer = KeyboardLayer.Qwerty
 
@@ -63,7 +62,9 @@ class KhmerInputMethodService : InputMethodService() {
         applyWindowBlur()
         val root = layoutInflater.inflate(R.layout.keyboard, null)
         root.setBackgroundColor(Color.TRANSPARENT)
-        preeditBar = root.findViewById(R.id.preedit_bar)
+        preeditStrip = root.findViewById<PreeditStripView>(R.id.preedit_strip).also { strip ->
+            strip.onSegmentFocused = { index -> handler?.focusSegment(index) }
+        }
         candidateStrip = root.findViewById(R.id.candidate_strip)
         keyboardLayer = root.findViewById(R.id.keyboard_layer)
         systemBottomSpacer = root.findViewById(R.id.system_bottom_spacer)
@@ -165,7 +166,7 @@ class KhmerInputMethodService : InputMethodService() {
     }
 
     private fun resetSuggestCharacterSuggestions() {
-        preeditBar?.text = ""
+        preeditStrip?.clear()
         candidateStrip?.removeAllViews()
     }
 
@@ -173,7 +174,8 @@ class KhmerInputMethodService : InputMethodService() {
 
     private fun renderState(state: KhmerRenderState) {
         val keyboardState = handler?.keyboardState
-        preeditBar?.text = KeyboardPresentationSpec.preeditText(keyboardState, state)
+        val romanHint = KeyboardPresentationSpec.preeditText(keyboardState, state)
+        preeditStrip?.render(state, romanHint)
 
         val strip = candidateStrip ?: return
         strip.removeAllViews()

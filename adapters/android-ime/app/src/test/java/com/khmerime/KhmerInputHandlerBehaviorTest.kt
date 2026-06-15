@@ -188,6 +188,65 @@ class KhmerInputHandlerBehaviorTest {
         assertEquals("backspace must shorten text by one char", "n", textField.text)
     }
 
+    // ── Segment editing ───────────────────────────────────────────────────────
+
+    @Test
+    fun focusSegmentOnMultiSegmentPhraseTriggersRender() {
+        val (handler, _) = makeHandler()
+        type("khnhomtov", into = handler)
+        var renderCount = 0
+        handler.onRender = { _ -> renderCount++ }
+
+        handler.focusSegment(0)
+
+        assertEquals("focusSegment must call onRender", 1, renderCount)
+    }
+
+    @Test
+    fun focusSegmentOutOfRangeIsNoOp() {
+        val (handler, _) = makeHandler()
+        type("khnhomtov", into = handler)
+        var renderCount = 0
+        handler.onRender = { _ -> renderCount++ }
+
+        handler.focusSegment(99)
+
+        assertEquals("out-of-range focusSegment must not trigger render", 0, renderCount)
+    }
+
+    @Test
+    fun focusSegmentTwiceOnSameIndexEntersEditMode() {
+        val (handler, _) = makeHandler()
+        type("khnhomtov", into = handler)
+        var lastRendered: KhmerRenderState? = null
+        handler.onRender = { state -> lastRendered = state }
+
+        handler.focusSegment(0)
+        handler.focusSegment(0)
+
+        assertTrue(
+            "calling focusSegment twice on same index must produce segmentEditActive=true at some point",
+            lastRendered?.segmentEditActive == true,
+        )
+    }
+
+    @Test
+    fun focusSegmentNavigatesBetweenSegmentsWithoutEnteringEditMode() {
+        val (handler, _) = makeHandler()
+        type("khnhomtov", into = handler)
+        handler.focusSegment(0)
+        var lastRendered: KhmerRenderState? = null
+        handler.onRender = { state -> lastRendered = state }
+
+        handler.focusSegment(1)
+
+        assertNotNull("focusSegment(1) must trigger render", lastRendered)
+        assertFalse(
+            "navigating to a different segment must not enter edit mode",
+            lastRendered?.segmentEditActive == true,
+        )
+    }
+
     // ── English mode ──────────────────────────────────────────────────────────
 
     @Test

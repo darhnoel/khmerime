@@ -5,17 +5,12 @@
     android:layout_height="wrap_content"
     android:background="#D1D5DB">
 
-    <!-- Preedit / roman hint bar -->
-    <TextView
-        android:id="@+id/preedit_bar"
+    <!-- Preedit strip: roman row + tappable Khmer segment row -->
+    <com.khmerime.PreeditStripView
+        android:id="@+id/preedit_strip"
         android:layout_width="match_parent"
-        android:layout_height="36dp"
-        android:paddingStart="12dp"
-        android:gravity="center_vertical"
-        android:textSize="20sp"
-        android:textColor="#E5E7EB"
-        android:background="@android:color/transparent"
-        android:text="" />
+        android:layout_height="52dp"
+        android:background="@android:color/transparent" />
 
     <!-- Candidate strip -->
     <HorizontalScrollView

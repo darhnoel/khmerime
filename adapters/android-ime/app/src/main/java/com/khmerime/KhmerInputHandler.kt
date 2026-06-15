@@ -138,6 +138,23 @@ class KhmerInputHandler(
 
     fun togglePanel() = toggleSuggestCharacter()
 
+    fun focusSegment(index: Int) {
+        val current = lastState ?: return
+        val segments = current.segments
+        if (index < 0 || index >= segments.size) return
+        val focusedIndex = current.focusedSegmentIndex ?: 0
+        if (index == focusedIndex && !current.segmentEditActive) {
+            render(session.processTab())
+            transitionTo(KeyboardState.Qwerty)
+        } else if (index != focusedIndex) {
+            val diff = index - focusedIndex
+            var state = current
+            if (diff > 0) repeat(diff) { state = session.processRight() }
+            else repeat(-diff) { state = session.processLeft() }
+            render(state)
+        }
+    }
+
     fun toggleEnglish() {
         when (keyboardState) {
             KeyboardState.English -> transitionTo(KeyboardState.Qwerty)
