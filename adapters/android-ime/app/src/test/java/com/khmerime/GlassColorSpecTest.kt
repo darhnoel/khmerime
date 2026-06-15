@@ -93,6 +93,34 @@ class GlassColorSpecTest {
     }
 
     @Test
+    fun toggleActiveBackgroundIsLighterThanRegularInDarkMode() {
+        val regular = GlassColorSpec.backgroundColor(isDark = true)
+        val active = GlassColorSpec.toggleActiveBackground(isDark = true)
+        assertTrue(
+            "active toggle must be lighter than regular key; regular=${regular.luminance()} active=${active.luminance()}",
+            active.luminance() > regular.luminance(),
+        )
+    }
+
+    @Test
+    fun toggleActiveBackgroundIsHighlyOpaque() {
+        val active = GlassColorSpec.toggleActiveBackground(isDark = true)
+        assertTrue(
+            "active toggle fill must be near-opaque (alpha >= 230), got ${active.alpha()}",
+            active.alpha() >= 230,
+        )
+    }
+
+    @Test
+    fun toggleActiveTextColorIsDark() {
+        val textColor = GlassColorSpec.toggleActiveTextColor()
+        assertTrue(
+            "active toggle text must be dark (luminance < 100), got ${textColor.luminance()}",
+            textColor.luminance() < 100,
+        )
+    }
+
+    @Test
     fun candidateBorderWidthIsWiderThanKeyBorderWidth() {
         assertTrue(
             "candidate border must be visually obvious (> 1dp equivalent)",

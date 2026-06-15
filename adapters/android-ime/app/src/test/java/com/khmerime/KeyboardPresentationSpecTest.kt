@@ -40,6 +40,33 @@ class KeyboardPresentationSpecTest {
     }
 
     @Test
+    fun toggleIsActiveWhenKeyIsPanelAndStateIsSuggestCharacter() {
+        val key = KeyboardKey("✦", KeyboardKeyAction.TogglePanel)
+        assertTrue(
+            "✦ key must be active when state is SuggestCharacter",
+            KeyboardPresentationSpec.isToggleActive(key, KeyboardState.SuggestCharacter),
+        )
+    }
+
+    @Test
+    fun toggleIsInactiveWhenStateIsQwerty() {
+        val key = KeyboardKey("✦", KeyboardKeyAction.TogglePanel)
+        assertFalse(
+            "✦ key must be inactive when state is Qwerty",
+            KeyboardPresentationSpec.isToggleActive(key, KeyboardState.Qwerty),
+        )
+    }
+
+    @Test
+    fun nonToggleKeyIsNeverActive() {
+        val key = KeyboardKey("A", KeyboardKeyAction.Insert, "a")
+        assertFalse(
+            "non-TogglePanel key must never report active",
+            KeyboardPresentationSpec.isToggleActive(key, KeyboardState.SuggestCharacter),
+        )
+    }
+
+    @Test
     fun selectedCandidateIndexReturnsNullWhenNoneSelected() {
         val state = KhmerRenderState(candidates = listOf("ក", "ខ"), selectedIndex = null)
         assertNull(

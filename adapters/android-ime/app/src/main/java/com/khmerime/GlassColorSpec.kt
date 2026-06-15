@@ -7,6 +7,11 @@ object GlassColorSpec {
     fun borderColor(isDark: Boolean): Int =
         if (isDark) argb(60, 255, 255, 255) else argb(40, 0, 0, 0)
 
+    fun toggleActiveBackground(isDark: Boolean): Int =
+        if (isDark) argb(245, 240, 240, 245) else argb(245, 255, 255, 255)
+
+    fun toggleActiveTextColor(): Int = argb(255, 20, 20, 24)
+
     fun selectedCandidateBackground(isDark: Boolean): Int =
         if (isDark) argb(235, 110, 110, 124) else argb(245, 210, 215, 225)
 

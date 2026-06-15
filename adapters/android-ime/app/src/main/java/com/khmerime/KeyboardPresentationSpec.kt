@@ -9,6 +9,9 @@ object KeyboardPresentationSpec {
     fun renderStateReplacesKeyboardLayer(keyboardState: KeyboardState?): Boolean =
         false
 
+    fun isToggleActive(key: KeyboardKey, keyboardState: KeyboardState): Boolean =
+        key.action == KeyboardKeyAction.TogglePanel && keyboardState == KeyboardState.SuggestCharacter
+
     fun selectedCandidateIndex(state: KhmerRenderState): Int? = state.selectedIndex
 
     fun keyboardLayerForState(keyboardState: KeyboardState?): KeyboardLayer = when (keyboardState) {

@@ -30,7 +30,6 @@ class KhmerInputMethodService : InputMethodService() {
 
     private val session = KhmerImeSession()
     private var handler: KhmerInputHandler? = null
-    private val keyViewFactory: KeyViewFactory = GlassKeyViewFactory()
 
     private var candidateStrip: LinearLayout? = null
     private var keyboardLayer: LinearLayout? = null
@@ -111,6 +110,10 @@ class KhmerInputMethodService : InputMethodService() {
         val container = keyboardLayer ?: return
         container.removeAllViews()
 
+        val factory: KeyViewFactory = GlassKeyViewFactory(
+            handler?.keyboardState ?: KeyboardState.Qwerty,
+        )
+
         KeyboardLayerSpec.rows(layer).forEach { keys ->
             val row = LinearLayout(this).apply {
                 orientation = LinearLayout.HORIZONTAL
@@ -125,7 +128,7 @@ class KhmerInputMethodService : InputMethodService() {
                 }
             }
             keys.forEach { key ->
-                val view = keyViewFactory.makeKeyView(this, key) { handleKey(key) }
+                val view = factory.makeKeyView(this, key) { handleKey(key) }
                 view.layoutParams = LinearLayout.LayoutParams(
                     0,
                     LinearLayout.LayoutParams.MATCH_PARENT,

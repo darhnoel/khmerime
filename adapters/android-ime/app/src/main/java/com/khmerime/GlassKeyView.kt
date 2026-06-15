@@ -11,6 +11,7 @@ import android.view.View
 class GlassKeyView(
     context: Context,
     private val key: KeyboardKey,
+    private val isActive: Boolean = false,
     private val onClick: () -> Unit,
 ) : View(context) {
 
@@ -38,9 +39,11 @@ class GlassKeyView(
 
     override fun onDraw(canvas: Canvas) {
         val dark = isDark
-        bgPaint.color = GlassColorSpec.backgroundColor(dark)
+        bgPaint.color = if (isActive) GlassColorSpec.toggleActiveBackground(dark)
+                        else GlassColorSpec.backgroundColor(dark)
         borderPaint.color = GlassColorSpec.borderColor(dark)
-        textPaint.color = if (dark) 0xFFFFFFFF.toInt() else 0xFF111111.toInt()
+        textPaint.color = if (isActive) GlassColorSpec.toggleActiveTextColor()
+                          else if (dark) 0xFFFFFFFF.toInt() else 0xFF111111.toInt()
         val spSize = if (key.label.length > 1) 13f else 16f
         textPaint.textSize = TypedValue.applyDimension(
             TypedValue.COMPLEX_UNIT_SP, spSize, resources.displayMetrics,
