@@ -1,5 +1,6 @@
-package com.khmerime
+package com.khmerime.layout
 
+import com.khmerime.R
 import android.content.Context
 import android.view.View
 import android.view.ContextThemeWrapper

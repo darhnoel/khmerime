@@ -1,4 +1,4 @@
-package com.khmerime
+package com.khmerime.input
 
 import com.google.gson.Gson
 

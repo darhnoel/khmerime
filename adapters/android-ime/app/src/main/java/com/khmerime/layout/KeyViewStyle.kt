@@ -1,4 +1,4 @@
-package com.khmerime
+package com.khmerime.layout
 
 object KeyViewStyle {
     fun weightFor(key: KeyboardKey): Float = when (key.action) {

@@ -13,7 +13,7 @@
         android:theme="@style/Theme.Khmerime">
 
         <service
-            android:name="com.khmerime.KhmerInputMethodService"
+            android:name="com.khmerime.service.KhmerInputMethodService"
             android:label="@string/ime_name"
             android:permission="android.permission.BIND_INPUT_METHOD"
             android:exported="true">

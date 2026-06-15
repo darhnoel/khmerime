@@ -1,5 +1,9 @@
 package com.khmerime
 
+import com.khmerime.layout.KeyboardKey
+import com.khmerime.layout.KeyboardKeyAction
+import com.khmerime.layout.KeyboardLayer
+import com.khmerime.layout.KeyboardLayerSpec
 import org.junit.Assert.assertEquals
 import org.junit.Test
 

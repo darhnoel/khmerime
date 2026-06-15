@@ -1,5 +1,6 @@
-package com.khmerime
+package com.khmerime.views
 
+import com.khmerime.layout.KeyboardKey
 import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Paint

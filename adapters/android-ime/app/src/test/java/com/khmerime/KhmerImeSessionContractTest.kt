@@ -1,5 +1,7 @@
 package com.khmerime
 
+import com.khmerime.input.KhmerImeSession
+import com.khmerime.input.KhmerRenderState
 import org.junit.Assert.assertTrue
 import org.junit.Test
 

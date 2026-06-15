@@ -1,4 +1,4 @@
-package com.khmerime
+package com.khmerime.views
 
 import android.content.Context
 import android.graphics.Canvas

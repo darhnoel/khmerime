@@ -1,7 +1,7 @@
 //! Android IME adapter – JNI bridge.
 //!
 //! Every `#[no_mangle]` function corresponds to a `private external fun` on
-//! `com.khmerime.KhmerImeSession`. The `ImeSession` is heap-allocated
+//! `com.khmerime.input.KhmerImeSession`. The `ImeSession` is heap-allocated
 //! via `Box::into_raw`; Kotlin stores the address as a `Long` (nativeHandle).
 //! All session state lives in Rust; Kotlin never inspects it directly.
 
@@ -104,7 +104,7 @@ unsafe fn session_mut(handle: jlong) -> &'static mut ImeSession {
 // ── JNI exports ───────────────────────────────────────────────────────────────
 
 #[no_mangle]
-pub extern "C" fn Java_com_khmerime_KhmerImeSession_nativeCreate(
+pub extern "C" fn Java_com_khmerime_input_KhmerImeSession_nativeCreate(
     _env: JNIEnv,
     _obj: JObject,
 ) -> jlong {
@@ -112,7 +112,7 @@ pub extern "C" fn Java_com_khmerime_KhmerImeSession_nativeCreate(
 }
 
 #[no_mangle]
-pub extern "C" fn Java_com_khmerime_KhmerImeSession_nativeDestroy(
+pub extern "C" fn Java_com_khmerime_input_KhmerImeSession_nativeDestroy(
     _env: JNIEnv,
     _obj: JObject,
     handle: jlong,
@@ -123,7 +123,7 @@ pub extern "C" fn Java_com_khmerime_KhmerImeSession_nativeDestroy(
 }
 
 #[no_mangle]
-pub extern "C" fn Java_com_khmerime_KhmerImeSession_nativeFocusIn(
+pub extern "C" fn Java_com_khmerime_input_KhmerImeSession_nativeFocusIn(
     mut env: JNIEnv,
     _obj: JObject,
     handle: jlong,
@@ -134,7 +134,7 @@ pub extern "C" fn Java_com_khmerime_KhmerImeSession_nativeFocusIn(
 }
 
 #[no_mangle]
-pub extern "C" fn Java_com_khmerime_KhmerImeSession_nativeFocusOut(
+pub extern "C" fn Java_com_khmerime_input_KhmerImeSession_nativeFocusOut(
     mut env: JNIEnv,
     _obj: JObject,
     handle: jlong,
@@ -145,7 +145,7 @@ pub extern "C" fn Java_com_khmerime_KhmerImeSession_nativeFocusOut(
 }
 
 #[no_mangle]
-pub extern "C" fn Java_com_khmerime_KhmerImeSession_nativeProcessCharacter(
+pub extern "C" fn Java_com_khmerime_input_KhmerImeSession_nativeProcessCharacter(
     mut env: JNIEnv,
     _obj: JObject,
     handle: jlong,
@@ -159,7 +159,7 @@ pub extern "C" fn Java_com_khmerime_KhmerImeSession_nativeProcessCharacter(
 }
 
 #[no_mangle]
-pub extern "C" fn Java_com_khmerime_KhmerImeSession_nativeProcessBackspace(
+pub extern "C" fn Java_com_khmerime_input_KhmerImeSession_nativeProcessBackspace(
     mut env: JNIEnv,
     _obj: JObject,
     handle: jlong,
@@ -170,7 +170,7 @@ pub extern "C" fn Java_com_khmerime_KhmerImeSession_nativeProcessBackspace(
 }
 
 #[no_mangle]
-pub extern "C" fn Java_com_khmerime_KhmerImeSession_nativeProcessSpace(
+pub extern "C" fn Java_com_khmerime_input_KhmerImeSession_nativeProcessSpace(
     mut env: JNIEnv,
     _obj: JObject,
     handle: jlong,
@@ -181,7 +181,7 @@ pub extern "C" fn Java_com_khmerime_KhmerImeSession_nativeProcessSpace(
 }
 
 #[no_mangle]
-pub extern "C" fn Java_com_khmerime_KhmerImeSession_nativeProcessEnter(
+pub extern "C" fn Java_com_khmerime_input_KhmerImeSession_nativeProcessEnter(
     mut env: JNIEnv,
     _obj: JObject,
     handle: jlong,
@@ -192,7 +192,7 @@ pub extern "C" fn Java_com_khmerime_KhmerImeSession_nativeProcessEnter(
 }
 
 #[no_mangle]
-pub extern "C" fn Java_com_khmerime_KhmerImeSession_nativeProcessLeft(
+pub extern "C" fn Java_com_khmerime_input_KhmerImeSession_nativeProcessLeft(
     mut env: JNIEnv,
     _obj: JObject,
     handle: jlong,
@@ -203,7 +203,7 @@ pub extern "C" fn Java_com_khmerime_KhmerImeSession_nativeProcessLeft(
 }
 
 #[no_mangle]
-pub extern "C" fn Java_com_khmerime_KhmerImeSession_nativeProcessRight(
+pub extern "C" fn Java_com_khmerime_input_KhmerImeSession_nativeProcessRight(
     mut env: JNIEnv,
     _obj: JObject,
     handle: jlong,
@@ -214,7 +214,7 @@ pub extern "C" fn Java_com_khmerime_KhmerImeSession_nativeProcessRight(
 }
 
 #[no_mangle]
-pub extern "C" fn Java_com_khmerime_KhmerImeSession_nativeProcessTab(
+pub extern "C" fn Java_com_khmerime_input_KhmerImeSession_nativeProcessTab(
     mut env: JNIEnv,
     _obj: JObject,
     handle: jlong,
@@ -225,7 +225,7 @@ pub extern "C" fn Java_com_khmerime_KhmerImeSession_nativeProcessTab(
 }
 
 #[no_mangle]
-pub extern "C" fn Java_com_khmerime_KhmerImeSession_nativeProcessDigit(
+pub extern "C" fn Java_com_khmerime_input_KhmerImeSession_nativeProcessDigit(
     mut env: JNIEnv,
     _obj: JObject,
     handle: jlong,
@@ -238,7 +238,7 @@ pub extern "C" fn Java_com_khmerime_KhmerImeSession_nativeProcessDigit(
 }
 
 #[no_mangle]
-pub extern "C" fn Java_com_khmerime_KhmerImeSession_nativeEnterCharPick(
+pub extern "C" fn Java_com_khmerime_input_KhmerImeSession_nativeEnterCharPick(
     mut env: JNIEnv,
     _obj: JObject,
     handle: jlong,
@@ -249,7 +249,7 @@ pub extern "C" fn Java_com_khmerime_KhmerImeSession_nativeEnterCharPick(
 }
 
 #[no_mangle]
-pub extern "C" fn Java_com_khmerime_KhmerImeSession_nativeExitCharPick(
+pub extern "C" fn Java_com_khmerime_input_KhmerImeSession_nativeExitCharPick(
     mut env: JNIEnv,
     _obj: JObject,
     handle: jlong,

@@ -1,5 +1,8 @@
 package com.khmerime
 
+import com.khmerime.layout.KeyboardKey
+import com.khmerime.layout.KeyboardKeyAction
+import com.khmerime.layout.KeyViewStyle
 import org.junit.Assert.*
 import org.junit.Test
 

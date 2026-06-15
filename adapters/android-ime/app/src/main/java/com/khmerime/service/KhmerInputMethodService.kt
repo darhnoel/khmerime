@@ -1,5 +1,21 @@
-package com.khmerime
+package com.khmerime.service
 
+import com.khmerime.input.InputConnectionProxy
+import com.khmerime.input.KhmerInputHandler
+import com.khmerime.input.KhmerImeSession
+import com.khmerime.input.KhmerRenderState
+import com.khmerime.input.KeyboardState
+import com.khmerime.layout.KeyboardKey
+import com.khmerime.layout.KeyboardKeyAction
+import com.khmerime.layout.KeyboardLayer
+import com.khmerime.layout.KeyboardLayerSpec
+import com.khmerime.layout.KeyboardPresentationSpec
+import com.khmerime.layout.KeyViewFactory
+import com.khmerime.layout.KeyViewStyle
+import com.khmerime.views.GlassKeyViewFactory
+import com.khmerime.views.PreeditStripView
+import com.khmerime.views.SuggestionChipView
+import com.khmerime.R
 import android.graphics.Color
 import android.graphics.drawable.ColorDrawable
 import android.inputmethodservice.InputMethodService

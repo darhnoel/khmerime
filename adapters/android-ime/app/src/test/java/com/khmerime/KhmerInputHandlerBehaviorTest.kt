@@ -1,5 +1,9 @@
 package com.khmerime
 
+import com.khmerime.input.KhmerInputHandler
+import com.khmerime.input.KhmerImeSession
+import com.khmerime.input.KhmerRenderState
+import com.khmerime.input.KeyboardState
 import org.junit.Assert.*
 import org.junit.Test
 

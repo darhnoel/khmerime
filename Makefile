@@ -64,7 +64,7 @@ ANDROID_ABI         ?= arm64-v8a
 ANDROID_JNI_LIBS    := $(ANDROID_ADAPTER_DIR)/app/src/main/jniLibs
 ANDROID_APK         := $(ANDROID_ADAPTER_DIR)/app/build/outputs/apk/debug/app-debug.apk
 ANDROID_PACKAGE     := com.khmerime.debug
-ANDROID_IME_SERVICE := $(ANDROID_PACKAGE)/com.khmerime.KhmerInputMethodService
+ANDROID_IME_SERVICE := $(ANDROID_PACKAGE)/com.khmerime.service.KhmerInputMethodService
 ANDROID_LEGACY_PACKAGE := com.example.khmerime
 # Android Studio bundles a JDK at this path on macOS. Override if your JDK is elsewhere.
 ANDROID_JAVA_HOME   ?= /Applications/Android Studio.app/Contents/jbr/Contents/Home

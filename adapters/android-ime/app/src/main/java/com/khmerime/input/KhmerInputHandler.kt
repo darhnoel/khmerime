@@ -1,4 +1,4 @@
-package com.khmerime
+package com.khmerime.input
 
 // KhmerInputHandler
 // =================

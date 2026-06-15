@@ -1,5 +1,6 @@
 package com.khmerime
 
+import com.khmerime.views.GlassColorSpec
 import org.junit.Assert.*
 import org.junit.Test
 

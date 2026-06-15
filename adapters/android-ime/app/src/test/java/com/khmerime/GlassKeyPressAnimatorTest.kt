@@ -1,5 +1,7 @@
 package com.khmerime
 
+import com.khmerime.views.AnimatorRunner
+import com.khmerime.views.GlassKeyPressAnimator
 import org.junit.Assert.*
 import org.junit.Test
 

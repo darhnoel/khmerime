@@ -1,5 +1,7 @@
-package com.khmerime
+package com.khmerime.views
 
+import com.khmerime.input.KhmerRenderState
+import com.khmerime.layout.KeyboardPresentationSpec
 import android.content.Context
 import android.graphics.Paint
 import android.graphics.Typeface

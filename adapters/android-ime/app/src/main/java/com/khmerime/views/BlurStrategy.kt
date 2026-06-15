@@ -1,4 +1,4 @@
-package com.khmerime
+package com.khmerime.views
 
 import android.os.Build
 import android.view.View

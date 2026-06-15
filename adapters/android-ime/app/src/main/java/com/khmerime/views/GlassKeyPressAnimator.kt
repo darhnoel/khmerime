@@ -1,4 +1,4 @@
-package com.khmerime
+package com.khmerime.views
 
 import android.animation.ValueAnimator
 import android.view.animation.DecelerateInterpolator

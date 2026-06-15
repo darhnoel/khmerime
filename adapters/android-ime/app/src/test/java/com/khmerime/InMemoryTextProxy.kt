@@ -1,5 +1,7 @@
 package com.khmerime
 
+import com.khmerime.input.TextProxy
+
 class InMemoryTextProxy : TextProxy {
 
     private val buffer = StringBuilder()

@@ -1,5 +1,9 @@
-package com.khmerime
+package com.khmerime.views
 
+import com.khmerime.input.KeyboardState
+import com.khmerime.layout.KeyboardKey
+import com.khmerime.layout.KeyboardPresentationSpec
+import com.khmerime.layout.KeyViewFactory
 import android.content.Context
 import android.view.View
 

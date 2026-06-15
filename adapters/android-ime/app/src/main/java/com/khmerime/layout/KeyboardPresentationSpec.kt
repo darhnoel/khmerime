@@ -1,4 +1,7 @@
-package com.khmerime
+package com.khmerime.layout
+
+import com.khmerime.input.KhmerRenderState
+import com.khmerime.input.KeyboardState
 
 object KeyboardPresentationSpec {
     fun suggestionCandidates(state: KhmerRenderState): List<String> = state.candidates

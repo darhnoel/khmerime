@@ -1,4 +1,4 @@
-package com.khmerime
+package com.khmerime.views
 
 object GlassColorSpec {
     fun backgroundColor(isDark: Boolean): Int =

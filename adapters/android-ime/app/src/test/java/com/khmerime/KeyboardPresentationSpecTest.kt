@@ -1,5 +1,12 @@
 package com.khmerime
 
+import com.khmerime.input.KhmerRenderState
+import com.khmerime.input.KhmerSegmentEntry
+import com.khmerime.input.KeyboardState
+import com.khmerime.layout.KeyboardKey
+import com.khmerime.layout.KeyboardKeyAction
+import com.khmerime.layout.KeyboardLayer
+import com.khmerime.layout.KeyboardPresentationSpec
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull

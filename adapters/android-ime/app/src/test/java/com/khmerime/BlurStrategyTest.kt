@@ -1,5 +1,6 @@
 package com.khmerime
 
+import com.khmerime.views.BlurStrategy
 import org.junit.Assert.*
 import org.junit.Test
 
