@@ -62,6 +62,15 @@ final class KeyboardLayerFactoryTests: XCTestCase {
         XCTAssertEqual(symbol.titleLabel?.font.pointSize, 17)
     }
 
+    func test_keyCornerRadiusFollowsAndroidGlassProportionAfterLayout() {
+        let letter = factory.makeLetterKey("k")
+
+        letter.frame = CGRect(x: 0, y: 0, width: 32, height: 44)
+        letter.layoutIfNeeded()
+
+        XCTAssertEqual(letter.layer.cornerRadius, 44 * 0.22, accuracy: 0.01)
+    }
+
     private func standardRows(in layer: UIView) -> [UIView] {
         guard let stack = layer.subviews.compactMap({ $0 as? UIStackView }).first else {
             XCTFail("Expected layer to contain a vertical stack")

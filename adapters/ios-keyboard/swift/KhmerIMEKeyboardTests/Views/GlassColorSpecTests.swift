@@ -89,6 +89,23 @@ final class GlassColorSpecTests: XCTestCase {
             "active toggle text must be dark")
     }
 
+    func test_charPickDismissButtonUsesActiveGlassToggleStyle() {
+        let panel = CandidatePanelView(metrics: KeyboardLayoutMetrics(device: .phone))
+
+        panel.renderCharPickAlphabet()
+
+        guard let toggle = allButtons(in: panel).first(where: { $0.title(for: .normal) == "✦" }) else {
+            XCTFail("Expected char-pick alphabet to include the ✦ dismiss button")
+            return
+        }
+        let expectedFill = GlassColorSpec.toggleActiveBackground(isDark: false)
+        let expectedText = GlassColorSpec.toggleActiveTextColor()
+
+        XCTAssertEqual(alpha(toggle.backgroundColor), alpha(expectedFill), accuracy: 0.01)
+        XCTAssertEqual(luminance(toggle.backgroundColor), luminance(expectedFill), accuracy: 0.01)
+        XCTAssertEqual(luminance(toggle.titleColor(for: .normal)), luminance(expectedText), accuracy: 0.01)
+    }
+
     // MARK: - candidateBorderWidth
 
     func test_candidateBorderWidthExceedsOnePoint() {
@@ -103,9 +120,27 @@ final class GlassColorSpecTests: XCTestCase {
         return a
     }
 
+    private func alpha(_ color: UIColor?) -> CGFloat {
+        guard let color else { return 0 }
+        return alpha(color)
+    }
+
     private func luminance(_ color: UIColor) -> CGFloat {
         var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0
         color.getRed(&r, green: &g, blue: &b, alpha: nil)
         return r + g + b
+    }
+
+    private func luminance(_ color: UIColor?) -> CGFloat {
+        guard let color else { return 0 }
+        return luminance(color)
+    }
+
+    private func allButtons(in view: UIView) -> [UIButton] {
+        var result = view.subviews.compactMap { $0 as? UIButton }
+        for subview in view.subviews {
+            result += allButtons(in: subview)
+        }
+        return result
     }
 }

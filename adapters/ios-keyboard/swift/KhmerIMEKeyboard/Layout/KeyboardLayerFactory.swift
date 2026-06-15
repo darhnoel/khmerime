@@ -188,7 +188,7 @@ struct KeyboardLayerFactory {
     }
 
     func makeLetterKey(_ letter: String) -> UIButton {
-        let btn = UIButton(type: .custom)
+        let btn = GlassKeyButton(frame: .zero)
         btn.setTitle(letter.uppercased(), for: .normal)
         KeyStyle.applyLetter(btn, isIPad: isIPad)
         btn.addTarget(target, action: actions.letter, for: .touchUpInside)
@@ -196,7 +196,7 @@ struct KeyboardLayerFactory {
     }
 
     func makeSymbolKey(_ symbol: String) -> UIButton {
-        let btn = UIButton(type: .custom)
+        let btn = GlassKeyButton(frame: .zero)
         btn.setTitle(symbol, for: .normal)
         KeyStyle.applySymbol(btn, isIPad: isIPad)
         btn.addTarget(target, action: actions.symbol, for: .touchUpInside)
@@ -204,7 +204,7 @@ struct KeyboardLayerFactory {
     }
 
     func makeSpecialKey(_ title: String, action: Selector) -> UIButton {
-        let btn = UIButton(type: .custom)
+        let btn = GlassKeyButton(frame: .zero)
         btn.setTitle(title, for: .normal)
         KeyStyle.applySpecial(btn, isIPad: isIPad)
         btn.addTarget(target, action: action, for: .touchUpInside)

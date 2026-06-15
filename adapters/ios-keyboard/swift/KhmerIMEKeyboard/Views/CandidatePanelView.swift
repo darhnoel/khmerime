@@ -75,7 +75,7 @@ private final class CandidateCell: UICollectionViewCell {
 //   │  [✦]  [ណុំ ✏]  [ទៅ ✏]  [សាលារៀន ✏]  44pt │  ← chips (scrollable h)
 //   ├───────────────────────────────────────────┤
 //   │  ខ្ញុំ   ញុំ   ណុំ                        │
-//   │  ណ៉ំ    ណ     …                  120pt  │  ← candidates (wrapped, scrollable v)
+//   │  ណ៉ំ    ណ     …           adaptive height │  ← candidates (wrapped, scrollable v)
 //   ├───────────────────────────────────────────┤
 //   │  123  │      space      │  .  │    ⏎     │  ← bottom row (from VC)
 //   └───────────────────────────────────────────┘
@@ -307,11 +307,10 @@ final class CandidatePanelView: UIView, KeyboardPanelDisplaying {
     }
 
     private func makeSpecialButton(_ title: String, action: Selector) -> UIButton {
-        let btn = UIButton(type: .system)
+        let btn = GlassKeyButton(frame: .zero)
         btn.setTitle(title, for: .normal)
         btn.titleLabel?.font = .systemFont(ofSize: 15, weight: .medium)
-        btn.setTitleColor(.black, for: .normal)
-        KeyStyle.applySpecial(btn)
+        KeyStyle.applySpecial(btn, isActive: title == "✦")
         btn.addTarget(self, action: action, for: .touchUpInside)
         return btn
     }

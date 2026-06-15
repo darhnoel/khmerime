@@ -41,4 +41,6 @@ enum GlassColorSpec {
     static func candidateBorderWidth() -> CGFloat { 1.5 }
 
     static func blurRadius(scale: CGFloat) -> CGFloat { 12 * scale }
+
+    static func keyCornerRadius(height: CGFloat) -> CGFloat { height * 0.22 }
 }
