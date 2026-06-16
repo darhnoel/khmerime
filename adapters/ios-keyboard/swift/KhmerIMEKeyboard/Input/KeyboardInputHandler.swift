@@ -361,11 +361,7 @@ final class KeyboardInputHandler {
             isEnglishMode = false
             onEnglishModeChanged?(false)
         }
-        switch keyboardState {
-        case .panel:
-            transition(to: .qwerty)
-
-        case .charPick:
+        if keyboardState == .charPick {
             dispatcher.onSession { [weak self] in
                 guard let self else { return }
                 _ = self.session.exitCharPick()
@@ -375,24 +371,17 @@ final class KeyboardInputHandler {
                     self.transition(to: .qwerty)
                 }
             }
-
-        default:
-            let hasComposition = lastState.map { !$0.candidates.isEmpty } ?? false
-            if hasComposition {
-                transition(to: .panel)
-                if let state = lastState { onRender?(state, romanBuffer) }
-            } else {
-                dispatcher.onSession { [weak self] in
-                    guard let self else { return }
-                    _ = self.session.enterCharPick()
-                    self.dispatcher.onMain { [weak self] in
-                        guard let self else { return }
-                        self.lastState = nil
-                        self.onStripClear?()
-                        self.onCharPickAlphabet?()
-                        self.transition(to: .charPick)
-                    }
-                }
+            return
+        }
+        dispatcher.onSession { [weak self] in
+            guard let self else { return }
+            _ = self.session.enterCharPick()
+            self.dispatcher.onMain { [weak self] in
+                guard let self else { return }
+                self.lastState = nil
+                self.onStripClear?()
+                self.onCharPickAlphabet?()
+                self.transition(to: .charPick)
             }
         }
     }

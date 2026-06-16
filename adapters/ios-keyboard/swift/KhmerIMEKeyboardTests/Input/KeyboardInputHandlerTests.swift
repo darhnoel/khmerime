@@ -61,22 +61,6 @@ final class KeyboardInputHandlerTests: XCTestCase {
             "no space before the newline; got \(proxy.text.debugDescription)")
     }
 
-    func test_returnInPanel_commitsAndClosesPanelWithoutNewline() {
-        let (handler, proxy) = makeHandler()
-        type("nhom", into: handler)
-        handler.togglePanel()       // → .panel
-
-        handler.returnTapped()
-        handler.textDidChange()
-
-        XCTAssertEqual(handler.keyboardState, .qwerty,
-            "⏎ in panel must accept the composition and close the panel")
-        XCTAssertFalse(proxy.text.contains("\n"),
-            "⏎ in panel must not insert a newline; got \(proxy.text.debugDescription)")
-        XCTAssertFalse(proxy.text.contains("nhom"),
-            "roman chars must be replaced by Khmer on panel commit")
-    }
-
     // MARK: - Test A: no trailing space before newline
 
     func test_spaceReturn_noTrailingSpaceBeforeNewline() {
@@ -185,43 +169,26 @@ final class KeyboardInputHandlerTests: XCTestCase {
 
     // MARK: - Panel state machine
 
-    func test_togglePanel_withComposition_transitionsToPanel() {
+    func test_togglePanel_withComposition_entersCharPick() {
+        // ✦ always enters CharPick now — the persistent candidate row (not the
+        // panel) is the surface for browsing candidates of an active composition.
         let (handler, _) = makeHandler()
         type("nhom", into: handler)
 
         handler.togglePanel()
 
-        XCTAssertEqual(handler.keyboardState, .panel,
-            "✦ with active composition must enter panel state")
+        XCTAssertEqual(handler.keyboardState, .charPick,
+            "✦ must enter charPick mode regardless of composition state")
     }
 
-    // Regression: onRender must fire AFTER transition so the VC can pass state
-    // to the panel view. Old code called onRender first (keyboardState still
-    // .qwerty), so panelView.render was never called and panel showed blank.
-    func test_togglePanel_withComposition_rendersWhileInPanelState() {
+    func test_togglePanel_whenInCharPick_transitionsToQwerty() {
         let (handler, _) = makeHandler()
-        type("nhom", into: handler)
-
-        var stateAtRenderTime: KeyboardState?
-        handler.onRender = { [weak handler] _, _ in
-            stateAtRenderTime = handler?.keyboardState
-        }
-
-        handler.togglePanel()
-
-        XCTAssertEqual(stateAtRenderTime, .panel,
-            "onRender must fire while keyboardState is already .panel, not before transition")
-    }
-
-    func test_togglePanel_whenInPanel_transitionsToQwerty() {
-        let (handler, _) = makeHandler()
-        type("nhom", into: handler)
-        handler.togglePanel()   // → .panel
+        handler.togglePanel()   // → .charPick
 
         handler.togglePanel()   // → .qwerty
 
         XCTAssertEqual(handler.keyboardState, .qwerty,
-            "second ✦ tap must dismiss panel and return to qwerty")
+            "second ✦ tap must dismiss charPick and return to qwerty")
     }
 
     func test_togglePanel_withoutComposition_transitionsToCharPick() {
@@ -240,10 +207,10 @@ final class KeyboardInputHandlerTests: XCTestCase {
         var transitions: [KeyboardState] = []
         handler.onTransition = { transitions.append($0) }
 
-        handler.togglePanel()   // → .panel
+        handler.togglePanel()   // → .charPick
         handler.togglePanel()   // → .qwerty
 
-        XCTAssertEqual(transitions, [.panel, .qwerty],
+        XCTAssertEqual(transitions, [.charPick, .qwerty],
             "onTransition must fire once per state change in order")
     }
 
@@ -275,7 +242,7 @@ final class KeyboardInputHandlerTests: XCTestCase {
     func test_chipTapped_whenPanelAlreadyOpen_staysInPanel() {
         let (handler, _) = makeHandler()
         type("khnhomtov", into: handler)   // multi-word phrase → segments.count >= 2
-        handler.togglePanel()   // → .panel
+        handler.chipTapped(at: 0)   // → .panel
 
         handler.chipTapped(at: 0)
 
