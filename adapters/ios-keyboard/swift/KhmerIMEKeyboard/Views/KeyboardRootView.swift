@@ -14,6 +14,7 @@ protocol KeyboardPanelDisplaying: AnyObject {
 
 final class KeyboardRootView: UIView {
     private let stripDisplay: KeyboardStripDisplaying
+    private let candidateRowDisplay: KeyboardCandidateRowDisplaying
     private let panelDisplay: KeyboardPanelDisplaying
     private let qwertyView: UIView
     private let numericView: UIView
@@ -34,6 +35,7 @@ final class KeyboardRootView: UIView {
         panelBottomAnchorGuide: UILayoutGuide
     ) {
         self.stripDisplay = stripView
+        self.candidateRowDisplay = candidateRowView
         self.panelDisplay = panelView
         self.qwertyView = qwertyView
         self.numericView = numericView
@@ -108,6 +110,7 @@ final class KeyboardRootView: UIView {
         case .charPick:
             panelDisplay.renderCharPickCandidates(state.candidates)
         default:
+            candidateRowDisplay.render(state)
             break
         }
     }

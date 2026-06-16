@@ -70,6 +70,17 @@ final class KeyboardRootViewTests: XCTestCase {
         XCTAssertEqual(fixture.panelView.renderedCharPickCandidates, ["ក", "ខ"])
     }
 
+    func test_renderQwertyStateUpdatesStripAndCandidateRow() {
+        let fixture = makeRootView()
+        let state = makeRenderState(candidates: ["ក", "ខ"])
+
+        fixture.rootView.render(state, romanHint: "k", keyboardState: .qwerty)
+
+        XCTAssertEqual(fixture.stripView.renderedRomanHint, "k")
+        XCTAssertEqual(fixture.stripView.renderedState, state)
+        XCTAssertEqual(fixture.candidateRowView.renderedState, state)
+    }
+
     func test_clearStripAndRenderCharPickAlphabetForwardToContainedViews() {
         let fixture = makeRootView()
 
