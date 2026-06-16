@@ -89,8 +89,6 @@ private final class ActionTarget: NSObject {
 }
 
 private final class PanelDelegate: CandidatePanelDelegate {
-    func candidatePanel(_ panel: CandidatePanelView, didTapChipAt index: Int) {}
-    func candidatePanel(_ panel: CandidatePanelView, didRequestEditAt index: Int) {}
     func candidatePanel(_ panel: CandidatePanelView, didSelectCandidateAt index: Int) {}
     func candidatePanelDidDismiss(_ panel: CandidatePanelView) {}
     func candidatePanelDidEnterCharPick(_ panel: CandidatePanelView) {}

@@ -3,10 +3,6 @@ import UIKit
 // MARK: - Delegate
 
 protocol CandidatePanelDelegate: AnyObject {
-    /// User tapped a segment chip to move focus to that segment.
-    func candidatePanel(_ panel: CandidatePanelView, didTapChipAt index: Int)
-    /// User tapped ✏ on a chip to enter Segment Edit Mode for that segment.
-    func candidatePanel(_ panel: CandidatePanelView, didRequestEditAt index: Int)
     /// User tapped a candidate to select it for the focused segment.
     func candidatePanel(_ panel: CandidatePanelView, didSelectCandidateAt index: Int)
     /// User tapped ✦ to dismiss the panel and return to the QWERTY view.
@@ -67,15 +63,14 @@ private final class CandidateCell: UICollectionViewCell {
 
 // CandidatePanelView
 // ==================
-// Full-replacement view for the key-rows area, shown when the user taps ✦.
-// The strip (StripView) remains above it at all times.
+// CharPick panel shown below the strip. Segment browsing now lives in the
+// persistent candidate row instead of this replacement panel.
 //
-// Layout (replaces key rows; strip stays above):
+// Layout:
 //   ┌───────────────────────────────────────────┐
-//   │  [✦]  [ណុំ ✏]  [ទៅ ✏]  [សាលារៀន ✏]  44pt │  ← chips (scrollable h)
+//   │  [✦]  [A] [B] [C] ...                44pt │  ← CharPick letters
 //   ├───────────────────────────────────────────┤
-//   │  ខ្ញុំ   ញុំ   ណុំ                        │
-//   │  ណ៉ំ    ណ     …           adaptive height │  ← candidates (wrapped, scrollable v)
+//   │  ក      ខ      ...       adaptive height │  ← candidates (wrapped, scrollable v)
 //   ├───────────────────────────────────────────┤
 //   │  123  │      space      │  .  │    ⏎     │  ← bottom row (from VC)
 //   └───────────────────────────────────────────┘
@@ -201,7 +196,7 @@ final class CandidatePanelView: UIView, KeyboardPanelDisplaying {
     // MARK: - Public API
 
     func render(_ state: IosRenderState) {
-        rebuildChips(state.segments)
+        chipStack.arrangedSubviews.forEach { $0.removeFromSuperview() }
         let selectedIdx = state.selectedIndex.map { Int($0) } ?? 0
         rebuildCandidates(state.candidates, selectedIndex: selectedIdx)
     }
@@ -231,17 +226,6 @@ final class CandidatePanelView: UIView, KeyboardPanelDisplaying {
 
     // MARK: - Builders
 
-    private func rebuildChips(_ segments: [IosSegmentEntry]) {
-        chipStack.arrangedSubviews.forEach { $0.removeFromSuperview() }
-        chipStack.addArrangedSubview(makeSpecialButton("✦", action: #selector(dismissTapped)))
-        // CharPick entry button — lets the user discard the current composition
-        // and switch to individual character picking.
-        chipStack.addArrangedSubview(makeSpecialButton("ក…", action: #selector(enterCharPickTapped)))
-        for (i, seg) in segments.enumerated() {
-            chipStack.addArrangedSubview(makeChipContainer(text: seg.output, focused: seg.focused, index: i))
-        }
-    }
-
     private func rebuildCandidates(_ candidates: [String], selectedIndex: Int) {
         displayCandidates = candidates
         displaySelectedIndex = selectedIndex
@@ -252,55 +236,6 @@ final class CandidatePanelView: UIView, KeyboardPanelDisplaying {
     }
 
     // MARK: - Button factories
-
-    private func makeChipContainer(text: String, focused: Bool, index: Int) -> UIView {
-        let container = UIView()
-        container.translatesAutoresizingMaskIntoConstraints = false
-
-        var chipConfig = UIButton.Configuration.plain()
-        chipConfig.title = text
-        chipConfig.baseForegroundColor = .label
-        chipConfig.contentInsets = NSDirectionalEdgeInsets(top: 6, leading: 12, bottom: 6, trailing: 12)
-        chipConfig.titleTextAttributesTransformer = UIConfigurationTextAttributesTransformer { attrs in
-            var a = attrs
-            a.font = UIFont.systemFont(ofSize: 16, weight: focused ? .semibold : .regular)
-            return a
-        }
-        let isDark = UITraitCollection.current.userInterfaceStyle == .dark
-        chipConfig.background.backgroundColor = focused
-            ? GlassColorSpec.selectedCandidateBackground(isDark: isDark)
-            : GlassColorSpec.backgroundColor(isDark: isDark)
-        chipConfig.background.cornerRadius = 12
-        chipConfig.background.strokeWidth = GlassColorSpec.candidateBorderWidth()
-        chipConfig.background.strokeColor = GlassColorSpec.borderColor(isDark: isDark)
-        let chip = UIButton(configuration: chipConfig)
-        chip.tag = index
-        chip.addTarget(self, action: #selector(chipTapped(_:)), for: .touchUpInside)
-        chip.translatesAutoresizingMaskIntoConstraints = false
-        container.addSubview(chip)
-
-        let editBtn = UIButton(type: .system)
-        editBtn.setTitle("✏", for: .normal)
-        editBtn.titleLabel?.font = .systemFont(ofSize: 12)
-        editBtn.setTitleColor(.systemBlue, for: .normal)
-        editBtn.isHidden = !focused
-        editBtn.tag = index
-        editBtn.addTarget(self, action: #selector(editTapped(_:)), for: .touchUpInside)
-        editBtn.translatesAutoresizingMaskIntoConstraints = false
-        container.addSubview(editBtn)
-
-        NSLayoutConstraint.activate([
-            chip.topAnchor.constraint(equalTo: container.topAnchor),
-            chip.leadingAnchor.constraint(equalTo: container.leadingAnchor),
-            chip.bottomAnchor.constraint(equalTo: container.bottomAnchor),
-
-            editBtn.leadingAnchor.constraint(equalTo: chip.trailingAnchor, constant: 2),
-            editBtn.trailingAnchor.constraint(equalTo: container.trailingAnchor),
-            editBtn.centerYAnchor.constraint(equalTo: container.centerYAnchor),
-            editBtn.widthAnchor.constraint(equalToConstant: 20),
-        ])
-        return container
-    }
 
     private func makeSpecialButton(_ title: String, action: Selector) -> UIButton {
         let btn = GlassKeyButton(frame: .zero)
@@ -338,8 +273,6 @@ final class CandidatePanelView: UIView, KeyboardPanelDisplaying {
 
     @objc private func dismissTapped()           { delegate?.candidatePanelDidDismiss(self) }
     @objc private func enterCharPickTapped()     { delegate?.candidatePanelDidEnterCharPick(self) }
-    @objc private func chipTapped(_ s: UIButton) { delegate?.candidatePanel(self, didTapChipAt: s.tag) }
-    @objc private func editTapped(_ s: UIButton) { delegate?.candidatePanel(self, didRequestEditAt: s.tag) }
 
     @objc private func charPickLetterTapped(_ sender: UITapGestureRecognizer) {
         guard let btn = sender.view as? UIButton,

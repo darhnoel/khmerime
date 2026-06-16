@@ -232,14 +232,6 @@ private extension UIView {
 
 extension KeyboardViewController: CandidatePanelDelegate {
 
-    func candidatePanel(_ panel: CandidatePanelView, didTapChipAt index: Int) {
-        handler.chipTapped(at: index)
-    }
-
-    func candidatePanel(_ panel: CandidatePanelView, didRequestEditAt index: Int) {
-        handler.requestEdit(at: index)
-    }
-
     func candidatePanelDidEnterCharPick(_ panel: CandidatePanelView) {
         handler.enterCharPickFromPanel()
     }

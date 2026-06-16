@@ -8,9 +8,17 @@ final class CandidatePanelViewTests: XCTestCase {
 
     func test_charPickLetterChip_isGlassKeyButton() {
         let panel = CandidatePanelView(metrics: KeyboardLayoutMetrics(device: .phone))
+        panel.render(makeRenderState(
+            candidates: ["ក"],
+            segments: [IosSegmentEntry(output: "ទៅ", input: "tow", focused: true)]
+        ))
+
+        XCTAssertNil(button("ទៅ", in: panel))
+        XCTAssertNil(button("✏", in: panel))
+
         panel.renderCharPickAlphabet()
 
-        guard let chip = letterChip("A", in: panel) else {
+        guard let chip = button("A", in: panel) else {
             XCTFail("Expected to find an 'A' letter chip after renderCharPickAlphabet")
             return
         }
@@ -49,9 +57,29 @@ final class CandidatePanelViewTests: XCTestCase {
     /// Finds the first button in the panel hierarchy whose displayed title matches `letter`.
     /// Checks both UIButton.Configuration.title (pre-fix) and title(for: .normal) (post-fix).
     private func letterChip(_ letter: String, in panel: CandidatePanelView) -> UIButton? {
+        button(letter, in: panel)
+    }
+
+    private func button(_ title: String, in panel: CandidatePanelView) -> UIButton? {
         allButtons(in: panel).first {
-            $0.title(for: .normal) == letter || $0.configuration?.title == letter
+            $0.title(for: .normal) == title || $0.configuration?.title == title
         }
+    }
+
+    private func makeRenderState(
+        candidates: [String],
+        segments: [IosSegmentEntry] = []
+    ) -> IosRenderState {
+        IosRenderState(
+            candidates: candidates,
+            selectedIndex: nil,
+            preedit: "",
+            segments: segments,
+            focusedSegmentIndex: nil,
+            commitText: nil,
+            segmentEditActive: false,
+            segmentEditIndex: nil
+        )
     }
 
     private func allButtons(in view: UIView) -> [UIButton] {
