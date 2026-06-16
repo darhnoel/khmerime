@@ -28,7 +28,7 @@ final class KeyboardViewHierarchyBuilderTests: XCTestCase {
         XCTAssertTrue(hierarchy.panelView.isHidden)
         XCTAssertTrue(hierarchy.panelBottomRow.isHidden)
 
-        hierarchy.rootView.apply(.panel)
+        hierarchy.rootView.apply(.charPick)
 
         XCTAssertTrue(hierarchy.qwertyView.isHidden)
         XCTAssertFalse(hierarchy.panelView.isHidden)

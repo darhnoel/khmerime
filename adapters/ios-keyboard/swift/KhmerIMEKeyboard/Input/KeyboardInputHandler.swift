@@ -126,7 +126,7 @@ final class KeyboardInputHandler {
             self.dispatcher.onMain { [weak self] in
                 guard let self else { return }
                 self.onStripClear?()
-                if self.keyboardState == .panel || self.keyboardState == .charPick {
+                if self.keyboardState == .charPick {
                     self.transition(to: .qwerty)
                 }
             }
@@ -217,7 +217,6 @@ final class KeyboardInputHandler {
                     }
                 }
                 self.onStripClear?()
-                if self.keyboardState == .panel { self.transition(to: .qwerty) }
             }
         }
     }
@@ -247,7 +246,6 @@ final class KeyboardInputHandler {
                 self.proxy.insertText(" ")
                 self.trailingSpace = true
                 self.onStripClear?()
-                if self.keyboardState == .panel { self.transition(to: .qwerty) }
             }
         }
     }
@@ -422,23 +420,6 @@ final class KeyboardInputHandler {
             if diff > 0      { for _ in 0..<diff    { state = self.session.sendRight() } }
             else if diff < 0 { for _ in 0..<(-diff) { state = self.session.sendLeft()  } }
             self.dispatcher.onMain { [weak self] in self?.render(state) }
-        }
-    }
-
-    func requestEdit(at index: Int) {
-        guard let current = lastState else { return }
-        let focused = current.focusedSegmentIndex.map { Int($0) } ?? 0
-        let diff = index - focused
-        dispatcher.onSession { [weak self] in
-            guard let self else { return }
-            if diff > 0      { for _ in 0..<diff    { _ = self.session.sendRight() } }
-            else if diff < 0 { for _ in 0..<(-diff) { _ = self.session.sendLeft()  } }
-            let state = self.session.sendTab()
-            self.dispatcher.onMain { [weak self] in
-                guard let self else { return }
-                self.render(state)
-                self.transition(to: .qwerty)
-            }
         }
     }
 

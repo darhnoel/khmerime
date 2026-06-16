@@ -14,10 +14,10 @@ final class KeyboardRootViewTests: XCTestCase {
         XCTAssertTrue(fixture.panelBottomRow.isHidden)
     }
 
-    func test_applyPanelStateShowsPanelAndBottomRow() {
+    func test_applyCharPickStateShowsPanelAndBottomRow() {
         let fixture = makeRootView()
 
-        fixture.rootView.apply(.panel)
+        fixture.rootView.apply(.charPick)
 
         XCTAssertTrue(fixture.qwertyView.isHidden)
         XCTAssertTrue(fixture.numericView.isHidden)
@@ -44,18 +44,6 @@ final class KeyboardRootViewTests: XCTestCase {
         fixture.rootView.apply(.charPick)
 
         XCTAssertTrue(fixture.candidateRowView.isHidden)
-    }
-
-    func test_renderPanelStateUpdatesStripAndPanel() {
-        let fixture = makeRootView()
-        let state = makeRenderState(candidates: ["ក"])
-
-        fixture.rootView.render(state, romanHint: "k", keyboardState: .panel)
-
-        XCTAssertEqual(fixture.stripView.renderedRomanHint, "k")
-        XCTAssertEqual(fixture.stripView.renderedState, state)
-        XCTAssertEqual(fixture.panelView.renderedState, state)
-        XCTAssertTrue(fixture.panelView.renderedCharPickCandidates.isEmpty)
     }
 
     func test_renderCharPickStateUpdatesStripAndOnlyPanelCandidates() {

@@ -105,14 +105,11 @@ final class KeyboardRootView: UIView {
     func render(_ state: IosRenderState, romanHint: String, keyboardState: KeyboardState) {
         stripDisplay.render(state, romanBuffer: romanHint)
         switch keyboardState {
-        case .panel:
-            panelDisplay.render(state)
         case .charPick:
             candidateRowDisplay.clear()
             panelDisplay.renderCharPickCandidates(state.candidates)
         default:
             candidateRowDisplay.render(state)
-            break
         }
     }
 

@@ -9,7 +9,7 @@ struct KeyboardLayerVisibility {
         showsQwerty = state == .qwerty
         showsNumeric = state == .numeric
         showsSymbols = state == .symbols
-        showsPanel = state == .panel || state == .charPick
-        showsCandidateRow = state != .panel && state != .charPick
+        showsPanel = state == .charPick
+        showsCandidateRow = state != .charPick
     }
 }
