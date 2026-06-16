@@ -28,6 +28,12 @@ enum GlassColorSpec {
             : UIColor(red: 1, green: 1, blue: 1, alpha: 245/255)
     }
 
+    static func pressedBackground(isDark: Bool) -> UIColor {
+        isDark
+            ? UIColor(red: 140/255, green: 140/255, blue: 155/255, alpha: 230/255)
+            : UIColor(red: 200/255, green: 205/255, blue: 215/255, alpha: 235/255)
+    }
+
     static func toggleActiveTextColor() -> UIColor {
         UIColor(red: 20/255, green: 20/255, blue: 24/255, alpha: 1)
     }
