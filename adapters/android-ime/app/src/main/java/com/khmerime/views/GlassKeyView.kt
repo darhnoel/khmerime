@@ -9,7 +9,7 @@ import android.util.TypedValue
 import android.view.MotionEvent
 import android.view.View
 
-class GlassKeyView(
+open class GlassKeyView(
     context: Context,
     private val key: KeyboardKey,
     private val isActive: Boolean = false,

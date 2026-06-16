@@ -1,0 +1,63 @@
+package com.khmerime.views
+
+import org.junit.Assert.*
+import org.junit.Test
+
+// ViewPoolTest
+// ============
+// The pool's grow/hide-excess policy is the only real logic here, so it's
+// tested against a fake child type (String) with recording lambdas instead
+// of real Android views — no Robolectric needed.
+
+class ViewPoolTest {
+
+    private fun makePool(): Triple<ViewPool<String>, MutableList<String>, MutableMap<String, Boolean>> {
+        val added = mutableListOf<String>()
+        val visibility = mutableMapOf<String, Boolean>()
+        var nextId = 0
+        val pool = ViewPool<String>(
+            createChild = { "child${nextId++}" },
+            addChild = { added.add(it) },
+            setVisible = { child, visible -> visibility[child] = visible },
+        )
+        return Triple(pool, added, visibility)
+    }
+
+    @Test
+    fun syncCreatesAndAddsChildrenUpToRequestedCount() {
+        val (pool, added, _) = makePool()
+
+        val visible = pool.sync(3)
+
+        assertEquals(listOf("child0", "child1", "child2"), visible)
+        assertEquals("each new child must be added to the parent exactly once", 3, added.size)
+    }
+
+    @Test
+    fun syncWithLowerCountHidesExcessInsteadOfRemoving() {
+        val (pool, added, visibility) = makePool()
+        pool.sync(3)
+
+        val visible = pool.sync(1)
+
+        assertEquals(listOf("child0"), visible)
+        assertEquals("no children should be removed, only hidden", 3, added.size)
+        assertEquals(true, visibility["child0"])
+        assertEquals(false, visibility["child1"])
+        assertEquals(false, visibility["child2"])
+    }
+
+    @Test
+    fun syncGrowingAgainReusesPreviouslyHiddenChildren() {
+        val (pool, added, visibility) = makePool()
+        pool.sync(3)
+        pool.sync(1)
+
+        val visible = pool.sync(3)
+
+        assertEquals(listOf("child0", "child1", "child2"), visible)
+        assertEquals("growing back up must reuse existing children, not create new ones", 3, added.size)
+        assertEquals(true, visibility["child1"])
+        assertEquals(true, visibility["child2"])
+    }
+}

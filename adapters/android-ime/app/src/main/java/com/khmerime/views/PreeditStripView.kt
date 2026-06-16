@@ -8,6 +8,7 @@ import android.graphics.Typeface
 import android.util.AttributeSet
 import android.util.TypedValue
 import android.view.Gravity
+import android.view.View
 import android.widget.LinearLayout
 import android.widget.TextView
 
@@ -18,6 +19,19 @@ class PreeditStripView @JvmOverloads constructor(
 
     private val romanRow = TextView(context)
     private val khmerRow = LinearLayout(context)
+    private val khmerRowPool = ViewPool<TextView>(
+        createChild = {
+            TextView(context).apply {
+                setPadding(8.dp, 0, 8.dp, 0)
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.WRAP_CONTENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT,
+                )
+            }
+        },
+        addChild = { khmerRow.addView(it) },
+        setVisible = { view, visible -> view.visibility = if (visible) View.VISIBLE else View.GONE },
+    )
 
     var onSegmentFocused: ((Int) -> Unit)? = null
 
@@ -46,52 +60,49 @@ class PreeditStripView @JvmOverloads constructor(
 
     fun clear() {
         romanRow.text = ""
-        khmerRow.removeAllViews()
+        khmerRowPool.sync(0)
     }
 
     private fun renderKhmerRow(state: KhmerRenderState) {
-        khmerRow.removeAllViews()
         val texts = KeyboardPresentationSpec.segmentKhmerTexts(state)
         val focusedIdx = KeyboardPresentationSpec.focusedSegmentIndex(state)
 
         if (texts.isEmpty()) {
             val candidate = state.candidates.getOrNull(state.selectedIndex ?: 0) ?: ""
-            if (candidate.isNotEmpty()) khmerRow.addView(makeCandidateLabel(candidate))
+            if (candidate.isEmpty()) {
+                khmerRowPool.sync(0)
+            } else {
+                styleCandidateLabel(khmerRowPool.sync(1)[0], candidate)
+            }
         } else {
+            val labels = khmerRowPool.sync(texts.size)
             texts.forEachIndexed { idx, text ->
-                khmerRow.addView(makeSegmentLabel(text, idx, focused = idx == focusedIdx))
+                styleSegmentLabel(labels[idx], text, idx, focused = idx == focusedIdx)
             }
         }
     }
 
-    private fun makeSegmentLabel(text: String, index: Int, focused: Boolean): TextView =
-        TextView(context).apply {
-            this.text = text
-            setTextSize(TypedValue.COMPLEX_UNIT_SP, 18f)
-            setTextColor(if (focused) primaryTextColor() else secondaryTextColor())
-            if (focused) {
-                setTypeface(typeface, Typeface.BOLD)
-                paintFlags = paintFlags or Paint.UNDERLINE_TEXT_FLAG
-            }
-            setPadding(8.dp, 0, 8.dp, 0)
-            setOnClickListener { onSegmentFocused?.invoke(index) }
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.WRAP_CONTENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT,
-            )
+    private fun styleSegmentLabel(label: TextView, text: String, index: Int, focused: Boolean) {
+        label.text = text
+        label.setTextSize(TypedValue.COMPLEX_UNIT_SP, 18f)
+        label.setTextColor(if (focused) primaryTextColor() else secondaryTextColor())
+        label.setTypeface(label.typeface, if (focused) Typeface.BOLD else Typeface.NORMAL)
+        label.paintFlags = if (focused) {
+            label.paintFlags or Paint.UNDERLINE_TEXT_FLAG
+        } else {
+            label.paintFlags and Paint.UNDERLINE_TEXT_FLAG.inv()
         }
+        label.setOnClickListener { onSegmentFocused?.invoke(index) }
+    }
 
-    private fun makeCandidateLabel(text: String): TextView =
-        TextView(context).apply {
-            this.text = text
-            setTextSize(TypedValue.COMPLEX_UNIT_SP, 18f)
-            setTextColor(primaryTextColor())
-            setTypeface(typeface, Typeface.BOLD)
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.WRAP_CONTENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT,
-            )
-        }
+    private fun styleCandidateLabel(label: TextView, text: String) {
+        label.text = text
+        label.setTextSize(TypedValue.COMPLEX_UNIT_SP, 18f)
+        label.setTextColor(primaryTextColor())
+        label.setTypeface(label.typeface, Typeface.BOLD)
+        label.paintFlags = label.paintFlags and Paint.UNDERLINE_TEXT_FLAG.inv()
+        label.setOnClickListener(null)
+    }
 
     private fun isDark(): Boolean =
         (resources.configuration.uiMode and

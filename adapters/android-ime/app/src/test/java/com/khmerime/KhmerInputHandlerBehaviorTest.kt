@@ -1,9 +1,11 @@
 package com.khmerime
 
+import com.khmerime.input.KhmerDispatcher
 import com.khmerime.input.KhmerInputHandler
 import com.khmerime.input.KhmerImeSession
 import com.khmerime.input.KhmerRenderState
 import com.khmerime.input.KeyboardState
+import com.khmerime.input.SynchronousDispatcher
 import org.junit.Assert.*
 import org.junit.Test
 
@@ -11,13 +13,18 @@ import org.junit.Test
 // =============================
 // Integration tests: real Rust session via JNI, in-memory TextProxy.
 // Mirrors KeyboardInputHandlerTests on iOS — behavior only, never internals.
+//
+// Uses SynchronousDispatcher so every test stays deterministic without
+// needing to await a background thread.
 
 class KhmerInputHandlerBehaviorTest {
 
-    private fun makeHandler(): Pair<KhmerInputHandler, InMemoryTextProxy> {
+    private fun makeHandler(
+        dispatcher: KhmerDispatcher = SynchronousDispatcher(),
+    ): Pair<KhmerInputHandler, InMemoryTextProxy> {
         val textField = InMemoryTextProxy()
         val session = KhmerImeSession()
-        val handler = KhmerInputHandler(textField, session)
+        val handler = KhmerInputHandler(textField, session, dispatcher)
         handler.focusIn()
         return Pair(handler, textField)
     }
@@ -46,6 +53,17 @@ class KhmerInputHandlerBehaviorTest {
         type("nh", into = handler)
 
         assertEquals("text field must reflect roman preedit speculatively", "nh", textField.text)
+    }
+
+    @Test
+    fun sendCharRunsSessionWorkThroughInjectedDispatcher() {
+        val recorder = RecordingDispatcher()
+        val (handler, _) = makeHandler(dispatcher = recorder)
+
+        handler.sendChar("n")
+
+        assertEquals("sendChar must run the session call via dispatcher.onSession", 1, recorder.onSessionCalls)
+        assertEquals("sendChar must run its render via dispatcher.onMain", 1, recorder.onMainCalls)
     }
 
     @Test
@@ -183,6 +201,20 @@ class KhmerInputHandlerBehaviorTest {
     }
 
     @Test
+    fun sendBackspaceRunsSessionWorkThroughInjectedDispatcher() {
+        val recorder = RecordingDispatcher()
+        val (handler, _) = makeHandler(dispatcher = recorder)
+        type("n", into = handler)
+        recorder.onSessionCalls = 0
+        recorder.onMainCalls = 0
+
+        handler.sendBackspace()
+
+        assertEquals("sendBackspace must run the session call via dispatcher.onSession", 1, recorder.onSessionCalls)
+        assertEquals("sendBackspace must run its render via dispatcher.onMain", 1, recorder.onMainCalls)
+    }
+
+    @Test
     fun backspaceDeletesRomanPreeditCharacter() {
         val (handler, textField) = makeHandler()
         type("nh", into = handler)
@@ -190,6 +222,56 @@ class KhmerInputHandlerBehaviorTest {
         handler.sendBackspace()
 
         assertEquals("backspace must shorten text by one char", "n", textField.text)
+    }
+
+    // ── Backspace hold-repeat ─────────────────────────────────────────────────
+
+    @Test
+    fun backspaceHoldFiredDeletesFromFieldWithoutSessionCall() {
+        val recorder = RecordingDispatcher()
+        val (handler, textField) = makeHandler(dispatcher = recorder)
+        type("nh", into = handler)
+        recorder.onSessionCalls = 0
+
+        handler.backspaceHoldFired()
+
+        assertEquals("each hold tick must delete one char from the field", "n", textField.text)
+        assertEquals(
+            "backspaceHoldFired must not call the session directly — backspaceHoldEnded batches it",
+            0,
+            recorder.onSessionCalls,
+        )
+    }
+
+    @Test
+    fun backspaceHoldEndedBatchesPendingHoldTicksIntoOneSessionCall() {
+        val recorder = RecordingDispatcher()
+        val (handler, textField) = makeHandler(dispatcher = recorder)
+        type("nhom", into = handler)
+        recorder.onSessionCalls = 0
+
+        handler.backspaceHoldFired()
+        handler.backspaceHoldFired()
+        handler.backspaceHoldFired()
+        recorder.onSessionCalls = 0
+        handler.backspaceHoldEnded()
+
+        assertEquals(
+            "backspaceHoldEnded must run exactly one batched session call for all pending ticks",
+            1,
+            recorder.onSessionCalls,
+        )
+        assertEquals("n", textField.text)
+    }
+
+    @Test
+    fun backspaceHoldEndedWithNoPendingTicksIsNoOp() {
+        val recorder = RecordingDispatcher()
+        val (handler, _) = makeHandler(dispatcher = recorder)
+
+        handler.backspaceHoldEnded()
+
+        assertEquals("no pending ticks must mean no session call at all", 0, recorder.onSessionCalls)
     }
 
     // ── Segment editing ───────────────────────────────────────────────────────
