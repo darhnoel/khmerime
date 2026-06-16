@@ -20,7 +20,7 @@ The ⏎ button's dual role (commit composition vs. insert newline) was implicit.
 | ⏎ idle | Nothing | **Insert newline** |
 | Panel candidate tap | Select only | Select only (unchanged) |
 
-Cycling is removed from the strip entirely. The panel is the only candidate-browsing surface. Tapping any candidate in the panel commits that variant immediately and closes the panel.
+Cycling is removed from the strip entirely. The panel is the only candidate-browsing surface. Tapping a candidate in the panel selects it (same effect as a digit key); Enter still commits. (Corrected 2026-06 — the original text here claimed tap-to-commit-and-close, but no code path ever did that; see ADR-0009.)
 
 ## Consequences
 
