@@ -603,4 +603,45 @@ final class KeyboardInputHandlerTests: XCTestCase {
         XCTAssertEqual(renderCount, 1,
             "backspaceHoldEnded must produce exactly one render, not one per hold fire")
     }
+
+    // MARK: - Render coalescing
+
+    func test_sendChar_skipsStaleRenderWhenNewerKeystrokeSupersedesIt() {
+        let proxy = MockTextProxy()
+        let dispatcher = QueueingDispatcher()
+        let handler = KeyboardInputHandler(proxy: proxy, session: KeyboardSession(), dispatcher: dispatcher)
+        handler.focusIn()
+        var renderCount = 0
+        handler.onRender = { _, _ in renderCount += 1 }
+
+        handler.sendChar("n")   // queues onSession #1
+        handler.sendChar("h")   // queues onSession #2 — supersedes #1 before it renders
+
+        dispatcher.sessionBlocks[0]()   // runs session.sendCharacter("n"), queues onMain #1
+        dispatcher.sessionBlocks[1]()   // runs session.sendCharacter("h"), queues onMain #2
+
+        dispatcher.mainBlocks[0]()      // stale — must be skipped
+        dispatcher.mainBlocks[1]()      // latest — must render
+
+        XCTAssertEqual(renderCount, 1,
+            "a render superseded by a newer in-flight keystroke must be skipped")
+    }
+}
+
+// MARK: - Test Doubles
+
+/// Queues session/main blocks without executing them, preserving call order.
+/// Lets tests simulate overlapping in-flight dispatches (e.g. two sendChar
+/// calls racing) and fire them in any order to test staleness handling.
+final class QueueingDispatcher: KeyboardDispatcher {
+    var sessionBlocks: [() -> Void] = []
+    var mainBlocks: [() -> Void] = []
+
+    func onSession(_ work: @escaping () -> Void) {
+        sessionBlocks.append(work)
+    }
+
+    func onMain(_ work: @escaping () -> Void) {
+        mainBlocks.append(work)
+    }
 }

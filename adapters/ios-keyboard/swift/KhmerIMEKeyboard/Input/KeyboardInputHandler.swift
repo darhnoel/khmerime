@@ -63,6 +63,12 @@ final class KeyboardInputHandler {
     // one batched session block, then resets to 0.
     private var pendingHoldBackspaces = 0
 
+    // Incremented on every sendChar(). A keystroke's render is only applied
+    // if its captured generation still matches when its onMain block runs —
+    // otherwise a newer keystroke has already superseded it, so the stale
+    // render is skipped to keep the main thread from queuing up backlog.
+    private var sendGeneration = 0
+
     // Set after deleteBackward×N + insertText(Khmer). iOS silently appends a
     // trailing space (autocorrect replacement detection) but documentContextBeforeInput
     // is stale until UIKit calls textDidChange(), so the check must live there.
@@ -161,6 +167,8 @@ final class KeyboardInputHandler {
         // before the session block executes (critical for responsiveness).
         proxy.insertText(ch)
         romanBuffer += ch
+        sendGeneration += 1
+        let myGeneration = sendGeneration
         dispatcher.onSession { [weak self] in
             guard let self else { return }
             let state = self.session.sendCharacter(ch)
@@ -173,6 +181,9 @@ final class KeyboardInputHandler {
                     self.proxy.insertText(committed)
                     self.romanBuffer = ""
                 }
+                // A newer keystroke has already been dispatched — its render
+                // supersedes this one, so skip to avoid a stale UI update.
+                guard myGeneration == self.sendGeneration else { return }
                 self.render(state)
             }
         }
