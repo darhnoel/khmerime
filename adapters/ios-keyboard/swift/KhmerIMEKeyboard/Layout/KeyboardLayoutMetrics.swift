@@ -24,12 +24,12 @@ struct KeyboardLayoutMetrics {
     init(device: Device) {
         switch device {
         case .phone:
-            baseKeyboardHeight = 260
+            baseKeyboardHeight = 304
             specialKeyWidth = 42
             returnKeyWidth = 82
             wideSpecialKeyWidth = 48
         case .pad:
-            baseKeyboardHeight = 320
+            baseKeyboardHeight = 364
             specialKeyWidth = 56
             returnKeyWidth = 112
             wideSpecialKeyWidth = 72
@@ -43,7 +43,7 @@ struct KeyboardLayoutMetrics {
         panelChipHeight = 44
         panelBottomRowTopSpacing = 8
 
-        let keyAreaHeight = baseKeyboardHeight - stripHeight
+        let keyAreaHeight = baseKeyboardHeight - stripHeight - candidateRowHeight
         let standardRowHeight = (
             keyAreaHeight
             - keyTopInset
