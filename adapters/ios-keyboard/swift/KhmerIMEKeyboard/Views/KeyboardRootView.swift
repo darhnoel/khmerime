@@ -95,6 +95,7 @@ final class KeyboardRootView: UIView {
         qwertyView.isHidden = !visibility.showsQwerty
         numericView.isHidden = !visibility.showsNumeric
         symbolsView.isHidden = !visibility.showsSymbols
+        candidateRowView.isHidden = !visibility.showsCandidateRow
         panelView.isHidden = !visibility.showsPanel
         panelBottomRow.isHidden = !visibility.showsPanel
     }

@@ -38,6 +38,14 @@ final class KeyboardRootViewTests: XCTestCase {
         XCTAssertTrue(fixture.panelBottomRow.isHidden)
     }
 
+    func test_applyCharPickStateHidesCandidateRow() {
+        let fixture = makeRootView()
+
+        fixture.rootView.apply(.charPick)
+
+        XCTAssertTrue(fixture.candidateRowView.isHidden)
+    }
+
     func test_renderPanelStateUpdatesStripAndPanel() {
         let fixture = makeRootView()
         let state = makeRenderState(candidates: ["ក"])
