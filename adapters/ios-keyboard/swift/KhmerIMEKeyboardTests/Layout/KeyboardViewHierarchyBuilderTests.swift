@@ -34,6 +34,28 @@ final class KeyboardViewHierarchyBuilderTests: XCTestCase {
         XCTAssertFalse(hierarchy.panelView.isHidden)
         XCTAssertFalse(hierarchy.panelBottomRow.isHidden)
     }
+
+    func test_buildWiresCandidateRowSelectionHandler() {
+        let target = ActionTarget()
+        let delegate = PanelDelegate()
+        var selectedIndex: Int?
+
+        let hierarchy = KeyboardViewHierarchyBuilder(
+            metrics: KeyboardLayoutMetrics(device: .phone),
+            isIPad: false,
+            target: target,
+            globeKeyTag: 99,
+            enKeyTag: 98,
+            actions: ActionTarget.actions
+        ).build(
+            panelDelegate: delegate,
+            candidateRowSelection: { selectedIndex = $0 }
+        )
+
+        hierarchy.candidateRowView.onCandidateSelected?(3)
+
+        XCTAssertEqual(selectedIndex, 3)
+    }
 }
 
 private final class ActionTarget: NSObject {

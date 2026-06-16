@@ -172,7 +172,12 @@ class KeyboardViewController: UIInputViewController {
             globeKeyTag: Self.globeKeyTag,
             enKeyTag: Self.enKeyTag,
             actions: layerActions
-        ).build(panelDelegate: self)
+        ).build(
+            panelDelegate: self,
+            candidateRowSelection: { [weak self] index in
+                self?.handler.selectCandidate(at: index)
+            }
+        )
 
         stripView = hierarchy.stripView
         panelView = hierarchy.panelView

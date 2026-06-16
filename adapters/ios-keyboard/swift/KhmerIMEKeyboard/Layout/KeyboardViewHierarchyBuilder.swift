@@ -19,11 +19,15 @@ struct KeyboardViewHierarchyBuilder {
     let enKeyTag: Int
     let actions: KeyboardLayerActions
 
-    func build(panelDelegate: CandidatePanelDelegate?) -> KeyboardViewHierarchy {
+    func build(
+        panelDelegate: CandidatePanelDelegate?,
+        candidateRowSelection: ((Int) -> Void)? = nil
+    ) -> KeyboardViewHierarchy {
         let stripView = StripView()
         stripView.translatesAutoresizingMaskIntoConstraints = false
 
         let candidateRowView = CandidateRowView()
+        candidateRowView.onCandidateSelected = candidateRowSelection
         candidateRowView.translatesAutoresizingMaskIntoConstraints = false
 
         let panelView = CandidatePanelView(metrics: metrics)
