@@ -1,6 +1,6 @@
 import UIKit
 
-final class GlassKeyButton: UIButton {
+class GlassKeyButton: UIButton {
     var isGlassActive = false {
         didSet { updateGlassAppearance() }
     }

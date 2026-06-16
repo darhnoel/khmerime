@@ -10,9 +10,11 @@ import XCTest
 final class KeyboardInputHandlerTests: XCTestCase {
 
     // Convenience: create a fresh handler with a clean MockTextProxy.
+    // SynchronousDispatcher keeps all session work inline so tests remain
+    // deterministic without XCTestExpectation.
     private func makeHandler() -> (KeyboardInputHandler, MockTextProxy) {
         let proxy = MockTextProxy()
-        let handler = KeyboardInputHandler(proxy: proxy, session: KeyboardSession())
+        let handler = KeyboardInputHandler(proxy: proxy, session: KeyboardSession(), dispatcher: SynchronousDispatcher())
         handler.focusIn()
         return (handler, proxy)
     }
@@ -151,7 +153,7 @@ final class KeyboardInputHandlerTests: XCTestCase {
         // A second ⏎ then inserts a clean newline.
         let proxy = MockTextProxy()
         proxy.autoSpaceAfterInsert = true
-        let handler = KeyboardInputHandler(proxy: proxy, session: KeyboardSession())
+        let handler = KeyboardInputHandler(proxy: proxy, session: KeyboardSession(), dispatcher: SynchronousDispatcher())
         handler.focusIn()
         type("nhom", into: handler)
 
@@ -170,7 +172,7 @@ final class KeyboardInputHandlerTests: XCTestCase {
         // textDidChange() still handles the deferred auto-space check.
         let proxy = MockTextProxy()
         proxy.autoSpaceAfterInsert = true
-        let handler = KeyboardInputHandler(proxy: proxy, session: KeyboardSession())
+        let handler = KeyboardInputHandler(proxy: proxy, session: KeyboardSession(), dispatcher: SynchronousDispatcher())
         handler.focusIn()
         type("nhom", into: handler)
 
@@ -365,7 +367,7 @@ final class KeyboardInputHandlerTests: XCTestCase {
 
     func test_textDidChange_whenProxyClearedExternally_clearsStrip() {
         let proxy = MockTextProxy()
-        let handler = KeyboardInputHandler(proxy: proxy, session: KeyboardSession())
+        let handler = KeyboardInputHandler(proxy: proxy, session: KeyboardSession(), dispatcher: SynchronousDispatcher())
         handler.focusIn()
         type("nhom", into: handler)
 
@@ -513,5 +515,92 @@ final class KeyboardInputHandlerTests: XCTestCase {
 
         XCTAssertFalse(handler.isEnglishMode,
             "✦ must exit English mode")
+    }
+
+    // MARK: - Backspace hold repeat
+
+    // Each repeat tick calls backspaceHoldFired(): proxy.deleteBackward() only —
+    // no session call. When the user lifts the finger, backspaceHoldEnded() fires
+    // exactly one batched session dispatch for the chars removed from romanBuffer.
+
+    func test_backspaceHoldFired_doesNotDispatchToSession() {
+        let dispatcher = CapturingDispatcher()
+        let proxy = MockTextProxy()
+        let handler = KeyboardInputHandler(proxy: proxy, session: KeyboardSession(), dispatcher: dispatcher)
+        handler.focusIn()
+
+        handler.backspaceHoldFired()
+
+        XCTAssertNil(dispatcher.capturedSession,
+            "backspaceHoldFired must not dispatch to the session queue — only proxy.deleteBackward()")
+    }
+
+    func test_backspaceHoldFired_deletesOneCharFromProxy() {
+        let proxy = MockTextProxy()
+        let handler = KeyboardInputHandler(proxy: proxy, session: KeyboardSession(), dispatcher: SynchronousDispatcher())
+        handler.focusIn()
+        handler.sendChar("k")   // proxy = "k"
+
+        handler.backspaceHoldFired()
+
+        XCTAssertEqual(proxy.text, "",
+            "backspaceHoldFired must delete one char from proxy immediately")
+    }
+
+    func test_backspaceHoldEnded_afterHoldFires_dispatchesToSession() {
+        let dispatcher = CapturingDispatcher()
+        let proxy = MockTextProxy()
+        let handler = KeyboardInputHandler(proxy: proxy, session: KeyboardSession(), dispatcher: dispatcher)
+        handler.focusIn()
+        // sendChar puts "k" in both proxy and romanBuffer immediately (proxy insert is
+        // synchronous); the session dispatch is captured but not executed.
+        handler.sendChar("k")
+
+        handler.backspaceHoldFired()   // romanBuffer = "", pendingHoldBackspaces = 1
+        handler.backspaceHoldEnded()   // overwrites capturedSession with hold-end work
+
+        XCTAssertNotNil(dispatcher.capturedSession,
+            "backspaceHoldEnded must dispatch one session block after hold fires")
+    }
+
+    func test_backspaceHoldEnded_withNoHoldFires_doesNotDispatch() {
+        let dispatcher = CapturingDispatcher()
+        let proxy = MockTextProxy()
+        let handler = KeyboardInputHandler(proxy: proxy, session: KeyboardSession(), dispatcher: dispatcher)
+        handler.focusIn()
+
+        handler.backspaceHoldEnded()
+
+        XCTAssertNil(dispatcher.capturedSession,
+            "backspaceHoldEnded with no hold fires must not dispatch — nothing to sync")
+    }
+
+    func test_backspaceHoldFired_pastRomanBuffer_holdEnd_doesNotDispatch() {
+        let dispatcher = CapturingDispatcher()
+        let proxy = MockTextProxy()
+        let handler = KeyboardInputHandler(proxy: proxy, session: KeyboardSession(), dispatcher: dispatcher)
+        handler.focusIn()
+        // No typing → romanBuffer is empty; deletions are past the roman buffer
+
+        handler.backspaceHoldFired()
+        handler.backspaceHoldEnded()
+
+        XCTAssertNil(dispatcher.capturedSession,
+            "hold fires past the roman buffer must not count toward session sync")
+    }
+
+    func test_backspaceHoldFired_thenHoldEnded_rendersSessionState() {
+        let (handler, _) = makeHandler()
+        type("khn", into: handler)   // romanBuffer = "khn"
+
+        var renderCount = 0
+        handler.onRender = { _, _ in renderCount += 1 }
+
+        handler.backspaceHoldFired()   // romanBuffer = "kh", no render
+        handler.backspaceHoldFired()   // romanBuffer = "k",  no render
+        handler.backspaceHoldEnded()   // one batched session → one render
+
+        XCTAssertEqual(renderCount, 1,
+            "backspaceHoldEnded must produce exactly one render, not one per hold fire")
     }
 }

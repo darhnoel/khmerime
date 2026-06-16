@@ -182,12 +182,21 @@ class KeyboardViewController: UIInputViewController {
         rootView = hierarchy.rootView
 
         setupStripCallbacks()
+        wireBackspaceButtons()
         heightConstraint = KeyboardHostLayout.install(
             rootView: rootView,
             in: view,
             metrics: layoutMetrics,
             safeAreaBottom: view.safeAreaInsets.bottom
         )
+    }
+
+    private func wireBackspaceButtons() {
+        rootView.allDescendants(ofType: BackspaceButton.self).forEach { btn in
+            btn.onTap      = { [weak self] in self?.handler.backspaceTapped() }
+            btn.onHoldFire = { [weak self] in self?.handler.backspaceHoldFired() }
+            btn.onHoldEnd  = { [weak self] in self?.handler.backspaceHoldEnded() }
+        }
     }
 }
 
@@ -199,6 +208,15 @@ private extension UIView {
         for sv in subviews {
             if sv.tag == tag { result.append(sv) }
             result += sv.allDescendants(tag: tag)
+        }
+        return result
+    }
+
+    func allDescendants<T: UIView>(ofType _: T.Type) -> [T] {
+        var result: [T] = []
+        for sv in subviews {
+            if let typed = sv as? T { result.append(typed) }
+            result += sv.allDescendants(ofType: T.self)
         }
         return result
     }

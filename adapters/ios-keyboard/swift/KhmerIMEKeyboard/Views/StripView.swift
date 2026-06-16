@@ -4,6 +4,7 @@ final class StripView: UIView, KeyboardStripDisplaying {
 
     private let romanRow = UILabel()
     private let khmerRow = UIStackView()
+    private let segmentPool = StripLabelPool()
 
     var onKhmerRowTapped: (() -> Void)?
     var onKhmerRowLongPressed: (() -> Void)?
@@ -25,7 +26,7 @@ final class StripView: UIView, KeyboardStripDisplaying {
 
     func clear() {
         romanRow.text = ""
-        khmerRow.arrangedSubviews.forEach { $0.removeFromSuperview() }
+        segmentPool.sync(count: 0, in: khmerRow)
     }
 
     // MARK: - Setup
@@ -73,52 +74,48 @@ final class StripView: UIView, KeyboardStripDisplaying {
     // MARK: - Khmer row chips
 
     private func rebuildKhmerRow(state: IosRenderState) {
-        khmerRow.arrangedSubviews.forEach { $0.removeFromSuperview() }
         let texts = StripPresentationSpec.segmentKhmerTexts(state: state)
         let focusedIdx = StripPresentationSpec.focusedSegmentIndex(state: state)
 
         if texts.isEmpty {
             let candidate = state.candidates.isEmpty ? "" :
                 state.candidates[state.selectedIndex.map { Int($0) } ?? 0]
-            if !candidate.isEmpty {
-                khmerRow.addArrangedSubview(makeCandidateLabel(candidate))
+            guard !candidate.isEmpty else {
+                segmentPool.sync(count: 0, in: khmerRow)
+                return
             }
+            let visible = segmentPool.sync(count: 1, in: khmerRow)
+            let lbl = visible[0]
+            lbl.gestureRecognizers?.forEach { lbl.removeGestureRecognizer($0) }
+            lbl.attributedText = nil
+            lbl.text = candidate
+            lbl.font = .systemFont(ofSize: 18, weight: .medium)
+            lbl.textColor = .label
         } else {
-            for (idx, text) in texts.enumerated() {
-                khmerRow.addArrangedSubview(makeSegmentLabel(text, index: idx, focused: idx == focusedIdx))
+            let visible = segmentPool.sync(count: texts.count, in: khmerRow)
+            for (idx, lbl) in visible.enumerated() {
+                let text = texts[idx]
+                let focused = idx == focusedIdx
+                lbl.gestureRecognizers?.forEach { lbl.removeGestureRecognizer($0) }
+                lbl.addGestureRecognizer(
+                    SegmentTapGestureRecognizer(index: idx) { [weak self] i in
+                        self?.onSegmentFocused?(i)
+                    }
+                )
+                if focused {
+                    lbl.attributedText = NSAttributedString(string: text, attributes: [
+                        .font: UIFont.systemFont(ofSize: 18, weight: .bold),
+                        .foregroundColor: UIColor.label,
+                        .underlineStyle: NSUnderlineStyle.single.rawValue,
+                    ])
+                } else {
+                    lbl.attributedText = nil
+                    lbl.text = text
+                    lbl.font = .systemFont(ofSize: 18)
+                    lbl.textColor = .secondaryLabel
+                }
             }
         }
-    }
-
-    private func makeSegmentLabel(_ text: String, index: Int, focused: Bool) -> UILabel {
-        let lbl = UILabel()
-        lbl.text = text
-        lbl.font = focused
-            ? .systemFont(ofSize: 18, weight: .bold)
-            : .systemFont(ofSize: 18)
-        lbl.textColor = focused ? .label : .secondaryLabel
-        if focused {
-            lbl.attributedText = NSAttributedString(string: text, attributes: [
-                .font: UIFont.systemFont(ofSize: 18, weight: .bold),
-                .foregroundColor: UIColor.label,
-                .underlineStyle: NSUnderlineStyle.single.rawValue,
-            ])
-        }
-        lbl.isUserInteractionEnabled = true
-        lbl.addGestureRecognizer(
-            SegmentTapGestureRecognizer(index: index) { [weak self] idx in
-                self?.onSegmentFocused?(idx)
-            }
-        )
-        return lbl
-    }
-
-    private func makeCandidateLabel(_ text: String) -> UILabel {
-        let lbl = UILabel()
-        lbl.text = text
-        lbl.font = .systemFont(ofSize: 18, weight: .medium)
-        lbl.textColor = .label
-        return lbl
     }
 
     // MARK: - Tap / long-press on khmer row (no segments)

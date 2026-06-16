@@ -11,6 +11,19 @@ import Foundation
 //                       NOT in romanBuffer; consumed by returnTapped() before "\n"
 //   • keyboardState   — current layer (qwerty / numeric / symbols / panel / charPick)
 //   • lastState       — most recent IosRenderState from the session
+//   • dispatcher      — controls where session calls execute (background queue in
+//                       production, inline in tests). See KeyboardDispatcher.swift.
+//
+// Dispatch contract
+// -----------------
+// For letter keys (sendChar): proxy.insertText is immediate on the calling thread.
+// The session call and render are deferred through the dispatcher. Letters never
+// produce commitText, so no proxy mutation happens in the deferred block.
+//
+// For commit-path operations (space / return / commitComposition): roman chars are
+// deleted immediately (count is known from romanBuffer). The Khmer commit text is
+// inserted inside the onMain block, after the session has resolved it. This
+// preserves correct ordering even when those operations are deferred.
 //
 // UI callbacks (set by KeyboardViewController in viewDidLoad):
 //   onTransition      — called when keyboardState changes; VC updates view visibility
@@ -35,6 +48,7 @@ final class KeyboardInputHandler {
 
     let proxy: TextProxy
     let session: KeyboardSession
+    private let dispatcher: KeyboardDispatcher
 
     // MARK: - State
 
@@ -43,6 +57,11 @@ final class KeyboardInputHandler {
     private var romanBuffer = ""
     private var trailingSpace = false
     private(set) var lastState: IosRenderState?
+
+    // Counts how many roman-buffer chars were deleted by backspaceHoldFired()
+    // without a matching session call. backspaceHoldEnded() drains this with
+    // one batched session block, then resets to 0.
+    private var pendingHoldBackspaces = 0
 
     // Set after deleteBackward×N + insertText(Khmer). iOS silently appends a
     // trailing space (autocorrect replacement detection) but documentContextBeforeInput
@@ -59,9 +78,10 @@ final class KeyboardInputHandler {
 
     // MARK: - Init
 
-    init(proxy: TextProxy, session: KeyboardSession) {
+    init(proxy: TextProxy, session: KeyboardSession, dispatcher: KeyboardDispatcher = QueuedDispatcher()) {
         self.proxy = proxy
         self.session = session
+        self.dispatcher = dispatcher
     }
 
     // MARK: - Lifecycle
@@ -94,10 +114,16 @@ final class KeyboardInputHandler {
         let before = proxy.documentContextBeforeInput ?? ""
         guard !before.hasSuffix(romanBuffer) else { return }
         romanBuffer = ""
-        _ = session.sendReturn()
-        onStripClear?()
-        if keyboardState == .panel || keyboardState == .charPick {
-            transition(to: .qwerty)
+        dispatcher.onSession { [weak self] in
+            guard let self else { return }
+            _ = self.session.sendReturn()
+            self.dispatcher.onMain { [weak self] in
+                guard let self else { return }
+                self.onStripClear?()
+                if self.keyboardState == .panel || self.keyboardState == .charPick {
+                    self.transition(to: .qwerty)
+                }
+            }
         }
     }
 
@@ -107,10 +133,16 @@ final class KeyboardInputHandler {
         if isEnglishMode {
             isEnglishMode = false
         } else {
-            _ = session.sendReturn()    // reset Rust session; roman text stays in proxy as-is
-            romanBuffer = ""
-            trailingSpace = false
-            onStripClear?()
+            dispatcher.onSession { [weak self] in
+                guard let self else { return }
+                _ = self.session.sendReturn()
+                self.dispatcher.onMain { [weak self] in
+                    guard let self else { return }
+                    self.romanBuffer = ""
+                    self.trailingSpace = false
+                    self.onStripClear?()
+                }
+            }
             isEnglishMode = true
         }
         onEnglishModeChanged?(isEnglishMode)
@@ -125,41 +157,58 @@ final class KeyboardInputHandler {
             return
         }
         trailingSpace = false
+        // Proxy insertion is immediate — the typed char appears in the text field
+        // before the session block executes (critical for responsiveness).
         proxy.insertText(ch)
         romanBuffer += ch
-        let state = session.sendCharacter(ch)
-        if let committed = state.commitText, !committed.isEmpty {
-            for _ in romanBuffer { proxy.deleteBackward() }
-            proxy.insertText(committed)
-            romanBuffer = ""
+        dispatcher.onSession { [weak self] in
+            guard let self else { return }
+            let state = self.session.sendCharacter(ch)
+            self.dispatcher.onMain { [weak self] in
+                guard let self else { return }
+                // Letters never produce commitText; this guard is a safety net
+                // for any symbol that might trigger a single-keycap auto-commit.
+                if let committed = state.commitText, !committed.isEmpty {
+                    for _ in self.romanBuffer { self.proxy.deleteBackward() }
+                    self.proxy.insertText(committed)
+                    self.romanBuffer = ""
+                }
+                self.render(state)
+            }
         }
-        render(state)
     }
 
     // MARK: - Key Actions
 
     func commitComposition() {
         guard keyboardState != .charPick else { return }
-        let state = session.sendReturn()
-        let khmerText = state.segments.isEmpty
-            ? (state.commitText ?? "")
-            : state.segments.map { $0.output }.joined()
+        // Delete the roman buffer immediately — we know the count now.
         let hadRomanBuffer = !romanBuffer.isEmpty
         for _ in romanBuffer { proxy.deleteBackward() }
-        if !khmerText.isEmpty {
-            proxy.insertText(khmerText)
-            if hadRomanBuffer {
-                // iOS treats deleteBackward×N + insertText as an autocorrect
-                // replacement and appends a trailing space. We can't remove it
-                // synchronously because documentContextBeforeInput is stale here.
-                // textDidChange() is called by UIKit once the insertion is settled
-                // and the context is fresh — the check runs there.
-                pendingAutoSpaceCheck = true
+        romanBuffer = ""
+        dispatcher.onSession { [weak self] in
+            guard let self else { return }
+            let state = self.session.sendReturn()
+            self.dispatcher.onMain { [weak self] in
+                guard let self else { return }
+                let khmerText = state.segments.isEmpty
+                    ? (state.commitText ?? "")
+                    : state.segments.map { $0.output }.joined()
+                if !khmerText.isEmpty {
+                    self.proxy.insertText(khmerText)
+                    if hadRomanBuffer {
+                        // iOS treats deleteBackward×N + insertText as an autocorrect
+                        // replacement and appends a trailing space. We can't remove it
+                        // synchronously because documentContextBeforeInput is stale here.
+                        // textDidChange() is called by UIKit once the insertion is settled
+                        // and the context is fresh — the check runs there.
+                        self.pendingAutoSpaceCheck = true
+                    }
+                }
+                self.onStripClear?()
+                if self.keyboardState == .panel { self.transition(to: .qwerty) }
             }
         }
-        romanBuffer = ""
-        onStripClear?()
-        if keyboardState == .panel { transition(to: .qwerty) }
     }
 
     func spaceTapped() {
@@ -167,9 +216,29 @@ final class KeyboardInputHandler {
             proxy.insertText(" ")
             return
         }
-        commitComposition()
-        proxy.insertText(" ")
-        trailingSpace = true
+        // Delete roman immediately, then let session resolve the Khmer commit.
+        // Space is appended inside onMain so it always follows the committed Khmer.
+        let hadRomanBuffer = !romanBuffer.isEmpty
+        for _ in romanBuffer { proxy.deleteBackward() }
+        romanBuffer = ""
+        dispatcher.onSession { [weak self] in
+            guard let self else { return }
+            let state = self.session.sendReturn()
+            self.dispatcher.onMain { [weak self] in
+                guard let self else { return }
+                let khmerText = state.segments.isEmpty
+                    ? (state.commitText ?? "")
+                    : state.segments.map { $0.output }.joined()
+                if !khmerText.isEmpty {
+                    self.proxy.insertText(khmerText)
+                    if hadRomanBuffer { self.pendingAutoSpaceCheck = true }
+                }
+                self.proxy.insertText(" ")
+                self.trailingSpace = true
+                self.onStripClear?()
+                if self.keyboardState == .panel { self.transition(to: .qwerty) }
+            }
+        }
     }
 
     func returnTapped() {
@@ -180,11 +249,17 @@ final class KeyboardInputHandler {
         if keyboardState == .charPick {
             if let current = lastState, !current.candidates.isEmpty {
                 proxy.insertText(current.candidates[0])
-                _ = session.enterCharPick()
-                lastState = nil
-                onStripClear?()
-                onCharPickAlphabet?()
-                transition(to: .charPick)
+                dispatcher.onSession { [weak self] in
+                    guard let self else { return }
+                    _ = self.session.enterCharPick()
+                    self.dispatcher.onMain { [weak self] in
+                        guard let self else { return }
+                        self.lastState = nil
+                        self.onStripClear?()
+                        self.onCharPickAlphabet?()
+                        self.transition(to: .charPick)
+                    }
+                }
             }
             return
         }
@@ -202,6 +277,35 @@ final class KeyboardInputHandler {
         proxy.insertText("\n")
     }
 
+    func backspaceHoldFired() {
+        if isEnglishMode { proxy.deleteBackward(); return }
+        trailingSpace = false
+        if keyboardState == .charPick { proxy.deleteBackward(); return }
+        if !romanBuffer.isEmpty {
+            romanBuffer.removeLast()
+            pendingHoldBackspaces += 1
+        }
+        proxy.deleteBackward()
+        // No session dispatch — backspaceHoldEnded() batches them all at once.
+    }
+
+    func backspaceHoldEnded() {
+        let count = pendingHoldBackspaces
+        pendingHoldBackspaces = 0
+        guard count > 0 else { return }
+        dispatcher.onSession { [weak self] in
+            guard let self else { return }
+            var state: IosRenderState?
+            for _ in 0..<count { state = self.session.sendBackspace() }
+            guard let finalState = state else { return }
+            self.dispatcher.onMain { [weak self] in
+                guard let self else { return }
+                self.render(finalState)
+                if self.romanBuffer.isEmpty { self.onStripClear?() }
+            }
+        }
+    }
+
     func backspaceTapped() {
         if isEnglishMode {
             proxy.deleteBackward()
@@ -210,11 +314,17 @@ final class KeyboardInputHandler {
         trailingSpace = false
         if keyboardState == .charPick {
             if let current = lastState, !current.candidates.isEmpty {
-                _ = session.enterCharPick()
-                lastState = nil
-                onStripClear?()
-                onCharPickAlphabet?()
-                transition(to: .charPick)
+                dispatcher.onSession { [weak self] in
+                    guard let self else { return }
+                    _ = self.session.enterCharPick()
+                    self.dispatcher.onMain { [weak self] in
+                        guard let self else { return }
+                        self.lastState = nil
+                        self.onStripClear?()
+                        self.onCharPickAlphabet?()
+                        self.transition(to: .charPick)
+                    }
+                }
             } else {
                 proxy.deleteBackward()
             }
@@ -222,9 +332,15 @@ final class KeyboardInputHandler {
         }
         if !romanBuffer.isEmpty { romanBuffer.removeLast() }
         proxy.deleteBackward()
-        let state = session.sendBackspace()
-        render(state)
-        if romanBuffer.isEmpty { onStripClear?() }
+        dispatcher.onSession { [weak self] in
+            guard let self else { return }
+            let state = self.session.sendBackspace()
+            self.dispatcher.onMain { [weak self] in
+                guard let self else { return }
+                self.render(state)
+                if self.romanBuffer.isEmpty { self.onStripClear?() }
+            }
+        }
     }
 
     // MARK: - Panel / Layer Switches
@@ -239,9 +355,15 @@ final class KeyboardInputHandler {
             transition(to: .qwerty)
 
         case .charPick:
-            _ = session.exitCharPick()
-            onStripClear?()
-            transition(to: .qwerty)
+            dispatcher.onSession { [weak self] in
+                guard let self else { return }
+                _ = self.session.exitCharPick()
+                self.dispatcher.onMain { [weak self] in
+                    guard let self else { return }
+                    self.onStripClear?()
+                    self.transition(to: .qwerty)
+                }
+            }
 
         default:
             let hasComposition = lastState.map { !$0.candidates.isEmpty } ?? false
@@ -249,11 +371,17 @@ final class KeyboardInputHandler {
                 transition(to: .panel)
                 if let state = lastState { onRender?(state, romanBuffer) }
             } else {
-                _ = session.enterCharPick()
-                lastState = nil
-                onStripClear?()
-                onCharPickAlphabet?()
-                transition(to: .charPick)
+                dispatcher.onSession { [weak self] in
+                    guard let self else { return }
+                    _ = self.session.enterCharPick()
+                    self.dispatcher.onMain { [weak self] in
+                        guard let self else { return }
+                        self.lastState = nil
+                        self.onStripClear?()
+                        self.onCharPickAlphabet?()
+                        self.transition(to: .charPick)
+                    }
+                }
             }
         }
     }
@@ -268,37 +396,58 @@ final class KeyboardInputHandler {
         guard let current = lastState else { return }
         let focused = current.focusedSegmentIndex.map { Int($0) } ?? 0
         let diff = index - focused
-        var state = current
-        if diff > 0      { for _ in 0..<diff    { state = session.sendRight() } }
-        else if diff < 0 { for _ in 0..<(-diff) { state = session.sendLeft()  } }
-        render(state)
+        dispatcher.onSession { [weak self] in
+            guard let self else { return }
+            var state = current
+            if diff > 0      { for _ in 0..<diff    { state = self.session.sendRight() } }
+            else if diff < 0 { for _ in 0..<(-diff) { state = self.session.sendLeft()  } }
+            self.dispatcher.onMain { [weak self] in self?.render(state) }
+        }
     }
 
     func requestEdit(at index: Int) {
         guard let current = lastState else { return }
         let focused = current.focusedSegmentIndex.map { Int($0) } ?? 0
         let diff = index - focused
-        if diff > 0      { for _ in 0..<diff    { _ = session.sendRight() } }
-        else if diff < 0 { for _ in 0..<(-diff) { _ = session.sendLeft()  } }
-        let state = session.sendTab()
-        render(state)
-        transition(to: .qwerty)
+        dispatcher.onSession { [weak self] in
+            guard let self else { return }
+            if diff > 0      { for _ in 0..<diff    { _ = self.session.sendRight() } }
+            else if diff < 0 { for _ in 0..<(-diff) { _ = self.session.sendLeft()  } }
+            let state = self.session.sendTab()
+            self.dispatcher.onMain { [weak self] in
+                guard let self else { return }
+                self.render(state)
+                self.transition(to: .qwerty)
+            }
+        }
     }
 
     func enterCharPickFromPanel() {
         for _ in romanBuffer { proxy.deleteBackward() }
         romanBuffer = ""
-        _ = session.enterCharPick()
-        lastState = nil
-        onStripClear?()
-        onCharPickAlphabet?()
-        transition(to: .charPick)
+        dispatcher.onSession { [weak self] in
+            guard let self else { return }
+            _ = self.session.enterCharPick()
+            self.dispatcher.onMain { [weak self] in
+                guard let self else { return }
+                self.lastState = nil
+                self.onStripClear?()
+                self.onCharPickAlphabet?()
+                self.transition(to: .charPick)
+            }
+        }
     }
 
     func charPickLetterTapped(_ letter: Character) {
-        let state = session.sendCharacter(String(letter))
-        lastState = state
-        onRender?(state, String(letter))
+        dispatcher.onSession { [weak self] in
+            guard let self else { return }
+            let state = self.session.sendCharacter(String(letter))
+            self.dispatcher.onMain { [weak self] in
+                guard let self else { return }
+                self.lastState = state
+                self.onRender?(state, String(letter))
+            }
+        }
     }
 
     func selectCandidate(at index: Int) {
@@ -306,20 +455,32 @@ final class KeyboardInputHandler {
             if let candidate = lastState?.candidates[safe: index] {
                 proxy.insertText(candidate)
             }
-            _ = session.enterCharPick()
-            lastState = nil
-            onStripClear?()
-            onCharPickAlphabet?()
+            dispatcher.onSession { [weak self] in
+                guard let self else { return }
+                _ = self.session.enterCharPick()
+                self.dispatcher.onMain { [weak self] in
+                    guard let self else { return }
+                    self.lastState = nil
+                    self.onStripClear?()
+                    self.onCharPickAlphabet?()
+                }
+            }
             return
         }
-        let state = session.selectCandidate(at: index)
-        render(state)
+        dispatcher.onSession { [weak self] in
+            guard let self else { return }
+            let state = self.session.selectCandidate(at: index)
+            self.dispatcher.onMain { [weak self] in self?.render(state) }
+        }
     }
 
     func dismissPanel() {
         if keyboardState == .charPick {
-            _ = session.exitCharPick()
-            onStripClear?()
+            dispatcher.onSession { [weak self] in
+                guard let self else { return }
+                _ = self.session.exitCharPick()
+                self.dispatcher.onMain { [weak self] in self?.onStripClear?() }
+            }
         }
         transition(to: .qwerty)
     }
