@@ -12,9 +12,11 @@ import com.khmerime.layout.KeyboardLayerSpec
 import com.khmerime.layout.KeyboardPresentationSpec
 import com.khmerime.layout.KeyViewFactory
 import com.khmerime.layout.KeyViewStyle
+import com.khmerime.views.BackspaceKeyView
 import com.khmerime.views.GlassKeyViewFactory
 import com.khmerime.views.PreeditStripView
 import com.khmerime.views.SuggestionChipView
+import com.khmerime.views.ViewPool
 import com.khmerime.R
 import android.graphics.Color
 import android.graphics.drawable.ColorDrawable
@@ -51,6 +53,25 @@ class KhmerInputMethodService : InputMethodService() {
     private var preeditStrip: PreeditStripView? = null
     private var systemBottomSpacer: View? = null
     private var currentLayer = KeyboardLayer.Qwerty
+
+    private val candidateChipPool = ViewPool<SuggestionChipView>(
+        createChild = {
+            SuggestionChipView(this).apply {
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.WRAP_CONTENT,
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                ).apply {
+                    marginStart = 4.dp()
+                    marginEnd = 4.dp()
+                    topMargin = 4.dp()
+                    bottomMargin = 4.dp()
+                    width = 80.dp()
+                }
+            }
+        },
+        addChild = { candidateStrip?.addView(it) },
+        setVisible = { view, visible -> view.visibility = if (visible) View.VISIBLE else View.GONE },
+    )
 
     // ── IME lifecycle ──────────────────────────────────────────────────────────
 
@@ -146,6 +167,10 @@ class KhmerInputMethodService : InputMethodService() {
             }
             keys.forEach { key ->
                 val view = factory.makeKeyView(this, key) { handleKey(key) }
+                if (view is BackspaceKeyView) {
+                    view.onHoldFire = { handler?.backspaceHoldFired() }
+                    view.onHoldEnd = { handler?.backspaceHoldEnded() }
+                }
                 view.layoutParams = LinearLayout.LayoutParams(
                     0,
                     LinearLayout.LayoutParams.MATCH_PARENT,
@@ -183,7 +208,7 @@ class KhmerInputMethodService : InputMethodService() {
 
     private fun resetSuggestCharacterSuggestions() {
         preeditStrip?.clear()
-        candidateStrip?.removeAllViews()
+        candidateChipPool.sync(0)
     }
 
     // ── Render ─────────────────────────────────────────────────────────────────
@@ -193,28 +218,16 @@ class KhmerInputMethodService : InputMethodService() {
         val romanHint = KeyboardPresentationSpec.preeditText(keyboardState, state)
         preeditStrip?.render(state, romanHint)
 
-        val strip = candidateStrip ?: return
-        strip.removeAllViews()
+        if (candidateStrip == null) return
         val selectedIndex = KeyboardPresentationSpec.selectedCandidateIndex(state)
-        KeyboardPresentationSpec.suggestionCandidates(state).forEachIndexed { index, candidate ->
-            val chip = SuggestionChipView(
-                context = this,
+        val candidates = KeyboardPresentationSpec.suggestionCandidates(state)
+        val chips = candidateChipPool.sync(candidates.size)
+        candidates.forEachIndexed { index, candidate ->
+            chips[index].update(
                 text = candidate,
                 isSelected = index == selectedIndex,
                 onClick = { handler?.selectCandidate(index) },
-            ).apply {
-                layoutParams = LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.WRAP_CONTENT,
-                    LinearLayout.LayoutParams.MATCH_PARENT,
-                ).apply {
-                    marginStart = 4.dp()
-                    marginEnd = 4.dp()
-                    topMargin = 4.dp()
-                    bottomMargin = 4.dp()
-                    width = 80.dp()
-                }
-            }
-            strip.addView(chip)
+            )
         }
     }
 }

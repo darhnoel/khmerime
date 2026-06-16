@@ -14,11 +14,17 @@ package com.khmerime.input
 class KhmerInputHandler(
     private val proxy: TextProxy,
     private val session: KhmerImeSession,
+    private val dispatcher: KhmerDispatcher = QueuedDispatcher(),
 ) {
 
     private var romanBuffer = ""
     private var trailingSpace = false
     private var lastState: KhmerRenderState? = null
+
+    // Counts how many roman-buffer chars were deleted by backspaceHoldFired()
+    // without a matching session call. backspaceHoldEnded() drains this with
+    // one batched session block, then resets to 0.
+    private var pendingHoldBackspaces = 0
 
     var keyboardState: KeyboardState = KeyboardState.Qwerty
         private set
@@ -45,21 +51,28 @@ class KhmerInputHandler(
             return
         }
         if (keyboardState == KeyboardState.SuggestCharacter) {
-            render(session.processCharacter(ch))
+            dispatcher.onSession {
+                val state = session.processCharacter(ch)
+                dispatcher.onMain { render(state) }
+            }
             return
         }
         if (keyboardState == KeyboardState.Panel) transitionTo(KeyboardState.Qwerty)
         trailingSpace = false
         proxy.insertText(ch)
         romanBuffer += ch
-        val state = session.processCharacter(ch)
-        val committed = state.commitText
-        if (committed != null && committed.isNotEmpty()) {
-            repeat(romanBuffer.length) { proxy.deleteBackward() }
-            proxy.insertText(committed)
-            romanBuffer = ""
+        dispatcher.onSession {
+            val state = session.processCharacter(ch)
+            dispatcher.onMain {
+                val committed = state.commitText
+                if (committed != null && committed.isNotEmpty()) {
+                    repeat(romanBuffer.length) { proxy.deleteBackward() }
+                    proxy.insertText(committed)
+                    romanBuffer = ""
+                }
+                render(state)
+            }
         }
-        render(state)
     }
 
     fun sendBackspace() {
@@ -71,10 +84,14 @@ class KhmerInputHandler(
         if (keyboardState == KeyboardState.SuggestCharacter) {
             val current = lastState
             if (current != null && current.candidates.isNotEmpty()) {
-                session.enterCharPick()
-                lastState = null
-                onSuggestCharacterReset?.invoke()
-                transitionTo(KeyboardState.SuggestCharacter)
+                dispatcher.onSession {
+                    session.enterCharPick()
+                    dispatcher.onMain {
+                        lastState = null
+                        onSuggestCharacterReset?.invoke()
+                        transitionTo(KeyboardState.SuggestCharacter)
+                    }
+                }
             } else {
                 proxy.deleteBackward()
             }
@@ -82,7 +99,40 @@ class KhmerInputHandler(
         }
         if (romanBuffer.isNotEmpty()) romanBuffer = romanBuffer.dropLast(1)
         proxy.deleteBackward()
-        render(session.processBackspace())
+        dispatcher.onSession {
+            val state = session.processBackspace()
+            dispatcher.onMain { render(state) }
+        }
+    }
+
+    fun backspaceHoldFired() {
+        if (keyboardState == KeyboardState.English) {
+            proxy.deleteBackward()
+            return
+        }
+        trailingSpace = false
+        if (keyboardState == KeyboardState.SuggestCharacter) {
+            proxy.deleteBackward()
+            return
+        }
+        if (romanBuffer.isNotEmpty()) {
+            romanBuffer = romanBuffer.dropLast(1)
+            pendingHoldBackspaces++
+        }
+        proxy.deleteBackward()
+        // No session dispatch — backspaceHoldEnded() batches them all at once.
+    }
+
+    fun backspaceHoldEnded() {
+        val count = pendingHoldBackspaces
+        pendingHoldBackspaces = 0
+        if (count <= 0) return
+        dispatcher.onSession {
+            var state: KhmerRenderState? = null
+            repeat(count) { state = session.processBackspace() }
+            val finalState = state ?: return@onSession
+            dispatcher.onMain { render(finalState) }
+        }
     }
 
     fun sendSpace() {

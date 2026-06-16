@@ -8,12 +8,20 @@ import android.util.TypedValue
 import android.view.MotionEvent
 import android.view.View
 
-class SuggestionChipView(
-    context: Context,
-    private val text: String,
-    private val isSelected: Boolean,
-    private val onClick: () -> Unit,
-) : View(context) {
+class SuggestionChipView(context: Context) : View(context) {
+
+    private var text: String = ""
+    private var isSelected: Boolean = false
+    private var onClick: () -> Unit = {}
+
+    // Re-styles a pooled chip for its new candidate/selection state instead
+    // of allocating a new view.
+    fun update(text: String, isSelected: Boolean, onClick: () -> Unit) {
+        this.text = text
+        this.isSelected = isSelected
+        this.onClick = onClick
+        invalidate()
+    }
 
     private val isDark: Boolean
         get() = (resources.configuration.uiMode and
