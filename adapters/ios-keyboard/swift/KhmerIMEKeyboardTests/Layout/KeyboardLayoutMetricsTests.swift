@@ -64,4 +64,18 @@ final class KeyboardLayoutMetricsTests: XCTestCase {
             XCTAssertEqual(metrics.panelBottomRowHeight, standardRowHeight, accuracy: 0.01)
         }
     }
+
+    func test_keyRowHeightStaysAboveTouchTargetFloorAfterCandidateRowInsertion() {
+        for metrics in [KeyboardLayoutMetrics(device: .phone), KeyboardLayoutMetrics(device: .pad)] {
+            let effectiveKeyAreaHeight = metrics.baseKeyboardHeight - metrics.stripHeight - metrics.candidateRowHeight
+            let standardRowHeight = (
+                effectiveKeyAreaHeight
+                - metrics.keyTopInset
+                - metrics.keyBottomInset
+                - (metrics.rowSpacing * 3)
+            ) / 4
+
+            XCTAssertGreaterThanOrEqual(standardRowHeight, 44)
+        }
+    }
 }
