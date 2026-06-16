@@ -3,6 +3,11 @@ import XCTest
 
 final class KeyboardLayoutMetricsTests: XCTestCase {
 
+    func test_candidateRowHeightIsReservedForPhoneAndPad() {
+        XCTAssertEqual(KeyboardLayoutMetrics(device: .phone).candidateRowHeight, 44)
+        XCTAssertEqual(KeyboardLayoutMetrics(device: .pad).candidateRowHeight, 44)
+    }
+
     func test_metricsPreserveCurrentPhoneAndPadSizingPolicy() {
         let phone = KeyboardLayoutMetrics(device: .phone)
         let pad = KeyboardLayoutMetrics(device: .pad)

@@ -8,6 +8,7 @@ struct KeyboardLayoutMetrics {
 
     let baseKeyboardHeight: CGFloat
     let stripHeight: CGFloat
+    let candidateRowHeight: CGFloat
     let specialKeyWidth: CGFloat
     let returnKeyWidth: CGFloat
     let wideSpecialKeyWidth: CGFloat
@@ -34,6 +35,7 @@ struct KeyboardLayoutMetrics {
             wideSpecialKeyWidth = 72
         }
         stripHeight = 44
+        candidateRowHeight = 44
         rowSpacing = 8
         keyHorizontalInset = 3
         keyTopInset = 8
