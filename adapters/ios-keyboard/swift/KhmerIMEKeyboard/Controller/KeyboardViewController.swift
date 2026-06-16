@@ -159,6 +159,7 @@ class KeyboardViewController: UIInputViewController {
     private func setupStripCallbacks() {
         stripView.onKhmerRowTapped      = { [weak self] in self?.handler.commitComposition() }
         stripView.onKhmerRowLongPressed = { [weak self] in self?.handler.togglePanel() }
+        stripView.onSegmentFocused      = { [weak self] index in self?.handler.chipTapped(at: index) }
     }
 
     // MARK: - Layout

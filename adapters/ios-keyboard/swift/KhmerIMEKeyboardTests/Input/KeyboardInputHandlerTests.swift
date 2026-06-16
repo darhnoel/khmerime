@@ -247,6 +247,29 @@ final class KeyboardInputHandlerTests: XCTestCase {
             "onTransition must fire once per state change in order")
     }
 
+    // MARK: - Tap a strip chip to edit it
+
+    func test_chipTapped_whenPanelClosed_opensPanel() {
+        let (handler, _) = makeHandler()
+        type("nhom", into: handler)
+
+        handler.chipTapped(at: 0)
+
+        XCTAssertEqual(handler.keyboardState, .panel,
+            "tapping a strip chip must open the panel so its candidates become visible")
+    }
+
+    func test_chipTapped_whenPanelAlreadyOpen_staysInPanel() {
+        let (handler, _) = makeHandler()
+        type("nhom", into: handler)
+        handler.togglePanel()   // → .panel
+
+        handler.chipTapped(at: 0)
+
+        XCTAssertEqual(handler.keyboardState, .panel,
+            "tapping a chip while the panel is already open must not toggle it closed")
+    }
+
     // MARK: - Layer switching
 
     func test_switchLayer_toNumeric() {

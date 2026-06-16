@@ -403,6 +403,9 @@ final class KeyboardInputHandler {
 
     // MARK: - Candidate Panel Actions
 
+    // Entry point for both the strip's chip tap and the panel's own chip row.
+    // The strip needs the panel opened first; the panel's chip row is already
+    // open, so this is a no-op there.
     func chipTapped(at index: Int) {
         guard let current = lastState else { return }
         let focused = current.focusedSegmentIndex.map { Int($0) } ?? 0
@@ -412,7 +415,11 @@ final class KeyboardInputHandler {
             var state = current
             if diff > 0      { for _ in 0..<diff    { state = self.session.sendRight() } }
             else if diff < 0 { for _ in 0..<(-diff) { state = self.session.sendLeft()  } }
-            self.dispatcher.onMain { [weak self] in self?.render(state) }
+            self.dispatcher.onMain { [weak self] in
+                guard let self else { return }
+                if self.keyboardState != .panel { self.transition(to: .panel) }
+                self.render(state)
+            }
         }
     }
 
