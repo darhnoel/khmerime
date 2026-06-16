@@ -229,25 +229,28 @@ final class KeyboardInputHandlerTests: XCTestCase {
             "roman chars must be replaced by the committed Khmer text")
     }
 
-    func test_chipTapped_whenComposingPhrase_opensPanel() {
+    func test_chipTapped_onDifferentSegment_navigatesFocusWithoutChangingState() {
         let (handler, _) = makeHandler()
-        type("khnhomtov", into: handler)   // multi-word phrase → segments.count >= 2
+        type("khnhomtov", into: handler)   // multi-word phrase, focus starts at segment 0
 
-        handler.chipTapped(at: 0)
+        handler.chipTapped(at: 1)
 
-        XCTAssertEqual(handler.keyboardState, .panel,
-            "tapping a chip in a real phrase must open the panel so its candidates become visible")
+        XCTAssertEqual(handler.keyboardState, .qwerty,
+            "tapping a different segment must navigate focus only — no panel, no state change")
+        XCTAssertEqual(handler.lastState?.focusedSegmentIndex.map { Int($0) }, 1,
+            "tapping segment 1 must move focus there")
     }
 
-    func test_chipTapped_whenPanelAlreadyOpen_staysInPanel() {
+    func test_chipTapped_onAlreadyFocusedSegment_entersInlineEditMode() {
         let (handler, _) = makeHandler()
-        type("khnhomtov", into: handler)   // multi-word phrase → segments.count >= 2
-        handler.chipTapped(at: 0)   // → .panel
+        type("khnhomtov", into: handler)   // multi-word phrase, focus starts at segment 0
 
-        handler.chipTapped(at: 0)
+        handler.chipTapped(at: 0)   // re-tap the already-focused segment
 
-        XCTAssertEqual(handler.keyboardState, .panel,
-            "tapping a chip while the panel is already open must not toggle it closed")
+        XCTAssertEqual(handler.keyboardState, .qwerty,
+            "2-tap-to-edit must stay in qwerty — edit mode renders inline, not via a panel")
+        XCTAssertEqual(handler.lastState?.segmentEditActive, true,
+            "re-tapping the focused segment must enter Segment Edit Mode")
     }
 
     // MARK: - Layer switching

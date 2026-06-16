@@ -392,30 +392,36 @@ final class KeyboardInputHandler {
 
     // MARK: - Candidate Panel Actions
 
-    // Entry point for both the strip's chip tap and the panel's own chip row.
-    // The strip needs the panel opened first; the panel's chip row is already
-    // open, so this is a no-op there.
+    // Tapping a segment chip in the strip. A different segment than the one
+    // currently focused just moves focus there (so its candidates surface in
+    // the persistent candidate row). Re-tapping the already-focused segment
+    // is the 2-tap-to-edit gesture: it enters Segment Edit Mode inline via
+    // sendTab() — no panel involved either way.
     func chipTapped(at index: Int) {
         guard let current = lastState else { return }
         // A single word has no segments at all (the Rust segmenter only ever
         // populates segments for a real multi-word phrase) — tapping it commits
-        // directly instead of opening the panel, since there's nothing to edit.
+        // directly, since there's nothing to navigate or edit.
         guard !current.segments.isEmpty else {
             commitComposition()
             return
         }
         let focused = current.focusedSegmentIndex.map { Int($0) } ?? 0
+        if index == focused {
+            dispatcher.onSession { [weak self] in
+                guard let self else { return }
+                let state = self.session.sendTab()
+                self.dispatcher.onMain { [weak self] in self?.render(state) }
+            }
+            return
+        }
         let diff = index - focused
         dispatcher.onSession { [weak self] in
             guard let self else { return }
             var state = current
             if diff > 0      { for _ in 0..<diff    { state = self.session.sendRight() } }
             else if diff < 0 { for _ in 0..<(-diff) { state = self.session.sendLeft()  } }
-            self.dispatcher.onMain { [weak self] in
-                guard let self else { return }
-                if self.keyboardState != .panel { self.transition(to: .panel) }
-                self.render(state)
-            }
+            self.dispatcher.onMain { [weak self] in self?.render(state) }
         }
     }
 
