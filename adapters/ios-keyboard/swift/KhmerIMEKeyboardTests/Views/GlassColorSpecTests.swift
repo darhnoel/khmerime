@@ -110,6 +110,35 @@ final class GlassColorSpecTests: XCTestCase {
                        "active ✦ text must be dark")
     }
 
+    // MARK: - pressedBackground
+
+    func test_pressedBackgroundDiffersFromRegularInLightMode() {
+        let regular = GlassColorSpec.backgroundColor(isDark: false)
+        let pressed = GlassColorSpec.pressedBackground(isDark: false)
+        XCTAssertNotEqual(luminance(pressed), luminance(regular),
+            "pressed key must look visually distinct from its resting state")
+    }
+
+    func test_pressedBackgroundDiffersFromRegularInDarkMode() {
+        let regular = GlassColorSpec.backgroundColor(isDark: true)
+        let pressed = GlassColorSpec.pressedBackground(isDark: true)
+        XCTAssertNotEqual(luminance(pressed), luminance(regular),
+            "pressed key must look visually distinct from its resting state in dark mode")
+    }
+
+    func test_pressedBackgroundDiffersFromToggleActiveBackground() {
+        let active  = GlassColorSpec.toggleActiveBackground(isDark: false)
+        let pressed = GlassColorSpec.pressedBackground(isDark: false)
+        XCTAssertNotEqual(luminance(pressed), luminance(active),
+            "press feedback must be visually distinguishable from the active-toggle fill")
+    }
+
+    func test_pressedBackgroundIsNearOpaque() {
+        let c = GlassColorSpec.pressedBackground(isDark: false)
+        XCTAssertGreaterThanOrEqual(alpha(c), 200.0/255.0,
+            "press feedback must be clearly visible, not barely-there")
+    }
+
     // MARK: - candidateBorderWidth
 
     func test_candidateBorderWidthExceedsOnePoint() {

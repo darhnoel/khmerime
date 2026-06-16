@@ -71,6 +71,7 @@ targets:
     sources:
       - path: KhmerIMEKeyboardTests
       # Share the handler + session source directly (no linking the extension bundle).
+      - path: KhmerIMEKeyboard/Input/KeyboardDispatcher.swift
       - path: KhmerIMEKeyboard/Input/KeyboardInputHandler.swift
       - path: KhmerIMEKeyboard/Input/KeyboardSession.swift
       - path: KhmerIMEKeyboard/Input/KeyboardState.swift
@@ -86,6 +87,8 @@ targets:
       - path: KhmerIMEKeyboard/Views/GlassKeyView.swift
       - path: KhmerIMEKeyboard/Views/KeyboardRootView.swift
       - path: KhmerIMEKeyboard/Views/KeyStyle.swift
+      - path: KhmerIMEKeyboard/Views/BackspaceButton.swift
+      - path: KhmerIMEKeyboard/Views/StripLabelPool.swift
       - path: KhmerIMEKeyboard/Views/StripPresentationSpec.swift
       - path: KhmerIMEKeyboard/Views/StripView.swift
       - path: KhmerIMEKeyboard/Generated/khmerime_ios_keyboard.swift

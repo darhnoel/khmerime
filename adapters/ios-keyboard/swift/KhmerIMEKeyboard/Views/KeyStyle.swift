@@ -1,10 +1,11 @@
 import UIKit
 
-final class GlassKeyButton: UIButton {
+class GlassKeyButton: UIButton {
     var isGlassActive = false {
         didSet { updateGlassAppearance() }
     }
 
+    private var isPressed = false
     private var pressAnimator: GlassKeyPressAnimator?
 
     private lazy var blurView: UIVisualEffectView = {
@@ -22,16 +23,22 @@ final class GlassKeyButton: UIButton {
     override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
         super.touchesBegan(touches, with: event)
         ensurePressAnimator().press()
+        isPressed = true
+        updateGlassAppearance()
     }
 
     override func touchesEnded(_ touches: Set<UITouch>, with event: UIEvent?) {
         super.touchesEnded(touches, with: event)
         ensurePressAnimator().release()
+        isPressed = false
+        updateGlassAppearance()
     }
 
     override func touchesCancelled(_ touches: Set<UITouch>, with event: UIEvent?) {
         super.touchesCancelled(touches, with: event)
         ensurePressAnimator().release()
+        isPressed = false
+        updateGlassAppearance()
     }
 
     override func layoutSubviews() {
@@ -65,7 +72,7 @@ final class GlassKeyButton: UIButton {
     }
 
     private func updateGlassAppearance() {
-        KeyStyle.updateGlassAppearance(self, isActive: isGlassActive)
+        KeyStyle.updateGlassAppearance(self, isActive: isGlassActive, isPressed: isPressed)
     }
 }
 
@@ -98,13 +105,16 @@ enum KeyStyle {
         btn.layer.masksToBounds = false
     }
 
-    fileprivate static func updateGlassAppearance(_ btn: UIButton, isActive: Bool) {
+    fileprivate static func updateGlassAppearance(_ btn: UIButton, isActive: Bool, isPressed: Bool = false) {
         let isDark = btn.traitCollection.userInterfaceStyle == .dark
+        // Pressed always wins while held, regardless of active/toggle state.
         // Active state uses flat opaque fill so EN/✦ buttons stand out clearly.
         // Inactive state is transparent — the blurView behind provides glass depth.
-        btn.backgroundColor = isActive
-            ? GlassColorSpec.toggleActiveBackground(isDark: isDark)
-            : .clear
+        btn.backgroundColor = isPressed
+            ? GlassColorSpec.pressedBackground(isDark: isDark)
+            : isActive
+                ? GlassColorSpec.toggleActiveBackground(isDark: isDark)
+                : .clear
         btn.setTitleColor(isActive ? GlassColorSpec.toggleActiveTextColor() : .label, for: .normal)
         btn.layer.cornerRadius = GlassColorSpec.keyCornerRadius(height: btn.bounds.height)
         btn.layer.borderColor = GlassColorSpec.borderColor(isDark: isDark).cgColor

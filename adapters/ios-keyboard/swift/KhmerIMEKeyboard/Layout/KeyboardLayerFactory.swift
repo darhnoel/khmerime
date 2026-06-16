@@ -145,7 +145,7 @@ struct KeyboardLayerFactory {
         let mid = makeLetterRow(["z", "x", "c", "v", "b", "n", "m"])
         mid.setContentHuggingPriority(.init(rawValue: 1), for: .horizontal)
 
-        let backBtn = makeSpecialKey("⌫", action: actions.backspace)
+        let backBtn = makeBackspaceButton()
         backBtn.widthAnchor.constraint(equalToConstant: specialKeyW).isActive = true
 
         row.addArrangedSubview(toggleBtn)
@@ -168,13 +168,20 @@ struct KeyboardLayerFactory {
         let mid = makeSymbolRow([".", ",", "?", "!", "'"])
         mid.setContentHuggingPriority(.init(rawValue: 1), for: .horizontal)
 
-        let backBtn = makeSpecialKey("⌫", action: actions.backspace)
+        let backBtn = makeBackspaceButton()
         backBtn.widthAnchor.constraint(equalToConstant: specialKeyW).isActive = true
 
         row.addArrangedSubview(leftBtn)
         row.addArrangedSubview(mid)
         row.addArrangedSubview(backBtn)
         return row
+    }
+
+    func makeBackspaceButton() -> BackspaceButton {
+        let btn = BackspaceButton()
+        btn.setTitle("⌫", for: .normal)
+        KeyStyle.applySpecial(btn, isIPad: isIPad)
+        return btn
     }
 
     // MARK: - Key Factories

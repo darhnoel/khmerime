@@ -73,6 +73,64 @@ final class GlassKeyButtonTests: XCTestCase {
             "blur view corner radius must follow glass proportion (height * 0.22)")
     }
 
+    // MARK: - press color feedback
+
+    func test_touchesBegan_setsBackgroundToPressedColor() {
+        let btn = GlassKeyButton()
+        btn.frame = CGRect(x: 0, y: 0, width: 40, height: 44)
+        btn.layoutIfNeeded()
+
+        btn.touchesBegan(Set(), with: nil)
+
+        var alpha: CGFloat = 0
+        (btn.backgroundColor ?? .clear).getRed(nil, green: nil, blue: nil, alpha: &alpha)
+        XCTAssertGreaterThanOrEqual(alpha, 200.0/255.0,
+            "pressed key must show a clearly visible tint")
+    }
+
+    func test_touchesEnded_revertsBackgroundToTransparentWhenInactive() {
+        let btn = GlassKeyButton()
+        btn.frame = CGRect(x: 0, y: 0, width: 40, height: 44)
+        btn.layoutIfNeeded()
+
+        btn.touchesBegan(Set(), with: nil)
+        btn.touchesEnded(Set(), with: nil)
+
+        var alpha: CGFloat = 0
+        (btn.backgroundColor ?? .clear).getRed(nil, green: nil, blue: nil, alpha: &alpha)
+        XCTAssertEqual(alpha, 0, accuracy: 0.01,
+            "releasing an inactive key must restore transparency")
+    }
+
+    func test_touchesCancelled_revertsBackgroundToTransparentWhenInactive() {
+        let btn = GlassKeyButton()
+        btn.frame = CGRect(x: 0, y: 0, width: 40, height: 44)
+        btn.layoutIfNeeded()
+
+        btn.touchesBegan(Set(), with: nil)
+        btn.touchesCancelled(Set(), with: nil)
+
+        var alpha: CGFloat = 0
+        (btn.backgroundColor ?? .clear).getRed(nil, green: nil, blue: nil, alpha: &alpha)
+        XCTAssertEqual(alpha, 0, accuracy: 0.01,
+            "cancelling touch on an inactive key must restore transparency")
+    }
+
+    func test_touchesEnded_revertsBackgroundToActiveColorWhenGlassActive() {
+        let btn = GlassKeyButton()
+        btn.frame = CGRect(x: 0, y: 0, width: 40, height: 44)
+        btn.isGlassActive = true
+        btn.layoutIfNeeded()
+
+        btn.touchesBegan(Set(), with: nil)
+        btn.touchesEnded(Set(), with: nil)
+
+        var alpha: CGFloat = 0
+        (btn.backgroundColor ?? .clear).getRed(nil, green: nil, blue: nil, alpha: &alpha)
+        XCTAssertGreaterThanOrEqual(alpha, 230.0/255.0,
+            "releasing an active key (e.g. EN/✦) must restore its near-opaque active fill, not transparency")
+    }
+
     func test_inactive_backgroundIsTransparent() {
         let btn = GlassKeyButton()
         btn.frame = CGRect(x: 0, y: 0, width: 40, height: 44)

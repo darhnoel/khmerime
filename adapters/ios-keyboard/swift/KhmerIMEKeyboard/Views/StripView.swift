@@ -4,10 +4,19 @@ final class StripView: UIView, KeyboardStripDisplaying {
 
     private let romanRow = UILabel()
     private let khmerRow = UIStackView()
+    private let segmentPool = StripLabelPool()
+    private var tappableSegmentLabels: [UILabel] = []
 
     var onKhmerRowTapped: (() -> Void)?
     var onKhmerRowLongPressed: (() -> Void)?
     var onSegmentFocused: ((Int) -> Void)?
+
+    // Pure hit-test: which label (if any) contains `point`. A single tap
+    // recognizer on the whole row delegates to this instead of racing two
+    // recognizers (one on the row, one per label) for the same touch.
+    static func segmentIndex(at point: CGPoint, labelFrames: [CGRect]) -> Int? {
+        labelFrames.firstIndex { $0.contains(point) }
+    }
 
     override init(frame: CGRect) {
         super.init(frame: frame)
@@ -25,7 +34,7 @@ final class StripView: UIView, KeyboardStripDisplaying {
 
     func clear() {
         romanRow.text = ""
-        khmerRow.arrangedSubviews.forEach { $0.removeFromSuperview() }
+        segmentPool.sync(count: 0, in: khmerRow)
     }
 
     // MARK: - Setup
@@ -73,83 +82,72 @@ final class StripView: UIView, KeyboardStripDisplaying {
     // MARK: - Khmer row chips
 
     private func rebuildKhmerRow(state: IosRenderState) {
-        khmerRow.arrangedSubviews.forEach { $0.removeFromSuperview() }
         let texts = StripPresentationSpec.segmentKhmerTexts(state: state)
         let focusedIdx = StripPresentationSpec.focusedSegmentIndex(state: state)
 
         if texts.isEmpty {
             let candidate = state.candidates.isEmpty ? "" :
                 state.candidates[state.selectedIndex.map { Int($0) } ?? 0]
-            if !candidate.isEmpty {
-                khmerRow.addArrangedSubview(makeCandidateLabel(candidate))
+            guard !candidate.isEmpty else {
+                segmentPool.sync(count: 0, in: khmerRow)
+                tappableSegmentLabels = []
+                return
             }
+            let visible = segmentPool.sync(count: 1, in: khmerRow)
+            let lbl = visible[0]
+            lbl.attributedText = nil
+            lbl.text = candidate
+            lbl.font = .systemFont(ofSize: 18, weight: .medium)
+            lbl.textColor = .label
+            tappableSegmentLabels = visible
         } else {
-            for (idx, text) in texts.enumerated() {
-                khmerRow.addArrangedSubview(makeSegmentLabel(text, index: idx, focused: idx == focusedIdx))
+            let visible = segmentPool.sync(count: texts.count, in: khmerRow)
+            for (idx, lbl) in visible.enumerated() {
+                let text = texts[idx]
+                let focused = idx == focusedIdx
+                if focused {
+                    lbl.attributedText = NSAttributedString(string: text, attributes: [
+                        .font: UIFont.systemFont(ofSize: 18, weight: .bold),
+                        .foregroundColor: UIColor.label,
+                        .underlineStyle: NSUnderlineStyle.single.rawValue,
+                    ])
+                } else {
+                    lbl.attributedText = nil
+                    lbl.text = text
+                    lbl.font = .systemFont(ofSize: 18)
+                    lbl.textColor = .secondaryLabel
+                }
             }
+            tappableSegmentLabels = visible
         }
     }
 
-    private func makeSegmentLabel(_ text: String, index: Int, focused: Bool) -> UILabel {
-        let lbl = UILabel()
-        lbl.text = text
-        lbl.font = focused
-            ? .systemFont(ofSize: 18, weight: .bold)
-            : .systemFont(ofSize: 18)
-        lbl.textColor = focused ? .label : .secondaryLabel
-        if focused {
-            lbl.attributedText = NSAttributedString(string: text, attributes: [
-                .font: UIFont.systemFont(ofSize: 18, weight: .bold),
-                .foregroundColor: UIColor.label,
-                .underlineStyle: NSUnderlineStyle.single.rawValue,
-            ])
-        }
-        lbl.isUserInteractionEnabled = true
-        lbl.addGestureRecognizer(
-            SegmentTapGestureRecognizer(index: index) { [weak self] idx in
-                self?.onSegmentFocused?(idx)
-            }
-        )
-        return lbl
-    }
-
-    private func makeCandidateLabel(_ text: String) -> UILabel {
-        let lbl = UILabel()
-        lbl.text = text
-        lbl.font = .systemFont(ofSize: 18, weight: .medium)
-        lbl.textColor = .label
-        return lbl
-    }
-
-    // MARK: - Tap / long-press on khmer row (no segments)
+    // MARK: - Tap / long-press on khmer row
 
     private func addKhmerRowTapGesture() {
-        let tap = UITapGestureRecognizer(target: self, action: #selector(khmerRowTapped))
+        let tap = UITapGestureRecognizer(target: self, action: #selector(khmerRowTapped(_:)))
         khmerRow.addGestureRecognizer(tap)
         let longPress = UILongPressGestureRecognizer(target: self, action: #selector(khmerRowLongPressed))
         longPress.minimumPressDuration = 0.4
         khmerRow.addGestureRecognizer(longPress)
     }
 
-    @objc private func khmerRowTapped()  { onKhmerRowTapped?() }
+    // A single recognizer on the whole row decides, per tap, whether it landed
+    // on a chip (→ focus that segment) or empty row space (→ commit). Avoids
+    // running two recognizers (row + per-label) that would otherwise both
+    // fire for the same touch.
+    @objc private func khmerRowTapped(_ gr: UITapGestureRecognizer) {
+        let point = gr.location(in: khmerRow)
+        let frames = tappableSegmentLabels.map { $0.frame }
+        if let index = StripView.segmentIndex(at: point, labelFrames: frames) {
+            onSegmentFocused?(index)
+        } else {
+            onKhmerRowTapped?()
+        }
+    }
 
     @objc private func khmerRowLongPressed(_ gr: UILongPressGestureRecognizer) {
         guard gr.state == .began else { return }
         onKhmerRowLongPressed?()
     }
-}
-
-// Carries the segment index through the gesture recognizer.
-private final class SegmentTapGestureRecognizer: UITapGestureRecognizer {
-    private let index: Int
-    private let handler: (Int) -> Void
-
-    init(index: Int, handler: @escaping (Int) -> Void) {
-        self.index = index
-        self.handler = handler
-        super.init(target: nil, action: nil)
-        addTarget(self, action: #selector(fired))
-    }
-
-    @objc private func fired() { handler(index) }
 }
