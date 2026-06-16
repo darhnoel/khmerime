@@ -9,6 +9,7 @@ final class KeyboardRootViewTests: XCTestCase {
         XCTAssertFalse(fixture.qwertyView.isHidden)
         XCTAssertTrue(fixture.numericView.isHidden)
         XCTAssertTrue(fixture.symbolsView.isHidden)
+        XCTAssertFalse(fixture.candidateRowView.isHidden)
         XCTAssertTrue(fixture.panelView.isHidden)
         XCTAssertTrue(fixture.panelBottomRow.isHidden)
     }
@@ -77,10 +78,12 @@ final class KeyboardRootViewTests: XCTestCase {
         qwertyView: UIView,
         numericView: UIView,
         symbolsView: UIView,
+        candidateRowView: SpyCandidateRowView,
         panelView: SpyPanelView,
         panelBottomRow: UIView
     ) {
         let stripView = SpyStripView()
+        let candidateRowView = SpyCandidateRowView()
         let panelView = SpyPanelView()
         let qwertyView = UIView()
         let numericView = UIView()
@@ -93,12 +96,13 @@ final class KeyboardRootViewTests: XCTestCase {
             qwertyView: qwertyView,
             numericView: numericView,
             symbolsView: symbolsView,
+            candidateRowView: candidateRowView,
             panelView: panelView,
             panelBottomRow: panelBottomRow,
             panelBottomAnchorGuide: panelView.bottomAnchorGuide
         )
 
-        return (rootView, stripView, qwertyView, numericView, symbolsView, panelView, panelBottomRow)
+        return (rootView, stripView, qwertyView, numericView, symbolsView, candidateRowView, panelView, panelBottomRow)
     }
 
     private func makeRenderState(candidates: [String]) -> IosRenderState {
@@ -123,6 +127,19 @@ private final class SpyStripView: UIView, KeyboardStripDisplaying {
     func render(_ state: IosRenderState, romanBuffer: String) {
         renderedState = state
         renderedRomanHint = romanBuffer
+    }
+
+    func clear() {
+        clearCount += 1
+    }
+}
+
+private final class SpyCandidateRowView: UIView, KeyboardCandidateRowDisplaying {
+    var renderedState: IosRenderState?
+    var clearCount = 0
+
+    func render(_ state: IosRenderState) {
+        renderedState = state
     }
 
     func clear() {

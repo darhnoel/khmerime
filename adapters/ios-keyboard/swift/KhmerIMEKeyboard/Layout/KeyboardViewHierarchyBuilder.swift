@@ -2,6 +2,7 @@ import UIKit
 
 struct KeyboardViewHierarchy {
     let stripView: StripView
+    let candidateRowView: CandidateRowView
     let panelView: CandidatePanelView
     let qwertyView: UIView
     let numericView: UIView
@@ -21,6 +22,9 @@ struct KeyboardViewHierarchyBuilder {
     func build(panelDelegate: CandidatePanelDelegate?) -> KeyboardViewHierarchy {
         let stripView = StripView()
         stripView.translatesAutoresizingMaskIntoConstraints = false
+
+        let candidateRowView = CandidateRowView()
+        candidateRowView.translatesAutoresizingMaskIntoConstraints = false
 
         let panelView = CandidatePanelView(metrics: metrics)
         panelView.delegate = panelDelegate
@@ -51,6 +55,7 @@ struct KeyboardViewHierarchyBuilder {
             qwertyView: qwertyView,
             numericView: numericView,
             symbolsView: symbolsView,
+            candidateRowView: candidateRowView,
             panelView: panelView,
             panelBottomRow: panelBottomRow,
             panelBottomAnchorGuide: panelView.bottomAnchorGuide
@@ -59,6 +64,7 @@ struct KeyboardViewHierarchyBuilder {
 
         return KeyboardViewHierarchy(
             stripView: stripView,
+            candidateRowView: candidateRowView,
             panelView: panelView,
             qwertyView: qwertyView,
             numericView: numericView,
