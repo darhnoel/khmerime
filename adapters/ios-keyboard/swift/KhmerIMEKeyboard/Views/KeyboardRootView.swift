@@ -108,6 +108,7 @@ final class KeyboardRootView: UIView {
         case .panel:
             panelDisplay.render(state)
         case .charPick:
+            candidateRowDisplay.clear()
             panelDisplay.renderCharPickCandidates(state.candidates)
         default:
             candidateRowDisplay.render(state)
