@@ -249,19 +249,32 @@ final class KeyboardInputHandlerTests: XCTestCase {
 
     // MARK: - Tap a strip chip to edit it
 
-    func test_chipTapped_whenPanelClosed_opensPanel() {
+    func test_chipTapped_whenComposingSingleWord_commitsInsteadOfOpeningPanel() {
+        let (handler, proxy) = makeHandler()
+        type("nhom", into: handler)   // single word → segments.isEmpty
+
+        handler.chipTapped(at: 0)
+        handler.textDidChange()
+
+        XCTAssertEqual(handler.keyboardState, .qwerty,
+            "tapping a single-word chip must commit, not open the panel")
+        XCTAssertFalse(proxy.text.contains("nhom"),
+            "roman chars must be replaced by the committed Khmer text")
+    }
+
+    func test_chipTapped_whenComposingPhrase_opensPanel() {
         let (handler, _) = makeHandler()
-        type("nhom", into: handler)
+        type("khnhomtov", into: handler)   // multi-word phrase → segments.count >= 2
 
         handler.chipTapped(at: 0)
 
         XCTAssertEqual(handler.keyboardState, .panel,
-            "tapping a strip chip must open the panel so its candidates become visible")
+            "tapping a chip in a real phrase must open the panel so its candidates become visible")
     }
 
     func test_chipTapped_whenPanelAlreadyOpen_staysInPanel() {
         let (handler, _) = makeHandler()
-        type("nhom", into: handler)
+        type("khnhomtov", into: handler)   // multi-word phrase → segments.count >= 2
         handler.togglePanel()   // → .panel
 
         handler.chipTapped(at: 0)

@@ -408,6 +408,13 @@ final class KeyboardInputHandler {
     // open, so this is a no-op there.
     func chipTapped(at index: Int) {
         guard let current = lastState else { return }
+        // A single word has no segments at all (the Rust segmenter only ever
+        // populates segments for a real multi-word phrase) — tapping it commits
+        // directly instead of opening the panel, since there's nothing to edit.
+        guard !current.segments.isEmpty else {
+            commitComposition()
+            return
+        }
         let focused = current.focusedSegmentIndex.map { Int($0) } ?? 0
         let diff = index - focused
         dispatcher.onSession { [weak self] in
