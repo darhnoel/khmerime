@@ -82,6 +82,7 @@ targets:
       - path: KhmerIMEKeyboard/Layout/KeyboardLayerVisibility.swift
       - path: KhmerIMEKeyboard/Layout/KeyboardLayoutMetrics.swift
       - path: KhmerIMEKeyboard/Layout/KeyboardViewHierarchyBuilder.swift
+      - path: KhmerIMEKeyboard/Views/CandidateRowLayout.swift
       - path: KhmerIMEKeyboard/Views/CandidateRowView.swift
       - path: KhmerIMEKeyboard/Views/GlassColorSpec.swift
       - path: KhmerIMEKeyboard/Views/GlassKeyPressAnimator.swift

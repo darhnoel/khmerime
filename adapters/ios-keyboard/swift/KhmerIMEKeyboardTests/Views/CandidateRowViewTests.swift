@@ -61,6 +61,38 @@ final class CandidateRowViewTests: XCTestCase {
             "clear() must hide every candidate label that was previously shown")
     }
 
+    func test_render_fewCandidates_centersContentSymmetrically() {
+        let row = CandidateRowView()
+        row.frame = CGRect(x: 0, y: 0, width: 300, height: 44)
+        row.render(makeState(candidates: ["ក"], selectedIndex: 0))
+        row.layoutIfNeeded()
+
+        let scroll = scrollView(in: row)
+        XCTAssertGreaterThan(scroll.contentInset.left, 8,
+            "a single candidate must be centered, not pinned to the left edge")
+        XCTAssertEqual(scroll.contentInset.left, scroll.contentInset.right, accuracy: 0.5,
+            "the centering inset must be symmetric so the chips sit in the middle")
+    }
+
+    func test_render_manyCandidates_usesEdgeInsetForLeftAlignedScroll() {
+        let row = CandidateRowView()
+        row.frame = CGRect(x: 0, y: 0, width: 300, height: 44)
+        let many = (0..<20).map { "ខ្ញុំ\($0)" }
+        row.render(makeState(candidates: many, selectedIndex: 0))
+        row.layoutIfNeeded()
+
+        let scroll = scrollView(in: row)
+        XCTAssertEqual(scroll.contentInset.left, 8, accuracy: 0.5,
+            "candidates that overflow the row must use the normal edge inset (left-aligned + scrollable)")
+    }
+
+    private func scrollView(in view: UIView) -> UIScrollView {
+        for sv in view.subviews {
+            if let scroll = sv as? UIScrollView { return scroll }
+        }
+        fatalError("CandidateRowView must contain a UIScrollView")
+    }
+
     private func visibleLabels(in view: UIView) -> [UILabel] {
         var result: [UILabel] = []
         for sv in view.subviews {

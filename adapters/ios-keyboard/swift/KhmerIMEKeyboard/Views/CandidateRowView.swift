@@ -12,6 +12,9 @@ final class CandidateRowView: UIView, KeyboardCandidateRowDisplaying {
     private let pool = StripLabelPool()
     private var tappableLabels: [UILabel] = []
 
+    // Normal horizontal padding at the row edges when chips overflow and scroll.
+    private static let edgeInset: CGFloat = 8
+
     var onCandidateSelected: ((Int) -> Void)?
 
     override init(frame: CGRect) {
@@ -54,8 +57,11 @@ final class CandidateRowView: UIView, KeyboardCandidateRowDisplaying {
             scrollView.topAnchor.constraint(equalTo: topAnchor),
             scrollView.bottomAnchor.constraint(equalTo: bottomAnchor),
 
-            stack.leadingAnchor.constraint(equalTo: scrollView.contentLayoutGuide.leadingAnchor, constant: 8),
-            stack.trailingAnchor.constraint(equalTo: scrollView.contentLayoutGuide.trailingAnchor, constant: -8),
+            // Stack pinned flush to the content guide; horizontal padding (edge
+            // inset when scrolling, or centering slack when sparse) is applied via
+            // scrollView.contentInset in layoutSubviews.
+            stack.leadingAnchor.constraint(equalTo: scrollView.contentLayoutGuide.leadingAnchor),
+            stack.trailingAnchor.constraint(equalTo: scrollView.contentLayoutGuide.trailingAnchor),
             stack.topAnchor.constraint(equalTo: scrollView.contentLayoutGuide.topAnchor),
             stack.bottomAnchor.constraint(equalTo: scrollView.contentLayoutGuide.bottomAnchor),
             stack.heightAnchor.constraint(equalTo: scrollView.frameLayoutGuide.heightAnchor),
@@ -63,6 +69,24 @@ final class CandidateRowView: UIView, KeyboardCandidateRowDisplaying {
 
         let tap = UITapGestureRecognizer(target: self, action: #selector(rowTapped(_:)))
         stack.addGestureRecognizer(tap)
+    }
+
+    // Center the chips while they all fit; once they overflow, apply the normal
+    // edge inset so the row left-aligns and scrolls. Recomputed whenever the chip
+    // set or the row width changes.
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        // Measure the chips directly: the stack isn't sized until the scroll view's
+        // own layout pass (which runs after ours), so stack.bounds is stale here.
+        let contentWidth = stack.systemLayoutSizeFitting(UIView.layoutFittingCompressedSize).width
+        let inset = CandidateRowLayout.centeringInset(
+            contentWidth: contentWidth,
+            availableWidth: bounds.width,
+            edgeInset: Self.edgeInset
+        )
+        if scrollView.contentInset.left != inset {
+            scrollView.contentInset = UIEdgeInsets(top: 0, left: inset, bottom: 0, right: inset)
+        }
     }
 
     // MARK: - Chips
@@ -76,6 +100,8 @@ final class CandidateRowView: UIView, KeyboardCandidateRowDisplaying {
             label.textColor = selected ? .label : .secondaryLabel
         }
         tappableLabels = visible
+        // Chip set changed → recompute the centering / edge inset.
+        setNeedsLayout()
         scrollSelectedIntoView(selectedIndex: selectedIndex, in: visible)
     }
 
