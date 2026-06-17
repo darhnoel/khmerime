@@ -68,6 +68,10 @@ final class KeyboardInputHandler {
     // render is skipped to keep the main thread from queuing up backlog.
     private var sendGeneration = 0
 
+    // Same coalescing guard for single-tap backspace. Rapid backspace taps
+    // queue multiple session calls; only the last one's render should fire.
+    private var backspaceGeneration = 0
+
     // Set after deleteBackward×N + insertText(Khmer). iOS silently appends a
     // trailing space (autocorrect replacement detection) but documentContextBeforeInput
     // is stale until UIKit calls textDidChange(), so the check must live there.
@@ -172,6 +176,11 @@ final class KeyboardInputHandler {
         // before the session block executes (critical for responsiveness).
         proxy.insertText(ch)
         romanBuffer += ch
+        // Optimistic render: show updated roman hint immediately using the last known
+        // session state. The deferred render (below) will update candidates once Rust
+        // returns. Skip when lastState is nil (first ever keystroke — no stale state
+        // to show, and the deferred render fires quickly enough).
+        if let currentState = lastState { onRender?(currentState, romanBuffer) }
         sendGeneration += 1
         let myGeneration = sendGeneration
         dispatcher.onSession { [weak self] in
@@ -342,11 +351,19 @@ final class KeyboardInputHandler {
         }
         if !romanBuffer.isEmpty { romanBuffer.removeLast() }
         proxy.deleteBackward()
+        if romanBuffer.isEmpty {
+            onStripClear?()
+        } else if let currentState = lastState {
+            onRender?(currentState, romanBuffer)
+        }
+        backspaceGeneration += 1
+        let myBackspaceGeneration = backspaceGeneration
         dispatcher.onSession { [weak self] in
             guard let self else { return }
             let state = self.session.sendBackspace()
             self.dispatcher.onMain { [weak self] in
                 guard let self else { return }
+                guard myBackspaceGeneration == self.backspaceGeneration else { return }
                 self.render(state)
                 if self.romanBuffer.isEmpty { self.onStripClear?() }
             }
@@ -444,7 +461,10 @@ final class KeyboardInputHandler {
         }
         dispatcher.onSession { [weak self] in
             guard let self else { return }
-            let state = self.session.selectCandidate(at: index)
+            var state = self.session.selectCandidate(at: index)
+            // processDigit leaves Segment Edit Mode active after selecting a candidate.
+            // A second sendTab() exits edit mode and pins the segment.
+            if state.segmentEditActive { state = self.session.sendTab() }
             self.dispatcher.onMain { [weak self] in self?.render(state) }
         }
     }
@@ -463,7 +483,21 @@ final class KeyboardInputHandler {
     // MARK: - Private
 
     private func render(_ state: IosRenderState) {
+        let wasEditActive = lastState?.segmentEditActive ?? false
         lastState = state
+
+        // On the transition into Segment Edit Mode, replace the proxy's roman
+        // buffer with just the edit segment's roman input so that subsequent
+        // backspaces and keystrokes operate at the correct cursor position.
+        if !wasEditActive && state.segmentEditActive,
+           let editIndex = state.segmentEditIndex.map({ Int($0) }),
+           editIndex < state.segments.count {
+            let editRoman = state.segments[editIndex].input
+            for _ in romanBuffer { proxy.deleteBackward() }
+            proxy.insertText(editRoman)
+            romanBuffer = editRoman
+        }
+
         onRender?(state, romanBuffer)
     }
 

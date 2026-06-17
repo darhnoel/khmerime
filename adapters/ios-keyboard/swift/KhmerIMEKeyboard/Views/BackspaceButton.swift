@@ -105,16 +105,16 @@ final class BackspaceButton: GlassKeyButton {
 
     override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
         super.touchesBegan(touches, with: event)
+        // Fire the deletion immediately on press-down so the character disappears
+        // without waiting for finger-lift (~50–150 ms per tap savings).
+        onTap?()
         repeater.beginHold()
     }
 
     override func touchesEnded(_ touches: Set<UITouch>, with event: UIEvent?) {
         super.touchesEnded(touches, with: event)
-        if repeater.hasFired {
-            onHoldEnd?()
-        } else if let touch = touches.first, bounds.contains(touch.location(in: self)) {
-            onTap?()
-        }
+        if repeater.hasFired { onHoldEnd?() }
+        // No onTap here — already fired in touchesBegan.
         repeater.endHold()
     }
 

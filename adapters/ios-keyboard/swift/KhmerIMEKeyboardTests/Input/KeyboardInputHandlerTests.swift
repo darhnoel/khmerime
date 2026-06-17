@@ -253,6 +253,63 @@ final class KeyboardInputHandlerTests: XCTestCase {
             "re-tapping the focused segment must enter Segment Edit Mode")
     }
 
+    // MARK: - Segment Edit Mode
+
+    func test_enterSegmentEditMode_syncsProxyToEditSegment() {
+        let (handler, proxy) = makeHandler()
+        type("khnhomtov", into: handler)   // multi-word → segments populated
+
+        guard let state = handler.lastState, !state.segments.isEmpty else {
+            XCTFail("khnhomtov must produce segments; got state: \(String(describing: handler.lastState))")
+            return
+        }
+        let focused = state.focusedSegmentIndex.map { Int($0) } ?? 0
+        let editRoman = state.segments[focused].input
+
+        handler.chipTapped(at: focused)   // re-tap focused segment → enters Segment Edit Mode
+
+        XCTAssertTrue(handler.lastState?.segmentEditActive == true,
+            "chipTapped on focused segment must enter Segment Edit Mode")
+        XCTAssertEqual(proxy.text, editRoman,
+            "entering Segment Edit Mode must replace the proxy with the edit segment's roman input")
+    }
+
+    func test_segmentEditMode_selectCandidate_exitEditModeAndPinsSegment() {
+        let (handler, _) = makeHandler()
+        type("khnhomtov", into: handler)
+        guard let state = handler.lastState, !state.segments.isEmpty else {
+            XCTFail("khnhomtov must produce segments"); return
+        }
+        let focused = state.focusedSegmentIndex.map { Int($0) } ?? 0
+        handler.chipTapped(at: focused)   // enters Segment Edit Mode
+        XCTAssertTrue(handler.lastState?.segmentEditActive == true)
+
+        handler.selectCandidate(at: 0)   // user taps first candidate to pin the segment
+
+        XCTAssertFalse(handler.lastState?.segmentEditActive == true,
+            "selecting a candidate in Segment Edit Mode must exit edit mode and pin the segment")
+        XCTAssertFalse(handler.lastState?.segments.isEmpty ?? true,
+            "segments must be preserved after pinning")
+    }
+
+    func test_segmentEditMode_backspace_removesFromEditSegmentNotFullBuffer() {
+        let (handler, proxy) = makeHandler()
+        type("khnhomtov", into: handler)
+
+        guard let state = handler.lastState, !state.segments.isEmpty else {
+            XCTFail("khnhomtov must produce segments")
+            return
+        }
+        let focused = state.focusedSegmentIndex.map { Int($0) } ?? 0
+        let editRoman = state.segments[focused].input
+
+        handler.chipTapped(at: focused)   // enters Segment Edit Mode; proxy = editRoman
+        handler.backspaceTapped()         // should remove last char of editRoman only
+
+        XCTAssertEqual(proxy.text, String(editRoman.dropLast()),
+            "backspace in Segment Edit Mode must remove the last char of the edit segment, not the full roman buffer")
+    }
+
     // MARK: - Layer switching
 
     func test_switchLayer_toNumeric() {
@@ -372,8 +429,10 @@ final class KeyboardInputHandlerTests: XCTestCase {
 
         type("nhom", into: handler)
 
-        XCTAssertEqual(renderCount, 4,
-            "onRender must fire once per typed character")
+        // Each char fires two renders: one optimistic (roman-hint update, immediate) and
+        // one deferred (Rust-confirmed candidates). 4 chars × 2 = 8 total renders.
+        XCTAssertEqual(renderCount, 8,
+            "onRender fires twice per typed character — once optimistically, once after Rust")
     }
 
     // MARK: - External text change
@@ -636,8 +695,56 @@ final class KeyboardInputHandlerTests: XCTestCase {
         dispatcher.mainBlocks[0]()      // stale — must be skipped
         dispatcher.mainBlocks[1]()      // latest — must render
 
-        XCTAssertEqual(renderCount, 1,
-            "a render superseded by a newer in-flight keystroke must be skipped")
+        // 2 optimistic renders (one per sendChar) + 1 deferred render (only the last
+        // keystroke's deferred render survives the generation check).
+        XCTAssertEqual(renderCount, 3,
+            "deferred renders superseded by newer keystrokes are skipped; optimistic renders always fire")
+    }
+
+    func test_backspace_emptiesBuffer_callsStripClearBeforeRustReturns() {
+        let proxy = MockTextProxy()
+        let dispatcher = CapturingDispatcher()
+        let handler = KeyboardInputHandler(proxy: proxy, session: KeyboardSession(), dispatcher: dispatcher)
+        handler.focusIn()
+        handler.sendChar("k")   // romanBuffer = "k"; CapturingDispatcher captures but does not run
+
+        var stripCleared = false
+        handler.onStripClear = { stripCleared = true }
+
+        handler.backspaceTapped()   // romanBuffer becomes "", session block captured (not yet run)
+
+        XCTAssertTrue(stripCleared,
+            "onStripClear must fire immediately when the last roman char is deleted — before Rust returns")
+    }
+
+    func test_rapidBackspaceTaps_onlyLastDeferredRenderFires() {
+        let proxy = MockTextProxy()
+        let dispatcher = QueueingDispatcher()
+        let handler = KeyboardInputHandler(proxy: proxy, session: KeyboardSession(), dispatcher: dispatcher)
+        handler.focusIn()
+        // Type "khn", flush session so lastState is set and romanBuffer = "khn"
+        handler.sendChar("k"); handler.sendChar("h"); handler.sendChar("n")
+        dispatcher.sessionBlocks.forEach { $0() }
+        dispatcher.mainBlocks.forEach { $0() }
+        dispatcher.sessionBlocks.removeAll(); dispatcher.mainBlocks.removeAll()
+
+        var renderCount = 0
+        handler.onRender = { _, _ in renderCount += 1 }
+
+        // Rapid double backspace: "khn" → "kh" → "k" (buffer still non-empty both times)
+        handler.backspaceTapped()   // queues session block #0
+        handler.backspaceTapped()   // queues session block #1
+
+        dispatcher.sessionBlocks[0]()   // sendBackspace for tap 1 → queues main block #0
+        dispatcher.sessionBlocks[1]()   // sendBackspace for tap 2 → queues main block #1
+
+        dispatcher.mainBlocks[0]()      // stale — must be skipped (generation mismatch)
+        dispatcher.mainBlocks[1]()      // latest — must render
+
+        // 2 optimistic renders (one per backspace tap) + 1 deferred render (only the last
+        // backspace's deferred render survives the generation check).
+        XCTAssertEqual(renderCount, 3,
+            "deferred backspace renders are coalesced; optimistic renders always fire immediately")
     }
 }
 

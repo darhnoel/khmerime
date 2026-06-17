@@ -4,6 +4,54 @@ import UIKit
 
 final class GlassKeyButtonTests: XCTestCase {
 
+    // MARK: - rapid-tap registration
+
+    // Verifies that every touchesBegan fires onPress, regardless of whether
+    // a previous touch is still active. UIKit only delivers overlapping touches
+    // to a view when isMultipleTouchEnabled = true; without it the second tap
+    // is silently dropped by UIKit before touchesBegan is even called.
+    func test_isMultipleTouchEnabled_allowsEveryTouchToFireOnPress() {
+        let btn = GlassKeyButton()
+        XCTAssertTrue(btn.isMultipleTouchEnabled,
+            "isMultipleTouchEnabled must be true — rapid taps where the second " +
+            "touch begins before the first ends are silently dropped otherwise")
+    }
+
+    func test_secondTouchesBegan_whileFirstStillActive_firesOnPressAgain() {
+        let btn = GlassKeyButton()
+        btn.configureForTesting(runner: synchronousRunner)
+        var count = 0
+        btn.onPress = { count += 1 }
+
+        btn.touchesBegan(Set(), with: nil)   // first touch down
+        btn.touchesBegan(Set(), with: nil)   // second touch before first lifts
+
+        XCTAssertEqual(count, 2,
+            "each touchesBegan must fire onPress — rapid overlapping taps must both register")
+    }
+
+    // The press animation scales the button to 92%. UIKit hit-tests through the
+    // scaled geometry, so a re-tap landing in the outer "dead ring" (inside the
+    // layout frame but outside the shrunken visual) is routed past the button and
+    // touchesBegan never fires. This is why every other rapid tap is dropped.
+    // The button must claim touches across its full un-squished frame.
+    func test_squishedButton_stillReceivesTouchInOuterRing() {
+        let container = UIView(frame: CGRect(x: 0, y: 0, width: 100, height: 100))
+        let btn = GlassKeyButton(frame: CGRect(x: 0, y: 0, width: 40, height: 44))
+        container.addSubview(btn)
+        // Simulate the mid-press squished state (release animation still running).
+        btn.transform = CGAffineTransform(scaleX: 0.92, y: 0.92)
+
+        // A point inside the layout frame (x < 40) but outside the 92%-scaled
+        // visual — exactly where a fast re-tap is currently dropped.
+        let deadRingPoint = CGPoint(x: 39, y: 22)
+        let hit = container.hitTest(deadRingPoint, with: nil)
+
+        XCTAssertTrue(hit === btn,
+            "a rapid re-tap landing in the squished button's outer ring must still hit the button — " +
+            "otherwise every other fast tap is silently dropped")
+    }
+
     // MARK: - press squish
 
     func test_touchesBegan_squishesButtonToNinetyTwoPercent() {

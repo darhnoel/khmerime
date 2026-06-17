@@ -206,7 +206,9 @@ struct KeyboardLayerFactory {
         let btn = GlassKeyButton(frame: .zero)
         btn.setTitle(letter.uppercased(), for: .normal)
         KeyStyle.applyLetter(btn, isIPad: isIPad)
-        btn.addTarget(target, action: actions.letter, for: .touchUpInside)
+        btn.onPress = { [weak target, weak btn] in
+            _ = target?.perform(actions.letter, with: btn)
+        }
         return btn
     }
 
@@ -214,7 +216,9 @@ struct KeyboardLayerFactory {
         let btn = GlassKeyButton(frame: .zero)
         btn.setTitle(symbol, for: .normal)
         KeyStyle.applySymbol(btn, isIPad: isIPad)
-        btn.addTarget(target, action: actions.symbol, for: .touchUpInside)
+        btn.onPress = { [weak target, weak btn] in
+            _ = target?.perform(actions.symbol, with: btn)
+        }
         return btn
     }
 

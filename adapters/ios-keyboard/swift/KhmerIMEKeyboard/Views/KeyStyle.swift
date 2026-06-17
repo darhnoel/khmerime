@@ -1,9 +1,19 @@
 import UIKit
 
 class GlassKeyButton: UIButton {
+    // Max depth of the press-squish: the button shrinks to (1 - pressScaleDepth)
+    // of its size at full press. Exposed so point(inside:) can compensate for the
+    // hit-test dead ring the scale would otherwise create (see point(inside:with:)).
+    static let pressScaleDepth: CGFloat = 0.08
+
     var isGlassActive = false {
         didSet { updateGlassAppearance() }
     }
+
+    // Fires on every touchesBegan, bypassing UIControl's single-touch tracking.
+    // Use this instead of addTarget(for: .touchDown) for keys that must register
+    // every rapid tap even when two touches physically overlap.
+    var onPress: (() -> Void)?
 
     private var isPressed = false
     private var pressAnimator: GlassKeyPressAnimator?
@@ -15,12 +25,23 @@ class GlassKeyButton: UIButton {
         return v
     }()
 
+    override init(frame: CGRect) {
+        super.init(frame: frame)
+        isMultipleTouchEnabled = true
+    }
+
+    required init?(coder: NSCoder) {
+        super.init(coder: coder)
+        isMultipleTouchEnabled = true
+    }
+
     // Inject a synchronous runner for testing before any touch event fires.
     func configureForTesting(runner: @escaping AnimatorRunner) {
         pressAnimator = GlassKeyPressAnimator(onUpdate: applySquish(_:), runner: runner)
     }
 
     override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
+        onPress?()
         super.touchesBegan(touches, with: event)
         ensurePressAnimator().press()
         isPressed = true
@@ -39,6 +60,24 @@ class GlassKeyButton: UIButton {
         ensurePressAnimator().release()
         isPressed = false
         updateGlassAppearance()
+    }
+
+    // The press animation scales the button down to (1 - pressScaleDepth). UIKit
+    // hit-tests through that scaled geometry, shrinking the touchable area and
+    // leaving a dead ring around the edge where rapid re-taps are dropped (every
+    // other fast tap misses). Expand the hit region to cover the full un-squished
+    // frame so a touch landing anywhere over the key's layout area still registers,
+    // even mid-squish. The margin is the exact inverse of the max scale, so at rest
+    // the overlap into the 6pt inter-key gap stays under ~2pt — well clear of
+    // neighbours.
+    override func point(inside point: CGPoint, with event: UIEvent?) -> Bool {
+        let minScale = 1 - Self.pressScaleDepth
+        let marginFraction = 0.5 / minScale - 0.5
+        let expanded = bounds.insetBy(
+            dx: -bounds.width * marginFraction,
+            dy: -bounds.height * marginFraction
+        )
+        return expanded.contains(point)
     }
 
     override func layoutSubviews() {
@@ -60,7 +99,7 @@ class GlassKeyButton: UIButton {
     }
 
     private func applySquish(_ squish: CGFloat) {
-        let scale = 1 - squish * 0.08
+        let scale = 1 - squish * Self.pressScaleDepth
         transform = CGAffineTransform(scaleX: scale, y: scale)
     }
 
