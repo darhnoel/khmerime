@@ -13,11 +13,11 @@ import UIKit
 //
 // Keyboard states
 // ---------------
-//   .qwerty    Default roman-input view. ✦ in shift slot, 123/space/./⏎ bottom.
+//   .qwerty    Default roman-input view. 123 in shift slot, ✦/space/./⏎ bottom.
 //   .numeric   123 layer: 1–0, punctuation, #+=, ABC/space/⏎.
 //   .symbols   #+= layer: []{}#%^*+=, currencies, 123/space/⏎.
-//   .panel     ✦ candidate panel: chips + candidates + bottom row.
-//   .charPick  CharPick mode: panel visible with A–Z chip row + candidate collection.
+//   .charPick  CharPick mode: qwerty stays visible, ✦ highlighted, letter keys
+//              browse Khmer characters without inserting roman text.
 
 class KeyboardViewController: UIInputViewController {
 
@@ -31,6 +31,10 @@ class KeyboardViewController: UIInputViewController {
     // appears/disappears (e.g. on iPhone X or on iPad when the bar changes).
     private var heightConstraint: NSLayoutConstraint!
 
+    // Whether the strip + candidate row are currently expanded. Starts collapsed:
+    // the keyboard appears keys-only and grows on the first keystroke.
+    private var isChromeComposing = false
+
     var isIPad: Bool { traitCollection.userInterfaceIdiom == .pad }
     var layoutMetrics: KeyboardLayoutMetrics {
         KeyboardLayoutMetrics(device: isIPad ? .pad : .phone)
@@ -43,7 +47,6 @@ class KeyboardViewController: UIInputViewController {
 
     private var layerActions: KeyboardLayerActions {
         KeyboardLayerActions(
-            nextKeyboard: #selector(nextKeyboardTapped),
             letter: #selector(letterTapped(_:)),
             symbol: #selector(symbolKeyTapped(_:)),
             period: #selector(periodTapped),
@@ -60,13 +63,11 @@ class KeyboardViewController: UIInputViewController {
 
     // MARK: - Views
 
-    private var stripView:      StripView!
-    private var panelView:      CandidatePanelView!
-    private var qwertyView:     UIView!
-    private var numericView:    UIView!
-    private var symbolsView:    UIView!
-    private var panelBottomRow: UIStackView!
-    private var rootView:       KeyboardRootView!
+    private var stripView: StripView!
+    private var qwertyView: UIView!
+    private var numericView: UIView!
+    private var symbolsView: UIView!
+    private var rootView: KeyboardRootView!
 
     // MARK: - Lifecycle
 
@@ -89,10 +90,31 @@ class KeyboardViewController: UIInputViewController {
 
     override func viewSafeAreaInsetsDidChange() {
         super.viewSafeAreaInsetsDidChange()
-        heightConstraint.constant = KeyboardHostLayout.heightConstant(
-            metrics: layoutMetrics,
-            safeAreaBottom: view.safeAreaInsets.bottom
-        )
+        heightConstraint.constant = keyboardHeight(composing: isChromeComposing)
+    }
+
+    // MARK: - Chrome collapse / expand
+
+    // Total keyboard height for the current chrome state. Idle drops the strip +
+    // candidate row (88pt); composing reserves them. Keys keep the same height in
+    // both, so only the total shrinks.
+    private func keyboardHeight(composing: Bool) -> CGFloat {
+        let base = composing ? layoutMetrics.baseKeyboardHeight : layoutMetrics.idleKeyboardHeight
+        return base + view.safeAreaInsets.bottom
+    }
+
+    // Expands or collapses the two chrome rows and the host height together. Only
+    // acts on a real transition, so the per-keystroke renders during composition
+    // don't re-trigger the animation.
+    private func setComposingChrome(_ composing: Bool, animated: Bool) {
+        guard composing != isChromeComposing else { return }
+        isChromeComposing = composing
+        rootView.setChromeVisible(composing)
+        heightConstraint.constant = keyboardHeight(composing: composing)
+        guard animated else { view.layoutIfNeeded(); return }
+        UIView.animate(withDuration: 0.2, delay: 0, options: [.curveEaseOut, .beginFromCurrentState]) {
+            self.view.layoutIfNeeded()
+        }
     }
 
     override func viewWillLayoutSubviews() {
@@ -110,17 +132,22 @@ class KeyboardViewController: UIInputViewController {
 
     private func wireHandlerCallbacks() {
         handler.onTransition = { [weak self] state in
-            self?.rootView.apply(state)
+            guard let self else { return }
+            self.rootView.apply(state)
+            let isCharPick = state == .charPick
+            self.rootView.allDescendants(ofType: GlassKeyButton.self)
+                .filter { $0.title(for: .normal) == "✦" }
+                .forEach { $0.isGlassActive = isCharPick }
         }
         handler.onRender = { [weak self] state, romanHint in
             guard let self else { return }
-            self.rootView.render(state, romanHint: romanHint, keyboardState: self.handler.keyboardState)
+            self.rootView.render(state, romanHint: romanHint)
+            self.setComposingChrome(KeyboardChrome.isComposing(romanHint: romanHint, state: state), animated: true)
         }
         handler.onStripClear = { [weak self] in
-            self?.rootView.clearStrip()
-        }
-        handler.onCharPickAlphabet = { [weak self] in
-            self?.rootView.renderCharPickAlphabet()
+            guard let self else { return }
+            self.rootView.clearStrip()
+            self.setComposingChrome(false, animated: true)
         }
         handler.onEnglishModeChanged = { [weak self] isEnglish in
             guard let self else { return }
@@ -132,7 +159,6 @@ class KeyboardViewController: UIInputViewController {
 
     // MARK: - Key Actions (forward to handler)
 
-    @objc func nextKeyboardTapped()    { advanceToNextInputMode() }
     @objc func toggleEnglishTapped()   { handler.toggleEnglish() }
 
     @objc func letterTapped(_ sender: UIButton) {
@@ -172,24 +198,30 @@ class KeyboardViewController: UIInputViewController {
             globeKeyTag: Self.globeKeyTag,
             enKeyTag: Self.enKeyTag,
             actions: layerActions
-        ).build(panelDelegate: self)
+        ).build(
+            candidateRowSelection: { [weak self] index in
+                self?.handler.selectCandidate(at: index)
+            }
+        )
 
         stripView = hierarchy.stripView
-        panelView = hierarchy.panelView
         qwertyView = hierarchy.qwertyView
         numericView = hierarchy.numericView
         symbolsView = hierarchy.symbolsView
-        panelBottomRow = hierarchy.panelBottomRow
         rootView = hierarchy.rootView
 
         setupStripCallbacks()
         wireBackspaceButtons()
+        wireGlobeButtons()
         heightConstraint = KeyboardHostLayout.install(
             rootView: rootView,
             in: view,
             metrics: layoutMetrics,
             safeAreaBottom: view.safeAreaInsets.bottom
         )
+        // rootView starts with its chrome collapsed, so the host begins at idle
+        // height — keys-only — and expands on the first keystroke.
+        heightConstraint.constant = keyboardHeight(composing: false)
     }
 
     private func wireBackspaceButtons() {
@@ -198,6 +230,22 @@ class KeyboardViewController: UIInputViewController {
             btn.onHoldFire = { [weak self] in self?.handler.backspaceHoldFired() }
             btn.onHoldEnd  = { [weak self] in self?.handler.backspaceHoldEnded() }
         }
+    }
+
+    // Wire every globe key (one per layer): short tap advances to the next
+    // keyboard; long press shows the system keyboard picker. GlobeKeyButton
+    // detects the long press internally via a timer and calls
+    // handleInputModeList(from:with:) with the real touch event so the system
+    // picker animates from the correct location.
+    private func wireGlobeButtons() {
+        rootView.allDescendants(tag: Self.globeKeyTag)
+            .compactMap { $0 as? GlobeKeyButton }
+            .forEach { btn in
+                btn.onShortTap = { [weak self] in self?.advanceToNextInputMode() }
+                btn.onLongPress = { [weak self] button, event in
+                    self?.handleInputModeList(from: button, with: event)
+                }
+            }
     }
 }
 
@@ -220,34 +268,5 @@ private extension UIView {
             result += sv.allDescendants(ofType: T.self)
         }
         return result
-    }
-}
-
-// MARK: - CandidatePanelDelegate
-
-extension KeyboardViewController: CandidatePanelDelegate {
-
-    func candidatePanel(_ panel: CandidatePanelView, didTapChipAt index: Int) {
-        handler.chipTapped(at: index)
-    }
-
-    func candidatePanel(_ panel: CandidatePanelView, didRequestEditAt index: Int) {
-        handler.requestEdit(at: index)
-    }
-
-    func candidatePanelDidEnterCharPick(_ panel: CandidatePanelView) {
-        handler.enterCharPickFromPanel()
-    }
-
-    func candidatePanel(_ panel: CandidatePanelView, didTapCharPickLetter letter: Character) {
-        handler.charPickLetterTapped(letter)
-    }
-
-    func candidatePanel(_ panel: CandidatePanelView, didSelectCandidateAt index: Int) {
-        handler.selectCandidate(at: index)
-    }
-
-    func candidatePanelDidDismiss(_ panel: CandidatePanelView) {
-        handler.dismissPanel()
     }
 }

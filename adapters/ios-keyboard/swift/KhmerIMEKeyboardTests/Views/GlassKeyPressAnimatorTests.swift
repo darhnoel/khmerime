@@ -5,7 +5,7 @@ final class GlassKeyPressAnimatorTests: XCTestCase {
 
     // MARK: - press()
 
-    func test_press_animatesSquishToOneWithEightyMsDuration() {
+    func test_press_animatesSquishToOneWithSnappyDuration() {
         var capturedTo: CGFloat?
         var capturedDuration: TimeInterval?
 
@@ -17,7 +17,8 @@ final class GlassKeyPressAnimatorTests: XCTestCase {
         animator.press()
 
         XCTAssertEqual(capturedTo, 1)
-        XCTAssertEqual(capturedDuration ?? -1, 0.080, accuracy: 0.001)
+        // Press feedback must be near-instant so the squish keeps up with fast typing.
+        XCTAssertEqual(capturedDuration ?? -1, 0.040, accuracy: 0.001)
     }
 
     func test_press_startsFromZeroOnFirstPress() {
@@ -45,7 +46,7 @@ final class GlassKeyPressAnimatorTests: XCTestCase {
 
     // MARK: - release()
 
-    func test_release_animatesSquishToZeroWithTwoHundredTwentyMsDuration() {
+    func test_release_animatesSquishToZeroWithSnappyDuration() {
         var capturedTo: CGFloat?
         var capturedDuration: TimeInterval?
 
@@ -57,7 +58,10 @@ final class GlassKeyPressAnimatorTests: XCTestCase {
         animator.release()
 
         XCTAssertEqual(capturedTo, 0)
-        XCTAssertEqual(capturedDuration ?? -1, 0.220, accuracy: 0.001)
+        // Release must be fast enough to finish before the next keystroke during
+        // fast typing — a slow grow-back is what makes keys feel like they trail
+        // the finger. 90ms keeps the squish from lagging behind rapid taps.
+        XCTAssertEqual(capturedDuration ?? -1, 0.090, accuracy: 0.001)
     }
 
     // MARK: - interruptible mid-flight

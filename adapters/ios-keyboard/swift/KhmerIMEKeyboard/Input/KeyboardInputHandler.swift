@@ -30,7 +30,6 @@ import Foundation
 //   onRender          — called with a new state and the roman-hint string the strip
 //                       should display in its top row
 //   onStripClear      — called when the strip should be blanked
-//   onCharPickAlphabet — called when the panel should switch to the A–Z picker
 //
 // Android equivalent
 // ------------------
@@ -69,6 +68,10 @@ final class KeyboardInputHandler {
     // render is skipped to keep the main thread from queuing up backlog.
     private var sendGeneration = 0
 
+    // Same coalescing guard for single-tap backspace. Rapid backspace taps
+    // queue multiple session calls; only the last one's render should fire.
+    private var backspaceGeneration = 0
+
     // Set after deleteBackward×N + insertText(Khmer). iOS silently appends a
     // trailing space (autocorrect replacement detection) but documentContextBeforeInput
     // is stale until UIKit calls textDidChange(), so the check must live there.
@@ -79,7 +82,6 @@ final class KeyboardInputHandler {
     var onTransition: ((KeyboardState) -> Void)?
     var onRender: ((_ state: IosRenderState, _ romanHint: String) -> Void)?
     var onStripClear: (() -> Void)?
-    var onCharPickAlphabet: (() -> Void)?
     var onEnglishModeChanged: ((Bool) -> Void)?
 
     // MARK: - Init
@@ -126,7 +128,7 @@ final class KeyboardInputHandler {
             self.dispatcher.onMain { [weak self] in
                 guard let self else { return }
                 self.onStripClear?()
-                if self.keyboardState == .panel || self.keyboardState == .charPick {
+                if self.keyboardState == .charPick {
                     self.transition(to: .qwerty)
                 }
             }
@@ -157,7 +159,14 @@ final class KeyboardInputHandler {
     // MARK: - Character Input
 
     func sendChar(_ ch: String) {
-        guard keyboardState != .charPick else { return }
+        if keyboardState == .charPick {
+            dispatcher.onSession { [weak self] in
+                guard let self else { return }
+                let state = self.session.sendCharacter(ch)
+                self.dispatcher.onMain { [weak self] in self?.render(state) }
+            }
+            return
+        }
         if isEnglishMode {
             proxy.insertText(ch)
             return
@@ -167,6 +176,11 @@ final class KeyboardInputHandler {
         // before the session block executes (critical for responsiveness).
         proxy.insertText(ch)
         romanBuffer += ch
+        // Optimistic render: show updated roman hint immediately using the last known
+        // session state. The deferred render (below) will update candidates once Rust
+        // returns. Skip when lastState is nil (first ever keystroke — no stale state
+        // to show, and the deferred render fires quickly enough).
+        if let currentState = lastState { onRender?(currentState, romanBuffer) }
         sendGeneration += 1
         let myGeneration = sendGeneration
         dispatcher.onSession { [weak self] in
@@ -217,7 +231,6 @@ final class KeyboardInputHandler {
                     }
                 }
                 self.onStripClear?()
-                if self.keyboardState == .panel { self.transition(to: .qwerty) }
             }
         }
     }
@@ -247,7 +260,6 @@ final class KeyboardInputHandler {
                 self.proxy.insertText(" ")
                 self.trailingSpace = true
                 self.onStripClear?()
-                if self.keyboardState == .panel { self.transition(to: .qwerty) }
             }
         }
     }
@@ -267,8 +279,6 @@ final class KeyboardInputHandler {
                         guard let self else { return }
                         self.lastState = nil
                         self.onStripClear?()
-                        self.onCharPickAlphabet?()
-                        self.transition(to: .charPick)
                     }
                 }
             }
@@ -332,8 +342,6 @@ final class KeyboardInputHandler {
                         guard let self else { return }
                         self.lastState = nil
                         self.onStripClear?()
-                        self.onCharPickAlphabet?()
-                        self.transition(to: .charPick)
                     }
                 }
             } else {
@@ -343,11 +351,19 @@ final class KeyboardInputHandler {
         }
         if !romanBuffer.isEmpty { romanBuffer.removeLast() }
         proxy.deleteBackward()
+        if romanBuffer.isEmpty {
+            onStripClear?()
+        } else if let currentState = lastState {
+            onRender?(currentState, romanBuffer)
+        }
+        backspaceGeneration += 1
+        let myBackspaceGeneration = backspaceGeneration
         dispatcher.onSession { [weak self] in
             guard let self else { return }
             let state = self.session.sendBackspace()
             self.dispatcher.onMain { [weak self] in
                 guard let self else { return }
+                guard myBackspaceGeneration == self.backspaceGeneration else { return }
                 self.render(state)
                 if self.romanBuffer.isEmpty { self.onStripClear?() }
             }
@@ -361,11 +377,7 @@ final class KeyboardInputHandler {
             isEnglishMode = false
             onEnglishModeChanged?(false)
         }
-        switch keyboardState {
-        case .panel:
-            transition(to: .qwerty)
-
-        case .charPick:
+        if keyboardState == .charPick {
             dispatcher.onSession { [weak self] in
                 guard let self else { return }
                 _ = self.session.exitCharPick()
@@ -375,24 +387,19 @@ final class KeyboardInputHandler {
                     self.transition(to: .qwerty)
                 }
             }
-
-        default:
-            let hasComposition = lastState.map { !$0.candidates.isEmpty } ?? false
-            if hasComposition {
-                transition(to: .panel)
-                if let state = lastState { onRender?(state, romanBuffer) }
-            } else {
-                dispatcher.onSession { [weak self] in
-                    guard let self else { return }
-                    _ = self.session.enterCharPick()
-                    self.dispatcher.onMain { [weak self] in
-                        guard let self else { return }
-                        self.lastState = nil
-                        self.onStripClear?()
-                        self.onCharPickAlphabet?()
-                        self.transition(to: .charPick)
-                    }
-                }
+            return
+        }
+        for _ in romanBuffer { proxy.deleteBackward() }
+        romanBuffer = ""
+        trailingSpace = false
+        dispatcher.onSession { [weak self] in
+            guard let self else { return }
+            _ = self.session.enterCharPick()
+            self.dispatcher.onMain { [weak self] in
+                guard let self else { return }
+                self.lastState = nil
+                self.onStripClear?()
+                self.transition(to: .charPick)
             }
         }
     }
@@ -403,75 +410,36 @@ final class KeyboardInputHandler {
 
     // MARK: - Candidate Panel Actions
 
-    // Entry point for both the strip's chip tap and the panel's own chip row.
-    // The strip needs the panel opened first; the panel's chip row is already
-    // open, so this is a no-op there.
+    // Tapping a segment chip in the strip. A different segment than the one
+    // currently focused just moves focus there (so its candidates surface in
+    // the persistent candidate row). Re-tapping the already-focused segment
+    // is the 2-tap-to-edit gesture: it enters Segment Edit Mode inline via
+    // sendTab() — no panel involved either way.
     func chipTapped(at index: Int) {
         guard let current = lastState else { return }
         // A single word has no segments at all (the Rust segmenter only ever
         // populates segments for a real multi-word phrase) — tapping it commits
-        // directly instead of opening the panel, since there's nothing to edit.
+        // directly, since there's nothing to navigate or edit.
         guard !current.segments.isEmpty else {
             commitComposition()
             return
         }
         let focused = current.focusedSegmentIndex.map { Int($0) } ?? 0
+        if index == focused {
+            dispatcher.onSession { [weak self] in
+                guard let self else { return }
+                let state = self.session.sendTab()
+                self.dispatcher.onMain { [weak self] in self?.render(state) }
+            }
+            return
+        }
         let diff = index - focused
         dispatcher.onSession { [weak self] in
             guard let self else { return }
             var state = current
             if diff > 0      { for _ in 0..<diff    { state = self.session.sendRight() } }
             else if diff < 0 { for _ in 0..<(-diff) { state = self.session.sendLeft()  } }
-            self.dispatcher.onMain { [weak self] in
-                guard let self else { return }
-                if self.keyboardState != .panel { self.transition(to: .panel) }
-                self.render(state)
-            }
-        }
-    }
-
-    func requestEdit(at index: Int) {
-        guard let current = lastState else { return }
-        let focused = current.focusedSegmentIndex.map { Int($0) } ?? 0
-        let diff = index - focused
-        dispatcher.onSession { [weak self] in
-            guard let self else { return }
-            if diff > 0      { for _ in 0..<diff    { _ = self.session.sendRight() } }
-            else if diff < 0 { for _ in 0..<(-diff) { _ = self.session.sendLeft()  } }
-            let state = self.session.sendTab()
-            self.dispatcher.onMain { [weak self] in
-                guard let self else { return }
-                self.render(state)
-                self.transition(to: .qwerty)
-            }
-        }
-    }
-
-    func enterCharPickFromPanel() {
-        for _ in romanBuffer { proxy.deleteBackward() }
-        romanBuffer = ""
-        dispatcher.onSession { [weak self] in
-            guard let self else { return }
-            _ = self.session.enterCharPick()
-            self.dispatcher.onMain { [weak self] in
-                guard let self else { return }
-                self.lastState = nil
-                self.onStripClear?()
-                self.onCharPickAlphabet?()
-                self.transition(to: .charPick)
-            }
-        }
-    }
-
-    func charPickLetterTapped(_ letter: Character) {
-        dispatcher.onSession { [weak self] in
-            guard let self else { return }
-            let state = self.session.sendCharacter(String(letter))
-            self.dispatcher.onMain { [weak self] in
-                guard let self else { return }
-                self.lastState = state
-                self.onRender?(state, String(letter))
-            }
+            self.dispatcher.onMain { [weak self] in self?.render(state) }
         }
     }
 
@@ -487,14 +455,16 @@ final class KeyboardInputHandler {
                     guard let self else { return }
                     self.lastState = nil
                     self.onStripClear?()
-                    self.onCharPickAlphabet?()
                 }
             }
             return
         }
         dispatcher.onSession { [weak self] in
             guard let self else { return }
-            let state = self.session.selectCandidate(at: index)
+            var state = self.session.selectCandidate(at: index)
+            // processDigit leaves Segment Edit Mode active after selecting a candidate.
+            // A second sendTab() exits edit mode and pins the segment.
+            if state.segmentEditActive { state = self.session.sendTab() }
             self.dispatcher.onMain { [weak self] in self?.render(state) }
         }
     }
@@ -513,7 +483,21 @@ final class KeyboardInputHandler {
     // MARK: - Private
 
     private func render(_ state: IosRenderState) {
+        let wasEditActive = lastState?.segmentEditActive ?? false
         lastState = state
+
+        // On the transition into Segment Edit Mode, replace the proxy's roman
+        // buffer with just the edit segment's roman input so that subsequent
+        // backspaces and keystrokes operate at the correct cursor position.
+        if !wasEditActive && state.segmentEditActive,
+           let editIndex = state.segmentEditIndex.map({ Int($0) }),
+           editIndex < state.segments.count {
+            let editRoman = state.segments[editIndex].input
+            for _ in romanBuffer { proxy.deleteBackward() }
+            proxy.insertText(editRoman)
+            romanBuffer = editRoman
+        }
+
         onRender?(state, romanBuffer)
     }
 

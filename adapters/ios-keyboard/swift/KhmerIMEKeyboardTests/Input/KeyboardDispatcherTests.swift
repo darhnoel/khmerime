@@ -30,34 +30,68 @@ final class KeyboardDispatcherTests: XCTestCase {
 
     // MARK: - Render fires inside onMain
 
-    func test_sendChar_renderDoesNotFireBeforeSessionWork() {
+    func test_sendChar_deferredRenderDoesNotFireBeforeOnMain() {
+        // sendChar fires one optimistic render immediately (roman-hint update),
+        // then a deferred render inside the onMain block (Rust-confirmed candidates).
+        // This test verifies the deferred render stays deferred until onMain runs.
         let dispatcher = CapturingDispatcher()
         let proxy = MockTextProxy()
         let handler = KeyboardInputHandler(proxy: proxy, session: KeyboardSession(), dispatcher: dispatcher)
         handler.focusIn()
 
-        var renderFired = false
-        handler.onRender = { _, _ in renderFired = true }
+        var renderCount = 0
+        handler.onRender = { _, _ in renderCount += 1 }
 
         handler.sendChar("k")
-        XCTAssertFalse(renderFired, "render must not fire before the session block runs")
-    }
+        XCTAssertEqual(renderCount, 1, "optimistic render must fire immediately")
 
-    func test_sendChar_renderFiresAfterSessionThenMain() {
-        let dispatcher = CapturingDispatcher()
-        let proxy = MockTextProxy()
-        let handler = KeyboardInputHandler(proxy: proxy, session: KeyboardSession(), dispatcher: dispatcher)
-        handler.focusIn()
-
-        var renderFired = false
-        handler.onRender = { _, _ in renderFired = true }
-
-        handler.sendChar("k")
-        dispatcher.capturedSession?()   // runs session work, which dispatches to onMain
-        XCTAssertFalse(renderFired, "render must not fire before onMain runs")
+        dispatcher.capturedSession?()   // runs session block, queues onMain
+        XCTAssertEqual(renderCount, 1, "deferred render must not fire before onMain runs")
 
         dispatcher.capturedMain?()      // runs the main callback
-        XCTAssertTrue(renderFired, "render must fire inside the onMain callback")
+        XCTAssertEqual(renderCount, 2, "deferred render must fire inside the onMain callback")
+    }
+
+    // MARK: - Optimistic render
+
+    // When lastState exists (i.e. at least one prior keystroke has been processed),
+    // sendChar must fire onRender immediately — before the session block executes —
+    // so the strip roman-hint row updates without waiting for Rust.
+    func test_backspaceTapped_withNonEmptyBuffer_firesOptimisticRenderImmediately() {
+        let dispatcher = CapturingDispatcher()
+        let proxy = MockTextProxy()
+        let handler = KeyboardInputHandler(proxy: proxy, session: KeyboardSession(), dispatcher: dispatcher)
+        handler.focusIn()
+        handler.sendChar("k"); handler.sendChar("h")   // romanBuffer = "kh", lastState set
+
+        var renderCount = 0
+        var firstRenderHint: String?
+        handler.onRender = { _, hint in
+            renderCount += 1
+            if renderCount == 1 { firstRenderHint = hint }
+        }
+
+        handler.backspaceTapped()   // romanBuffer becomes "k" (non-empty)
+        // Session block captured but NOT yet executed.
+        XCTAssertEqual(renderCount, 1,
+            "backspaceTapped must fire onRender optimistically when buffer stays non-empty")
+        XCTAssertEqual(firstRenderHint, "k",
+            "optimistic render must use the updated romanBuffer after the deletion")
+    }
+
+    func test_sendChar_withExistingLastState_firesOptimisticRenderImmediately() {
+        let dispatcher = CapturingDispatcher()
+        let proxy = MockTextProxy()
+        let handler = KeyboardInputHandler(proxy: proxy, session: KeyboardSession(), dispatcher: dispatcher)
+        handler.focusIn()   // sets lastState
+
+        var renderCount = 0
+        handler.onRender = { _, _ in renderCount += 1 }
+
+        handler.sendChar("k")
+        // Session block captured but NOT yet executed.
+        XCTAssertEqual(renderCount, 1,
+            "sendChar must fire onRender optimistically before the session block runs")
     }
 
     // MARK: - Multiple chars processed in order
@@ -75,8 +109,10 @@ final class KeyboardDispatcherTests: XCTestCase {
         handler.sendChar("h")
         handler.sendChar("n")
 
-        XCTAssertEqual(preeditHistory, ["k", "kh", "khn"],
-            "renders must arrive in keystroke order — session is serial")
+        // Each char fires twice: optimistic (stale previous preedit) then Rust-confirmed.
+        // focusIn() produces an empty-preedit lastState, so the first optimistic render is "".
+        XCTAssertEqual(preeditHistory, ["", "k", "k", "kh", "kh", "khn"],
+            "renders must arrive in keystroke order — optimistic (stale preedit) then Rust-confirmed per char")
     }
 }
 

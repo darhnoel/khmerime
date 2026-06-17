@@ -9,7 +9,7 @@ final class KeyboardLayerVisibilityTests: XCTestCase {
         XCTAssertTrue(visibility.showsQwerty)
         XCTAssertFalse(visibility.showsNumeric)
         XCTAssertFalse(visibility.showsSymbols)
-        XCTAssertFalse(visibility.showsPanel)
+        XCTAssertTrue(visibility.showsCandidateRow)
     }
 
     func test_numericShowsOnlyNumericLayer() {
@@ -18,7 +18,7 @@ final class KeyboardLayerVisibilityTests: XCTestCase {
         XCTAssertFalse(visibility.showsQwerty)
         XCTAssertTrue(visibility.showsNumeric)
         XCTAssertFalse(visibility.showsSymbols)
-        XCTAssertFalse(visibility.showsPanel)
+        XCTAssertTrue(visibility.showsCandidateRow)
     }
 
     func test_symbolsShowsOnlySymbolsLayer() {
@@ -27,16 +27,15 @@ final class KeyboardLayerVisibilityTests: XCTestCase {
         XCTAssertFalse(visibility.showsQwerty)
         XCTAssertFalse(visibility.showsNumeric)
         XCTAssertTrue(visibility.showsSymbols)
-        XCTAssertFalse(visibility.showsPanel)
+        XCTAssertTrue(visibility.showsCandidateRow)
     }
 
-    func test_panelAndCharPickShowPanelLayer() {
-        let panel = KeyboardLayerVisibility(state: .panel)
-        let charPick = KeyboardLayerVisibility(state: .charPick)
+    func test_charPickShowsQwertyLayerAndCandidateRow() {
+        let visibility = KeyboardLayerVisibility(state: .charPick)
 
-        XCTAssertTrue(panel.showsPanel)
-        XCTAssertTrue(charPick.showsPanel)
-        XCTAssertFalse(panel.showsQwerty)
-        XCTAssertFalse(charPick.showsQwerty)
+        XCTAssertTrue(visibility.showsQwerty)
+        XCTAssertFalse(visibility.showsNumeric)
+        XCTAssertFalse(visibility.showsSymbols)
+        XCTAssertTrue(visibility.showsCandidateRow)
     }
 }

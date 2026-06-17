@@ -9,20 +9,17 @@ final class KeyboardRootViewTests: XCTestCase {
         XCTAssertFalse(fixture.qwertyView.isHidden)
         XCTAssertTrue(fixture.numericView.isHidden)
         XCTAssertTrue(fixture.symbolsView.isHidden)
-        XCTAssertTrue(fixture.panelView.isHidden)
-        XCTAssertTrue(fixture.panelBottomRow.isHidden)
+        XCTAssertFalse(fixture.candidateRowView.isHidden)
     }
 
-    func test_applyPanelStateShowsPanelAndBottomRow() {
+    func test_applyCharPickStateKeepsQwertyVisible() {
         let fixture = makeRootView()
 
-        fixture.rootView.apply(.panel)
+        fixture.rootView.apply(.charPick)
 
-        XCTAssertTrue(fixture.qwertyView.isHidden)
+        XCTAssertFalse(fixture.qwertyView.isHidden)
         XCTAssertTrue(fixture.numericView.isHidden)
         XCTAssertTrue(fixture.symbolsView.isHidden)
-        XCTAssertFalse(fixture.panelView.isHidden)
-        XCTAssertFalse(fixture.panelBottomRow.isHidden)
     }
 
     func test_applyNumericStateShowsNumericLayerOnly() {
@@ -33,42 +30,75 @@ final class KeyboardRootViewTests: XCTestCase {
         XCTAssertTrue(fixture.qwertyView.isHidden)
         XCTAssertFalse(fixture.numericView.isHidden)
         XCTAssertTrue(fixture.symbolsView.isHidden)
-        XCTAssertTrue(fixture.panelView.isHidden)
-        XCTAssertTrue(fixture.panelBottomRow.isHidden)
     }
 
-    func test_renderPanelStateUpdatesStripAndPanel() {
+    func test_applyCharPickStateShowsCandidateRow() {
         let fixture = makeRootView()
-        let state = makeRenderState(candidates: ["ក"])
 
-        fixture.rootView.render(state, romanHint: "k", keyboardState: .panel)
+        fixture.rootView.apply(.charPick)
 
-        XCTAssertEqual(fixture.stripView.renderedRomanHint, "k")
-        XCTAssertEqual(fixture.stripView.renderedState, state)
-        XCTAssertEqual(fixture.panelView.renderedState, state)
-        XCTAssertTrue(fixture.panelView.renderedCharPickCandidates.isEmpty)
+        XCTAssertFalse(fixture.candidateRowView.isHidden)
     }
 
-    func test_renderCharPickStateUpdatesStripAndOnlyPanelCandidates() {
+    func test_renderUpdatesBothStripAndCandidateRow() {
         let fixture = makeRootView()
         let state = makeRenderState(candidates: ["ក", "ខ"])
 
-        fixture.rootView.render(state, romanHint: "k", keyboardState: .charPick)
+        fixture.rootView.render(state, romanHint: "k")
 
         XCTAssertEqual(fixture.stripView.renderedRomanHint, "k")
         XCTAssertEqual(fixture.stripView.renderedState, state)
-        XCTAssertNil(fixture.panelView.renderedState)
-        XCTAssertEqual(fixture.panelView.renderedCharPickCandidates, ["ក", "ខ"])
+        XCTAssertEqual(fixture.candidateRowView.renderedState, state)
     }
 
-    func test_clearStripAndRenderCharPickAlphabetForwardToContainedViews() {
+    func test_clearStrip_alsoClearsCandidateRow() {
         let fixture = makeRootView()
-
         fixture.rootView.clearStrip()
-        fixture.rootView.renderCharPickAlphabet()
 
         XCTAssertEqual(fixture.stripView.clearCount, 1)
-        XCTAssertEqual(fixture.panelView.alphabetRenderCount, 1)
+        XCTAssertEqual(fixture.candidateRowView.clearCount, 1,
+            "candidate row must be cleared whenever the strip is cleared so stale candidates don't linger after a commit")
+    }
+
+    // MARK: - chrome collapse / expand
+
+    func test_setChromeVisibleFalse_collapsesStripAndCandidateRowToZero() {
+        let fixture = makeRootView()
+
+        fixture.rootView.setChromeVisible(false)
+
+        XCTAssertEqual(fixture.rootView.stripHeightConstraint.constant, 0,
+            "collapsed chrome must drop the strip height to zero")
+        XCTAssertEqual(fixture.rootView.candidateRowHeightConstraint.constant, 0,
+            "collapsed chrome must drop the candidate row height to zero")
+    }
+
+    func test_setChromeVisibleTrue_restoresReservedRowHeights() {
+        let fixture = makeRootView()
+        fixture.rootView.setChromeVisible(false)
+
+        fixture.rootView.setChromeVisible(true)
+
+        XCTAssertEqual(fixture.rootView.stripHeightConstraint.constant, 44,
+            "expanded chrome must restore the strip to its reserved height")
+        XCTAssertEqual(fixture.rootView.candidateRowHeightConstraint.constant, 44,
+            "expanded chrome must restore the candidate row to its reserved height")
+    }
+
+    func test_keyLayerHeightIsFixedAndUnaffectedByChromeCollapse() {
+        let fixture = makeRootView()
+        let metrics = KeyboardLayoutMetrics(device: .phone)
+        fixture.rootView.frame = CGRect(x: 0, y: 0, width: 320, height: metrics.baseKeyboardHeight)
+
+        fixture.rootView.setChromeVisible(true)
+        fixture.rootView.layoutIfNeeded()
+        XCTAssertEqual(fixture.qwertyView.bounds.height, metrics.idleKeyboardHeight, accuracy: 0.5,
+            "key area must equal the fixed idle height while composing")
+
+        fixture.rootView.setChromeVisible(false)
+        fixture.rootView.layoutIfNeeded()
+        XCTAssertEqual(fixture.qwertyView.bounds.height, metrics.idleKeyboardHeight, accuracy: 0.5,
+            "key area height must not change when the chrome collapses — the keys never resize or move")
     }
 
     private func makeRootView() -> (
@@ -77,15 +107,13 @@ final class KeyboardRootViewTests: XCTestCase {
         qwertyView: UIView,
         numericView: UIView,
         symbolsView: UIView,
-        panelView: SpyPanelView,
-        panelBottomRow: UIView
+        candidateRowView: SpyCandidateRowView
     ) {
         let stripView = SpyStripView()
-        let panelView = SpyPanelView()
+        let candidateRowView = SpyCandidateRowView()
         let qwertyView = UIView()
         let numericView = UIView()
         let symbolsView = UIView()
-        let panelBottomRow = UIView()
 
         let rootView = KeyboardRootView(
             metrics: KeyboardLayoutMetrics(device: .phone),
@@ -93,12 +121,10 @@ final class KeyboardRootViewTests: XCTestCase {
             qwertyView: qwertyView,
             numericView: numericView,
             symbolsView: symbolsView,
-            panelView: panelView,
-            panelBottomRow: panelBottomRow,
-            panelBottomAnchorGuide: panelView.bottomAnchorGuide
+            candidateRowView: candidateRowView
         )
 
-        return (rootView, stripView, qwertyView, numericView, symbolsView, panelView, panelBottomRow)
+        return (rootView, stripView, qwertyView, numericView, symbolsView, candidateRowView)
     }
 
     private func makeRenderState(candidates: [String]) -> IosRenderState {
@@ -130,33 +156,15 @@ private final class SpyStripView: UIView, KeyboardStripDisplaying {
     }
 }
 
-private final class SpyPanelView: UIView, KeyboardPanelDisplaying {
-    let bottomAnchorGuide = UILayoutGuide()
+private final class SpyCandidateRowView: UIView, KeyboardCandidateRowDisplaying {
     var renderedState: IosRenderState?
-    var renderedCharPickCandidates: [String] = []
-    var alphabetRenderCount = 0
-
-    override init(frame: CGRect) {
-        super.init(frame: frame)
-        addLayoutGuide(bottomAnchorGuide)
-        NSLayoutConstraint.activate([
-            bottomAnchorGuide.topAnchor.constraint(equalTo: bottomAnchor),
-            bottomAnchorGuide.leadingAnchor.constraint(equalTo: leadingAnchor),
-            bottomAnchorGuide.trailingAnchor.constraint(equalTo: trailingAnchor),
-        ])
-    }
-
-    required init?(coder: NSCoder) { fatalError("use init(frame:)") }
+    var clearCount = 0
 
     func render(_ state: IosRenderState) {
         renderedState = state
     }
 
-    func renderCharPickCandidates(_ candidates: [String]) {
-        renderedCharPickCandidates = candidates
-    }
-
-    func renderCharPickAlphabet() {
-        alphabetRenderCount += 1
+    func clear() {
+        clearCount += 1
     }
 }

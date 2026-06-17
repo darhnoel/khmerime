@@ -20,15 +20,14 @@ import UIKit
 // Key row anatomy:
 //   QWERTY row 1: q w e r t y u i o p       (10 letter keys, fillEqually)
 //   QWERTY row 2:   a s d f g h j k l       (9 letter keys, fillEqually, inset)
-//   QWERTY row 3: ✦ z x c v b n m ⌫        (special | letters | special)
-//   Bottom row:   123 | space (flex) | . | ⏎
+//   QWERTY row 3: 123 z x c v b n m ⌫        (special | letters | special)
+//   Bottom row:   ✦ | space (flex) | . | ⏎
 //
 //   123 row 3:    #+= | . , ? ! ' | ⌫
 //   #+= row 3:    123 | . , ? ! ' | ⌫
 //   ABC bottom:   ABC | space (flex) | ⏎      (no period: it's in row 3)
 
 struct KeyboardLayerActions {
-    let nextKeyboard: Selector
     let letter: Selector
     let symbol: Selector
     let period: Selector
@@ -63,7 +62,7 @@ struct KeyboardLayerFactory {
             makeLetterRow(["q", "w", "e", "r", "t", "y", "u", "i", "o", "p"]),
             makeLetterRow(["a", "s", "d", "f", "g", "h", "j", "k", "l"]),
             makeQwertyRow3(),
-            makeBottomRow(leftLabel: "123", leftAction: actions.numeric, includePeriod: true),
+            makeBottomRow(leftLabel: "✦", leftAction: actions.togglePanel, includePeriod: true),
         ])
     }
 
@@ -96,9 +95,8 @@ struct KeyboardLayerFactory {
         row.spacing = 6
         row.distribution = .fill
 
-        let globeBtn = makeSpecialKey("🌐", action: actions.nextKeyboard)
+        let globeBtn = makeGlobeKey()
         globeBtn.widthAnchor.constraint(equalToConstant: specialKeyW).isActive = true
-        globeBtn.tag = globeKeyTag
         row.addArrangedSubview(globeBtn)
 
         let enBtn = makeSpecialKey("EN", action: actions.toggleEnglish)
@@ -139,7 +137,7 @@ struct KeyboardLayerFactory {
         row.spacing = 6
         row.distribution = .fill
 
-        let toggleBtn = makeSpecialKey("✦", action: actions.togglePanel)
+        let toggleBtn = makeSpecialKey("123", action: actions.numeric)
         toggleBtn.widthAnchor.constraint(equalToConstant: specialKeyW).isActive = true
 
         let mid = makeLetterRow(["z", "x", "c", "v", "b", "n", "m"])
@@ -206,7 +204,9 @@ struct KeyboardLayerFactory {
         let btn = GlassKeyButton(frame: .zero)
         btn.setTitle(letter.uppercased(), for: .normal)
         KeyStyle.applyLetter(btn, isIPad: isIPad)
-        btn.addTarget(target, action: actions.letter, for: .touchUpInside)
+        btn.onPress = { [weak target, weak btn] in
+            _ = target?.perform(actions.letter, with: btn)
+        }
         return btn
     }
 
@@ -214,7 +214,9 @@ struct KeyboardLayerFactory {
         let btn = GlassKeyButton(frame: .zero)
         btn.setTitle(symbol, for: .normal)
         KeyStyle.applySymbol(btn, isIPad: isIPad)
-        btn.addTarget(target, action: actions.symbol, for: .touchUpInside)
+        btn.onPress = { [weak target, weak btn] in
+            _ = target?.perform(actions.symbol, with: btn)
+        }
         return btn
     }
 
@@ -223,6 +225,20 @@ struct KeyboardLayerFactory {
         btn.setTitle(title, for: .normal)
         KeyStyle.applySpecial(btn, isIPad: isIPad)
         btn.addTarget(target, action: action, for: .touchUpInside)
+        return btn
+    }
+
+    // The next-keyboard key. Uses the SF Symbol "globe" sized and tinted to match
+    // the other special keys. GlobeKeyButton handles long-press detection internally
+    // via timer; KeyboardViewController wires onShortTap / onLongPress callbacks.
+    func makeGlobeKey() -> UIButton {
+        let btn = GlobeKeyButton(frame: .zero)
+        let config = UIImage.SymbolConfiguration(pointSize: isIPad ? 17 : 15, weight: .medium)
+        btn.setImage(UIImage(systemName: "globe", withConfiguration: config), for: .normal)
+        KeyStyle.applySpecial(btn, isIPad: isIPad)
+        btn.tintColor = .label
+        btn.accessibilityLabel = "Next Keyboard"
+        btn.tag = globeKeyTag
         return btn
     }
 
