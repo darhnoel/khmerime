@@ -90,6 +90,7 @@ targets:
       - path: KhmerIMEKeyboard/Views/KeyboardRootView.swift
       - path: KhmerIMEKeyboard/Views/KeyStyle.swift
       - path: KhmerIMEKeyboard/Views/BackspaceButton.swift
+      - path: KhmerIMEKeyboard/Views/GlobeKeyButton.swift
       - path: KhmerIMEKeyboard/Views/StripLabelPool.swift
       - path: KhmerIMEKeyboard/Views/StripPresentationSpec.swift
       - path: KhmerIMEKeyboard/Views/StripView.swift

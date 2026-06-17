@@ -50,7 +50,6 @@ final class KeyboardViewHierarchyBuilderTests: XCTestCase {
 
 private final class ActionTarget: NSObject {
     static let actions = KeyboardLayerActions(
-        nextKeyboard: #selector(nextKeyboardTapped),
         letter: #selector(letterTapped(_:)),
         symbol: #selector(symbolKeyTapped(_:)),
         period: #selector(periodTapped),
@@ -64,7 +63,6 @@ private final class ActionTarget: NSObject {
         abc: #selector(abcTapped)
     )
 
-    @objc func nextKeyboardTapped() {}
     @objc func letterTapped(_ sender: UIButton) {}
     @objc func symbolKeyTapped(_ sender: UIButton) {}
     @objc func periodTapped() {}

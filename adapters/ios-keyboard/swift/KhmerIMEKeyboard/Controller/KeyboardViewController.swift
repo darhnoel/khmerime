@@ -47,7 +47,6 @@ class KeyboardViewController: UIInputViewController {
 
     private var layerActions: KeyboardLayerActions {
         KeyboardLayerActions(
-            nextKeyboard: #selector(nextKeyboardTapped),
             letter: #selector(letterTapped(_:)),
             symbol: #selector(symbolKeyTapped(_:)),
             period: #selector(periodTapped),
@@ -160,7 +159,6 @@ class KeyboardViewController: UIInputViewController {
 
     // MARK: - Key Actions (forward to handler)
 
-    @objc func nextKeyboardTapped()    { advanceToNextInputMode() }
     @objc func toggleEnglishTapped()   { handler.toggleEnglish() }
 
     @objc func letterTapped(_ sender: UIButton) {
@@ -214,6 +212,7 @@ class KeyboardViewController: UIInputViewController {
 
         setupStripCallbacks()
         wireBackspaceButtons()
+        wireGlobeButtons()
         heightConstraint = KeyboardHostLayout.install(
             rootView: rootView,
             in: view,
@@ -231,6 +230,22 @@ class KeyboardViewController: UIInputViewController {
             btn.onHoldFire = { [weak self] in self?.handler.backspaceHoldFired() }
             btn.onHoldEnd  = { [weak self] in self?.handler.backspaceHoldEnded() }
         }
+    }
+
+    // Wire every globe key (one per layer): short tap advances to the next
+    // keyboard; long press shows the system keyboard picker. GlobeKeyButton
+    // detects the long press internally via a timer and calls
+    // handleInputModeList(from:with:) with the real touch event so the system
+    // picker animates from the correct location.
+    private func wireGlobeButtons() {
+        rootView.allDescendants(tag: Self.globeKeyTag)
+            .compactMap { $0 as? GlobeKeyButton }
+            .forEach { btn in
+                btn.onShortTap = { [weak self] in self?.advanceToNextInputMode() }
+                btn.onLongPress = { [weak self] button, event in
+                    self?.handleInputModeList(from: button, with: event)
+                }
+            }
     }
 }
 

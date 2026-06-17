@@ -28,7 +28,6 @@ import UIKit
 //   ABC bottom:   ABC | space (flex) | ⏎      (no period: it's in row 3)
 
 struct KeyboardLayerActions {
-    let nextKeyboard: Selector
     let letter: Selector
     let symbol: Selector
     let period: Selector
@@ -96,9 +95,8 @@ struct KeyboardLayerFactory {
         row.spacing = 6
         row.distribution = .fill
 
-        let globeBtn = makeSpecialKey("🌐", action: actions.nextKeyboard)
+        let globeBtn = makeGlobeKey()
         globeBtn.widthAnchor.constraint(equalToConstant: specialKeyW).isActive = true
-        globeBtn.tag = globeKeyTag
         row.addArrangedSubview(globeBtn)
 
         let enBtn = makeSpecialKey("EN", action: actions.toggleEnglish)
@@ -227,6 +225,20 @@ struct KeyboardLayerFactory {
         btn.setTitle(title, for: .normal)
         KeyStyle.applySpecial(btn, isIPad: isIPad)
         btn.addTarget(target, action: action, for: .touchUpInside)
+        return btn
+    }
+
+    // The next-keyboard key. Uses the SF Symbol "globe" sized and tinted to match
+    // the other special keys. GlobeKeyButton handles long-press detection internally
+    // via timer; KeyboardViewController wires onShortTap / onLongPress callbacks.
+    func makeGlobeKey() -> UIButton {
+        let btn = GlobeKeyButton(frame: .zero)
+        let config = UIImage.SymbolConfiguration(pointSize: isIPad ? 17 : 15, weight: .medium)
+        btn.setImage(UIImage(systemName: "globe", withConfiguration: config), for: .normal)
+        KeyStyle.applySpecial(btn, isIPad: isIPad)
+        btn.tintColor = .label
+        btn.accessibilityLabel = "Next Keyboard"
+        btn.tag = globeKeyTag
         return btn
     }
 

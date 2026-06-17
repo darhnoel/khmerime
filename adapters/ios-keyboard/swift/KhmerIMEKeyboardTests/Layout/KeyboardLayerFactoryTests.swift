@@ -26,7 +26,8 @@ final class KeyboardLayerFactoryTests: XCTestCase {
         XCTAssertEqual(buttonTitles(in: rows[0]), ["Q", "W", "E", "R", "T", "Y", "U", "I", "O", "P"])
         XCTAssertEqual(buttonTitles(in: rows[1]), ["A", "S", "D", "F", "G", "H", "J", "K", "L"])
         XCTAssertEqual(buttonTitles(in: rows[2]), ["123", "Z", "X", "C", "V", "B", "N", "M", "⌫"])
-        XCTAssertEqual(buttonTitles(in: rows[3]), ["🌐", "EN", "✦", "space", ".", "⏎"])
+        // Globe uses an SF Symbol image, so it has no title (empty slot).
+        XCTAssertEqual(buttonTitles(in: rows[3]), ["", "EN", "✦", "space", ".", "⏎"])
     }
 
     func test_numericAndSymbolsLayersBuildExpectedModeSwitchRows() {
@@ -34,9 +35,9 @@ final class KeyboardLayerFactoryTests: XCTestCase {
         let symbolsRows = standardRows(in: factory.buildSymbolsView())
 
         XCTAssertEqual(buttonTitles(in: numericRows[2]), ["#+=", ".", ",", "?", "!", "'", "⌫"])
-        XCTAssertEqual(buttonTitles(in: numericRows[3]), ["🌐", "EN", "ABC", "space", "⏎"])
+        XCTAssertEqual(buttonTitles(in: numericRows[3]), ["", "EN", "ABC", "space", "⏎"])
         XCTAssertEqual(buttonTitles(in: symbolsRows[2]), ["123", ".", ",", "?", "!", "'", "⌫"])
-        XCTAssertEqual(buttonTitles(in: symbolsRows[3]), ["🌐", "EN", "ABC", "space", "⏎"])
+        XCTAssertEqual(buttonTitles(in: symbolsRows[3]), ["", "EN", "ABC", "space", "⏎"])
     }
 
     func test_bottomRowTagsGlobeAndEnAndWiresActionsToTarget() {
@@ -45,12 +46,26 @@ final class KeyboardLayerFactoryTests: XCTestCase {
 
         XCTAssertEqual(buttons[0].tag, 42, "globe must carry globeKeyTag")
         XCTAssertEqual(buttons[1].tag, 43, "EN must carry enKeyTag")
-        XCTAssertEqual(actionNames(on: buttons[0]), ["nextKeyboardTapped"])
+        // Globe has no factory-wired tap action: KeyboardViewController wires
+        // handleInputModeList(from:with:) for .allTouchEvents at runtime.
+        XCTAssertEqual(actionNames(on: buttons[0]), [])
         XCTAssertEqual(actionNames(on: buttons[1]), ["toggleEnglishTapped"])
         XCTAssertEqual(actionNames(on: buttons[2]), ["numericTapped"])
         XCTAssertEqual(actionNames(on: buttons[3]), ["spaceTapped"])
         XCTAssertEqual(actionNames(on: buttons[4]), ["periodTapped"])
         XCTAssertEqual(actionNames(on: buttons[5]), ["returnTapped"])
+    }
+
+    func test_globeKeyUsesGlobeSymbolStyledLikeOtherKeys() {
+        let globe = factory.makeGlobeKey()
+
+        XCTAssertNotNil(globe.image(for: .normal),
+            "globe must use an SF Symbol image, not a text/emoji title")
+        XCTAssertNil(globe.title(for: .normal),
+            "globe must not carry a text label")
+        XCTAssertEqual(globe.tintColor, .label,
+            "globe tint must match the other keys' label color")
+        XCTAssertEqual(globe.tag, 42, "globe must carry globeKeyTag")
     }
 
     func test_letterAndSymbolKeysUseNativeButtonsWithNativeFonts() {
@@ -95,7 +110,6 @@ final class KeyboardLayerFactoryTests: XCTestCase {
 
 private final class ActionTarget: NSObject {
     static let actions = KeyboardLayerActions(
-        nextKeyboard: #selector(nextKeyboardTapped),
         letter: #selector(letterTapped(_:)),
         symbol: #selector(symbolKeyTapped(_:)),
         period: #selector(periodTapped),
@@ -109,7 +123,6 @@ private final class ActionTarget: NSObject {
         abc: #selector(abcTapped)
     )
 
-    @objc func nextKeyboardTapped() {}
     @objc func letterTapped(_ sender: UIButton) {}
     @objc func symbolKeyTapped(_ sender: UIButton) {}
     @objc func periodTapped() {}
