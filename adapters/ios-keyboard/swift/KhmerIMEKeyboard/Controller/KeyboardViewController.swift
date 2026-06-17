@@ -13,7 +13,7 @@ import UIKit
 //
 // Keyboard states
 // ---------------
-//   .qwerty    Default roman-input view. ✦ in shift slot, 123/space/./⏎ bottom.
+//   .qwerty    Default roman-input view. 123 in shift slot, ✦/space/./⏎ bottom.
 //   .numeric   123 layer: 1–0, punctuation, #+=, ABC/space/⏎.
 //   .symbols   #+= layer: []{}#%^*+=, currencies, 123/space/⏎.
 //   .charPick  CharPick mode: qwerty stays visible, ✦ highlighted, letter keys

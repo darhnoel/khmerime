@@ -20,8 +20,8 @@ import UIKit
 // Key row anatomy:
 //   QWERTY row 1: q w e r t y u i o p       (10 letter keys, fillEqually)
 //   QWERTY row 2:   a s d f g h j k l       (9 letter keys, fillEqually, inset)
-//   QWERTY row 3: ✦ z x c v b n m ⌫        (special | letters | special)
-//   Bottom row:   123 | space (flex) | . | ⏎
+//   QWERTY row 3: 123 z x c v b n m ⌫        (special | letters | special)
+//   Bottom row:   ✦ | space (flex) | . | ⏎
 //
 //   123 row 3:    #+= | . , ? ! ' | ⌫
 //   #+= row 3:    123 | . , ? ! ' | ⌫
@@ -63,7 +63,7 @@ struct KeyboardLayerFactory {
             makeLetterRow(["q", "w", "e", "r", "t", "y", "u", "i", "o", "p"]),
             makeLetterRow(["a", "s", "d", "f", "g", "h", "j", "k", "l"]),
             makeQwertyRow3(),
-            makeBottomRow(leftLabel: "123", leftAction: actions.numeric, includePeriod: true),
+            makeBottomRow(leftLabel: "✦", leftAction: actions.togglePanel, includePeriod: true),
         ])
     }
 
@@ -139,7 +139,7 @@ struct KeyboardLayerFactory {
         row.spacing = 6
         row.distribution = .fill
 
-        let toggleBtn = makeSpecialKey("✦", action: actions.togglePanel)
+        let toggleBtn = makeSpecialKey("123", action: actions.numeric)
         toggleBtn.widthAnchor.constraint(equalToConstant: specialKeyW).isActive = true
 
         let mid = makeLetterRow(["z", "x", "c", "v", "b", "n", "m"])

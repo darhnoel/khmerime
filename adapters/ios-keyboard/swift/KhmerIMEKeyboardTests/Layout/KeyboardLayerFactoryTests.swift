@@ -25,8 +25,8 @@ final class KeyboardLayerFactoryTests: XCTestCase {
         XCTAssertEqual(rows.count, 4)
         XCTAssertEqual(buttonTitles(in: rows[0]), ["Q", "W", "E", "R", "T", "Y", "U", "I", "O", "P"])
         XCTAssertEqual(buttonTitles(in: rows[1]), ["A", "S", "D", "F", "G", "H", "J", "K", "L"])
-        XCTAssertEqual(buttonTitles(in: rows[2]), ["✦", "Z", "X", "C", "V", "B", "N", "M", "⌫"])
-        XCTAssertEqual(buttonTitles(in: rows[3]), ["🌐", "EN", "123", "space", ".", "⏎"])
+        XCTAssertEqual(buttonTitles(in: rows[2]), ["123", "Z", "X", "C", "V", "B", "N", "M", "⌫"])
+        XCTAssertEqual(buttonTitles(in: rows[3]), ["🌐", "EN", "✦", "space", ".", "⏎"])
     }
 
     func test_numericAndSymbolsLayersBuildExpectedModeSwitchRows() {

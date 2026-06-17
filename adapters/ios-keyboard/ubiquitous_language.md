@@ -10,7 +10,7 @@ The currently visible keyboard view. Exactly one state is active at all times.
 
 | State | Description |
 |---|---|
-| **QWERTY** | Default roman-input view. ✦ in shift position, `123 space . ⏎` bottom row. |
+| **QWERTY** | Default roman-input view. 123 in shift position, `✦ space . ⏎` bottom row. |
 | **123** | Number/symbol layer. Native iOS layout. All keys go through the session. |
 | **#+=** | Secondary symbol layer, reached from 123. Full native iOS layout. |
 | **Panel** | Candidate panel. Replaces QWERTY area. Shows segment chips + candidate row. |
@@ -112,7 +112,7 @@ The full-replacement keyboard view activated by the ✦ button. Layout:
 ├──────────────────────────────────────────────┤
 │  ខ្ញុំ   ញុំ   ណុំ   ណ៉ំ  …          ← candidates │
 ├──────────────────────────────────────────────┤
-│   123   │        space        │  .  │   ⏎   │
+│   ✦    │        space        │  .  │   ⏎   │
 └──────────────────────────────────────────────┘
 ```
 
@@ -141,7 +141,7 @@ A key event that the session emits unchanged. Symbols (`-`, `/`, `(`, etc.) have
 
 ## ✦ Button
 
-The toggle button in the shift-key position (row 3, left). Switches between QWERTY and Panel states. Does not send any event to the session.
+The toggle button on the bottom row (between EN and space). Switches between QWERTY and Panel states. Does not send any event to the session.
 
 ---
 
@@ -153,7 +153,7 @@ The return/submit key. Label: `⏎` glyph. Triggers a full Commit of the current
 
 ## 123 Button
 
-Switches keyboard state from QWERTY → 123 (or Panel → 123). Label: `123`. Does not send any event to the session.
+Mode-switch button in row 3 (leftmost position). Switches keyboard state from QWERTY → 123 (or Panel → 123). Label: `123`. Does not send any event to the session.
 
 ---
 
