@@ -199,6 +199,12 @@ fn main() {
     println!("cargo:rerun-if-env-changed=KHMERIME_WARN_MISSING_OPTIONAL_DATA");
     println!("cargo:rerun-if-env-changed=KHPOS_SURFACE_MIN_COUNT");
     println!("cargo:rerun-if-env-changed=KHPOS_SURFACE_TOP_N");
+    println!("cargo:rerun-if-env-changed=KHMERIME_WARN_MISSING_OPTIONAL_DATA");
+
+    // Set KHMERIME_WARN_MISSING_OPTIONAL_DATA=1 when auditing data-path
+    // configuration and you want missing optional files to be visible as Cargo
+    // warnings.
+    let warn_missing_optional_data = env::var_os("KHMERIME_WARN_MISSING_OPTIONAL_DATA").is_some();
 
     // The checked-in CSV is canonical, but the TSV fallback keeps older local
     // worktrees usable while data migrations are in flight.
@@ -213,20 +219,24 @@ fn main() {
     let additional_source =
         fs::read_to_string(&additional_lexicon_csv).expect("additional most-common English-Khmer CSV must be readable");
     entries.extend(parse_additional_csv_entries(&additional_source));
-    let khpos_train =
-        fs::read_to_string(&data_paths.khpos_train).expect("khPOS after-replace train corpus must be readable");
-    let khpos_tags =
-        fs::read_to_string(&data_paths.khpos_tag).expect("khPOS after-replace tag corpus must be readable");
+    // khPOS corpus files improve decoding quality, but they are large and
+    // gitignored. CI runners won't have them unless the step runner downloads
+    // them separately. Treat them as optional like mobile keyboard n-grams.
+    let khpos_train = read_optional_source(
+        &data_paths.khpos_train,
+        "khPOS after-replace train corpus",
+        warn_missing_optional_data,
+    );
+    let khpos_tags = read_optional_source(
+        &data_paths.khpos_tag,
+        "khPOS after-replace tag corpus",
+        warn_missing_optional_data,
+    );
     let compiled_khpos = compile_khpos_stats(&khpos_train, &khpos_tags, khpos_build_options)
         .expect("khPOS after-replace corpus must compile");
     let compiled_dictionary_image = compile_dictionary_image(&entries, Some(&compiled_khpos.frequency_stats))
         .expect("default dictionary image must compile");
     let compiled = compile_lexicon_entries(entries).expect("default lexicon entries must compile");
-    // Mobile keyboard n-grams improve next-word scoring, but they are optional
-    // for normal development. Set KHMERIME_WARN_MISSING_OPTIONAL_DATA=1 when
-    // auditing data-path configuration and you want missing optional files to be
-    // visible as Cargo warnings.
-    let warn_missing_optional_data = env::var_os("KHMERIME_WARN_MISSING_OPTIONAL_DATA").is_some();
     let mobile_keyboard_1gram = read_optional_source(
         &data_paths.mobile_keyboard_1gram,
         "mobile keyboard 1-gram",
