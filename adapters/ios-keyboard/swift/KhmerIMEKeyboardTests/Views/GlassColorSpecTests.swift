@@ -89,23 +89,16 @@ final class GlassColorSpecTests: XCTestCase {
             "active toggle text must be dark")
     }
 
-    func test_charPickDismissButtonUsesActiveGlassToggleStyle() {
-        let panel = CandidatePanelView(metrics: KeyboardLayoutMetrics(device: .phone))
+    func test_activeGlassKeyButtonUsesToggleActiveStyle() {
+        let btn = GlassKeyButton(frame: .zero)
+        btn.setTitle("✦", for: .normal)
+        btn.isGlassActive = true
 
-        panel.renderCharPickAlphabet()
-
-        guard let toggle = allButtons(in: panel).first(where: { $0.title(for: .normal) == "✦" }) else {
-            XCTFail("Expected char-pick alphabet to include the ✦ dismiss button")
-            return
-        }
-        // toggleActiveBackground is near-white and near-opaque in both light and dark mode;
-        // test behavioral properties rather than exact color to avoid traitCollection
-        // temporal mismatch when the view is configured outside a window hierarchy.
-        XCTAssertGreaterThanOrEqual(alpha(toggle.backgroundColor), 230.0/255.0,
+        XCTAssertGreaterThanOrEqual(alpha(btn.backgroundColor), 230.0/255.0,
             "active ✦ must be near-opaque")
-        XCTAssertGreaterThanOrEqual(luminance(toggle.backgroundColor), 2.5,
+        XCTAssertGreaterThanOrEqual(luminance(btn.backgroundColor), 2.5,
             "active ✦ fill must be near-white in any appearance mode")
-        XCTAssertEqual(luminance(toggle.titleColor(for: .normal)),
+        XCTAssertEqual(luminance(btn.titleColor(for: .normal)),
                        luminance(GlassColorSpec.toggleActiveTextColor()), accuracy: 0.01,
                        "active ✦ text must be dark")
     }

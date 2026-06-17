@@ -5,21 +5,13 @@ protocol KeyboardStripDisplaying: AnyObject {
     func clear()
 }
 
-protocol KeyboardPanelDisplaying: AnyObject {
-    var bottomAnchorGuide: UILayoutGuide { get }
-    func render(_ state: IosRenderState)
-    func renderCharPickCandidates(_ candidates: [String])
-    func renderCharPickAlphabet()
-}
-
 final class KeyboardRootView: UIView {
     private let stripDisplay: KeyboardStripDisplaying
-    private let panelDisplay: KeyboardPanelDisplaying
+    private let candidateRowDisplay: KeyboardCandidateRowDisplaying
     private let qwertyView: UIView
     private let numericView: UIView
     private let symbolsView: UIView
-    private let panelView: UIView
-    private let panelBottomRow: UIView
+    private let candidateRowView: UIView
 
     init(
         metrics: KeyboardLayoutMetrics,
@@ -27,21 +19,18 @@ final class KeyboardRootView: UIView {
         qwertyView: UIView,
         numericView: UIView,
         symbolsView: UIView,
-        panelView: UIView & KeyboardPanelDisplaying,
-        panelBottomRow: UIView,
-        panelBottomAnchorGuide: UILayoutGuide
+        candidateRowView: UIView & KeyboardCandidateRowDisplaying
     ) {
         self.stripDisplay = stripView
-        self.panelDisplay = panelView
+        self.candidateRowDisplay = candidateRowView
         self.qwertyView = qwertyView
         self.numericView = numericView
         self.symbolsView = symbolsView
-        self.panelView = panelView
-        self.panelBottomRow = panelBottomRow
+        self.candidateRowView = candidateRowView
         super.init(frame: .zero)
 
         backgroundColor = .clear
-        for view in [stripView, qwertyView, numericView, symbolsView, panelView, panelBottomRow] {
+        for view in [stripView, candidateRowView, qwertyView, numericView, symbolsView] {
             view.translatesAutoresizingMaskIntoConstraints = false
             addSubview(view)
         }
@@ -52,62 +41,47 @@ final class KeyboardRootView: UIView {
             stripView.trailingAnchor.constraint(equalTo: trailingAnchor),
             stripView.heightAnchor.constraint(equalToConstant: metrics.stripHeight),
 
-            qwertyView.topAnchor.constraint(equalTo: stripView.bottomAnchor),
+            candidateRowView.topAnchor.constraint(equalTo: stripView.bottomAnchor),
+            candidateRowView.leadingAnchor.constraint(equalTo: leadingAnchor),
+            candidateRowView.trailingAnchor.constraint(equalTo: trailingAnchor),
+            candidateRowView.heightAnchor.constraint(equalToConstant: metrics.candidateRowHeight),
+
+            qwertyView.topAnchor.constraint(equalTo: candidateRowView.bottomAnchor),
             qwertyView.leadingAnchor.constraint(equalTo: leadingAnchor),
             qwertyView.trailingAnchor.constraint(equalTo: trailingAnchor),
             qwertyView.bottomAnchor.constraint(equalTo: bottomAnchor),
 
-            numericView.topAnchor.constraint(equalTo: stripView.bottomAnchor),
+            numericView.topAnchor.constraint(equalTo: candidateRowView.bottomAnchor),
             numericView.leadingAnchor.constraint(equalTo: leadingAnchor),
             numericView.trailingAnchor.constraint(equalTo: trailingAnchor),
             numericView.bottomAnchor.constraint(equalTo: bottomAnchor),
 
-            symbolsView.topAnchor.constraint(equalTo: stripView.bottomAnchor),
+            symbolsView.topAnchor.constraint(equalTo: candidateRowView.bottomAnchor),
             symbolsView.leadingAnchor.constraint(equalTo: leadingAnchor),
             symbolsView.trailingAnchor.constraint(equalTo: trailingAnchor),
             symbolsView.bottomAnchor.constraint(equalTo: bottomAnchor),
-
-            panelView.topAnchor.constraint(equalTo: stripView.bottomAnchor),
-            panelView.leadingAnchor.constraint(equalTo: leadingAnchor),
-            panelView.trailingAnchor.constraint(equalTo: trailingAnchor),
-
-            panelBottomRow.topAnchor.constraint(equalTo: panelBottomAnchorGuide.topAnchor, constant: metrics.panelBottomRowTopSpacing),
-            panelBottomRow.leadingAnchor.constraint(equalTo: leadingAnchor, constant: metrics.keyHorizontalInset),
-            panelBottomRow.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -metrics.keyHorizontalInset),
-            panelBottomRow.heightAnchor.constraint(equalToConstant: metrics.panelBottomRowHeight),
         ])
 
         apply(.qwerty)
     }
 
-    required init?(coder: NSCoder) { fatalError("use init(metrics:stripView:qwertyView:numericView:symbolsView:panelView:panelBottomRow:panelBottomAnchorGuide:)") }
+    required init?(coder: NSCoder) { fatalError("use init(metrics:stripView:qwertyView:numericView:symbolsView:candidateRowView:)") }
 
     func apply(_ state: KeyboardState) {
         let visibility = KeyboardLayerVisibility(state: state)
         qwertyView.isHidden = !visibility.showsQwerty
         numericView.isHidden = !visibility.showsNumeric
         symbolsView.isHidden = !visibility.showsSymbols
-        panelView.isHidden = !visibility.showsPanel
-        panelBottomRow.isHidden = !visibility.showsPanel
+        candidateRowView.isHidden = !visibility.showsCandidateRow
     }
 
-    func render(_ state: IosRenderState, romanHint: String, keyboardState: KeyboardState) {
+    func render(_ state: IosRenderState, romanHint: String) {
         stripDisplay.render(state, romanBuffer: romanHint)
-        switch keyboardState {
-        case .panel:
-            panelDisplay.render(state)
-        case .charPick:
-            panelDisplay.renderCharPickCandidates(state.candidates)
-        default:
-            break
-        }
+        candidateRowDisplay.render(state)
     }
 
     func clearStrip() {
         stripDisplay.clear()
-    }
-
-    func renderCharPickAlphabet() {
-        panelDisplay.renderCharPickAlphabet()
+        candidateRowDisplay.clear()
     }
 }

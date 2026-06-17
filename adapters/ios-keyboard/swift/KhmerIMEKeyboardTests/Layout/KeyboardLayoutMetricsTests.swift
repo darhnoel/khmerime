@@ -3,11 +3,16 @@ import XCTest
 
 final class KeyboardLayoutMetricsTests: XCTestCase {
 
+    func test_candidateRowHeightIsReservedForPhoneAndPad() {
+        XCTAssertEqual(KeyboardLayoutMetrics(device: .phone).candidateRowHeight, 44)
+        XCTAssertEqual(KeyboardLayoutMetrics(device: .pad).candidateRowHeight, 44)
+    }
+
     func test_metricsPreserveCurrentPhoneAndPadSizingPolicy() {
         let phone = KeyboardLayoutMetrics(device: .phone)
         let pad = KeyboardLayoutMetrics(device: .pad)
 
-        XCTAssertEqual(phone.baseKeyboardHeight, 260)
+        XCTAssertEqual(phone.baseKeyboardHeight, 304)
         XCTAssertEqual(phone.stripHeight, 44)
         XCTAssertEqual(phone.specialKeyWidth, 42)
         XCTAssertEqual(phone.returnKeyWidth, 82)
@@ -16,12 +21,8 @@ final class KeyboardLayoutMetricsTests: XCTestCase {
         XCTAssertEqual(phone.keyHorizontalInset, 3)
         XCTAssertEqual(phone.keyTopInset, 8)
         XCTAssertEqual(phone.keyBottomInset, 4)
-        XCTAssertEqual(phone.panelChipHeight, 44)
-        XCTAssertEqual(phone.panelCandidateHeight, 110)
-        XCTAssertEqual(phone.panelBottomRowTopSpacing, 8)
-        XCTAssertEqual(phone.panelBottomRowHeight, 45)
 
-        XCTAssertEqual(pad.baseKeyboardHeight, 320)
+        XCTAssertEqual(pad.baseKeyboardHeight, 364)
         XCTAssertEqual(pad.stripHeight, 44)
         XCTAssertEqual(pad.specialKeyWidth, 56)
         XCTAssertEqual(pad.returnKeyWidth, 112)
@@ -30,33 +31,19 @@ final class KeyboardLayoutMetricsTests: XCTestCase {
         XCTAssertEqual(pad.keyHorizontalInset, 3)
         XCTAssertEqual(pad.keyTopInset, 8)
         XCTAssertEqual(pad.keyBottomInset, 4)
-        XCTAssertEqual(pad.panelChipHeight, 44)
-        XCTAssertEqual(pad.panelCandidateHeight, 155)
-        XCTAssertEqual(pad.panelBottomRowTopSpacing, 8)
-        XCTAssertEqual(pad.panelBottomRowHeight, 60)
     }
 
-    func test_panelBottomRowAlignsWithStandardKeyboardBottomRow() {
+    func test_keyRowHeightStaysAboveTouchTargetFloorAfterCandidateRowInsertion() {
         for metrics in [KeyboardLayoutMetrics(device: .phone), KeyboardLayoutMetrics(device: .pad)] {
-            let keyAreaHeight = metrics.baseKeyboardHeight - metrics.stripHeight
+            let effectiveKeyAreaHeight = metrics.baseKeyboardHeight - metrics.stripHeight - metrics.candidateRowHeight
             let standardRowHeight = (
-                keyAreaHeight
+                effectiveKeyAreaHeight
                 - metrics.keyTopInset
                 - metrics.keyBottomInset
                 - (metrics.rowSpacing * 3)
             ) / 4
-            let standardBottomRowTop = metrics.keyTopInset + (standardRowHeight + metrics.rowSpacing) * 3
-            let panelBottomRowTop = (
-                4
-                + metrics.panelChipHeight
-                + 0.5
-                + metrics.panelCandidateHeight
-                + 0.5
-                + metrics.panelBottomRowTopSpacing
-            )
 
-            XCTAssertEqual(panelBottomRowTop, standardBottomRowTop, accuracy: 0.01)
-            XCTAssertEqual(metrics.panelBottomRowHeight, standardRowHeight, accuracy: 0.01)
+            XCTAssertGreaterThanOrEqual(standardRowHeight, 44)
         }
     }
 }

@@ -61,22 +61,6 @@ final class KeyboardInputHandlerTests: XCTestCase {
             "no space before the newline; got \(proxy.text.debugDescription)")
     }
 
-    func test_returnInPanel_commitsAndClosesPanelWithoutNewline() {
-        let (handler, proxy) = makeHandler()
-        type("nhom", into: handler)
-        handler.togglePanel()       // → .panel
-
-        handler.returnTapped()
-        handler.textDidChange()
-
-        XCTAssertEqual(handler.keyboardState, .qwerty,
-            "⏎ in panel must accept the composition and close the panel")
-        XCTAssertFalse(proxy.text.contains("\n"),
-            "⏎ in panel must not insert a newline; got \(proxy.text.debugDescription)")
-        XCTAssertFalse(proxy.text.contains("nhom"),
-            "roman chars must be replaced by Khmer on panel commit")
-    }
-
     // MARK: - Test A: no trailing space before newline
 
     func test_spaceReturn_noTrailingSpaceBeforeNewline() {
@@ -185,43 +169,26 @@ final class KeyboardInputHandlerTests: XCTestCase {
 
     // MARK: - Panel state machine
 
-    func test_togglePanel_withComposition_transitionsToPanel() {
+    func test_togglePanel_withComposition_entersCharPick() {
+        // ✦ always enters CharPick now — the persistent candidate row (not the
+        // panel) is the surface for browsing candidates of an active composition.
         let (handler, _) = makeHandler()
         type("nhom", into: handler)
 
         handler.togglePanel()
 
-        XCTAssertEqual(handler.keyboardState, .panel,
-            "✦ with active composition must enter panel state")
+        XCTAssertEqual(handler.keyboardState, .charPick,
+            "✦ must enter charPick mode regardless of composition state")
     }
 
-    // Regression: onRender must fire AFTER transition so the VC can pass state
-    // to the panel view. Old code called onRender first (keyboardState still
-    // .qwerty), so panelView.render was never called and panel showed blank.
-    func test_togglePanel_withComposition_rendersWhileInPanelState() {
+    func test_togglePanel_whenInCharPick_transitionsToQwerty() {
         let (handler, _) = makeHandler()
-        type("nhom", into: handler)
-
-        var stateAtRenderTime: KeyboardState?
-        handler.onRender = { [weak handler] _, _ in
-            stateAtRenderTime = handler?.keyboardState
-        }
-
-        handler.togglePanel()
-
-        XCTAssertEqual(stateAtRenderTime, .panel,
-            "onRender must fire while keyboardState is already .panel, not before transition")
-    }
-
-    func test_togglePanel_whenInPanel_transitionsToQwerty() {
-        let (handler, _) = makeHandler()
-        type("nhom", into: handler)
-        handler.togglePanel()   // → .panel
+        handler.togglePanel()   // → .charPick
 
         handler.togglePanel()   // → .qwerty
 
         XCTAssertEqual(handler.keyboardState, .qwerty,
-            "second ✦ tap must dismiss panel and return to qwerty")
+            "second ✦ tap must dismiss charPick and return to qwerty")
     }
 
     func test_togglePanel_withoutComposition_transitionsToCharPick() {
@@ -240,10 +207,10 @@ final class KeyboardInputHandlerTests: XCTestCase {
         var transitions: [KeyboardState] = []
         handler.onTransition = { transitions.append($0) }
 
-        handler.togglePanel()   // → .panel
+        handler.togglePanel()   // → .charPick
         handler.togglePanel()   // → .qwerty
 
-        XCTAssertEqual(transitions, [.panel, .qwerty],
+        XCTAssertEqual(transitions, [.charPick, .qwerty],
             "onTransition must fire once per state change in order")
     }
 
@@ -262,25 +229,28 @@ final class KeyboardInputHandlerTests: XCTestCase {
             "roman chars must be replaced by the committed Khmer text")
     }
 
-    func test_chipTapped_whenComposingPhrase_opensPanel() {
+    func test_chipTapped_onDifferentSegment_navigatesFocusWithoutChangingState() {
         let (handler, _) = makeHandler()
-        type("khnhomtov", into: handler)   // multi-word phrase → segments.count >= 2
+        type("khnhomtov", into: handler)   // multi-word phrase, focus starts at segment 0
 
-        handler.chipTapped(at: 0)
+        handler.chipTapped(at: 1)
 
-        XCTAssertEqual(handler.keyboardState, .panel,
-            "tapping a chip in a real phrase must open the panel so its candidates become visible")
+        XCTAssertEqual(handler.keyboardState, .qwerty,
+            "tapping a different segment must navigate focus only — no panel, no state change")
+        XCTAssertEqual(handler.lastState?.focusedSegmentIndex.map { Int($0) }, 1,
+            "tapping segment 1 must move focus there")
     }
 
-    func test_chipTapped_whenPanelAlreadyOpen_staysInPanel() {
+    func test_chipTapped_onAlreadyFocusedSegment_entersInlineEditMode() {
         let (handler, _) = makeHandler()
-        type("khnhomtov", into: handler)   // multi-word phrase → segments.count >= 2
-        handler.togglePanel()   // → .panel
+        type("khnhomtov", into: handler)   // multi-word phrase, focus starts at segment 0
 
-        handler.chipTapped(at: 0)
+        handler.chipTapped(at: 0)   // re-tap the already-focused segment
 
-        XCTAssertEqual(handler.keyboardState, .panel,
-            "tapping a chip while the panel is already open must not toggle it closed")
+        XCTAssertEqual(handler.keyboardState, .qwerty,
+            "2-tap-to-edit must stay in qwerty — edit mode renders inline, not via a panel")
+        XCTAssertEqual(handler.lastState?.segmentEditActive, true,
+            "re-tapping the focused segment must enter Segment Edit Mode")
     }
 
     // MARK: - Layer switching
@@ -308,48 +278,10 @@ final class KeyboardInputHandlerTests: XCTestCase {
 
     // MARK: - CharPick letter tapping
 
-    // Regression: onRender fired from charPickLetterTapped must report keyboardState
-    // == .charPick so the VC can call renderCharPickCandidates() instead of render(),
-    // which would destroy the alphabet chip row by rebuilding chips from empty segments.
-    // NOTE: These tests call handler.charPickLetterTapped() directly and therefore
-    // bypass CandidatePanelView's gesture recognizer → delegate path. A separate
-    // UI test would be needed to catch bugs in that UIKit layer (e.g. the
-    // btn.title(for:) vs btn.configuration?.title issue fixed in CandidatePanelView).
-
-    func test_charPickLetter_firesOnRenderWhileInCharPickState() {
-        let (handler, _) = makeHandler()
-        handler.togglePanel()   // no composition → charPick
-
-        var stateAtRenderTime: KeyboardState?
-        handler.onRender = { [weak handler] _, _ in
-            stateAtRenderTime = handler?.keyboardState
-        }
-
-        handler.charPickLetterTapped("k")
-
-        XCTAssertEqual(stateAtRenderTime, .charPick,
-            "onRender from charPickLetterTapped must fire while in .charPick so the VC routes to renderCharPickCandidates()")
-    }
-
-    func test_charPickLetter_rendersKhmerCandidates() {
-        let (handler, _) = makeHandler()
-        handler.togglePanel()
-
-        var renderedCandidates: [String] = []
-        handler.onRender = { state, _ in renderedCandidates = state.candidates }
-
-        handler.charPickLetterTapped("k")
-
-        XCTAssertFalse(renderedCandidates.isEmpty,
-            "charPickLetterTapped must produce Khmer candidates via onRender")
-        XCTAssertTrue(renderedCandidates.contains("ក"),
-            "candidates for 'k' must include ក; got \(renderedCandidates)")
-    }
-
     func test_charPickSelect_insertsKhmerToProxy() {
         let (handler, proxy) = makeHandler()
         handler.togglePanel()
-        handler.charPickLetterTapped("k")   // loads candidates incl. ក
+        handler.sendChar("k")   // loads candidates incl. ក
 
         handler.selectCandidate(at: 0)
 
@@ -360,19 +292,19 @@ final class KeyboardInputHandlerTests: XCTestCase {
             "inserted text must be Khmer Unicode; got \(proxy.text.debugDescription)")
     }
 
-    func test_charPickSelect_resetsToAlphabetView() {
-        // After selecting a candidate, onCharPickAlphabet must fire so the VC
-        // re-renders the letter chip row for the next pick.
+    func test_charPickSelect_clearsCandidateRowAndStaysInCharPick() {
         let (handler, _) = makeHandler()
         handler.togglePanel()
-        handler.charPickLetterTapped("k")
+        handler.sendChar("k")   // loads candidates
 
-        var alphabetResetCount = 0
-        handler.onCharPickAlphabet = { alphabetResetCount += 1 }
+        var stripCleared = false
+        handler.onStripClear = { stripCleared = true }
         handler.selectCandidate(at: 0)
 
-        XCTAssertEqual(alphabetResetCount, 1,
-            "onCharPickAlphabet must fire once after candidate selection to restore the alphabet row")
+        XCTAssertTrue(stripCleared,
+            "selecting a charPick candidate must clear the candidate row for the next pick")
+        XCTAssertEqual(handler.keyboardState, .charPick,
+            "charPick mode must persist after candidate selection")
     }
 
     func test_sendChar_inCharPickMode_doesNotModifyProxy() {
@@ -384,6 +316,51 @@ final class KeyboardInputHandlerTests: XCTestCase {
 
         XCTAssertEqual(proxy.text, textBefore,
             "sendChar in charPick must not insert roman chars into the proxy")
+    }
+
+    func test_sendChar_inCharPickMode_firesOnRenderWithKhmerCandidates() {
+        let (handler, _) = makeHandler()
+        handler.togglePanel()   // → charPick
+
+        var renderedCandidates: [String] = []
+        handler.onRender = { state, _ in renderedCandidates = state.candidates }
+
+        handler.sendChar("k")
+
+        XCTAssertFalse(renderedCandidates.isEmpty,
+            "sendChar in charPick must fire onRender with session candidates")
+        XCTAssertTrue(renderedCandidates.contains("ក"),
+            "candidates for 'k' in charPick must include ក; got \(renderedCandidates)")
+    }
+
+    func test_backspace_inCharPickMode_withCandidates_clearsCandidatesAndStaysInCharPick() {
+        let (handler, proxy) = makeHandler()
+        handler.togglePanel()   // → charPick
+        handler.sendChar("k")   // loads candidates
+        let textBefore = proxy.text
+
+        var stripCleared = false
+        handler.onStripClear = { stripCleared = true }
+
+        handler.backspaceTapped()
+
+        XCTAssertEqual(proxy.text, textBefore,
+            "backspace in charPick with candidates must not delete from proxy")
+        XCTAssertTrue(stripCleared,
+            "backspace in charPick with candidates must clear the candidate row")
+        XCTAssertEqual(handler.keyboardState, .charPick,
+            "backspace in charPick must stay in charPick mode")
+    }
+
+    func test_backspace_inCharPickMode_withNoCandidates_deletesFromProxy() {
+        let (handler, proxy) = makeHandler()
+        proxy.insertText("ក")   // some committed text
+        handler.togglePanel()   // → charPick, no candidates yet
+
+        handler.backspaceTapped()
+
+        XCTAssertEqual(proxy.text, "",
+            "backspace in charPick with no candidates must delete from proxy")
     }
 
     // MARK: - Render callback
