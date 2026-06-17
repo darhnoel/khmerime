@@ -33,6 +33,18 @@ final class KeyboardLayoutMetricsTests: XCTestCase {
         XCTAssertEqual(pad.keyBottomInset, 4)
     }
 
+    func test_idleKeyboardHeightDropsBothChromeRows() {
+        // When idle (no composition) the strip + candidate row collapse to zero, so
+        // the keyboard's total height is the full height minus both reserved rows.
+        for metrics in [KeyboardLayoutMetrics(device: .phone), KeyboardLayoutMetrics(device: .pad)] {
+            XCTAssertEqual(
+                metrics.idleKeyboardHeight,
+                metrics.baseKeyboardHeight - metrics.stripHeight - metrics.candidateRowHeight,
+                "idle height must drop exactly the strip + candidate row (88pt), keeping the key area unchanged"
+            )
+        }
+    }
+
     func test_keyRowHeightStaysAboveTouchTargetFloorAfterCandidateRowInsertion() {
         for metrics in [KeyboardLayoutMetrics(device: .phone), KeyboardLayoutMetrics(device: .pad)] {
             let effectiveKeyAreaHeight = metrics.baseKeyboardHeight - metrics.stripHeight - metrics.candidateRowHeight

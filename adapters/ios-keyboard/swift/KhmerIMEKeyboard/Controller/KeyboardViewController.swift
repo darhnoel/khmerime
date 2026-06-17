@@ -31,6 +31,10 @@ class KeyboardViewController: UIInputViewController {
     // appears/disappears (e.g. on iPhone X or on iPad when the bar changes).
     private var heightConstraint: NSLayoutConstraint!
 
+    // Whether the strip + candidate row are currently expanded. Starts collapsed:
+    // the keyboard appears keys-only and grows on the first keystroke.
+    private var isChromeComposing = false
+
     var isIPad: Bool { traitCollection.userInterfaceIdiom == .pad }
     var layoutMetrics: KeyboardLayoutMetrics {
         KeyboardLayoutMetrics(device: isIPad ? .pad : .phone)
@@ -87,10 +91,31 @@ class KeyboardViewController: UIInputViewController {
 
     override func viewSafeAreaInsetsDidChange() {
         super.viewSafeAreaInsetsDidChange()
-        heightConstraint.constant = KeyboardHostLayout.heightConstant(
-            metrics: layoutMetrics,
-            safeAreaBottom: view.safeAreaInsets.bottom
-        )
+        heightConstraint.constant = keyboardHeight(composing: isChromeComposing)
+    }
+
+    // MARK: - Chrome collapse / expand
+
+    // Total keyboard height for the current chrome state. Idle drops the strip +
+    // candidate row (88pt); composing reserves them. Keys keep the same height in
+    // both, so only the total shrinks.
+    private func keyboardHeight(composing: Bool) -> CGFloat {
+        let base = composing ? layoutMetrics.baseKeyboardHeight : layoutMetrics.idleKeyboardHeight
+        return base + view.safeAreaInsets.bottom
+    }
+
+    // Expands or collapses the two chrome rows and the host height together. Only
+    // acts on a real transition, so the per-keystroke renders during composition
+    // don't re-trigger the animation.
+    private func setComposingChrome(_ composing: Bool, animated: Bool) {
+        guard composing != isChromeComposing else { return }
+        isChromeComposing = composing
+        rootView.setChromeVisible(composing)
+        heightConstraint.constant = keyboardHeight(composing: composing)
+        guard animated else { view.layoutIfNeeded(); return }
+        UIView.animate(withDuration: 0.2, delay: 0, options: [.curveEaseOut, .beginFromCurrentState]) {
+            self.view.layoutIfNeeded()
+        }
     }
 
     override func viewWillLayoutSubviews() {
@@ -118,9 +143,12 @@ class KeyboardViewController: UIInputViewController {
         handler.onRender = { [weak self] state, romanHint in
             guard let self else { return }
             self.rootView.render(state, romanHint: romanHint)
+            self.setComposingChrome(KeyboardChrome.isComposing(romanHint: romanHint, state: state), animated: true)
         }
         handler.onStripClear = { [weak self] in
-            self?.rootView.clearStrip()
+            guard let self else { return }
+            self.rootView.clearStrip()
+            self.setComposingChrome(false, animated: true)
         }
         handler.onEnglishModeChanged = { [weak self] isEnglish in
             guard let self else { return }
@@ -192,6 +220,9 @@ class KeyboardViewController: UIInputViewController {
             metrics: layoutMetrics,
             safeAreaBottom: view.safeAreaInsets.bottom
         )
+        // rootView starts with its chrome collapsed, so the host begins at idle
+        // height — keys-only — and expands on the first keystroke.
+        heightConstraint.constant = keyboardHeight(composing: false)
     }
 
     private func wireBackspaceButtons() {

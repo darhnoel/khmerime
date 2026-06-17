@@ -37,4 +37,10 @@ struct KeyboardLayoutMetrics {
         keyTopInset = 8
         keyBottomInset = 4
     }
+
+    // Height when idle: the strip + candidate row collapse to zero, leaving only
+    // the key area. The keyboard expands to baseKeyboardHeight while composing.
+    var idleKeyboardHeight: CGFloat {
+        baseKeyboardHeight - stripHeight - candidateRowHeight
+    }
 }

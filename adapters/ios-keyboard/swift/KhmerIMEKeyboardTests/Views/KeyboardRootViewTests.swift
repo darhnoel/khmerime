@@ -60,6 +60,47 @@ final class KeyboardRootViewTests: XCTestCase {
             "candidate row must be cleared whenever the strip is cleared so stale candidates don't linger after a commit")
     }
 
+    // MARK: - chrome collapse / expand
+
+    func test_setChromeVisibleFalse_collapsesStripAndCandidateRowToZero() {
+        let fixture = makeRootView()
+
+        fixture.rootView.setChromeVisible(false)
+
+        XCTAssertEqual(fixture.rootView.stripHeightConstraint.constant, 0,
+            "collapsed chrome must drop the strip height to zero")
+        XCTAssertEqual(fixture.rootView.candidateRowHeightConstraint.constant, 0,
+            "collapsed chrome must drop the candidate row height to zero")
+    }
+
+    func test_setChromeVisibleTrue_restoresReservedRowHeights() {
+        let fixture = makeRootView()
+        fixture.rootView.setChromeVisible(false)
+
+        fixture.rootView.setChromeVisible(true)
+
+        XCTAssertEqual(fixture.rootView.stripHeightConstraint.constant, 44,
+            "expanded chrome must restore the strip to its reserved height")
+        XCTAssertEqual(fixture.rootView.candidateRowHeightConstraint.constant, 44,
+            "expanded chrome must restore the candidate row to its reserved height")
+    }
+
+    func test_keyLayerHeightIsFixedAndUnaffectedByChromeCollapse() {
+        let fixture = makeRootView()
+        let metrics = KeyboardLayoutMetrics(device: .phone)
+        fixture.rootView.frame = CGRect(x: 0, y: 0, width: 320, height: metrics.baseKeyboardHeight)
+
+        fixture.rootView.setChromeVisible(true)
+        fixture.rootView.layoutIfNeeded()
+        XCTAssertEqual(fixture.qwertyView.bounds.height, metrics.idleKeyboardHeight, accuracy: 0.5,
+            "key area must equal the fixed idle height while composing")
+
+        fixture.rootView.setChromeVisible(false)
+        fixture.rootView.layoutIfNeeded()
+        XCTAssertEqual(fixture.qwertyView.bounds.height, metrics.idleKeyboardHeight, accuracy: 0.5,
+            "key area height must not change when the chrome collapses — the keys never resize or move")
+    }
+
     private func makeRootView() -> (
         rootView: KeyboardRootView,
         stripView: SpyStripView,

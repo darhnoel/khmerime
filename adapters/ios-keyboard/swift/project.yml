@@ -76,6 +76,7 @@ targets:
       - path: KhmerIMEKeyboard/Input/KeyboardSession.swift
       - path: KhmerIMEKeyboard/Input/KeyboardState.swift
       - path: KhmerIMEKeyboard/Input/TextProxy.swift
+      - path: KhmerIMEKeyboard/Layout/KeyboardChrome.swift
       - path: KhmerIMEKeyboard/Layout/KeyboardHostLayout.swift
       - path: KhmerIMEKeyboard/Layout/KeyboardLayerFactory.swift
       - path: KhmerIMEKeyboard/Layout/KeyboardLayerVisibility.swift
