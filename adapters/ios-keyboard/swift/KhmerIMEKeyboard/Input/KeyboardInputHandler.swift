@@ -30,7 +30,6 @@ import Foundation
 //   onRender          — called with a new state and the roman-hint string the strip
 //                       should display in its top row
 //   onStripClear      — called when the strip should be blanked
-//   onCharPickAlphabet — called when the panel should switch to the A–Z picker
 //
 // Android equivalent
 // ------------------
@@ -79,7 +78,6 @@ final class KeyboardInputHandler {
     var onTransition: ((KeyboardState) -> Void)?
     var onRender: ((_ state: IosRenderState, _ romanHint: String) -> Void)?
     var onStripClear: (() -> Void)?
-    var onCharPickAlphabet: (() -> Void)?
     var onEnglishModeChanged: ((Bool) -> Void)?
 
     // MARK: - Init
@@ -157,7 +155,14 @@ final class KeyboardInputHandler {
     // MARK: - Character Input
 
     func sendChar(_ ch: String) {
-        guard keyboardState != .charPick else { return }
+        if keyboardState == .charPick {
+            dispatcher.onSession { [weak self] in
+                guard let self else { return }
+                let state = self.session.sendCharacter(ch)
+                self.dispatcher.onMain { [weak self] in self?.render(state) }
+            }
+            return
+        }
         if isEnglishMode {
             proxy.insertText(ch)
             return
@@ -265,8 +270,6 @@ final class KeyboardInputHandler {
                         guard let self else { return }
                         self.lastState = nil
                         self.onStripClear?()
-                        self.onCharPickAlphabet?()
-                        self.transition(to: .charPick)
                     }
                 }
             }
@@ -330,8 +333,6 @@ final class KeyboardInputHandler {
                         guard let self else { return }
                         self.lastState = nil
                         self.onStripClear?()
-                        self.onCharPickAlphabet?()
-                        self.transition(to: .charPick)
                     }
                 }
             } else {
@@ -371,6 +372,9 @@ final class KeyboardInputHandler {
             }
             return
         }
+        for _ in romanBuffer { proxy.deleteBackward() }
+        romanBuffer = ""
+        trailingSpace = false
         dispatcher.onSession { [weak self] in
             guard let self else { return }
             _ = self.session.enterCharPick()
@@ -378,7 +382,6 @@ final class KeyboardInputHandler {
                 guard let self else { return }
                 self.lastState = nil
                 self.onStripClear?()
-                self.onCharPickAlphabet?()
                 self.transition(to: .charPick)
             }
         }
@@ -423,34 +426,6 @@ final class KeyboardInputHandler {
         }
     }
 
-    func enterCharPickFromPanel() {
-        for _ in romanBuffer { proxy.deleteBackward() }
-        romanBuffer = ""
-        dispatcher.onSession { [weak self] in
-            guard let self else { return }
-            _ = self.session.enterCharPick()
-            self.dispatcher.onMain { [weak self] in
-                guard let self else { return }
-                self.lastState = nil
-                self.onStripClear?()
-                self.onCharPickAlphabet?()
-                self.transition(to: .charPick)
-            }
-        }
-    }
-
-    func charPickLetterTapped(_ letter: Character) {
-        dispatcher.onSession { [weak self] in
-            guard let self else { return }
-            let state = self.session.sendCharacter(String(letter))
-            self.dispatcher.onMain { [weak self] in
-                guard let self else { return }
-                self.lastState = state
-                self.onRender?(state, String(letter))
-            }
-        }
-    }
-
     func selectCandidate(at index: Int) {
         if keyboardState == .charPick {
             if let candidate = lastState?.candidates[safe: index] {
@@ -463,7 +438,6 @@ final class KeyboardInputHandler {
                     guard let self else { return }
                     self.lastState = nil
                     self.onStripClear?()
-                    self.onCharPickAlphabet?()
                 }
             }
             return

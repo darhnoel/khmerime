@@ -10,20 +10,16 @@ final class KeyboardRootViewTests: XCTestCase {
         XCTAssertTrue(fixture.numericView.isHidden)
         XCTAssertTrue(fixture.symbolsView.isHidden)
         XCTAssertFalse(fixture.candidateRowView.isHidden)
-        XCTAssertTrue(fixture.panelView.isHidden)
-        XCTAssertTrue(fixture.panelBottomRow.isHidden)
     }
 
-    func test_applyCharPickStateShowsPanelAndBottomRow() {
+    func test_applyCharPickStateKeepsQwertyVisible() {
         let fixture = makeRootView()
 
         fixture.rootView.apply(.charPick)
 
-        XCTAssertTrue(fixture.qwertyView.isHidden)
+        XCTAssertFalse(fixture.qwertyView.isHidden)
         XCTAssertTrue(fixture.numericView.isHidden)
         XCTAssertTrue(fixture.symbolsView.isHidden)
-        XCTAssertFalse(fixture.panelView.isHidden)
-        XCTAssertFalse(fixture.panelBottomRow.isHidden)
     }
 
     func test_applyNumericStateShowsNumericLayerOnly() {
@@ -34,60 +30,34 @@ final class KeyboardRootViewTests: XCTestCase {
         XCTAssertTrue(fixture.qwertyView.isHidden)
         XCTAssertFalse(fixture.numericView.isHidden)
         XCTAssertTrue(fixture.symbolsView.isHidden)
-        XCTAssertTrue(fixture.panelView.isHidden)
-        XCTAssertTrue(fixture.panelBottomRow.isHidden)
     }
 
-    func test_applyCharPickStateHidesCandidateRow() {
+    func test_applyCharPickStateShowsCandidateRow() {
         let fixture = makeRootView()
 
         fixture.rootView.apply(.charPick)
 
-        XCTAssertTrue(fixture.candidateRowView.isHidden)
+        XCTAssertFalse(fixture.candidateRowView.isHidden)
     }
 
-    func test_renderCharPickStateUpdatesStripAndOnlyPanelCandidates() {
+    func test_renderUpdatesBothStripAndCandidateRow() {
         let fixture = makeRootView()
         let state = makeRenderState(candidates: ["ក", "ខ"])
 
-        fixture.rootView.render(state, romanHint: "k", keyboardState: .charPick)
-
-        XCTAssertEqual(fixture.stripView.renderedRomanHint, "k")
-        XCTAssertEqual(fixture.stripView.renderedState, state)
-        XCTAssertNil(fixture.panelView.renderedState)
-        XCTAssertEqual(fixture.panelView.renderedCharPickCandidates, ["ក", "ខ"])
-    }
-
-    func test_renderCharPickStateClearsCandidateRow() {
-        let fixture = makeRootView()
-        let qwertyState = makeRenderState(candidates: ["ក"])
-        let charPickState = makeRenderState(candidates: ["ខ"])
-
-        fixture.rootView.render(qwertyState, romanHint: "k", keyboardState: .qwerty)
-        fixture.rootView.render(charPickState, romanHint: "kh", keyboardState: .charPick)
-
-        XCTAssertEqual(fixture.candidateRowView.clearCount, 1)
-    }
-
-    func test_renderQwertyStateUpdatesStripAndCandidateRow() {
-        let fixture = makeRootView()
-        let state = makeRenderState(candidates: ["ក", "ខ"])
-
-        fixture.rootView.render(state, romanHint: "k", keyboardState: .qwerty)
+        fixture.rootView.render(state, romanHint: "k")
 
         XCTAssertEqual(fixture.stripView.renderedRomanHint, "k")
         XCTAssertEqual(fixture.stripView.renderedState, state)
         XCTAssertEqual(fixture.candidateRowView.renderedState, state)
     }
 
-    func test_clearStripAndRenderCharPickAlphabetForwardToContainedViews() {
+    func test_clearStrip_alsoClearsCandidateRow() {
         let fixture = makeRootView()
-
         fixture.rootView.clearStrip()
-        fixture.rootView.renderCharPickAlphabet()
 
         XCTAssertEqual(fixture.stripView.clearCount, 1)
-        XCTAssertEqual(fixture.panelView.alphabetRenderCount, 1)
+        XCTAssertEqual(fixture.candidateRowView.clearCount, 1,
+            "candidate row must be cleared whenever the strip is cleared so stale candidates don't linger after a commit")
     }
 
     private func makeRootView() -> (
@@ -96,17 +66,13 @@ final class KeyboardRootViewTests: XCTestCase {
         qwertyView: UIView,
         numericView: UIView,
         symbolsView: UIView,
-        candidateRowView: SpyCandidateRowView,
-        panelView: SpyPanelView,
-        panelBottomRow: UIView
+        candidateRowView: SpyCandidateRowView
     ) {
         let stripView = SpyStripView()
         let candidateRowView = SpyCandidateRowView()
-        let panelView = SpyPanelView()
         let qwertyView = UIView()
         let numericView = UIView()
         let symbolsView = UIView()
-        let panelBottomRow = UIView()
 
         let rootView = KeyboardRootView(
             metrics: KeyboardLayoutMetrics(device: .phone),
@@ -114,13 +80,10 @@ final class KeyboardRootViewTests: XCTestCase {
             qwertyView: qwertyView,
             numericView: numericView,
             symbolsView: symbolsView,
-            candidateRowView: candidateRowView,
-            panelView: panelView,
-            panelBottomRow: panelBottomRow,
-            panelBottomAnchorGuide: panelView.bottomAnchorGuide
+            candidateRowView: candidateRowView
         )
 
-        return (rootView, stripView, qwertyView, numericView, symbolsView, candidateRowView, panelView, panelBottomRow)
+        return (rootView, stripView, qwertyView, numericView, symbolsView, candidateRowView)
     }
 
     private func makeRenderState(candidates: [String]) -> IosRenderState {
@@ -162,36 +125,5 @@ private final class SpyCandidateRowView: UIView, KeyboardCandidateRowDisplaying 
 
     func clear() {
         clearCount += 1
-    }
-}
-
-private final class SpyPanelView: UIView, KeyboardPanelDisplaying {
-    let bottomAnchorGuide = UILayoutGuide()
-    var renderedState: IosRenderState?
-    var renderedCharPickCandidates: [String] = []
-    var alphabetRenderCount = 0
-
-    override init(frame: CGRect) {
-        super.init(frame: frame)
-        addLayoutGuide(bottomAnchorGuide)
-        NSLayoutConstraint.activate([
-            bottomAnchorGuide.topAnchor.constraint(equalTo: bottomAnchor),
-            bottomAnchorGuide.leadingAnchor.constraint(equalTo: leadingAnchor),
-            bottomAnchorGuide.trailingAnchor.constraint(equalTo: trailingAnchor),
-        ])
-    }
-
-    required init?(coder: NSCoder) { fatalError("use init(frame:)") }
-
-    func render(_ state: IosRenderState) {
-        renderedState = state
-    }
-
-    func renderCharPickCandidates(_ candidates: [String]) {
-        renderedCharPickCandidates = candidates
-    }
-
-    func renderCharPickAlphabet() {
-        alphabetRenderCount += 1
     }
 }

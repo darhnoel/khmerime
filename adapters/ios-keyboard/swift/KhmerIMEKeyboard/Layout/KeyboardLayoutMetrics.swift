@@ -16,10 +16,6 @@ struct KeyboardLayoutMetrics {
     let keyHorizontalInset: CGFloat
     let keyTopInset: CGFloat
     let keyBottomInset: CGFloat
-    let panelChipHeight: CGFloat
-    let panelCandidateHeight: CGFloat
-    let panelBottomRowTopSpacing: CGFloat
-    let panelBottomRowHeight: CGFloat
 
     init(device: Device) {
         switch device {
@@ -40,26 +36,5 @@ struct KeyboardLayoutMetrics {
         keyHorizontalInset = 3
         keyTopInset = 8
         keyBottomInset = 4
-        panelChipHeight = 44
-        panelBottomRowTopSpacing = 8
-
-        let keyAreaHeight = baseKeyboardHeight - stripHeight - candidateRowHeight
-        let standardRowHeight = (
-            keyAreaHeight
-            - keyTopInset
-            - keyBottomInset
-            - (rowSpacing * 3)
-        ) / 4
-        let standardBottomRowTop = keyTopInset + (standardRowHeight + rowSpacing) * 3
-
-        panelBottomRowHeight = standardRowHeight
-        panelCandidateHeight = (
-            standardBottomRowTop
-            - 4
-            - panelChipHeight
-            - 0.5
-            - 0.5
-            - panelBottomRowTopSpacing
-        )
     }
 }

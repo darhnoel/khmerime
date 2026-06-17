@@ -16,7 +16,8 @@ import UIKit
 //   .qwerty    Default roman-input view. ✦ in shift slot, 123/space/./⏎ bottom.
 //   .numeric   123 layer: 1–0, punctuation, #+=, ABC/space/⏎.
 //   .symbols   #+= layer: []{}#%^*+=, currencies, 123/space/⏎.
-//   .charPick  CharPick mode: panel visible with A–Z chip row + candidate collection.
+//   .charPick  CharPick mode: qwerty stays visible, ✦ highlighted, letter keys
+//              browse Khmer characters without inserting roman text.
 
 class KeyboardViewController: UIInputViewController {
 
@@ -59,13 +60,11 @@ class KeyboardViewController: UIInputViewController {
 
     // MARK: - Views
 
-    private var stripView:      StripView!
-    private var panelView:      CandidatePanelView!
-    private var qwertyView:     UIView!
-    private var numericView:    UIView!
-    private var symbolsView:    UIView!
-    private var panelBottomRow: UIStackView!
-    private var rootView:       KeyboardRootView!
+    private var stripView: StripView!
+    private var qwertyView: UIView!
+    private var numericView: UIView!
+    private var symbolsView: UIView!
+    private var rootView: KeyboardRootView!
 
     // MARK: - Lifecycle
 
@@ -109,17 +108,19 @@ class KeyboardViewController: UIInputViewController {
 
     private func wireHandlerCallbacks() {
         handler.onTransition = { [weak self] state in
-            self?.rootView.apply(state)
+            guard let self else { return }
+            self.rootView.apply(state)
+            let isCharPick = state == .charPick
+            self.rootView.allDescendants(ofType: GlassKeyButton.self)
+                .filter { $0.title(for: .normal) == "✦" }
+                .forEach { $0.isGlassActive = isCharPick }
         }
         handler.onRender = { [weak self] state, romanHint in
             guard let self else { return }
-            self.rootView.render(state, romanHint: romanHint, keyboardState: self.handler.keyboardState)
+            self.rootView.render(state, romanHint: romanHint)
         }
         handler.onStripClear = { [weak self] in
             self?.rootView.clearStrip()
-        }
-        handler.onCharPickAlphabet = { [weak self] in
-            self?.rootView.renderCharPickAlphabet()
         }
         handler.onEnglishModeChanged = { [weak self] isEnglish in
             guard let self else { return }
@@ -172,18 +173,15 @@ class KeyboardViewController: UIInputViewController {
             enKeyTag: Self.enKeyTag,
             actions: layerActions
         ).build(
-            panelDelegate: self,
             candidateRowSelection: { [weak self] index in
                 self?.handler.selectCandidate(at: index)
             }
         )
 
         stripView = hierarchy.stripView
-        panelView = hierarchy.panelView
         qwertyView = hierarchy.qwertyView
         numericView = hierarchy.numericView
         symbolsView = hierarchy.symbolsView
-        panelBottomRow = hierarchy.panelBottomRow
         rootView = hierarchy.rootView
 
         setupStripCallbacks()
@@ -224,26 +222,5 @@ private extension UIView {
             result += sv.allDescendants(ofType: T.self)
         }
         return result
-    }
-}
-
-// MARK: - CandidatePanelDelegate
-
-extension KeyboardViewController: CandidatePanelDelegate {
-
-    func candidatePanelDidEnterCharPick(_ panel: CandidatePanelView) {
-        handler.enterCharPickFromPanel()
-    }
-
-    func candidatePanel(_ panel: CandidatePanelView, didTapCharPickLetter letter: Character) {
-        handler.charPickLetterTapped(letter)
-    }
-
-    func candidatePanel(_ panel: CandidatePanelView, didSelectCandidateAt index: Int) {
-        handler.selectCandidate(at: index)
-    }
-
-    func candidatePanelDidDismiss(_ panel: CandidatePanelView) {
-        handler.dismissPanel()
     }
 }

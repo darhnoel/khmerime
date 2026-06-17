@@ -3,11 +3,9 @@ import UIKit
 struct KeyboardViewHierarchy {
     let stripView: StripView
     let candidateRowView: CandidateRowView
-    let panelView: CandidatePanelView
     let qwertyView: UIView
     let numericView: UIView
     let symbolsView: UIView
-    let panelBottomRow: UIStackView
     let rootView: KeyboardRootView
 }
 
@@ -20,7 +18,6 @@ struct KeyboardViewHierarchyBuilder {
     let actions: KeyboardLayerActions
 
     func build(
-        panelDelegate: CandidatePanelDelegate?,
         candidateRowSelection: ((Int) -> Void)? = nil
     ) -> KeyboardViewHierarchy {
         let stripView = StripView()
@@ -29,10 +26,6 @@ struct KeyboardViewHierarchyBuilder {
         let candidateRowView = CandidateRowView()
         candidateRowView.onCandidateSelected = candidateRowSelection
         candidateRowView.translatesAutoresizingMaskIntoConstraints = false
-
-        let panelView = CandidatePanelView(metrics: metrics)
-        panelView.delegate = panelDelegate
-        panelView.translatesAutoresizingMaskIntoConstraints = false
 
         let layerFactory = KeyboardLayerFactory(
             metrics: metrics,
@@ -46,34 +39,22 @@ struct KeyboardViewHierarchyBuilder {
         let numericView = layerFactory.buildNumericView()
         let symbolsView = layerFactory.buildSymbolsView()
 
-        let panelBottomRow = layerFactory.makeBottomRow(
-            leftLabel: "123",
-            leftAction: actions.numeric,
-            includePeriod: true
-        )
-        panelBottomRow.translatesAutoresizingMaskIntoConstraints = false
-
         let rootView = KeyboardRootView(
             metrics: metrics,
             stripView: stripView,
             qwertyView: qwertyView,
             numericView: numericView,
             symbolsView: symbolsView,
-            candidateRowView: candidateRowView,
-            panelView: panelView,
-            panelBottomRow: panelBottomRow,
-            panelBottomAnchorGuide: panelView.bottomAnchorGuide
+            candidateRowView: candidateRowView
         )
         rootView.translatesAutoresizingMaskIntoConstraints = false
 
         return KeyboardViewHierarchy(
             stripView: stripView,
             candidateRowView: candidateRowView,
-            panelView: panelView,
             qwertyView: qwertyView,
             numericView: numericView,
             symbolsView: symbolsView,
-            panelBottomRow: panelBottomRow,
             rootView: rootView
         )
     }
