@@ -77,24 +77,20 @@ prioritizes it.
 
 ### Phased plan (each phase measurable via the harness, golden-test guarded)
 
-1. **Ranked entry table → image.** `ranked.entries` already mirrors the image entries
-   (asserted in `roman_lookup/mod.rs`), so this is the lowest-risk slice. Serve ranked
-   entries from `DictionaryImageView` instead of the heap `Vec`.
-   - **Step 1 DONE** (commit b1c241c): per-entry `alias_keys` added to the image
-     (schema v4) + `DictionaryImageView::entry_alias_keys`; validation test confirms it
-     matches `ranked.entries[*].alias_keys`. No behavior change.
-   - **Blocker found for the decoder swap:** the image entry records hard-code
-     `first_tag_id/last_tag_id = MISSING` (`build.rs`), but the heap path computes
-     `first_tag/last_tag` from corpus *dominant tags* via `boundary_tags_for_target`.
-     Swapping the decoder to read entries from the image therefore loses POS boundary
-     tags → golden diff (verified). Before the swap, the builder must populate the
-     entry tags: thread the build-time dominant-word-tags map (computed in the khpos
-     compile path, NOT currently in `BuildCorpusFrequencyStats`) into
-     `compile_dictionary_image` and intern first/last word tags per entry. Alternative:
-     keep a slim per-entry tags side-table heap-side and read only tags from it.
-   - **Remaining:** populate tags → refactor `weighted_span` (`score_span_candidate`,
-     `compare_retrieval_hits`) to read via a `ranked_entry` accessor → drop
-     `ranked.entries` when the image is present → golden + measure.
+1. **Ranked entry table → image. ✅ DONE — measured −14.2 MB heap (52.8 → 38.6 MB).**
+   - alias_keys section added to the image (schema v4) + `entry_alias_keys` accessor
+     (commit b1c241c).
+   - The image entry table must match the *production* (real-corpus) ranked table, not
+     the default-corpus one: the heap computes **corpus-adjusted frequency**
+     (`entry.frequency.max(corpus_unigram).max(1)`) and **boundary tags**
+     (`boundary_tags_for_target`). Both are now replicated in the builder —
+     `BuildCorpusFrequencyStats` carries `dominant_word_tags`, and
+     `compile_dictionary_image` computes effective frequency + first/last tags per
+     entry. The equivalence test now builds `ranked` with the real khpos stats and
+     asserts frequency/tags/alias_keys all match.
+   - `RankedEntryView` (heap | image) + `LegacyData::ranked_entry`; the `weighted_span`
+     decoder (`score_span_candidate`, `compare_retrieval_hits`) reads entries through it.
+   - `ranked.entries` is dropped when the image is present. Golden snapshot unchanged.
 2. **N-gram postings + corpus stats → image sections.** The ~14.5 MB khpos corpus stats
    and the word/tag n-gram maps become offset/range sections read via views.
 3. **Composer table → image.** The ~13 MB composer/decoder table.

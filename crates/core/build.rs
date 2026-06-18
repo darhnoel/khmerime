@@ -612,6 +612,9 @@ struct CompiledKhposStats {
 struct BuildCorpusFrequencyStats {
     word_unigrams: HashMap<String, u32>,
     surface_unigrams: HashMap<String, u32>,
+    // word -> dominant POS tag, mirroring the runtime CorpusStats.dominant_word_tags
+    // so the dictionary image can carry per-entry boundary tags.
+    dominant_word_tags: HashMap<String, String>,
 }
 
 fn compile_dictionary_image(
@@ -641,9 +644,21 @@ fn compile_dictionary_image(
         let canonical_roman_id = interner.intern(&entry.roman)?;
         let normalized_key_id = interner.intern(&normalized_key)?;
         let frequency_lang_id = interner.intern(&entry.frequency_lang)?;
+        // Mirror RankedLexicon's effective frequency: max of the entry frequency and
+        // the corpus surface/word unigram count, so the image entry table matches the
+        // heap ranked table built with the same corpus stats.
+        let corpus_frequency = corpus_stats
+            .and_then(|stats| {
+                stats
+                    .surface_unigrams
+                    .get(&entry.target)
+                    .or_else(|| stats.word_unigrams.get(&entry.target))
+            })
+            .copied()
+            .unwrap_or(0);
         let frequency = *target_frequency
             .entry((entry.target.clone(), entry.frequency_lang.clone()))
-            .or_insert(entry.frequency.max(1));
+            .or_insert(entry.frequency.max(corpus_frequency).max(1));
         let entry_id = u32::try_from(image_entries.len())
             .map_err(|_| "dictionary image entry table exceeded u32 ids".to_owned())?;
 
@@ -662,14 +677,19 @@ fn compile_dictionary_image(
         }
         push_dictionary_grams(&mut gram_index, &normalized_key, entry_id);
 
+        let (first_tag_id, last_tag_id) = boundary_tag_ids(
+            &entry.target,
+            corpus_stats.map(|stats| &stats.dominant_word_tags),
+            &mut interner,
+        )?;
         image_entries.push(DictionaryImageEntryRecord {
             target_id,
             canonical_roman_id,
             normalized_key_id,
             frequency,
             frequency_lang_id,
-            first_tag_id: MISSING_STRING_ID,
-            last_tag_id: MISSING_STRING_ID,
+            first_tag_id,
+            last_tag_id,
         });
         entry_alias_ids.push(this_entry_alias_ids);
     }
@@ -716,6 +736,33 @@ fn compile_dictionary_image(
         (SECTION_ENTRY_ALIAS_REFS, entry_alias_refs),
         (SECTION_ENTRY_ALIAS_IDS, entry_alias_id_blob),
     ])
+}
+
+// The entry's first/last word boundary tag string ids, mirroring the runtime
+// boundary_tags_for_target so the image carries the same POS tags the heap ranked
+// table would compute. Returns MISSING_STRING_ID when a tag is absent.
+fn boundary_tag_ids(
+    target: &str,
+    dominant_word_tags: Option<&HashMap<String, String>>,
+    interner: &mut DictionaryImageInterner,
+) -> Result<(u32, u32), String> {
+    let Some(dominant) = dominant_word_tags else {
+        return Ok((MISSING_STRING_ID, MISSING_STRING_ID));
+    };
+    let mut words = target.split_whitespace();
+    let Some(first_word) = words.next() else {
+        return Ok((MISSING_STRING_ID, MISSING_STRING_ID));
+    };
+    let last_word = words.last().unwrap_or(first_word);
+    let intern_tag = |interner: &mut DictionaryImageInterner, word: &str| -> Result<u32, String> {
+        match dominant.get(word) {
+            Some(tag) => interner.intern(tag),
+            None => Ok(MISSING_STRING_ID),
+        }
+    };
+    let first_tag_id = intern_tag(interner, first_word)?;
+    let last_tag_id = intern_tag(interner, last_word)?;
+    Ok((first_tag_id, last_tag_id))
 }
 
 // Per-entry alias keys as a dense ragged array: REFS holds a (start, count) record
@@ -1279,11 +1326,16 @@ fn compile_khpos_stats(
     write_string_count_map(&mut output, &tag_unigrams)?;
     write_pair_count_map(&mut output, &tag_bigrams)?;
     write_dominant_tags(&mut output, &dominant_tags)?;
+    let dominant_word_tags = dominant_tags
+        .iter()
+        .map(|(word, tag, _)| (word.clone(), tag.clone()))
+        .collect::<HashMap<_, _>>();
     Ok(CompiledKhposStats {
         bytes: output,
         frequency_stats: BuildCorpusFrequencyStats {
             word_unigrams,
             surface_unigrams,
+            dominant_word_tags,
         },
     })
 }

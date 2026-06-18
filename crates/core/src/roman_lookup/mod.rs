@@ -36,6 +36,7 @@ use types::*;
 
 pub use types::{AppliedSuggestion, Entry, LexiconError, Result, SharedTransliteratorData, Transliterator};
 
+pub(crate) use legacy_data::RankedEntryView;
 pub(crate) use normalization::{char_ngrams, normalize, roman_search_variants};
 pub(crate) use types::{LegacyData, RankedLexicon, RankedLexiconEntry};
 
@@ -175,7 +176,9 @@ mod tests {
     #[test]
     fn dictionary_image_matches_ranked_retrieval_indexes() {
         let compiled_entries = parse_compiled_lexicon(DEFAULT_COMPILED_DATA).unwrap();
-        let ranked = RankedLexicon::from_entries(&compiled_entries, CorpusStats::default());
+        // Use the real corpus stats the image was built from so boundary tags match.
+        let corpus_stats = parse_compiled_khpos_stats(DEFAULT_COMPILED_KHPOS_STATS).unwrap();
+        let ranked = RankedLexicon::from_entries(&compiled_entries, corpus_stats);
         let image = dictionary_image::DictionaryImageView::parse(DEFAULT_DICTIONARY_IMAGE).unwrap();
 
         assert_eq!(image.entry_count(), ranked.entries.len());
@@ -190,8 +193,10 @@ mod tests {
             assert_eq!(actual.normalized_key().unwrap(), expected.normalized_key.as_str());
             assert_eq!(actual.frequency().unwrap(), expected.frequency);
             assert_eq!(actual.frequency_lang().unwrap(), expected.frequency_lang.as_str());
-            assert_eq!(actual.first_tag().unwrap(), None);
-            assert_eq!(actual.last_tag().unwrap(), None);
+            assert_eq!(actual.first_tag().unwrap(), expected.first_tag.as_deref(),
+                "first_tag mismatch entry {entry_id} target={:?}", expected.target);
+            assert_eq!(actual.last_tag().unwrap(), expected.last_tag.as_deref(),
+                "last_tag mismatch entry {entry_id} target={:?}", expected.target);
             // The image must reproduce the entry's alias_keys exactly, so score_forms
             // is identical whether the ranked table is heap- or image-backed.
             let actual_alias_keys = image.entry_alias_keys(entry_id as u32).unwrap();

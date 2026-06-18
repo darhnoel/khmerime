@@ -1,5 +1,85 @@
+use super::dictionary_image::DictionaryEntryView;
 use super::search_index::SearchIndex;
 use super::*;
+
+// A ranked entry whose fields come from either the heap ranked table or the
+// zero-copy dictionary image, so the decoder can read entries without retaining
+// the heap Vec<RankedLexiconEntry> when the image is present.
+pub(crate) enum RankedEntryView<'a> {
+    Heap(&'a RankedLexiconEntry),
+    Image {
+        image: DictionaryImageView<'a>,
+        entry: DictionaryEntryView<'a>,
+        entry_id: u32,
+    },
+}
+
+impl<'a> RankedEntryView<'a> {
+    pub(crate) fn frequency(&self) -> u32 {
+        match self {
+            Self::Heap(entry) => entry.frequency,
+            Self::Image { entry, .. } => entry.frequency().expect("dictionary image entry frequency"),
+        }
+    }
+
+    pub(crate) fn normalized_key(&self) -> &'a str {
+        match self {
+            Self::Heap(entry) => entry.normalized_key.as_str(),
+            Self::Image { entry, .. } => entry.normalized_key().expect("dictionary image entry normalized_key"),
+        }
+    }
+
+    pub(crate) fn target(&self) -> &'a str {
+        match self {
+            Self::Heap(entry) => entry.target.as_str(),
+            Self::Image { entry, .. } => entry.target().expect("dictionary image entry target"),
+        }
+    }
+
+    pub(crate) fn canonical_roman(&self) -> &'a str {
+        match self {
+            Self::Heap(entry) => entry.canonical_roman.as_str(),
+            Self::Image { entry, .. } => entry.canonical_roman().expect("dictionary image entry canonical_roman"),
+        }
+    }
+
+    pub(crate) fn frequency_lang(&self) -> &'a str {
+        match self {
+            Self::Heap(entry) => entry.frequency_lang.as_str(),
+            Self::Image { entry, .. } => entry.frequency_lang().expect("dictionary image entry frequency_lang"),
+        }
+    }
+
+    pub(crate) fn first_tag(&self) -> Option<&'a str> {
+        match self {
+            Self::Heap(entry) => entry.first_tag.as_deref(),
+            Self::Image { entry, .. } => entry.first_tag().expect("dictionary image entry first_tag"),
+        }
+    }
+
+    pub(crate) fn last_tag(&self) -> Option<&'a str> {
+        match self {
+            Self::Heap(entry) => entry.last_tag.as_deref(),
+            Self::Image { entry, .. } => entry.last_tag().expect("dictionary image entry last_tag"),
+        }
+    }
+
+    // normalized_key + alias_keys, excluding "sk:"-prefixed keys (matches
+    // RankedLexiconEntry::score_forms).
+    pub(crate) fn score_forms(&self) -> Vec<&'a str> {
+        match self {
+            Self::Heap(entry) => entry.score_forms().collect(),
+            Self::Image { image, entry_id, .. } => {
+                let normalized = self.normalized_key();
+                let alias_keys = image.entry_alias_keys(*entry_id).expect("dictionary image entry alias_keys");
+                std::iter::once(normalized)
+                    .chain(alias_keys)
+                    .filter(|key| !key.starts_with("sk:"))
+                    .collect()
+            }
+        }
+    }
+}
 
 impl LegacyData {
     #[cfg(not(all(target_arch = "wasm32", feature = "fetch-data")))]
@@ -116,7 +196,7 @@ impl LegacyData {
         } else {
             RankedLookupIndexMode::BuildRetrievalIndexes
         };
-        let ranked = RankedLexicon::from_entries_with_stage_logger_and_index_mode(
+        let mut ranked = RankedLexicon::from_entries_with_stage_logger_and_index_mode(
             &entries,
             corpus_stats,
             index_mode,
@@ -124,6 +204,12 @@ impl LegacyData {
                 log_stage(&format!("ranked_lexicon.{stage}"), elapsed_ms);
             },
         );
+        // With the image present the decoder reads entries via ranked_entry (image),
+        // so the heap entry table is redundant — drop it to cut resident memory. The
+        // n-gram/context maps on `ranked` are kept; only the entry Vec is freed.
+        if dictionary_image.is_some() {
+            ranked.entries = Vec::new();
+        }
         log_stage("ranked_lexicon", elapsed_stage_ms(started));
 
         let started = start_stage_timer();
@@ -223,6 +309,21 @@ impl LegacyData {
 
     pub(crate) fn ranked(&self) -> &RankedLexicon {
         &self.ranked
+    }
+
+    // A view of ranked entry `entry_id`, sourced from the zero-copy dictionary image
+    // when present (default system lexicon) or the heap ranked table otherwise
+    // (custom/CLI lexicons). The image and heap entry-id spaces are identical (see
+    // dictionary_image_matches_ranked_retrieval_indexes), so callers index the same
+    // way regardless of source.
+    pub(crate) fn ranked_entry(&self, entry_id: usize) -> RankedEntryView<'_> {
+        if let Some(image) = self.dictionary_image {
+            let id = entry_id as u32;
+            let entry = image.entry(id).expect("dictionary image entry must resolve");
+            RankedEntryView::Image { image, entry, entry_id: id }
+        } else {
+            RankedEntryView::Heap(&self.ranked.entries[entry_id])
+        }
     }
 
     pub(crate) fn starter_suggestions(&self, history: &HashMap<String, usize>) -> Vec<String> {
