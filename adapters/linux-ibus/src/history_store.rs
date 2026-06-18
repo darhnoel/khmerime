@@ -1,6 +1,8 @@
 use std::collections::HashMap;
 
-use khmerime_session::{should_persist_history_word, HistoryStore};
+#[cfg(not(target_arch = "wasm32"))]
+use khmerime_session::should_persist_history_word;
+use khmerime_session::HistoryStore;
 
 #[cfg(not(target_arch = "wasm32"))]
 use std::fs;

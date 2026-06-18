@@ -88,11 +88,15 @@ Two distinct `Transliterator` views built from the same **SharedTransliteratorDa
 _Avoid_: refiner (use the qualified form)
 
 **Download Landing Page**:
-The public KhmerIME page that helps users choose a platform download, try the online beta, and follow install steps. It is download-first, with the visitor's platform download as the primary action and the online beta as a secondary trial path.
+The public KhmerIME page that helps users choose a platform download, try the **Online Beta**, and follow install steps. It is download-first, with the visitor's platform download as the primary action and the **Online Beta** as a secondary trial path.
 _Avoid_: homepage, product site
 
+**Online Beta**:
+The in-browser build of KhmerIME (the dioxus-app, deployed at the beta URL) where a visitor types romanized Khmer and sees candidates without installing anything. Reached from the **Download Landing Page** as its secondary trial path; a quick trial surface, not a replacement for the installed platform IMEs.
+_Avoid_: playground, demo, web app
+
 **Silk Veil**:
-The visual identity for the **Download Landing Page**: a fully glassmorphic design language built around the refractive KhmerIME logo, soft translucent panes, subtle liquid distortion, and a new color system distinct from the current light download page.
+The shared glassmorphic visual identity for KhmerIME's public web surfaces — the **Download Landing Page** and the **Online Beta**. A deep-ink / charcoal-plum base, soft translucent pearl-glass panes with white rim highlights, an ember-amber primary action, sparse peacock-teal accents, and warm ivory text — distinct from the previous light cream/terracotta web styling.
 _Avoid_: Liquid Glass Theme, light download theme, glass accents
 
 ## Relationships
@@ -108,3 +112,5 @@ _Avoid_: Liquid Glass Theme, light download theme, glass accents
 - A **Visible Candidate Commit** makes the visible selected candidate authoritative over hidden commit refinement
 - A **Hidden Commit Fallback** only applies when visible state is not useful Khmer **Commit Text**
 - A **Bridge** owns exactly one **SharedTransliteratorData** for its lifetime
+- The **Download Landing Page** and the **Online Beta** share the **Silk Veil** visual identity
+- The **Download Landing Page** links to the **Online Beta** as its secondary trial path

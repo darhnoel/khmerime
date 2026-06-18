@@ -131,6 +131,7 @@ impl LegacyData {
         }
     }
 
+    #[cfg(not(all(target_arch = "wasm32", feature = "fetch-data")))]
     pub(crate) fn from_entries_phase_a_with_dictionary_image(
         entries: Vec<Entry>,
         dictionary_image: DictionaryImageView<'static>,
@@ -154,6 +155,7 @@ impl LegacyData {
         }
     }
 
+    #[cfg(not(all(target_arch = "wasm32", feature = "fetch-data")))]
     pub(crate) fn from_entries_with_stats(
         entries: Vec<Entry>,
         corpus_stats: CorpusStats,
@@ -162,6 +164,7 @@ impl LegacyData {
         Self::from_entries_with_stats_and_stage_logger(entries, corpus_stats, next_word, |_, _| {})
     }
 
+    #[cfg(not(all(target_arch = "wasm32", feature = "fetch-data")))]
     pub(crate) fn from_entries_with_stats_and_stage_logger(
         entries: Vec<Entry>,
         corpus_stats: CorpusStats,
@@ -676,6 +679,7 @@ impl LegacyData {
         self.target_frequency.get(target).copied().unwrap_or(1)
     }
 
+    #[cfg(not(all(target_arch = "wasm32", feature = "fetch-data")))]
     pub(crate) fn attach_dictionary_image(&mut self, dictionary_image: DictionaryImageView<'static>) {
         self.dictionary_image = Some(dictionary_image);
     }

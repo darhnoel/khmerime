@@ -97,6 +97,7 @@ pub(super) fn parse_csv(source: &str) -> Result<Vec<Entry>> {
     Ok(entries)
 }
 
+#[cfg(not(all(target_arch = "wasm32", feature = "fetch-data")))]
 fn parse_frequency(raw: &str, line_no: usize) -> Result<u32> {
     let value = raw.trim();
     if value.is_empty() {
@@ -115,6 +116,7 @@ fn parse_frequency(raw: &str, line_no: usize) -> Result<u32> {
     Ok(parsed)
 }
 
+#[cfg(not(all(target_arch = "wasm32", feature = "fetch-data")))]
 fn validate_frequency_lang(value: &str, line_no: usize) -> Result<()> {
     if matches!(value, "km" | "en" | "ja" | "zh" | "ko") {
         Ok(())

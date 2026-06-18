@@ -1,3 +1,4 @@
+<link rel="stylesheet" href="./assets/main.css">
 <style>
     @media (max-width: 900px) {
         body:not([data-app-shell-ready="1"]) #main {
@@ -13,10 +14,25 @@
         place-items: center;
         padding: 20px;
         background:
-            radial-gradient(circle at 18% 14%, rgba(186, 109, 40, 0.09), transparent 32%),
-            linear-gradient(165deg, #f7f1e8 0%, #efe5d6 100%);
-        color: #1f1710;
+            radial-gradient(circle at 18% 14%, rgba(233, 138, 78, 0.14), transparent 32%),
+            radial-gradient(circle at 82% 18%, rgba(56, 198, 192, 0.08), transparent 30%),
+            radial-gradient(circle at 50% 100%, rgba(120, 72, 140, 0.18), transparent 44%),
+            linear-gradient(165deg, #14101b 0%, #0d0b13 100%);
+        color: #f4ece2;
         transition: opacity 180ms ease, visibility 180ms ease;
+    }
+
+    #app-preboot-splash::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        background:
+            linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px),
+            linear-gradient(180deg, rgba(255, 255, 255, 0.025) 1px, transparent 1px);
+        background-size: 44px 44px;
+        mask-image: radial-gradient(circle at center, black, transparent 72%);
+        opacity: 0.34;
     }
 
     #app-preboot-splash[data-hidden="true"] {
@@ -28,22 +44,35 @@
     .app-preboot-content {
         width: min(460px, 100%);
         display: grid;
-        gap: 10px;
+        gap: 12px;
         justify-items: center;
         text-align: center;
         font-family: "Noto Sans Khmer", "IBM Plex Sans", sans-serif;
+        position: relative;
+        padding: 26px 28px;
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        border-radius: 24px;
+        background:
+            linear-gradient(180deg, rgba(255, 255, 255, 0.075), rgba(255, 255, 255, 0.035)),
+            rgba(28, 22, 34, 0.72);
+        box-shadow:
+            0 28px 80px rgba(0, 0, 0, 0.42),
+            inset 0 1px 0 rgba(255, 255, 255, 0.14);
+        backdrop-filter: blur(18px) saturate(125%);
+        -webkit-backdrop-filter: blur(18px) saturate(125%);
     }
 
     .app-preboot-title {
         margin: 0;
         font-size: clamp(1.35rem, 2.8vw, 1.9rem);
         line-height: 1.2;
-        font-weight: 700;
+        font-weight: 800;
+        letter-spacing: 0;
     }
 
     .app-preboot-subtitle {
         margin: 0;
-        color: #695d51;
+        color: #c4b9ac;
         font-size: 0.96rem;
         line-height: 1.5;
         min-height: var(--pretext-splash-subtitle-min-height, 0px);
@@ -53,8 +82,9 @@
         width: 30px;
         height: 30px;
         border-radius: 999px;
-        border: 2px solid rgba(177, 77, 30, 0.2);
-        border-top-color: #b14d1e;
+        border: 2px solid rgba(244, 166, 97, 0.18);
+        border-top-color: #f4a661;
+        box-shadow: 0 0 18px rgba(233, 138, 78, 0.14);
         animation: app-preboot-spin 0.85s linear infinite;
     }
 
@@ -62,7 +92,8 @@
         width: 108px;
         height: 2px;
         border-radius: 2px;
-        background: linear-gradient(90deg, rgba(177, 77, 30, 0.2), rgba(177, 77, 30, 0.75));
+        background: linear-gradient(90deg, transparent, rgba(244, 166, 97, 0.82), transparent);
+        box-shadow: 0 0 18px rgba(233, 138, 78, 0.18);
     }
 
     @keyframes app-preboot-spin {
@@ -72,6 +103,15 @@
     }
 
     @media (max-width: 700px) {
+        #app-preboot-splash {
+            padding: 14px;
+        }
+
+        .app-preboot-content {
+            padding: 22px 18px;
+            border-radius: 20px;
+        }
+
         .app-preboot-title {
             font-size: 1.55rem;
         }

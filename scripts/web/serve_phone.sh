@@ -4,12 +4,30 @@ set -euo pipefail
 ADDR="${ADDR:-0.0.0.0}"
 PORT="${PORT:-4173}"
 FEATURES="${DX_FEATURES:-}"
+VERBOSE="${DX_VERBOSE:-}"
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 APP_DIR="$ROOT_DIR/apps/dioxus-app"
 INDEX_HTML="$ROOT_DIR/target/dx/roman_lookup/debug/web/public/index.html"
+PUBLIC_ASSETS_DIR="$ROOT_DIR/target/dx/roman_lookup/debug/web/public/assets"
 HEAD_SNIPPET="$ROOT_DIR/assets/web_preboot_head.html"
 BODY_SNIPPET="$ROOT_DIR/assets/web_preboot_body.html"
+
+sync_static_assets() {
+  mkdir -p "$PUBLIC_ASSETS_DIR"
+
+  if [[ -f "$ROOT_DIR/assets/main.css" ]]; then
+    cp "$ROOT_DIR/assets/main.css" "$PUBLIC_ASSETS_DIR/main.css"
+  fi
+  if [[ -d "$ROOT_DIR/assets/css" ]]; then
+    rm -rf "$PUBLIC_ASSETS_DIR/css"
+    cp -R "$ROOT_DIR/assets/css" "$PUBLIC_ASSETS_DIR/css"
+  fi
+  if [[ -d "$ROOT_DIR/assets/vendor" ]]; then
+    rm -rf "$PUBLIC_ASSETS_DIR/vendor"
+    cp -R "$ROOT_DIR/assets/vendor" "$PUBLIC_ASSETS_DIR/vendor"
+  fi
+}
 
 inject_shell_splash() {
   local index_html="$1"
@@ -40,7 +58,9 @@ inject_shell_splash() {
 }
 
 watch_and_patch_shell() {
-  while kill -0 "$DX_PID" 2>/dev/null; do
+  local parent_pid="$1"
+  while kill -0 "$parent_pid" 2>/dev/null; do
+    sync_static_assets
     inject_shell_splash "$INDEX_HTML"
     sleep 0.25
   done
@@ -50,20 +70,30 @@ DX_CMD=(dx serve --platform web --addr "$ADDR" --port "$PORT" --open false)
 if [[ -n "$FEATURES" ]]; then
   DX_CMD+=(--features "$FEATURES")
 fi
+if [[ -n "$VERBOSE" ]]; then
+  DX_CMD+=(--verbose)
+fi
 
-(
-  cd "$APP_DIR"
-  "${DX_CMD[@]}"
-) &
-DX_PID=$!
-watch_and_patch_shell &
+echo "Starting Dioxus web server on ${ADDR}:${PORT}"
+echo "Local URL: http://127.0.0.1:${PORT}"
+if [[ "$ADDR" == "0.0.0.0" ]]; then
+  echo "Phone/LAN URL: http://<this-computer-ip>:${PORT}"
+fi
+echo "Using app directory: $APP_DIR"
+echo "Syncing CSS assets into: $PUBLIC_ASSETS_DIR"
+echo "Press Ctrl+C to stop."
+
+sync_static_assets
+watch_and_patch_shell "$$" &
 PATCH_PID=$!
 
 cleanup() {
   kill "$PATCH_PID" 2>/dev/null || true
-  kill "$DX_PID" 2>/dev/null || true
 }
 
 trap cleanup EXIT INT TERM
 
-wait "$DX_PID"
+(
+  cd "$APP_DIR"
+  "${DX_CMD[@]}"
+)

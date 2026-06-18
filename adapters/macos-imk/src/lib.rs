@@ -73,8 +73,8 @@ use std::time::Duration;
 
 use khmerime_core::{DecoderConfig, Transliterator};
 use khmerime_session::{
-    CandidateDisplayEntry, ImeSession, ImeSessionOptions, NativeKeyEvent, SegmentPreviewEntry,
-    SegmentedPreviewMode, SessionResult, SessionSnapshot,
+    CandidateDisplayEntry, ImeSession, ImeSessionOptions, NativeKeyEvent, SegmentPreviewEntry, SegmentedPreviewMode,
+    SessionResult, SessionSnapshot,
 };
 
 uniffi::setup_scaffolding!("khmerime_macos_imk");
@@ -108,7 +108,11 @@ pub struct MacosSegmentEntry {
 
 impl From<&SegmentPreviewEntry> for MacosSegmentEntry {
     fn from(s: &SegmentPreviewEntry) -> Self {
-        MacosSegmentEntry { output: s.output.clone(), input: s.input.clone(), focused: s.focused }
+        MacosSegmentEntry {
+            output: s.output.clone(),
+            input: s.input.clone(),
+            focused: s.focused,
+        }
     }
 }
 
@@ -212,10 +216,8 @@ impl MacosIMKSession {
             let history = std::collections::HashMap::new();
             let input_mode = khmerime_session::InputMode::Roman;
 
-            let live = Transliterator::from_default_data_with_config(
-                DecoderConfig::shadow_interactive(),
-            )
-            .expect("compiled-in lexicon data must be valid");
+            let live = Transliterator::from_default_data_with_config(DecoderConfig::shadow_interactive())
+                .expect("compiled-in lexicon data must be valid");
 
             // TODO: wire visible and commit refiners once ImeSession refiner
             // constructor is available (mirrors IBus bridge Phase B).
@@ -226,7 +228,9 @@ impl MacosIMKSession {
                 live,
                 history,
                 input_mode,
-                ImeSessionOptions { segmented_preview: SegmentedPreviewMode::Enabled },
+                ImeSessionOptions {
+                    segmented_preview: SegmentedPreviewMode::Enabled,
+                },
             );
 
             *s.inner.lock().unwrap() = Some(ime);
@@ -271,12 +275,7 @@ impl MacosIMKSession {
     /// `mac_keycode` is `NSEvent.keyCode` — converted to an evdev scancode for
     /// NIDA mode via `keycode_mac_to_evdev`. `modifier_flags` is the raw
     /// `NSEvent.modifierFlags.rawValue` mapped to XKB-style modifier bits.
-    pub fn handle_event(
-        &self,
-        keyval: u32,
-        mac_keycode: u16,
-        modifier_flags: u32,
-    ) -> MacosRenderState {
+    pub fn handle_event(&self, keyval: u32, mac_keycode: u16, modifier_flags: u32) -> MacosRenderState {
         let evdev_keycode = keycode_mac_to_evdev(mac_keycode);
         let xkb_state = modifier_flags_to_xkb_state(modifier_flags);
         self.with_session(|s| {
@@ -422,8 +421,14 @@ pub fn modifier_flags_to_xkb_state(flags: u32) -> u32 {
     const NS_ALTERNATE_KEY_MASK: u32 = 1 << 19;
 
     let mut xkb = 0u32;
-    if flags & NS_SHIFT_KEY_MASK != 0 { xkb |= 1; }      // ShiftMask
-    if flags & NS_CONTROL_KEY_MASK != 0 { xkb |= 4; }    // ControlMask
-    if flags & NS_ALTERNATE_KEY_MASK != 0 { xkb |= 8; }  // Mod1Mask (Alt)
+    if flags & NS_SHIFT_KEY_MASK != 0 {
+        xkb |= 1;
+    } // ShiftMask
+    if flags & NS_CONTROL_KEY_MASK != 0 {
+        xkb |= 4;
+    } // ControlMask
+    if flags & NS_ALTERNATE_KEY_MASK != 0 {
+        xkb |= 8;
+    } // Mod1Mask (Alt)
     xkb
 }

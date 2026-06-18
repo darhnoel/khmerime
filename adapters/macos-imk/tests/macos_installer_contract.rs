@@ -31,10 +31,8 @@ fn info_plist_allows_candidate_panel_display() {
     // window-server access and cannot show panels, so LSBackgroundOnly must
     // not be true — while LSUIElement must stay true to keep the IME an
     // accessory app (no Dock icon, no menu bar) that can still float a panel.
-    let plist = std::fs::read_to_string(
-        repo_root().join("adapters/macos-imk/swift/KhmerIMEMacOS/Info.plist"),
-    )
-    .expect("Info.plist exists");
+    let plist = std::fs::read_to_string(repo_root().join("adapters/macos-imk/swift/KhmerIMEMacOS/Info.plist"))
+        .expect("Info.plist exists");
 
     assert_ne!(
         plist_bool(&plist, "LSBackgroundOnly"),

@@ -27,7 +27,11 @@ const KEY_RIGHT: u32 = 0xFF53;
 const KEY_TAB: u32 = 0xFF09;
 
 fn key_event(keyval: u32) -> NativeKeyEvent {
-    NativeKeyEvent { keyval, keycode: 0, state: 0 }
+    NativeKeyEvent {
+        keyval,
+        keycode: 0,
+        state: 0,
+    }
 }
 
 // ── Render state ──────────────────────────────────────────────────────────────
@@ -75,8 +79,7 @@ fn make_render_state(snapshot: &SessionSnapshot, result: &SessionResult) -> Rend
 }
 
 fn render_json(env: &mut JNIEnv, snapshot: &SessionSnapshot, result: &SessionResult) -> jstring {
-    let json = serde_json::to_string(&make_render_state(snapshot, result))
-        .expect("render state must serialize");
+    let json = serde_json::to_string(&make_render_state(snapshot, result)).expect("render state must serialize");
     let js = env.new_string(&json).expect("new_string must not fail");
     js.into_raw()
 }
@@ -84,9 +87,8 @@ fn render_json(env: &mut JNIEnv, snapshot: &SessionSnapshot, result: &SessionRes
 // ── Session helpers ───────────────────────────────────────────────────────────
 
 fn build_session() -> ImeSession {
-    let transliterator =
-        Transliterator::from_default_data_with_config(DecoderConfig::shadow_interactive())
-            .expect("compiled-in lexicon must be valid");
+    let transliterator = Transliterator::from_default_data_with_config(DecoderConfig::shadow_interactive())
+        .expect("compiled-in lexicon must be valid");
     ImeSession::builder(transliterator, HashMap::new())
         .input_mode(InputMode::Roman)
         .options(ImeSessionOptions {
@@ -104,19 +106,12 @@ unsafe fn session_mut(handle: jlong) -> &'static mut ImeSession {
 // ── JNI exports ───────────────────────────────────────────────────────────────
 
 #[no_mangle]
-pub extern "C" fn Java_com_khmerime_input_KhmerImeSession_nativeCreate(
-    _env: JNIEnv,
-    _obj: JObject,
-) -> jlong {
+pub extern "C" fn Java_com_khmerime_input_KhmerImeSession_nativeCreate(_env: JNIEnv, _obj: JObject) -> jlong {
     Box::into_raw(Box::new(build_session())) as jlong
 }
 
 #[no_mangle]
-pub extern "C" fn Java_com_khmerime_input_KhmerImeSession_nativeDestroy(
-    _env: JNIEnv,
-    _obj: JObject,
-    handle: jlong,
-) {
+pub extern "C" fn Java_com_khmerime_input_KhmerImeSession_nativeDestroy(_env: JNIEnv, _obj: JObject, handle: jlong) {
     if handle != 0 {
         unsafe { drop(Box::from_raw(handle as *mut ImeSession)) }
     }
