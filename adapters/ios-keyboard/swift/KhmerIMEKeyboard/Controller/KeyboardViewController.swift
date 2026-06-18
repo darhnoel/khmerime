@@ -1,4 +1,5 @@
 import UIKit
+import os
 
 // KeyboardViewController
 // ======================
@@ -73,8 +74,11 @@ class KeyboardViewController: UIInputViewController {
 
     override func viewDidLoad() {
         super.viewDidLoad()
+        Self.logMemory("launch")
         handler = KeyboardInputHandler(proxy: DocumentProxyWrapper(textDocumentProxy), session: KeyboardSession())
+        Self.logMemory("after session init")
         setupLayout()
+        Self.logMemory("after layout")
         wireHandlerCallbacks()
     }
 
@@ -222,6 +226,31 @@ class KeyboardViewController: UIInputViewController {
         // rootView starts with its chrome collapsed, so the host begins at idle
         // height — keys-only — and expands on the first keystroke.
         heightConstraint.constant = keyboardHeight(composing: false)
+    }
+
+    // MARK: - Memory diagnostics (TEMPORARY — remove after measuring)
+    // Logs physical footprint and remaining headroom before iOS jetsams us at the
+    // ~77 MB extension cap. Runs only at launch, never on the typing path. Read in
+    // Console.app: filter by category "memory" (subsystem com.khmerime…Keyboard).
+
+    private static let memoryLog = Logger(subsystem: "com.khmerime.KhmerIME.Keyboard", category: "memory")
+
+    static func logMemory(_ phase: String) {
+        let footprintMB = Double(currentPhysFootprintBytes()) / 1_048_576.0
+        let headroomMB = Double(os_proc_available_memory()) / 1_048_576.0
+        let msg = String(format: "MEM %@: footprint=%.1f MB, headroom=%.1f MB", phase, footprintMB, headroomMB)
+        memoryLog.log("\(msg, privacy: .public)")
+    }
+
+    private static func currentPhysFootprintBytes() -> UInt64 {
+        var info = task_vm_info_data_t()
+        var count = mach_msg_type_number_t(MemoryLayout<task_vm_info_data_t>.size / MemoryLayout<integer_t>.size)
+        let kr = withUnsafeMutablePointer(to: &info) { ptr in
+            ptr.withMemoryRebound(to: integer_t.self, capacity: Int(count)) {
+                task_info(mach_task_self_, task_flavor_t(TASK_VM_INFO), $0, &count)
+            }
+        }
+        return kr == KERN_SUCCESS ? info.phys_footprint : 0
     }
 
     private func wireBackspaceButtons() {
