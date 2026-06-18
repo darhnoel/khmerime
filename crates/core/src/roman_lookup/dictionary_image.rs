@@ -33,6 +33,8 @@ pub(crate) struct DictionaryImageView<'a> {
     corpus_surface_unigrams: &'a [u8],
     tag_unigrams: &'a [u8],
     tag_bigrams: &'a [u8],
+    composer_nodes: &'a [u8],
+    composer_edges: &'a [u8],
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -96,6 +98,8 @@ impl<'a> DictionaryImageView<'a> {
             corpus_surface_unigrams: section(source, section_count, SECTION_CORPUS_SURFACE_UNIGRAMS)?,
             tag_unigrams: section(source, section_count, SECTION_TAG_UNIGRAMS)?,
             tag_bigrams: section(source, section_count, SECTION_TAG_BIGRAMS)?,
+            composer_nodes: section(source, section_count, SECTION_COMPOSER_NODES)?,
+            composer_edges: section(source, section_count, SECTION_COMPOSER_EDGES)?,
         };
         view.validate_record_sections()?;
         Ok(view)
@@ -246,6 +250,44 @@ impl<'a> DictionaryImageView<'a> {
         self.bigram_count(self.tag_bigrams, left, right)
     }
 
+    pub(crate) fn composer_child(&self, node_id: u32, ch: char) -> Result<Option<u32>> {
+        let offset = self.composer_node_offset(node_id)?;
+        let start = read_u32_at(self.composer_nodes, offset)? as usize;
+        let count = read_u32_at(self.composer_nodes, offset + 4)? as usize;
+        let byte_start = start
+            .checked_mul(COMPOSER_EDGE_RECORD_LEN)
+            .ok_or_else(|| LexiconError::Parse("dictionary image composer edge range overflow".to_owned()))?;
+        let byte_len = count
+            .checked_mul(COMPOSER_EDGE_RECORD_LEN)
+            .ok_or_else(|| LexiconError::Parse("dictionary image composer edge range overflow".to_owned()))?;
+        let range = checked_range(self.composer_edges, byte_start, byte_len)?;
+        let edges = &self.composer_edges[range];
+        let query = ch as u32;
+        let mut low = 0usize;
+        let mut high = edges.len() / COMPOSER_EDGE_RECORD_LEN;
+        while low < high {
+            let mid = low + (high - low) / 2;
+            let edge_offset = mid * COMPOSER_EDGE_RECORD_LEN;
+            let actual = read_u32_at(edges, edge_offset)?;
+            match actual.cmp(&query) {
+                Ordering::Less => low = mid + 1,
+                Ordering::Equal => return read_u32_at(edges, edge_offset + 4).map(Some),
+                Ordering::Greater => high = mid,
+            }
+        }
+        Ok(None)
+    }
+
+    pub(crate) fn composer_node_terminal(&self, node_id: u32) -> Result<bool> {
+        let offset = self.composer_node_offset(node_id)?;
+        read_u32_at(self.composer_nodes, offset + 8).map(|value| value != 0)
+    }
+
+    pub(crate) fn composer_node_max_frequency(&self, node_id: u32) -> Result<u32> {
+        let offset = self.composer_node_offset(node_id)?;
+        read_u32_at(self.composer_nodes, offset + 12)
+    }
+
     fn lookup_string_values(&self, keys: &'a [u8], postings: &'a [u8], query: &str) -> Result<Option<Vec<&'a str>>> {
         let Some(ids) = self.lookup_key(keys, postings, query)? else {
             return Ok(None);
@@ -297,6 +339,18 @@ impl<'a> DictionaryImageView<'a> {
             }
         }
         Ok(0)
+    }
+
+    fn composer_node_offset(&self, node_id: u32) -> Result<usize> {
+        let offset = (node_id as usize)
+            .checked_mul(COMPOSER_NODE_RECORD_LEN)
+            .ok_or_else(|| LexiconError::Parse("dictionary image composer node id overflow".to_owned()))?;
+        if self.composer_nodes.len().saturating_sub(offset) < COMPOSER_NODE_RECORD_LEN {
+            return Err(LexiconError::Parse(
+                "dictionary image composer node id out of range".to_owned(),
+            ));
+        }
+        Ok(offset)
     }
 
     fn lookup_key(&self, keys: &'a [u8], postings: &'a [u8], query: &str) -> Result<Option<DictionaryPostings<'a>>> {
@@ -407,6 +461,8 @@ impl<'a> DictionaryImageView<'a> {
             ),
             ("tag unigrams", self.tag_unigrams.len(), STRING_U32_RECORD_LEN),
             ("tag bigrams", self.tag_bigrams.len(), BIGRAM_RECORD_LEN),
+            ("composer nodes", self.composer_nodes.len(), COMPOSER_NODE_RECORD_LEN),
+            ("composer edges", self.composer_edges.len(), COMPOSER_EDGE_RECORD_LEN),
         ] {
             if len % record_len != 0 {
                 return Err(LexiconError::Parse(format!(
@@ -425,6 +481,11 @@ impl<'a> DictionaryImageView<'a> {
         {
             return Err(LexiconError::Parse(
                 "dictionary image postings section has partial record".to_owned(),
+            ));
+        }
+        if self.composer_nodes.is_empty() {
+            return Err(LexiconError::Parse(
+                "dictionary image composer nodes section is empty".to_owned(),
             ));
         }
         Ok(())

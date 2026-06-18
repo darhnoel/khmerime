@@ -1,6 +1,6 @@
 pub(crate) const DICTIONARY_IMAGE_MAGIC: &[u8; 4] = b"KDI1";
-pub(crate) const DICTIONARY_IMAGE_SCHEMA_VERSION: u32 = 5;
-pub(crate) const DICTIONARY_IMAGE_SECTION_COUNT: u32 = 27;
+pub(crate) const DICTIONARY_IMAGE_SCHEMA_VERSION: u32 = 6;
+pub(crate) const DICTIONARY_IMAGE_SECTION_COUNT: u32 = 29;
 pub(crate) const MISSING_STRING_ID: u32 = u32::MAX;
 
 pub(crate) const SECTION_STRING_REFS: u32 = 1;
@@ -33,6 +33,8 @@ pub(crate) const SECTION_CORPUS_WORD_BIGRAMS: u32 = 24;
 pub(crate) const SECTION_CORPUS_SURFACE_UNIGRAMS: u32 = 25;
 pub(crate) const SECTION_TAG_UNIGRAMS: u32 = 26;
 pub(crate) const SECTION_TAG_BIGRAMS: u32 = 27;
+pub(crate) const SECTION_COMPOSER_NODES: u32 = 28;
+pub(crate) const SECTION_COMPOSER_EDGES: u32 = 29;
 
 pub(crate) const HEADER_LEN: usize = 12;
 pub(crate) const SECTION_RECORD_LEN: usize = 12;
@@ -42,3 +44,5 @@ pub(crate) const ENTRY_ALIAS_REF_RECORD_LEN: usize = 8;
 pub(crate) const KEY_RANGE_RECORD_LEN: usize = 12;
 pub(crate) const STRING_U32_RECORD_LEN: usize = 8;
 pub(crate) const BIGRAM_RECORD_LEN: usize = 12;
+pub(crate) const COMPOSER_NODE_RECORD_LEN: usize = 16;
+pub(crate) const COMPOSER_EDGE_RECORD_LEN: usize = 8;

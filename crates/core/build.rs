@@ -603,6 +603,46 @@ struct DictionaryImageEntryRecord {
     last_tag_id: u32,
 }
 
+#[derive(Default)]
+struct BuildComposerNode {
+    children: BTreeMap<char, u32>,
+    terminal: bool,
+    max_frequency: u32,
+}
+
+struct BuildComposerTrie {
+    nodes: Vec<BuildComposerNode>,
+}
+
+impl Default for BuildComposerTrie {
+    fn default() -> Self {
+        Self {
+            nodes: vec![BuildComposerNode::default()],
+        }
+    }
+}
+
+impl BuildComposerTrie {
+    fn insert(&mut self, input: &str, frequency: u32) -> Result<(), String> {
+        let mut node_index = 0usize;
+        for ch in input.chars() {
+            let next = if let Some(child) = self.nodes[node_index].children.get(&ch).copied() {
+                child
+            } else {
+                let child = u32::try_from(self.nodes.len())
+                    .map_err(|_| "dictionary image composer trie exceeded u32 node ids".to_owned())?;
+                self.nodes.push(BuildComposerNode::default());
+                self.nodes[node_index].children.insert(ch, child);
+                child
+            };
+            node_index = next as usize;
+        }
+        self.nodes[node_index].terminal = true;
+        self.nodes[node_index].max_frequency = self.nodes[node_index].max_frequency.max(frequency);
+        Ok(())
+    }
+}
+
 struct CompiledKhposStats {
     bytes: Vec<u8>,
     frequency_stats: BuildCorpusFrequencyStats,
@@ -634,6 +674,7 @@ fn compile_dictionary_image(
     let mut gram_index = BTreeMap::<String, Vec<u32>>::new();
     let mut word_unigrams = BTreeMap::<String, u32>::new();
     let mut word_bigrams = BTreeMap::<(String, String), u32>::new();
+    let mut composer = BuildComposerTrie::default();
     let mut target_frequency = HashMap::<(String, String), u32>::new();
 
     for entry in entries {
@@ -653,6 +694,7 @@ fn compile_dictionary_image(
         if normalized_key.is_empty() {
             continue;
         }
+        composer.insert(&normalized_key, entry.frequency)?;
 
         let target_id = interner.intern(&entry.target)?;
         let canonical_roman_id = interner.intern(&entry.roman)?;
@@ -745,6 +787,7 @@ fn compile_dictionary_image(
         &mut interner,
         btree_bigram_counts(corpus_stats.map(|stats| &stats.tag_bigrams)),
     )?;
+    let (composer_nodes, composer_edges) = compile_dictionary_composer_sections(&composer.nodes)?;
 
     // Key-index compilation may intern late keys; write string sections after
     // all sections have had a chance to assign string IDs.
@@ -778,6 +821,8 @@ fn compile_dictionary_image(
         (SECTION_CORPUS_SURFACE_UNIGRAMS, corpus_surface_unigrams),
         (SECTION_TAG_UNIGRAMS, tag_unigrams),
         (SECTION_TAG_BIGRAMS, tag_bigrams),
+        (SECTION_COMPOSER_NODES, composer_nodes),
+        (SECTION_COMPOSER_EDGES, composer_edges),
     ])
 }
 
@@ -1053,6 +1098,26 @@ fn btree_bigram_counts(source: Option<&HashMap<(String, String), u32>>) -> BTree
                 .collect()
         })
         .unwrap_or_default()
+}
+
+fn compile_dictionary_composer_sections(nodes: &[BuildComposerNode]) -> Result<(Vec<u8>, Vec<u8>), String> {
+    let mut node_records = Vec::with_capacity(nodes.len() * COMPOSER_NODE_RECORD_LEN);
+    let mut edges = Vec::new();
+    for node in nodes {
+        let start = u32::try_from(edges.len() / COMPOSER_EDGE_RECORD_LEN)
+            .map_err(|_| "dictionary image composer edges exceeded u32 offsets".to_owned())?;
+        let count = u32::try_from(node.children.len())
+            .map_err(|_| "dictionary image composer edge range exceeded u32 length".to_owned())?;
+        write_u32(&mut node_records, start);
+        write_u32(&mut node_records, count);
+        write_u32(&mut node_records, u32::from(node.terminal));
+        write_u32(&mut node_records, node.max_frequency);
+        for (ch, child) in &node.children {
+            write_u32(&mut edges, *ch as u32);
+            write_u32(&mut edges, *child);
+        }
+    }
+    Ok((node_records, edges))
 }
 
 fn write_dictionary_image_sections(sections: &[(u32, Vec<u8>)]) -> Result<Vec<u8>, String> {

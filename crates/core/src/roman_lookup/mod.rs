@@ -30,7 +30,7 @@ mod types;
 use compiled_io::{parse_compiled_khpos_stats, parse_compiled_lexicon, parse_compiled_next_word_stats};
 #[cfg(not(all(target_arch = "wasm32", feature = "fetch-data")))]
 use compiled_io::{parse_csv, parse_tsv};
-use dictionary_image::DictionaryImageView;
+pub(crate) use dictionary_image::DictionaryImageView;
 use normalization::map_next_word_context_token;
 use types::*;
 
@@ -395,6 +395,23 @@ mod tests {
             .suggest("kit", &history)
             .iter()
             .any(|candidate| candidate == "គិត"));
+    }
+
+    #[test]
+    fn default_shared_data_uses_dictionary_image_for_composer_table() {
+        let shared = Transliterator::from_default_shared_data().unwrap();
+        assert!(shared.composer.is_image_backed_for_tests());
+
+        let heap = ComposerTable::from_entries(shared.legacy.entries());
+        for input in [
+            "khnhomttov",
+            "meannekbongtte",
+            "sakampheapttenglay",
+            "knhhomttovsalarien",
+            "khomtaekitmnakaeng",
+        ] {
+            assert_eq!(shared.composer.analyze(input), heap.analyze(input), "{input}");
+        }
     }
 
     #[test]

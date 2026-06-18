@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use serde::{Deserialize, Serialize};
 
-use crate::roman_lookup::{normalize, Entry};
+use crate::roman_lookup::{normalize, DictionaryImageView, Entry};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum ComposerChunkKind {
@@ -188,12 +188,15 @@ impl PathState {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub(crate) struct ComposerTable {
     nodes: Vec<ComposerNode>,
+    #[serde(skip)]
+    image: Option<DictionaryImageView<'static>>,
 }
 
 impl ComposerTable {
     pub(crate) fn empty() -> Self {
         Self {
             nodes: vec![ComposerNode::default()],
+            image: None,
         }
     }
 
@@ -209,6 +212,18 @@ impl ComposerTable {
         }
 
         table
+    }
+
+    pub(crate) fn from_dictionary_image(image: DictionaryImageView<'static>) -> Self {
+        Self {
+            nodes: Vec::new(),
+            image: Some(image),
+        }
+    }
+
+    #[cfg(test)]
+    pub(crate) fn is_image_backed_for_tests(&self) -> bool {
+        self.image.is_some()
     }
 
     pub(crate) fn analyze(&self, input: &str) -> ComposerAnalysis {
@@ -398,16 +413,16 @@ impl ComposerTable {
 
             let mut node_index = 0usize;
             for end in start..chars.len() {
-                let Some(&child) = self.nodes[node_index].children.get(&chars[end]) else {
+                let Some(child) = self.child_node(node_index, chars[end]) else {
                     break;
                 };
                 node_index = child;
-                if !self.nodes[node_index].terminal {
+                if !self.node_terminal(node_index) {
                     continue;
                 }
                 let chunk_len = end + 1 - start;
                 let trusted_short_chunk =
-                    chunk_len < 3 && self.nodes[node_index].max_frequency >= TRUSTED_SHORT_CHUNK_MIN_FREQUENCY;
+                    chunk_len < 3 && self.node_max_frequency(node_index) >= TRUSTED_SHORT_CHUNK_MIN_FREQUENCY;
                 let next_state = PathState {
                     chunk_count: prefix_state.chunk_count + 1,
                     weak_chunk_count: prefix_state.weak_chunk_count
@@ -423,6 +438,34 @@ impl ComposerTable {
         }
 
         states
+    }
+
+    fn child_node(&self, node_index: usize, ch: char) -> Option<usize> {
+        if let Some(image) = self.image {
+            return image
+                .composer_child(node_index as u32, ch)
+                .expect("dictionary image composer child")
+                .map(|child| child as usize);
+        }
+        self.nodes.get(node_index)?.children.get(&ch).copied()
+    }
+
+    fn node_terminal(&self, node_index: usize) -> bool {
+        if let Some(image) = self.image {
+            return image
+                .composer_node_terminal(node_index as u32)
+                .expect("dictionary image composer terminal");
+        }
+        self.nodes.get(node_index).map(|node| node.terminal).unwrap_or(false)
+    }
+
+    fn node_max_frequency(&self, node_index: usize) -> u32 {
+        if let Some(image) = self.image {
+            return image
+                .composer_node_max_frequency(node_index as u32)
+                .expect("dictionary image composer max frequency");
+        }
+        self.nodes.get(node_index).map(|node| node.max_frequency).unwrap_or(0)
     }
 
     fn weighted_span_chunk_paths(&self, analysis: &ComposerAnalysis) -> Vec<Vec<ComposerChunk>> {
