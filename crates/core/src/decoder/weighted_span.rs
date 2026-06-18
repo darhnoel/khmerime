@@ -1,7 +1,7 @@
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
-use crate::roman_lookup::{char_ngrams, roman_search_variants, LegacyData, RankedEntryView, RankedLexicon};
+use crate::roman_lookup::{char_ngrams, roman_search_variants, LegacyData, RankedEntryView};
 
 use super::{
     elapsed_decode_us, start_decode_timer, DecodeCandidate, DecodeFailure, DecodeRequest, DecodeResult, DecodeSegment,
@@ -559,9 +559,9 @@ impl WeightedSpanDecoder {
         beam.scores.chunk += candidate.score;
         beam.scores.segmentation += segmentation_delta(candidate.input.chars().count(), candidate.edit_similarity);
         beam.scores.segmentation += composer_alignment_delta(request.composer, candidate.start, candidate.end);
-        beam.scores.context += context_delta(self.data.ranked(), beam.words.last(), &candidate.output);
+        beam.scores.context += context_delta(self.data.as_ref(), beam.words.last(), &candidate.output);
         beam.scores.pos += pos_delta(
-            self.data.ranked(),
+            self.data.as_ref(),
             beam.last_tags.last().and_then(|tag| tag.as_deref()),
             candidate.first_tag.as_deref(),
         );
@@ -833,10 +833,10 @@ fn segmentation_delta(span_len: usize, edit_similarity: f64) -> i32 {
     length_bonus + quality_bonus - chunk_penalty - micro_penalty
 }
 
-fn context_delta(lexicon: &RankedLexicon, previous: Option<&String>, word: &str) -> i32 {
-    let corpus_surface = lexicon.corpus_surface_unigrams.get(word).copied().unwrap_or(0);
-    let corpus_word = lexicon.corpus_word_unigrams.get(word).copied().unwrap_or(0);
-    let lexicon_unigram = lexicon.word_unigrams.get(word).copied().unwrap_or(0);
+fn context_delta(data: &LegacyData, previous: Option<&String>, word: &str) -> i32 {
+    let corpus_surface = data.corpus_surface_unigram_count(word);
+    let corpus_word = data.corpus_word_unigram_count(word);
+    let lexicon_unigram = data.word_unigram_count(word);
     let unigram_score = if corpus_surface > 0 {
         (((corpus_surface + 1) as f64).ln() * 260.0).round() as i32
     } else if corpus_word > 0 {
@@ -846,26 +846,17 @@ fn context_delta(lexicon: &RankedLexicon, previous: Option<&String>, word: &str)
     };
     let bigram_score = previous
         .map(|prev| {
-            let corpus_bigram = lexicon
-                .corpus_word_bigrams
-                .get(&(prev.clone(), word.to_owned()))
-                .copied()
-                .unwrap_or(0);
+            let corpus_bigram = data.corpus_word_bigram_count(prev, word);
             if corpus_bigram > 0 {
                 return (((corpus_bigram + 1) as f64).ln() * 320.0).round() as i32;
             }
 
-            let lexicon_bigram = lexicon
-                .word_bigrams
-                .get(&(prev.clone(), word.to_owned()))
-                .copied()
-                .unwrap_or(0);
+            let lexicon_bigram = data.word_bigram_count(prev, word);
             if lexicon_bigram > 0 {
                 return (((lexicon_bigram + 1) as f64).ln() * 260.0).round() as i32;
             }
 
-            if lexicon.corpus_surface_unigrams.contains_key(prev) && lexicon.corpus_surface_unigrams.contains_key(word)
-            {
+            if data.corpus_surface_unigram_count(prev) > 0 && data.corpus_surface_unigram_count(word) > 0 {
                 -40
             } else {
                 -90
@@ -876,22 +867,18 @@ fn context_delta(lexicon: &RankedLexicon, previous: Option<&String>, word: &str)
 }
 
 // Heuristic POS/context transition score from observed tag unigram and bigram counts.
-fn pos_delta(lexicon: &RankedLexicon, previous: Option<&str>, current: Option<&str>) -> i32 {
+fn pos_delta(data: &LegacyData, previous: Option<&str>, current: Option<&str>) -> i32 {
     let (Some(previous), Some(current)) = (previous, current) else {
         return 0;
     };
 
-    let transition = lexicon
-        .tag_bigrams
-        .get(&(previous.to_owned(), current.to_owned()))
-        .copied()
-        .unwrap_or(0);
+    let transition = data.tag_bigram_count(previous, current);
     if transition > 0 {
         return (((transition + 1) as f64).ln() * 28.0).round() as i32;
     }
 
-    let previous_seen = lexicon.tag_unigrams.contains_key(previous);
-    let current_seen = lexicon.tag_unigrams.contains_key(current);
+    let previous_seen = data.tag_unigram_count(previous) > 0;
+    let current_seen = data.tag_unigram_count(current) > 0;
     if previous_seen && current_seen {
         -18
     } else {
@@ -1270,25 +1257,25 @@ mod tests {
 
     #[test]
     fn context_delta_prefers_corpus_surface_counts_for_joined_outputs() {
-        let mut lexicon = RankedLexicon::default();
-        lexicon.corpus_surface_unigrams.insert(String::from("ខ្ញុំទៅ"), 3);
-        lexicon.word_unigrams.insert(String::from("ខ្ញុំទៅ"), 1);
+        let mut ranked = RankedLexicon::default();
+        ranked.corpus_surface_unigrams.insert(String::from("ខ្ញុំទៅ"), 3);
+        ranked.word_unigrams.insert(String::from("ខ្ញុំទៅ"), 1);
+        let data = LegacyData::from_ranked_for_tests(ranked);
 
-        assert!(context_delta(&lexicon, None, "ខ្ញុំទៅ") > 0);
+        assert!(context_delta(&data, None, "ខ្ញុំទៅ") > 0);
     }
 
     #[test]
     fn pos_delta_prefers_seen_tag_transitions() {
-        let mut lexicon = RankedLexicon::default();
-        lexicon.tag_unigrams.insert(String::from("PRO"), 10);
-        lexicon.tag_unigrams.insert(String::from("VB"), 12);
-        lexicon.tag_unigrams.insert(String::from("JJ"), 4);
-        lexicon
-            .tag_bigrams
-            .insert((String::from("PRO"), String::from("VB")), 25);
+        let mut ranked = RankedLexicon::default();
+        ranked.tag_unigrams.insert(String::from("PRO"), 10);
+        ranked.tag_unigrams.insert(String::from("VB"), 12);
+        ranked.tag_unigrams.insert(String::from("JJ"), 4);
+        ranked.tag_bigrams.insert((String::from("PRO"), String::from("VB")), 25);
+        let data = LegacyData::from_ranked_for_tests(ranked);
 
-        assert!(pos_delta(&lexicon, Some("PRO"), Some("VB")) > 0);
-        assert!(pos_delta(&lexicon, Some("PRO"), Some("JJ")) < 0);
-        assert_eq!(pos_delta(&lexicon, None, Some("VB")), 0);
+        assert!(pos_delta(&data, Some("PRO"), Some("VB")) > 0);
+        assert!(pos_delta(&data, Some("PRO"), Some("JJ")) < 0);
+        assert_eq!(pos_delta(&data, None, Some("VB")), 0);
     }
 }

@@ -371,6 +371,13 @@ mod tests {
         assert!(shared.legacy.target_frequency.is_empty());
         assert!(shared.legacy.roman_normalized.is_empty());
         assert!(shared.legacy.roman_prefix_index.is_empty());
+        assert!(shared.legacy.ranked.word_unigrams.is_empty());
+        assert!(shared.legacy.ranked.word_bigrams.is_empty());
+        assert!(shared.legacy.ranked.corpus_word_unigrams.is_empty());
+        assert!(shared.legacy.ranked.corpus_word_bigrams.is_empty());
+        assert!(shared.legacy.ranked.corpus_surface_unigrams.is_empty());
+        assert!(shared.legacy.ranked.tag_unigrams.is_empty());
+        assert!(shared.legacy.ranked.tag_bigrams.is_empty());
 
         let transliterator = Transliterator::from_shared_data_with_config(
             &shared,
