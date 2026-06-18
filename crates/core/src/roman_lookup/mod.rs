@@ -30,12 +30,13 @@ mod types;
 use compiled_io::{parse_compiled_khpos_stats, parse_compiled_lexicon, parse_compiled_next_word_stats};
 #[cfg(not(all(target_arch = "wasm32", feature = "fetch-data")))]
 use compiled_io::{parse_csv, parse_tsv};
-use dictionary_image::DictionaryImageView;
+pub(crate) use dictionary_image::DictionaryImageView;
 use normalization::map_next_word_context_token;
 use types::*;
 
 pub use types::{AppliedSuggestion, Entry, LexiconError, Result, SharedTransliteratorData, Transliterator};
 
+pub(crate) use legacy_data::RankedEntryView;
 pub(crate) use normalization::{char_ngrams, normalize, roman_search_variants};
 pub(crate) use types::{LegacyData, RankedLexicon, RankedLexiconEntry};
 
@@ -175,7 +176,9 @@ mod tests {
     #[test]
     fn dictionary_image_matches_ranked_retrieval_indexes() {
         let compiled_entries = parse_compiled_lexicon(DEFAULT_COMPILED_DATA).unwrap();
-        let ranked = RankedLexicon::from_entries(&compiled_entries, CorpusStats::default());
+        // Use the real corpus stats the image was built from so boundary tags match.
+        let corpus_stats = parse_compiled_khpos_stats(DEFAULT_COMPILED_KHPOS_STATS).unwrap();
+        let ranked = RankedLexicon::from_entries(&compiled_entries, corpus_stats);
         let image = dictionary_image::DictionaryImageView::parse(DEFAULT_DICTIONARY_IMAGE).unwrap();
 
         assert_eq!(image.entry_count(), ranked.entries.len());
@@ -190,8 +193,26 @@ mod tests {
             assert_eq!(actual.normalized_key().unwrap(), expected.normalized_key.as_str());
             assert_eq!(actual.frequency().unwrap(), expected.frequency);
             assert_eq!(actual.frequency_lang().unwrap(), expected.frequency_lang.as_str());
-            assert_eq!(actual.first_tag().unwrap(), None);
-            assert_eq!(actual.last_tag().unwrap(), None);
+            assert_eq!(
+                actual.first_tag().unwrap(),
+                expected.first_tag.as_deref(),
+                "first_tag mismatch entry {entry_id} target={:?}",
+                expected.target
+            );
+            assert_eq!(
+                actual.last_tag().unwrap(),
+                expected.last_tag.as_deref(),
+                "last_tag mismatch entry {entry_id} target={:?}",
+                expected.target
+            );
+            // The image must reproduce the entry's alias_keys exactly, so score_forms
+            // is identical whether the ranked table is heap- or image-backed.
+            let actual_alias_keys = image.entry_alias_keys(entry_id as u32).unwrap();
+            assert_eq!(
+                actual_alias_keys,
+                expected.alias_keys.iter().map(String::as_str).collect::<Vec<_>>(),
+                "entry alias_keys mismatch for entry {entry_id}"
+            );
         }
 
         for (key, expected) in &ranked.exact_index {
@@ -222,6 +243,64 @@ mod tests {
                 .unwrap_or_default();
             let expected = expected.iter().map(|id| *id as u32).collect::<Vec<_>>();
             assert_eq!(actual, expected, "gram postings mismatch for {key}");
+        }
+    }
+
+    #[test]
+    fn dictionary_image_matches_ranked_ngram_counts() {
+        let compiled_entries = parse_compiled_lexicon(DEFAULT_COMPILED_DATA).unwrap();
+        // Use the real corpus stats the image was built from, not default/empty
+        // corpus data, so this validates the production sections.
+        let corpus_stats = parse_compiled_khpos_stats(DEFAULT_COMPILED_KHPOS_STATS).unwrap();
+        let ranked = RankedLexicon::from_entries(&compiled_entries, corpus_stats);
+        let image = dictionary_image::DictionaryImageView::parse(DEFAULT_DICTIONARY_IMAGE).unwrap();
+
+        assert_string_count_section("word unigrams", &ranked.word_unigrams, |key| {
+            image.word_unigram_count(key).unwrap()
+        });
+        assert_bigram_count_section("word bigrams", &ranked.word_bigrams, |left, right| {
+            image.word_bigram_count(left, right).unwrap()
+        });
+        assert_string_count_section("corpus word unigrams", &ranked.corpus_word_unigrams, |key| {
+            image.corpus_word_unigram_count(key).unwrap()
+        });
+        assert_bigram_count_section("corpus word bigrams", &ranked.corpus_word_bigrams, |left, right| {
+            image.corpus_word_bigram_count(left, right).unwrap()
+        });
+        assert_string_count_section("corpus surface unigrams", &ranked.corpus_surface_unigrams, |key| {
+            image.corpus_surface_unigram_count(key).unwrap()
+        });
+        assert_string_count_section("tag unigrams", &ranked.tag_unigrams, |key| {
+            image.tag_unigram_count(key).unwrap()
+        });
+        assert_bigram_count_section("tag bigrams", &ranked.tag_bigrams, |left, right| {
+            image.tag_bigram_count(left, right).unwrap()
+        });
+
+        assert_eq!(image.word_unigram_count("__khmerime_missing_word__").unwrap(), 0);
+        assert_eq!(
+            image
+                .word_bigram_count("__khmerime_missing_left__", "__khmerime_missing_right__")
+                .unwrap(),
+            0
+        );
+    }
+
+    fn assert_string_count_section<F>(label: &str, expected: &HashMap<String, u32>, lookup: F)
+    where
+        F: Fn(&str) -> u32,
+    {
+        for (key, count) in expected {
+            assert_eq!(lookup(key), *count, "{label} mismatch for {key}");
+        }
+    }
+
+    fn assert_bigram_count_section<F>(label: &str, expected: &HashMap<(String, String), u32>, lookup: F)
+    where
+        F: Fn(&str, &str) -> u32,
+    {
+        for ((left, right), count) in expected {
+            assert_eq!(lookup(left, right), *count, "{label} mismatch for ({left}, {right})");
         }
     }
 
@@ -292,6 +371,13 @@ mod tests {
         assert!(shared.legacy.target_frequency.is_empty());
         assert!(shared.legacy.roman_normalized.is_empty());
         assert!(shared.legacy.roman_prefix_index.is_empty());
+        assert!(shared.legacy.ranked.word_unigrams.is_empty());
+        assert!(shared.legacy.ranked.word_bigrams.is_empty());
+        assert!(shared.legacy.ranked.corpus_word_unigrams.is_empty());
+        assert!(shared.legacy.ranked.corpus_word_bigrams.is_empty());
+        assert!(shared.legacy.ranked.corpus_surface_unigrams.is_empty());
+        assert!(shared.legacy.ranked.tag_unigrams.is_empty());
+        assert!(shared.legacy.ranked.tag_bigrams.is_empty());
 
         let transliterator = Transliterator::from_shared_data_with_config(
             &shared,
@@ -309,6 +395,23 @@ mod tests {
             .suggest("kit", &history)
             .iter()
             .any(|candidate| candidate == "គិត"));
+    }
+
+    #[test]
+    fn default_shared_data_uses_dictionary_image_for_composer_table() {
+        let shared = Transliterator::from_default_shared_data().unwrap();
+        assert!(shared.composer.is_image_backed_for_tests());
+
+        let heap = ComposerTable::from_entries(shared.legacy.entries());
+        for input in [
+            "khnhomttov",
+            "meannekbongtte",
+            "sakampheapttenglay",
+            "knhhomttovsalarien",
+            "khomtaekitmnakaeng",
+        ] {
+            assert_eq!(shared.composer.analyze(input), heap.analyze(input), "{input}");
+        }
     }
 
     #[test]

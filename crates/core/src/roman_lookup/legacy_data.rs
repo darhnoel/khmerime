@@ -1,5 +1,87 @@
+use super::dictionary_image::DictionaryEntryView;
 use super::search_index::SearchIndex;
 use super::*;
+
+// A ranked entry whose fields come from either the heap ranked table or the
+// zero-copy dictionary image, so the decoder can read entries without retaining
+// the heap Vec<RankedLexiconEntry> when the image is present.
+pub(crate) enum RankedEntryView<'a> {
+    Heap(&'a RankedLexiconEntry),
+    Image {
+        image: DictionaryImageView<'a>,
+        entry: DictionaryEntryView<'a>,
+        entry_id: u32,
+    },
+}
+
+impl<'a> RankedEntryView<'a> {
+    pub(crate) fn frequency(&self) -> u32 {
+        match self {
+            Self::Heap(entry) => entry.frequency,
+            Self::Image { entry, .. } => entry.frequency().expect("dictionary image entry frequency"),
+        }
+    }
+
+    pub(crate) fn normalized_key(&self) -> &'a str {
+        match self {
+            Self::Heap(entry) => entry.normalized_key.as_str(),
+            Self::Image { entry, .. } => entry.normalized_key().expect("dictionary image entry normalized_key"),
+        }
+    }
+
+    pub(crate) fn target(&self) -> &'a str {
+        match self {
+            Self::Heap(entry) => entry.target.as_str(),
+            Self::Image { entry, .. } => entry.target().expect("dictionary image entry target"),
+        }
+    }
+
+    pub(crate) fn canonical_roman(&self) -> &'a str {
+        match self {
+            Self::Heap(entry) => entry.canonical_roman.as_str(),
+            Self::Image { entry, .. } => entry.canonical_roman().expect("dictionary image entry canonical_roman"),
+        }
+    }
+
+    pub(crate) fn frequency_lang(&self) -> &'a str {
+        match self {
+            Self::Heap(entry) => entry.frequency_lang.as_str(),
+            Self::Image { entry, .. } => entry.frequency_lang().expect("dictionary image entry frequency_lang"),
+        }
+    }
+
+    pub(crate) fn first_tag(&self) -> Option<&'a str> {
+        match self {
+            Self::Heap(entry) => entry.first_tag.as_deref(),
+            Self::Image { entry, .. } => entry.first_tag().expect("dictionary image entry first_tag"),
+        }
+    }
+
+    pub(crate) fn last_tag(&self) -> Option<&'a str> {
+        match self {
+            Self::Heap(entry) => entry.last_tag.as_deref(),
+            Self::Image { entry, .. } => entry.last_tag().expect("dictionary image entry last_tag"),
+        }
+    }
+
+    // normalized_key + alias_keys, excluding "sk:"-prefixed keys (matches
+    // RankedLexiconEntry::score_forms).
+    pub(crate) fn score_forms(&self) -> Vec<&'a str> {
+        match self {
+            Self::Heap(entry) => entry.score_forms().collect(),
+            Self::Image { image, entry_id, .. } => {
+                let normalized = self.normalized_key();
+                let alias_keys = image
+                    .entry_alias_keys(*entry_id)
+                    .expect("dictionary image entry alias_keys");
+                std::iter::once(normalized)
+                    .chain(alias_keys)
+                    .filter(|key| !key.starts_with("sk:"))
+                    .collect()
+            }
+        }
+    }
+}
 
 impl LegacyData {
     #[cfg(not(all(target_arch = "wasm32", feature = "fetch-data")))]
@@ -26,6 +108,24 @@ impl LegacyData {
             ranked: RankedLexicon::default(),
             dictionary_image: None,
             // Phase A defers next-word n-gram stats until full engine promotion.
+            next_word: NextWordStats::default(),
+            next_word_max_context_chars: 0,
+        }
+    }
+
+    #[cfg(test)]
+    pub(crate) fn from_ranked_for_tests(ranked: RankedLexicon) -> Self {
+        Self {
+            entries: Vec::new(),
+            by_roman: HashMap::new(),
+            by_normalized: HashMap::new(),
+            by_target: HashMap::new(),
+            target_frequency: HashMap::new(),
+            roman_normalized: HashMap::new(),
+            roman_prefix_index: HashMap::new(),
+            index: SearchIndex::new(&[], true, 2, 3),
+            ranked,
+            dictionary_image: None,
             next_word: NextWordStats::default(),
             next_word_max_context_chars: 0,
         }
@@ -116,7 +216,7 @@ impl LegacyData {
         } else {
             RankedLookupIndexMode::BuildRetrievalIndexes
         };
-        let ranked = RankedLexicon::from_entries_with_stage_logger_and_index_mode(
+        let mut ranked = RankedLexicon::from_entries_with_stage_logger_and_index_mode(
             &entries,
             corpus_stats,
             index_mode,
@@ -124,6 +224,18 @@ impl LegacyData {
                 log_stage(&format!("ranked_lexicon.{stage}"), elapsed_ms);
             },
         );
+        // With the image present the decoder reads entries and count sections from
+        // the image, so the corresponding heap tables are redundant.
+        if dictionary_image.is_some() {
+            ranked.entries = Vec::new();
+            ranked.word_unigrams = HashMap::new();
+            ranked.word_bigrams = HashMap::new();
+            ranked.corpus_word_unigrams = HashMap::new();
+            ranked.corpus_word_bigrams = HashMap::new();
+            ranked.corpus_surface_unigrams = HashMap::new();
+            ranked.tag_unigrams = HashMap::new();
+            ranked.tag_bigrams = HashMap::new();
+        }
         log_stage("ranked_lexicon", elapsed_stage_ms(started));
 
         let started = start_stage_timer();
@@ -221,8 +333,23 @@ impl LegacyData {
         &self.entries
     }
 
-    pub(crate) fn ranked(&self) -> &RankedLexicon {
-        &self.ranked
+    // A view of ranked entry `entry_id`, sourced from the zero-copy dictionary image
+    // when present (default system lexicon) or the heap ranked table otherwise
+    // (custom/CLI lexicons). The image and heap entry-id spaces are identical (see
+    // dictionary_image_matches_ranked_retrieval_indexes), so callers index the same
+    // way regardless of source.
+    pub(crate) fn ranked_entry(&self, entry_id: usize) -> RankedEntryView<'_> {
+        if let Some(image) = self.dictionary_image {
+            let id = entry_id as u32;
+            let entry = image.entry(id).expect("dictionary image entry must resolve");
+            RankedEntryView::Image {
+                image,
+                entry,
+                entry_id: id,
+            }
+        } else {
+            RankedEntryView::Heap(&self.ranked.entries[entry_id])
+        }
     }
 
     pub(crate) fn starter_suggestions(&self, history: &HashMap<String, usize>) -> Vec<String> {
@@ -594,6 +721,81 @@ impl LegacyData {
                 .unwrap_or_default();
         }
         self.ranked.gram_index.get(key).cloned().unwrap_or_default()
+    }
+
+    pub(crate) fn word_unigram_count(&self, word: &str) -> u32 {
+        if let Some(image) = self.dictionary_image {
+            return image
+                .word_unigram_count(word)
+                .expect("dictionary image word unigram count");
+        }
+        self.ranked.word_unigrams.get(word).copied().unwrap_or(0)
+    }
+
+    pub(crate) fn word_bigram_count(&self, left: &str, right: &str) -> u32 {
+        if let Some(image) = self.dictionary_image {
+            return image
+                .word_bigram_count(left, right)
+                .expect("dictionary image word bigram count");
+        }
+        self.ranked
+            .word_bigrams
+            .get(&(left.to_owned(), right.to_owned()))
+            .copied()
+            .unwrap_or(0)
+    }
+
+    pub(crate) fn corpus_word_unigram_count(&self, word: &str) -> u32 {
+        if let Some(image) = self.dictionary_image {
+            return image
+                .corpus_word_unigram_count(word)
+                .expect("dictionary image corpus word unigram count");
+        }
+        self.ranked.corpus_word_unigrams.get(word).copied().unwrap_or(0)
+    }
+
+    pub(crate) fn corpus_word_bigram_count(&self, left: &str, right: &str) -> u32 {
+        if let Some(image) = self.dictionary_image {
+            return image
+                .corpus_word_bigram_count(left, right)
+                .expect("dictionary image corpus word bigram count");
+        }
+        self.ranked
+            .corpus_word_bigrams
+            .get(&(left.to_owned(), right.to_owned()))
+            .copied()
+            .unwrap_or(0)
+    }
+
+    pub(crate) fn corpus_surface_unigram_count(&self, surface: &str) -> u32 {
+        if let Some(image) = self.dictionary_image {
+            return image
+                .corpus_surface_unigram_count(surface)
+                .expect("dictionary image corpus surface unigram count");
+        }
+        self.ranked.corpus_surface_unigrams.get(surface).copied().unwrap_or(0)
+    }
+
+    pub(crate) fn tag_unigram_count(&self, tag: &str) -> u32 {
+        if let Some(image) = self.dictionary_image {
+            return image
+                .tag_unigram_count(tag)
+                .expect("dictionary image tag unigram count");
+        }
+        self.ranked.tag_unigrams.get(tag).copied().unwrap_or(0)
+    }
+
+    pub(crate) fn tag_bigram_count(&self, left: &str, right: &str) -> u32 {
+        if let Some(image) = self.dictionary_image {
+            return image
+                .tag_bigram_count(left, right)
+                .expect("dictionary image tag bigram count");
+        }
+        self.ranked
+            .tag_bigrams
+            .get(&(left.to_owned(), right.to_owned()))
+            .copied()
+            .unwrap_or(0)
     }
 }
 

@@ -1,7 +1,7 @@
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
-use crate::roman_lookup::{char_ngrams, roman_search_variants, LegacyData, RankedLexicon, RankedLexiconEntry};
+use crate::roman_lookup::{char_ngrams, roman_search_variants, LegacyData, RankedEntryView};
 
 use super::{
     elapsed_decode_us, start_decode_timer, DecodeCandidate, DecodeFailure, DecodeRequest, DecodeResult, DecodeSegment,
@@ -358,8 +358,8 @@ impl WeightedSpanDecoder {
             if has_exact_hit && !signals.exact_hit {
                 continue;
             }
-            let entry = &self.data.ranked().entries[entry_index];
-            if let Some(candidate) = self.score_span_candidate(start, end, span, entry, &search_keys, &signals) {
+            let entry = self.data.ranked_entry(entry_index);
+            if let Some(candidate) = self.score_span_candidate(start, end, span, &entry, &search_keys, &signals) {
                 match best_by_output.get(candidate.output.as_str()) {
                     Some(current) if !compare_span_candidates(current, &candidate).is_gt() => {}
                     _ => {
@@ -376,7 +376,7 @@ impl WeightedSpanDecoder {
     }
 
     fn retrieve_candidates(&self, search_keys: &[String], raw_key: &str) -> Vec<(usize, RetrievalSignals)> {
-        let lexicon = self.data.ranked();
+        let data = self.data.as_ref();
         let raw_exact_ids = self.data.ranked_exact_entry_ids(raw_key);
         if !raw_exact_ids.is_empty() {
             let mut ranked = raw_exact_ids
@@ -393,7 +393,7 @@ impl WeightedSpanDecoder {
                     )
                 })
                 .collect::<Vec<_>>();
-            ranked.sort_by(|left, right| compare_retrieval_hits(left, right, lexicon));
+            ranked.sort_by(|left, right| compare_retrieval_hits(left, right, data));
             ranked.truncate(self.config.beam_retrieval_shortlist.max(1));
             return ranked;
         }
@@ -428,14 +428,14 @@ impl WeightedSpanDecoder {
 
         if self.config.interactive_mode && !exact_signals.is_empty() {
             let mut ranked = exact_signals.into_iter().collect::<Vec<_>>();
-            ranked.sort_by(|left, right| compare_retrieval_hits(left, right, lexicon));
+            ranked.sort_by(|left, right| compare_retrieval_hits(left, right, data));
             ranked.truncate(self.config.beam_retrieval_shortlist.max(1));
             return ranked;
         }
 
         if self.config.interactive_mode && raw_key.chars().count() >= 4 && !alias_only.is_empty() {
             let mut ranked = alias_only.into_iter().collect::<Vec<_>>();
-            ranked.sort_by(|left, right| compare_retrieval_hits(left, right, lexicon));
+            ranked.sort_by(|left, right| compare_retrieval_hits(left, right, data));
             ranked.truncate(self.config.beam_retrieval_shortlist.max(1));
             return ranked;
         }
@@ -482,7 +482,7 @@ impl WeightedSpanDecoder {
         }
 
         let mut ranked = signals.into_iter().collect::<Vec<_>>();
-        ranked.sort_by(|left, right| compare_retrieval_hits(left, right, lexicon));
+        ranked.sort_by(|left, right| compare_retrieval_hits(left, right, data));
         ranked.truncate(self.config.beam_retrieval_shortlist);
         ranked
     }
@@ -492,14 +492,15 @@ impl WeightedSpanDecoder {
         start: usize,
         end: usize,
         span: &str,
-        entry: &RankedLexiconEntry,
+        entry: &RankedEntryView,
         search_keys: &[String],
         signals: &RetrievalSignals,
     ) -> Option<SpanCandidate> {
         let mut best_edit = 0.0f64;
         let mut best_ngram = 0.0f64;
+        let forms = entry.score_forms();
         for query in search_keys {
-            for form in entry.score_forms() {
+            for &form in &forms {
                 best_edit = best_edit.max(weighted_similarity(query, form));
                 best_ngram = best_ngram.max(dice_score(query, form));
             }
@@ -509,7 +510,7 @@ impl WeightedSpanDecoder {
             return None;
         }
 
-        if entry.frequency <= RARE_ENTRY_FREQUENCY_MAX
+        if entry.frequency() <= RARE_ENTRY_FREQUENCY_MAX
             && best_edit < RARE_ENTRY_FUZZY_FLOOR
             && !signals.exact_hit
             && !signals.alias_hit
@@ -517,12 +518,12 @@ impl WeightedSpanDecoder {
             return None;
         }
 
-        let prefix_bonus = onset_bonus(span, &entry.normalized_key);
+        let prefix_bonus = onset_bonus(span, entry.normalized_key());
         let exact_bonus = if signals.exact_hit { 3_200 } else { 0 };
         let alias_bonus = if signals.alias_hit { 2_300 } else { 0 };
         let edit_score = (best_edit * 4_600.0).round() as i32;
         let ngram_score = (best_ngram * 2_200.0).round() as i32;
-        let frequency_score = frequency_prior(entry.frequency);
+        let frequency_score = frequency_prior(entry.frequency());
         let span_len = end.saturating_sub(start) as i32;
         let span_bonus = span_len * 220;
         let long_span_bonus = if span_len >= 5 && (signals.exact_hit || signals.alias_hit || best_edit >= 0.72) {
@@ -543,10 +544,10 @@ impl WeightedSpanDecoder {
             start,
             end,
             input: span.to_owned(),
-            output: entry.target.clone(),
-            recovered_roman: entry.canonical_roman.clone(),
-            first_tag: entry.first_tag.clone(),
-            last_tag: entry.last_tag.clone(),
+            output: entry.target().to_owned(),
+            recovered_roman: entry.canonical_roman().to_owned(),
+            first_tag: entry.first_tag().map(str::to_owned),
+            last_tag: entry.last_tag().map(str::to_owned),
             score,
             score_bps: score_to_bps(score),
             edit_similarity: best_edit,
@@ -558,9 +559,9 @@ impl WeightedSpanDecoder {
         beam.scores.chunk += candidate.score;
         beam.scores.segmentation += segmentation_delta(candidate.input.chars().count(), candidate.edit_similarity);
         beam.scores.segmentation += composer_alignment_delta(request.composer, candidate.start, candidate.end);
-        beam.scores.context += context_delta(self.data.ranked(), beam.words.last(), &candidate.output);
+        beam.scores.context += context_delta(self.data.as_ref(), beam.words.last(), &candidate.output);
         beam.scores.pos += pos_delta(
-            self.data.ranked(),
+            self.data.as_ref(),
             beam.last_tags.last().and_then(|tag| tag.as_deref()),
             candidate.first_tag.as_deref(),
         );
@@ -788,10 +789,10 @@ fn compare_span_candidates(left: &SpanCandidate, right: &SpanCandidate) -> std::
 fn compare_retrieval_hits(
     left: &(usize, RetrievalSignals),
     right: &(usize, RetrievalSignals),
-    lexicon: &RankedLexicon,
+    data: &LegacyData,
 ) -> std::cmp::Ordering {
-    let left_entry = &lexicon.entries[left.0];
-    let right_entry = &lexicon.entries[right.0];
+    let left_entry = data.ranked_entry(left.0);
+    let right_entry = data.ranked_entry(right.0);
     let left_signal = &left.1;
     let right_signal = &right.1;
 
@@ -801,10 +802,10 @@ fn compare_retrieval_hits(
         .then_with(|| right_signal.exact_hit.cmp(&left_signal.exact_hit))
         .then_with(|| right_signal.alias_hit.cmp(&left_signal.alias_hit))
         .then_with(|| right_signal.gram_hits.cmp(&left_signal.gram_hits))
-        .then_with(|| right_entry.frequency.cmp(&left_entry.frequency))
-        .then_with(|| left_entry.canonical_roman.cmp(&right_entry.canonical_roman))
-        .then_with(|| left_entry.target.cmp(&right_entry.target))
-        .then_with(|| left_entry.frequency_lang.cmp(&right_entry.frequency_lang))
+        .then_with(|| right_entry.frequency().cmp(&left_entry.frequency()))
+        .then_with(|| left_entry.canonical_roman().cmp(right_entry.canonical_roman()))
+        .then_with(|| left_entry.target().cmp(right_entry.target()))
+        .then_with(|| left_entry.frequency_lang().cmp(right_entry.frequency_lang()))
 }
 
 fn frequency_prior(frequency: u32) -> i32 {
@@ -832,10 +833,10 @@ fn segmentation_delta(span_len: usize, edit_similarity: f64) -> i32 {
     length_bonus + quality_bonus - chunk_penalty - micro_penalty
 }
 
-fn context_delta(lexicon: &RankedLexicon, previous: Option<&String>, word: &str) -> i32 {
-    let corpus_surface = lexicon.corpus_surface_unigrams.get(word).copied().unwrap_or(0);
-    let corpus_word = lexicon.corpus_word_unigrams.get(word).copied().unwrap_or(0);
-    let lexicon_unigram = lexicon.word_unigrams.get(word).copied().unwrap_or(0);
+fn context_delta(data: &LegacyData, previous: Option<&String>, word: &str) -> i32 {
+    let corpus_surface = data.corpus_surface_unigram_count(word);
+    let corpus_word = data.corpus_word_unigram_count(word);
+    let lexicon_unigram = data.word_unigram_count(word);
     let unigram_score = if corpus_surface > 0 {
         (((corpus_surface + 1) as f64).ln() * 260.0).round() as i32
     } else if corpus_word > 0 {
@@ -845,26 +846,17 @@ fn context_delta(lexicon: &RankedLexicon, previous: Option<&String>, word: &str)
     };
     let bigram_score = previous
         .map(|prev| {
-            let corpus_bigram = lexicon
-                .corpus_word_bigrams
-                .get(&(prev.clone(), word.to_owned()))
-                .copied()
-                .unwrap_or(0);
+            let corpus_bigram = data.corpus_word_bigram_count(prev, word);
             if corpus_bigram > 0 {
                 return (((corpus_bigram + 1) as f64).ln() * 320.0).round() as i32;
             }
 
-            let lexicon_bigram = lexicon
-                .word_bigrams
-                .get(&(prev.clone(), word.to_owned()))
-                .copied()
-                .unwrap_or(0);
+            let lexicon_bigram = data.word_bigram_count(prev, word);
             if lexicon_bigram > 0 {
                 return (((lexicon_bigram + 1) as f64).ln() * 260.0).round() as i32;
             }
 
-            if lexicon.corpus_surface_unigrams.contains_key(prev) && lexicon.corpus_surface_unigrams.contains_key(word)
-            {
+            if data.corpus_surface_unigram_count(prev) > 0 && data.corpus_surface_unigram_count(word) > 0 {
                 -40
             } else {
                 -90
@@ -875,22 +867,18 @@ fn context_delta(lexicon: &RankedLexicon, previous: Option<&String>, word: &str)
 }
 
 // Heuristic POS/context transition score from observed tag unigram and bigram counts.
-fn pos_delta(lexicon: &RankedLexicon, previous: Option<&str>, current: Option<&str>) -> i32 {
+fn pos_delta(data: &LegacyData, previous: Option<&str>, current: Option<&str>) -> i32 {
     let (Some(previous), Some(current)) = (previous, current) else {
         return 0;
     };
 
-    let transition = lexicon
-        .tag_bigrams
-        .get(&(previous.to_owned(), current.to_owned()))
-        .copied()
-        .unwrap_or(0);
+    let transition = data.tag_bigram_count(previous, current);
     if transition > 0 {
         return (((transition + 1) as f64).ln() * 28.0).round() as i32;
     }
 
-    let previous_seen = lexicon.tag_unigrams.contains_key(previous);
-    let current_seen = lexicon.tag_unigrams.contains_key(current);
+    let previous_seen = data.tag_unigram_count(previous) > 0;
+    let current_seen = data.tag_unigram_count(current) > 0;
     if previous_seen && current_seen {
         -18
     } else {
@@ -1269,25 +1257,25 @@ mod tests {
 
     #[test]
     fn context_delta_prefers_corpus_surface_counts_for_joined_outputs() {
-        let mut lexicon = RankedLexicon::default();
-        lexicon.corpus_surface_unigrams.insert(String::from("ខ្ញុំទៅ"), 3);
-        lexicon.word_unigrams.insert(String::from("ខ្ញុំទៅ"), 1);
+        let mut ranked = RankedLexicon::default();
+        ranked.corpus_surface_unigrams.insert(String::from("ខ្ញុំទៅ"), 3);
+        ranked.word_unigrams.insert(String::from("ខ្ញុំទៅ"), 1);
+        let data = LegacyData::from_ranked_for_tests(ranked);
 
-        assert!(context_delta(&lexicon, None, "ខ្ញុំទៅ") > 0);
+        assert!(context_delta(&data, None, "ខ្ញុំទៅ") > 0);
     }
 
     #[test]
     fn pos_delta_prefers_seen_tag_transitions() {
-        let mut lexicon = RankedLexicon::default();
-        lexicon.tag_unigrams.insert(String::from("PRO"), 10);
-        lexicon.tag_unigrams.insert(String::from("VB"), 12);
-        lexicon.tag_unigrams.insert(String::from("JJ"), 4);
-        lexicon
-            .tag_bigrams
-            .insert((String::from("PRO"), String::from("VB")), 25);
+        let mut ranked = RankedLexicon::default();
+        ranked.tag_unigrams.insert(String::from("PRO"), 10);
+        ranked.tag_unigrams.insert(String::from("VB"), 12);
+        ranked.tag_unigrams.insert(String::from("JJ"), 4);
+        ranked.tag_bigrams.insert((String::from("PRO"), String::from("VB")), 25);
+        let data = LegacyData::from_ranked_for_tests(ranked);
 
-        assert!(pos_delta(&lexicon, Some("PRO"), Some("VB")) > 0);
-        assert!(pos_delta(&lexicon, Some("PRO"), Some("JJ")) < 0);
-        assert_eq!(pos_delta(&lexicon, None, Some("VB")), 0);
+        assert!(pos_delta(&data, Some("PRO"), Some("VB")) > 0);
+        assert!(pos_delta(&data, Some("PRO"), Some("JJ")) < 0);
+        assert_eq!(pos_delta(&data, None, Some("VB")), 0);
     }
 }

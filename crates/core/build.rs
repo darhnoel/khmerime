@@ -199,6 +199,12 @@ fn main() {
     println!("cargo:rerun-if-env-changed=KHMERIME_WARN_MISSING_OPTIONAL_DATA");
     println!("cargo:rerun-if-env-changed=KHPOS_SURFACE_MIN_COUNT");
     println!("cargo:rerun-if-env-changed=KHPOS_SURFACE_TOP_N");
+    println!("cargo:rerun-if-env-changed=KHMERIME_WARN_MISSING_OPTIONAL_DATA");
+
+    // Set KHMERIME_WARN_MISSING_OPTIONAL_DATA=1 when auditing data-path
+    // configuration and you want missing optional files to be visible as Cargo
+    // warnings.
+    let warn_missing_optional_data = env::var_os("KHMERIME_WARN_MISSING_OPTIONAL_DATA").is_some();
 
     // The checked-in CSV is canonical, but the TSV fallback keeps older local
     // worktrees usable while data migrations are in flight.
@@ -213,20 +219,24 @@ fn main() {
     let additional_source =
         fs::read_to_string(&additional_lexicon_csv).expect("additional most-common English-Khmer CSV must be readable");
     entries.extend(parse_additional_csv_entries(&additional_source));
-    let khpos_train =
-        fs::read_to_string(&data_paths.khpos_train).expect("khPOS after-replace train corpus must be readable");
-    let khpos_tags =
-        fs::read_to_string(&data_paths.khpos_tag).expect("khPOS after-replace tag corpus must be readable");
+    // khPOS corpus files improve decoding quality, but they are large and
+    // gitignored. CI runners won't have them unless the step runner downloads
+    // them separately. Treat them as optional like mobile keyboard n-grams.
+    let khpos_train = read_optional_source(
+        &data_paths.khpos_train,
+        "khPOS after-replace train corpus",
+        warn_missing_optional_data,
+    );
+    let khpos_tags = read_optional_source(
+        &data_paths.khpos_tag,
+        "khPOS after-replace tag corpus",
+        warn_missing_optional_data,
+    );
     let compiled_khpos = compile_khpos_stats(&khpos_train, &khpos_tags, khpos_build_options)
         .expect("khPOS after-replace corpus must compile");
     let compiled_dictionary_image = compile_dictionary_image(&entries, Some(&compiled_khpos.frequency_stats))
         .expect("default dictionary image must compile");
     let compiled = compile_lexicon_entries(entries).expect("default lexicon entries must compile");
-    // Mobile keyboard n-grams improve next-word scoring, but they are optional
-    // for normal development. Set KHMERIME_WARN_MISSING_OPTIONAL_DATA=1 when
-    // auditing data-path configuration and you want missing optional files to be
-    // visible as Cargo warnings.
-    let warn_missing_optional_data = env::var_os("KHMERIME_WARN_MISSING_OPTIONAL_DATA").is_some();
     let mobile_keyboard_1gram = read_optional_source(
         &data_paths.mobile_keyboard_1gram,
         "mobile keyboard 1-gram",
@@ -593,6 +603,46 @@ struct DictionaryImageEntryRecord {
     last_tag_id: u32,
 }
 
+#[derive(Default)]
+struct BuildComposerNode {
+    children: BTreeMap<char, u32>,
+    terminal: bool,
+    max_frequency: u32,
+}
+
+struct BuildComposerTrie {
+    nodes: Vec<BuildComposerNode>,
+}
+
+impl Default for BuildComposerTrie {
+    fn default() -> Self {
+        Self {
+            nodes: vec![BuildComposerNode::default()],
+        }
+    }
+}
+
+impl BuildComposerTrie {
+    fn insert(&mut self, input: &str, frequency: u32) -> Result<(), String> {
+        let mut node_index = 0usize;
+        for ch in input.chars() {
+            let next = if let Some(child) = self.nodes[node_index].children.get(&ch).copied() {
+                child
+            } else {
+                let child = u32::try_from(self.nodes.len())
+                    .map_err(|_| "dictionary image composer trie exceeded u32 node ids".to_owned())?;
+                self.nodes.push(BuildComposerNode::default());
+                self.nodes[node_index].children.insert(ch, child);
+                child
+            };
+            node_index = next as usize;
+        }
+        self.nodes[node_index].terminal = true;
+        self.nodes[node_index].max_frequency = self.nodes[node_index].max_frequency.max(frequency);
+        Ok(())
+    }
+}
+
 struct CompiledKhposStats {
     bytes: Vec<u8>,
     frequency_stats: BuildCorpusFrequencyStats,
@@ -601,7 +651,13 @@ struct CompiledKhposStats {
 #[derive(Default)]
 struct BuildCorpusFrequencyStats {
     word_unigrams: HashMap<String, u32>,
+    word_bigrams: HashMap<(String, String), u32>,
     surface_unigrams: HashMap<String, u32>,
+    tag_unigrams: HashMap<String, u32>,
+    tag_bigrams: HashMap<(String, String), u32>,
+    // word -> dominant POS tag, mirroring the runtime CorpusStats.dominant_word_tags
+    // so the dictionary image can carry per-entry boundary tags.
+    dominant_word_tags: HashMap<String, String>,
 }
 
 fn compile_dictionary_image(
@@ -610,54 +666,93 @@ fn compile_dictionary_image(
 ) -> Result<Vec<u8>, String> {
     let mut interner = DictionaryImageInterner::default();
     let mut image_entries = Vec::<DictionaryImageEntryRecord>::with_capacity(entries.len());
+    // Per-entry alias-key string ids, parallel to image_entries. Lets the ranked
+    // entry table's alias_keys (and thus score_forms) be served from the image.
+    let mut entry_alias_ids = Vec::<Vec<u32>>::with_capacity(entries.len());
     let mut exact_index = BTreeMap::<String, Vec<u32>>::new();
     let mut alias_index = BTreeMap::<String, Vec<u32>>::new();
     let mut gram_index = BTreeMap::<String, Vec<u32>>::new();
+    let mut word_unigrams = BTreeMap::<String, u32>::new();
+    let mut word_bigrams = BTreeMap::<(String, String), u32>::new();
+    let mut composer = BuildComposerTrie::default();
     let mut target_frequency = HashMap::<(String, String), u32>::new();
 
     for entry in entries {
         if entry.roman.contains('\0') || entry.target.contains('\0') || entry.frequency_lang.contains('\0') {
             return Err("NUL byte is not supported in dictionary image entries".to_owned());
         }
+        let words = entry.target.split_whitespace().collect::<Vec<_>>();
+        for word in &words {
+            *word_unigrams.entry((*word).to_owned()).or_default() += 1;
+        }
+        for pair in words.windows(2) {
+            *word_bigrams
+                .entry((pair[0].to_owned(), pair[1].to_owned()))
+                .or_default() += 1;
+        }
         let normalized_key = normalize(&entry.roman);
         if normalized_key.is_empty() {
             continue;
         }
+        composer.insert(&normalized_key, entry.frequency)?;
 
         let target_id = interner.intern(&entry.target)?;
         let canonical_roman_id = interner.intern(&entry.roman)?;
         let normalized_key_id = interner.intern(&normalized_key)?;
         let frequency_lang_id = interner.intern(&entry.frequency_lang)?;
+        // Mirror RankedLexicon's effective frequency: max of the entry frequency and
+        // the corpus surface/word unigram count, so the image entry table matches the
+        // heap ranked table built with the same corpus stats.
+        let corpus_frequency = corpus_stats
+            .and_then(|stats| {
+                stats
+                    .surface_unigrams
+                    .get(&entry.target)
+                    .or_else(|| stats.word_unigrams.get(&entry.target))
+            })
+            .copied()
+            .unwrap_or(0);
         let frequency = *target_frequency
             .entry((entry.target.clone(), entry.frequency_lang.clone()))
-            .or_insert(entry.frequency.max(1));
+            .or_insert(entry.frequency.max(corpus_frequency).max(1));
         let entry_id = u32::try_from(image_entries.len())
             .map_err(|_| "dictionary image entry table exceeded u32 ids".to_owned())?;
 
         exact_index.entry(normalized_key.clone()).or_default().push(entry_id);
+        // Same construction as RankedLexiconEntry.alias_keys (roman_search_variants
+        // minus the normalized key) so score_forms matches the heap path exactly.
+        let mut this_entry_alias_ids = Vec::<u32>::new();
         for key in roman_search_variants(&entry.roman)
             .into_iter()
             .filter(|key| key != &normalized_key)
         {
-            interner.intern(&key)?;
+            let alias_key_id = interner.intern(&key)?;
+            this_entry_alias_ids.push(alias_key_id);
             push_dictionary_grams(&mut gram_index, &key, entry_id);
             alias_index.entry(key).or_default().push(entry_id);
         }
         push_dictionary_grams(&mut gram_index, &normalized_key, entry_id);
 
+        let (first_tag_id, last_tag_id) = boundary_tag_ids(
+            &entry.target,
+            corpus_stats.map(|stats| &stats.dominant_word_tags),
+            &mut interner,
+        )?;
         image_entries.push(DictionaryImageEntryRecord {
             target_id,
             canonical_roman_id,
             normalized_key_id,
             frequency,
             frequency_lang_id,
-            first_tag_id: MISSING_STRING_ID,
-            last_tag_id: MISSING_STRING_ID,
+            first_tag_id,
+            last_tag_id,
         });
+        entry_alias_ids.push(this_entry_alias_ids);
     }
 
     let legacy_indexes = build_legacy_dictionary_indexes(entries, corpus_stats);
     let entries_section = compile_dictionary_entry_section(&image_entries);
+    let (entry_alias_refs, entry_alias_id_blob) = compile_dictionary_entry_alias_sections(&entry_alias_ids)?;
     let (exact_keys, exact_postings) = compile_dictionary_key_index(&mut interner, exact_index)?;
     let (alias_keys, alias_postings) = compile_dictionary_key_index(&mut interner, alias_index)?;
     let (gram_keys, gram_postings) = compile_dictionary_key_index(&mut interner, gram_index)?;
@@ -670,6 +765,29 @@ fn compile_dictionary_image(
     let (legacy_prefix_keys, legacy_prefix_postings) =
         compile_dictionary_string_index(&mut interner, legacy_indexes.roman_prefix_index)?;
     let legacy_target_frequencies = compile_dictionary_frequency_index(&mut interner, legacy_indexes.target_frequency)?;
+    let word_unigrams = compile_dictionary_frequency_index(&mut interner, word_unigrams)?;
+    let word_bigrams = compile_dictionary_bigram_frequency_index(&mut interner, word_bigrams)?;
+    let corpus_word_unigrams = compile_dictionary_frequency_index(
+        &mut interner,
+        btree_string_counts(corpus_stats.map(|stats| &stats.word_unigrams)),
+    )?;
+    let corpus_word_bigrams = compile_dictionary_bigram_frequency_index(
+        &mut interner,
+        btree_bigram_counts(corpus_stats.map(|stats| &stats.word_bigrams)),
+    )?;
+    let corpus_surface_unigrams = compile_dictionary_frequency_index(
+        &mut interner,
+        btree_string_counts(corpus_stats.map(|stats| &stats.surface_unigrams)),
+    )?;
+    let tag_unigrams = compile_dictionary_frequency_index(
+        &mut interner,
+        btree_string_counts(corpus_stats.map(|stats| &stats.tag_unigrams)),
+    )?;
+    let tag_bigrams = compile_dictionary_bigram_frequency_index(
+        &mut interner,
+        btree_bigram_counts(corpus_stats.map(|stats| &stats.tag_bigrams)),
+    )?;
+    let (composer_nodes, composer_edges) = compile_dictionary_composer_sections(&composer.nodes)?;
 
     // Key-index compilation may intern late keys; write string sections after
     // all sections have had a chance to assign string IDs.
@@ -694,7 +812,64 @@ fn compile_dictionary_image(
         (SECTION_LEGACY_PREFIX_KEYS, legacy_prefix_keys),
         (SECTION_LEGACY_PREFIX_POSTINGS, legacy_prefix_postings),
         (SECTION_LEGACY_TARGET_FREQUENCIES, legacy_target_frequencies),
+        (SECTION_ENTRY_ALIAS_REFS, entry_alias_refs),
+        (SECTION_ENTRY_ALIAS_IDS, entry_alias_id_blob),
+        (SECTION_WORD_UNIGRAMS, word_unigrams),
+        (SECTION_WORD_BIGRAMS, word_bigrams),
+        (SECTION_CORPUS_WORD_UNIGRAMS, corpus_word_unigrams),
+        (SECTION_CORPUS_WORD_BIGRAMS, corpus_word_bigrams),
+        (SECTION_CORPUS_SURFACE_UNIGRAMS, corpus_surface_unigrams),
+        (SECTION_TAG_UNIGRAMS, tag_unigrams),
+        (SECTION_TAG_BIGRAMS, tag_bigrams),
+        (SECTION_COMPOSER_NODES, composer_nodes),
+        (SECTION_COMPOSER_EDGES, composer_edges),
     ])
+}
+
+// The entry's first/last word boundary tag string ids, mirroring the runtime
+// boundary_tags_for_target so the image carries the same POS tags the heap ranked
+// table would compute. Returns MISSING_STRING_ID when a tag is absent.
+fn boundary_tag_ids(
+    target: &str,
+    dominant_word_tags: Option<&HashMap<String, String>>,
+    interner: &mut DictionaryImageInterner,
+) -> Result<(u32, u32), String> {
+    let Some(dominant) = dominant_word_tags else {
+        return Ok((MISSING_STRING_ID, MISSING_STRING_ID));
+    };
+    let mut words = target.split_whitespace();
+    let Some(first_word) = words.next() else {
+        return Ok((MISSING_STRING_ID, MISSING_STRING_ID));
+    };
+    let last_word = words.last().unwrap_or(first_word);
+    let intern_tag = |interner: &mut DictionaryImageInterner, word: &str| -> Result<u32, String> {
+        match dominant.get(word) {
+            Some(tag) => interner.intern(tag),
+            None => Ok(MISSING_STRING_ID),
+        }
+    };
+    let first_tag_id = intern_tag(interner, first_word)?;
+    let last_tag_id = intern_tag(interner, last_word)?;
+    Ok((first_tag_id, last_tag_id))
+}
+
+// Per-entry alias keys as a dense ragged array: REFS holds a (start, count) record
+// per entry id (start is a u32 index into IDS); IDS is a flat u32 blob of string ids.
+fn compile_dictionary_entry_alias_sections(entry_alias_ids: &[Vec<u32>]) -> Result<(Vec<u8>, Vec<u8>), String> {
+    let mut refs = Vec::with_capacity(entry_alias_ids.len() * ENTRY_ALIAS_REF_RECORD_LEN);
+    let mut ids = Vec::new();
+    for alias_ids in entry_alias_ids {
+        let start = u32::try_from(ids.len() / 4)
+            .map_err(|_| "dictionary image entry alias ids exceeded u32 offsets".to_owned())?;
+        let count = u32::try_from(alias_ids.len())
+            .map_err(|_| "dictionary image entry alias range exceeded u32 length".to_owned())?;
+        write_u32(&mut refs, start);
+        write_u32(&mut refs, count);
+        for id in alias_ids {
+            write_u32(&mut ids, *id);
+        }
+    }
+    Ok((refs, ids))
 }
 
 struct LegacyDictionaryIndexes {
@@ -892,6 +1067,57 @@ fn compile_dictionary_frequency_index(
         write_u32(&mut records, frequency);
     }
     Ok(records)
+}
+
+fn compile_dictionary_bigram_frequency_index(
+    interner: &mut DictionaryImageInterner,
+    index: BTreeMap<(String, String), u32>,
+) -> Result<Vec<u8>, String> {
+    let mut records = Vec::with_capacity(index.len() * BIGRAM_RECORD_LEN);
+    for ((left, right), frequency) in index {
+        let left_id = interner.intern(&left)?;
+        let right_id = interner.intern(&right)?;
+        write_u32(&mut records, left_id);
+        write_u32(&mut records, right_id);
+        write_u32(&mut records, frequency);
+    }
+    Ok(records)
+}
+
+fn btree_string_counts(source: Option<&HashMap<String, u32>>) -> BTreeMap<String, u32> {
+    source
+        .map(|map| map.iter().map(|(key, count)| (key.clone(), *count)).collect())
+        .unwrap_or_default()
+}
+
+fn btree_bigram_counts(source: Option<&HashMap<(String, String), u32>>) -> BTreeMap<(String, String), u32> {
+    source
+        .map(|map| {
+            map.iter()
+                .map(|((left, right), count)| ((left.clone(), right.clone()), *count))
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+fn compile_dictionary_composer_sections(nodes: &[BuildComposerNode]) -> Result<(Vec<u8>, Vec<u8>), String> {
+    let mut node_records = Vec::with_capacity(nodes.len() * COMPOSER_NODE_RECORD_LEN);
+    let mut edges = Vec::new();
+    for node in nodes {
+        let start = u32::try_from(edges.len() / COMPOSER_EDGE_RECORD_LEN)
+            .map_err(|_| "dictionary image composer edges exceeded u32 offsets".to_owned())?;
+        let count = u32::try_from(node.children.len())
+            .map_err(|_| "dictionary image composer edge range exceeded u32 length".to_owned())?;
+        write_u32(&mut node_records, start);
+        write_u32(&mut node_records, count);
+        write_u32(&mut node_records, u32::from(node.terminal));
+        write_u32(&mut node_records, node.max_frequency);
+        for (ch, child) in &node.children {
+            write_u32(&mut edges, *ch as u32);
+            write_u32(&mut edges, *child);
+        }
+    }
+    Ok((node_records, edges))
 }
 
 fn write_dictionary_image_sections(sections: &[(u32, Vec<u8>)]) -> Result<Vec<u8>, String> {
@@ -1239,11 +1465,19 @@ fn compile_khpos_stats(
     write_string_count_map(&mut output, &tag_unigrams)?;
     write_pair_count_map(&mut output, &tag_bigrams)?;
     write_dominant_tags(&mut output, &dominant_tags)?;
+    let dominant_word_tags = dominant_tags
+        .iter()
+        .map(|(word, tag, _)| (word.clone(), tag.clone()))
+        .collect::<HashMap<_, _>>();
     Ok(CompiledKhposStats {
         bytes: output,
         frequency_stats: BuildCorpusFrequencyStats {
             word_unigrams,
+            word_bigrams,
             surface_unigrams,
+            tag_unigrams,
+            tag_bigrams,
+            dominant_word_tags,
         },
     })
 }

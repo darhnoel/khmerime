@@ -152,7 +152,7 @@ impl Transliterator {
             entries,
             dictionary_image,
         ));
-        let composer = Arc::new(ComposerTable::from_entries(legacy.entries()));
+        let composer = Arc::new(ComposerTable::from_dictionary_image(dictionary_image));
         let transliterator = Self::from_shared_parts(legacy, composer, config);
         startup_trace_log("Transliterator::from_default_phase_a_data.end");
         Ok(transliterator)
@@ -230,7 +230,10 @@ impl Transliterator {
             dictionary_image,
             |_, _| {},
         ));
-        let composer = ComposerTable::from_entries(legacy.entries());
+        let composer = match dictionary_image {
+            Some(image) => ComposerTable::from_dictionary_image(image),
+            None => ComposerTable::from_entries(legacy.entries()),
+        };
         Ok(Self::from_shared_parts(legacy, Arc::new(composer), config))
     }
 
@@ -277,7 +280,10 @@ impl Transliterator {
         log_stage("build_legacy_data", elapsed_stage_ms(started));
 
         let started = start_stage_timer();
-        let composer = Arc::new(ComposerTable::from_entries(legacy.entries()));
+        let composer = Arc::new(match dictionary_image {
+            Some(image) => ComposerTable::from_dictionary_image(image),
+            None => ComposerTable::from_entries(legacy.entries()),
+        });
         log_stage("build_composer", elapsed_stage_ms(started));
 
         SharedTransliteratorData { legacy, composer }

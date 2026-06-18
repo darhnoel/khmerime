@@ -24,6 +24,17 @@ pub(crate) struct DictionaryImageView<'a> {
     legacy_prefix_keys: &'a [u8],
     legacy_prefix_postings: &'a [u8],
     legacy_target_frequencies: &'a [u8],
+    entry_alias_refs: &'a [u8],
+    entry_alias_ids: &'a [u8],
+    word_unigrams: &'a [u8],
+    word_bigrams: &'a [u8],
+    corpus_word_unigrams: &'a [u8],
+    corpus_word_bigrams: &'a [u8],
+    corpus_surface_unigrams: &'a [u8],
+    tag_unigrams: &'a [u8],
+    tag_bigrams: &'a [u8],
+    composer_nodes: &'a [u8],
+    composer_edges: &'a [u8],
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -78,6 +89,17 @@ impl<'a> DictionaryImageView<'a> {
             legacy_prefix_keys: section(source, section_count, SECTION_LEGACY_PREFIX_KEYS)?,
             legacy_prefix_postings: section(source, section_count, SECTION_LEGACY_PREFIX_POSTINGS)?,
             legacy_target_frequencies: section(source, section_count, SECTION_LEGACY_TARGET_FREQUENCIES)?,
+            entry_alias_refs: section(source, section_count, SECTION_ENTRY_ALIAS_REFS)?,
+            entry_alias_ids: section(source, section_count, SECTION_ENTRY_ALIAS_IDS)?,
+            word_unigrams: section(source, section_count, SECTION_WORD_UNIGRAMS)?,
+            word_bigrams: section(source, section_count, SECTION_WORD_BIGRAMS)?,
+            corpus_word_unigrams: section(source, section_count, SECTION_CORPUS_WORD_UNIGRAMS)?,
+            corpus_word_bigrams: section(source, section_count, SECTION_CORPUS_WORD_BIGRAMS)?,
+            corpus_surface_unigrams: section(source, section_count, SECTION_CORPUS_SURFACE_UNIGRAMS)?,
+            tag_unigrams: section(source, section_count, SECTION_TAG_UNIGRAMS)?,
+            tag_bigrams: section(source, section_count, SECTION_TAG_BIGRAMS)?,
+            composer_nodes: section(source, section_count, SECTION_COMPOSER_NODES)?,
+            composer_edges: section(source, section_count, SECTION_COMPOSER_EDGES)?,
         };
         view.validate_record_sections()?;
         Ok(view)
@@ -123,6 +145,32 @@ impl<'a> DictionaryImageView<'a> {
             return Err(LexiconError::Parse("dictionary image entry id out of range".to_owned()));
         }
         Ok(DictionaryEntryView { image: *self, offset })
+    }
+
+    // The entry's alias keys (score_forms minus the normalized key), matching
+    // RankedLexiconEntry.alias_keys. Lets the ranked entry table be served from the
+    // image rather than a heap Vec.
+    pub(crate) fn entry_alias_keys(&self, entry_id: u32) -> Result<Vec<&'a str>> {
+        let ref_offset = (entry_id as usize)
+            .checked_mul(ENTRY_ALIAS_REF_RECORD_LEN)
+            .ok_or_else(|| LexiconError::Parse("dictionary image entry alias id overflow".to_owned()))?;
+        if self.entry_alias_refs.len().saturating_sub(ref_offset) < ENTRY_ALIAS_REF_RECORD_LEN {
+            return Err(LexiconError::Parse(
+                "dictionary image entry alias id out of range".to_owned(),
+            ));
+        }
+        let start = read_u32_at(self.entry_alias_refs, ref_offset)? as usize;
+        let count = read_u32_at(self.entry_alias_refs, ref_offset + 4)? as usize;
+        let mut keys = Vec::with_capacity(count);
+        for index in 0..count {
+            let id_offset = start
+                .checked_add(index)
+                .and_then(|pos| pos.checked_mul(4))
+                .ok_or_else(|| LexiconError::Parse("dictionary image entry alias offset overflow".to_owned()))?;
+            let string_id = read_u32_at(self.entry_alias_ids, id_offset)?;
+            keys.push(self.string(string_id)?);
+        }
+        Ok(keys)
     }
 
     pub(crate) fn exact_postings(&self, key: &str) -> Result<Option<DictionaryPostings<'a>>> {
@@ -174,6 +222,72 @@ impl<'a> DictionaryImageView<'a> {
         Ok(None)
     }
 
+    pub(crate) fn word_unigram_count(&self, word: &str) -> Result<u32> {
+        self.unigram_count(self.word_unigrams, word)
+    }
+
+    pub(crate) fn word_bigram_count(&self, left: &str, right: &str) -> Result<u32> {
+        self.bigram_count(self.word_bigrams, left, right)
+    }
+
+    pub(crate) fn corpus_word_unigram_count(&self, word: &str) -> Result<u32> {
+        self.unigram_count(self.corpus_word_unigrams, word)
+    }
+
+    pub(crate) fn corpus_word_bigram_count(&self, left: &str, right: &str) -> Result<u32> {
+        self.bigram_count(self.corpus_word_bigrams, left, right)
+    }
+
+    pub(crate) fn corpus_surface_unigram_count(&self, surface: &str) -> Result<u32> {
+        self.unigram_count(self.corpus_surface_unigrams, surface)
+    }
+
+    pub(crate) fn tag_unigram_count(&self, tag: &str) -> Result<u32> {
+        self.unigram_count(self.tag_unigrams, tag)
+    }
+
+    pub(crate) fn tag_bigram_count(&self, left: &str, right: &str) -> Result<u32> {
+        self.bigram_count(self.tag_bigrams, left, right)
+    }
+
+    pub(crate) fn composer_child(&self, node_id: u32, ch: char) -> Result<Option<u32>> {
+        let offset = self.composer_node_offset(node_id)?;
+        let start = read_u32_at(self.composer_nodes, offset)? as usize;
+        let count = read_u32_at(self.composer_nodes, offset + 4)? as usize;
+        let byte_start = start
+            .checked_mul(COMPOSER_EDGE_RECORD_LEN)
+            .ok_or_else(|| LexiconError::Parse("dictionary image composer edge range overflow".to_owned()))?;
+        let byte_len = count
+            .checked_mul(COMPOSER_EDGE_RECORD_LEN)
+            .ok_or_else(|| LexiconError::Parse("dictionary image composer edge range overflow".to_owned()))?;
+        let range = checked_range(self.composer_edges, byte_start, byte_len)?;
+        let edges = &self.composer_edges[range];
+        let query = ch as u32;
+        let mut low = 0usize;
+        let mut high = edges.len() / COMPOSER_EDGE_RECORD_LEN;
+        while low < high {
+            let mid = low + (high - low) / 2;
+            let edge_offset = mid * COMPOSER_EDGE_RECORD_LEN;
+            let actual = read_u32_at(edges, edge_offset)?;
+            match actual.cmp(&query) {
+                Ordering::Less => low = mid + 1,
+                Ordering::Equal => return read_u32_at(edges, edge_offset + 4).map(Some),
+                Ordering::Greater => high = mid,
+            }
+        }
+        Ok(None)
+    }
+
+    pub(crate) fn composer_node_terminal(&self, node_id: u32) -> Result<bool> {
+        let offset = self.composer_node_offset(node_id)?;
+        read_u32_at(self.composer_nodes, offset + 8).map(|value| value != 0)
+    }
+
+    pub(crate) fn composer_node_max_frequency(&self, node_id: u32) -> Result<u32> {
+        let offset = self.composer_node_offset(node_id)?;
+        read_u32_at(self.composer_nodes, offset + 12)
+    }
+
     fn lookup_string_values(&self, keys: &'a [u8], postings: &'a [u8], query: &str) -> Result<Option<Vec<&'a str>>> {
         let Some(ids) = self.lookup_key(keys, postings, query)? else {
             return Ok(None);
@@ -191,6 +305,52 @@ impl<'a> DictionaryImageView<'a> {
             values.push(self.string(read_u32_at(keys, offset)?)?);
         }
         Ok(values)
+    }
+
+    fn unigram_count(&self, records: &'a [u8], query: &str) -> Result<u32> {
+        let mut low = 0usize;
+        let mut high = records.len() / STRING_U32_RECORD_LEN;
+        while low < high {
+            let mid = low + (high - low) / 2;
+            let offset = mid * STRING_U32_RECORD_LEN;
+            let key_id = read_u32_at(records, offset)?;
+            let key = self.string(key_id)?;
+            match key.cmp(query) {
+                Ordering::Less => low = mid + 1,
+                Ordering::Equal => return read_u32_at(records, offset + 4),
+                Ordering::Greater => high = mid,
+            }
+        }
+        Ok(0)
+    }
+
+    fn bigram_count(&self, records: &'a [u8], left: &str, right: &str) -> Result<u32> {
+        let mut low = 0usize;
+        let mut high = records.len() / BIGRAM_RECORD_LEN;
+        while low < high {
+            let mid = low + (high - low) / 2;
+            let offset = mid * BIGRAM_RECORD_LEN;
+            let actual_left = self.string(read_u32_at(records, offset)?)?;
+            let actual_right = self.string(read_u32_at(records, offset + 4)?)?;
+            match actual_left.cmp(left).then_with(|| actual_right.cmp(right)) {
+                Ordering::Less => low = mid + 1,
+                Ordering::Equal => return read_u32_at(records, offset + 8),
+                Ordering::Greater => high = mid,
+            }
+        }
+        Ok(0)
+    }
+
+    fn composer_node_offset(&self, node_id: u32) -> Result<usize> {
+        let offset = (node_id as usize)
+            .checked_mul(COMPOSER_NODE_RECORD_LEN)
+            .ok_or_else(|| LexiconError::Parse("dictionary image composer node id overflow".to_owned()))?;
+        if self.composer_nodes.len().saturating_sub(offset) < COMPOSER_NODE_RECORD_LEN {
+            return Err(LexiconError::Parse(
+                "dictionary image composer node id out of range".to_owned(),
+            ));
+        }
+        Ok(offset)
     }
 
     fn lookup_key(&self, keys: &'a [u8], postings: &'a [u8], query: &str) -> Result<Option<DictionaryPostings<'a>>> {
@@ -281,6 +441,28 @@ impl<'a> DictionaryImageView<'a> {
                 self.legacy_target_frequencies.len(),
                 STRING_U32_RECORD_LEN,
             ),
+            (
+                "entry alias refs",
+                self.entry_alias_refs.len(),
+                ENTRY_ALIAS_REF_RECORD_LEN,
+            ),
+            ("word unigrams", self.word_unigrams.len(), STRING_U32_RECORD_LEN),
+            ("word bigrams", self.word_bigrams.len(), BIGRAM_RECORD_LEN),
+            (
+                "corpus word unigrams",
+                self.corpus_word_unigrams.len(),
+                STRING_U32_RECORD_LEN,
+            ),
+            ("corpus word bigrams", self.corpus_word_bigrams.len(), BIGRAM_RECORD_LEN),
+            (
+                "corpus surface unigrams",
+                self.corpus_surface_unigrams.len(),
+                STRING_U32_RECORD_LEN,
+            ),
+            ("tag unigrams", self.tag_unigrams.len(), STRING_U32_RECORD_LEN),
+            ("tag bigrams", self.tag_bigrams.len(), BIGRAM_RECORD_LEN),
+            ("composer nodes", self.composer_nodes.len(), COMPOSER_NODE_RECORD_LEN),
+            ("composer edges", self.composer_edges.len(), COMPOSER_EDGE_RECORD_LEN),
         ] {
             if len % record_len != 0 {
                 return Err(LexiconError::Parse(format!(
@@ -295,9 +477,15 @@ impl<'a> DictionaryImageView<'a> {
             || self.legacy_normalized_postings.len() % 4 != 0
             || self.legacy_target_postings.len() % 4 != 0
             || self.legacy_prefix_postings.len() % 4 != 0
+            || self.entry_alias_ids.len() % 4 != 0
         {
             return Err(LexiconError::Parse(
                 "dictionary image postings section has partial record".to_owned(),
+            ));
+        }
+        if self.composer_nodes.is_empty() {
+            return Err(LexiconError::Parse(
+                "dictionary image composer nodes section is empty".to_owned(),
             ));
         }
         Ok(())
