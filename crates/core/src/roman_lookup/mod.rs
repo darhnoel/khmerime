@@ -192,6 +192,14 @@ mod tests {
             assert_eq!(actual.frequency_lang().unwrap(), expected.frequency_lang.as_str());
             assert_eq!(actual.first_tag().unwrap(), None);
             assert_eq!(actual.last_tag().unwrap(), None);
+            // The image must reproduce the entry's alias_keys exactly, so score_forms
+            // is identical whether the ranked table is heap- or image-backed.
+            let actual_alias_keys = image.entry_alias_keys(entry_id as u32).unwrap();
+            assert_eq!(
+                actual_alias_keys,
+                expected.alias_keys.iter().map(String::as_str).collect::<Vec<_>>(),
+                "entry alias_keys mismatch for entry {entry_id}"
+            );
         }
 
         for (key, expected) in &ranked.exact_index {

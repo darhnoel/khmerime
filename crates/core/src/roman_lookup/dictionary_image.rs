@@ -24,6 +24,8 @@ pub(crate) struct DictionaryImageView<'a> {
     legacy_prefix_keys: &'a [u8],
     legacy_prefix_postings: &'a [u8],
     legacy_target_frequencies: &'a [u8],
+    entry_alias_refs: &'a [u8],
+    entry_alias_ids: &'a [u8],
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -78,6 +80,8 @@ impl<'a> DictionaryImageView<'a> {
             legacy_prefix_keys: section(source, section_count, SECTION_LEGACY_PREFIX_KEYS)?,
             legacy_prefix_postings: section(source, section_count, SECTION_LEGACY_PREFIX_POSTINGS)?,
             legacy_target_frequencies: section(source, section_count, SECTION_LEGACY_TARGET_FREQUENCIES)?,
+            entry_alias_refs: section(source, section_count, SECTION_ENTRY_ALIAS_REFS)?,
+            entry_alias_ids: section(source, section_count, SECTION_ENTRY_ALIAS_IDS)?,
         };
         view.validate_record_sections()?;
         Ok(view)
@@ -123,6 +127,30 @@ impl<'a> DictionaryImageView<'a> {
             return Err(LexiconError::Parse("dictionary image entry id out of range".to_owned()));
         }
         Ok(DictionaryEntryView { image: *self, offset })
+    }
+
+    // The entry's alias keys (score_forms minus the normalized key), matching
+    // RankedLexiconEntry.alias_keys. Lets the ranked entry table be served from the
+    // image rather than a heap Vec.
+    pub(crate) fn entry_alias_keys(&self, entry_id: u32) -> Result<Vec<&'a str>> {
+        let ref_offset = (entry_id as usize)
+            .checked_mul(ENTRY_ALIAS_REF_RECORD_LEN)
+            .ok_or_else(|| LexiconError::Parse("dictionary image entry alias id overflow".to_owned()))?;
+        if self.entry_alias_refs.len().saturating_sub(ref_offset) < ENTRY_ALIAS_REF_RECORD_LEN {
+            return Err(LexiconError::Parse("dictionary image entry alias id out of range".to_owned()));
+        }
+        let start = read_u32_at(self.entry_alias_refs, ref_offset)? as usize;
+        let count = read_u32_at(self.entry_alias_refs, ref_offset + 4)? as usize;
+        let mut keys = Vec::with_capacity(count);
+        for index in 0..count {
+            let id_offset = start
+                .checked_add(index)
+                .and_then(|pos| pos.checked_mul(4))
+                .ok_or_else(|| LexiconError::Parse("dictionary image entry alias offset overflow".to_owned()))?;
+            let string_id = read_u32_at(self.entry_alias_ids, id_offset)?;
+            keys.push(self.string(string_id)?);
+        }
+        Ok(keys)
     }
 
     pub(crate) fn exact_postings(&self, key: &str) -> Result<Option<DictionaryPostings<'a>>> {

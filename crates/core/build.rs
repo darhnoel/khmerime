@@ -620,6 +620,9 @@ fn compile_dictionary_image(
 ) -> Result<Vec<u8>, String> {
     let mut interner = DictionaryImageInterner::default();
     let mut image_entries = Vec::<DictionaryImageEntryRecord>::with_capacity(entries.len());
+    // Per-entry alias-key string ids, parallel to image_entries. Lets the ranked
+    // entry table's alias_keys (and thus score_forms) be served from the image.
+    let mut entry_alias_ids = Vec::<Vec<u32>>::with_capacity(entries.len());
     let mut exact_index = BTreeMap::<String, Vec<u32>>::new();
     let mut alias_index = BTreeMap::<String, Vec<u32>>::new();
     let mut gram_index = BTreeMap::<String, Vec<u32>>::new();
@@ -645,11 +648,15 @@ fn compile_dictionary_image(
             .map_err(|_| "dictionary image entry table exceeded u32 ids".to_owned())?;
 
         exact_index.entry(normalized_key.clone()).or_default().push(entry_id);
+        // Same construction as RankedLexiconEntry.alias_keys (roman_search_variants
+        // minus the normalized key) so score_forms matches the heap path exactly.
+        let mut this_entry_alias_ids = Vec::<u32>::new();
         for key in roman_search_variants(&entry.roman)
             .into_iter()
             .filter(|key| key != &normalized_key)
         {
-            interner.intern(&key)?;
+            let alias_key_id = interner.intern(&key)?;
+            this_entry_alias_ids.push(alias_key_id);
             push_dictionary_grams(&mut gram_index, &key, entry_id);
             alias_index.entry(key).or_default().push(entry_id);
         }
@@ -664,10 +671,12 @@ fn compile_dictionary_image(
             first_tag_id: MISSING_STRING_ID,
             last_tag_id: MISSING_STRING_ID,
         });
+        entry_alias_ids.push(this_entry_alias_ids);
     }
 
     let legacy_indexes = build_legacy_dictionary_indexes(entries, corpus_stats);
     let entries_section = compile_dictionary_entry_section(&image_entries);
+    let (entry_alias_refs, entry_alias_id_blob) = compile_dictionary_entry_alias_sections(&entry_alias_ids)?;
     let (exact_keys, exact_postings) = compile_dictionary_key_index(&mut interner, exact_index)?;
     let (alias_keys, alias_postings) = compile_dictionary_key_index(&mut interner, alias_index)?;
     let (gram_keys, gram_postings) = compile_dictionary_key_index(&mut interner, gram_index)?;
@@ -704,7 +713,28 @@ fn compile_dictionary_image(
         (SECTION_LEGACY_PREFIX_KEYS, legacy_prefix_keys),
         (SECTION_LEGACY_PREFIX_POSTINGS, legacy_prefix_postings),
         (SECTION_LEGACY_TARGET_FREQUENCIES, legacy_target_frequencies),
+        (SECTION_ENTRY_ALIAS_REFS, entry_alias_refs),
+        (SECTION_ENTRY_ALIAS_IDS, entry_alias_id_blob),
     ])
+}
+
+// Per-entry alias keys as a dense ragged array: REFS holds a (start, count) record
+// per entry id (start is a u32 index into IDS); IDS is a flat u32 blob of string ids.
+fn compile_dictionary_entry_alias_sections(entry_alias_ids: &[Vec<u32>]) -> Result<(Vec<u8>, Vec<u8>), String> {
+    let mut refs = Vec::with_capacity(entry_alias_ids.len() * ENTRY_ALIAS_REF_RECORD_LEN);
+    let mut ids = Vec::new();
+    for alias_ids in entry_alias_ids {
+        let start = u32::try_from(ids.len() / 4)
+            .map_err(|_| "dictionary image entry alias ids exceeded u32 offsets".to_owned())?;
+        let count = u32::try_from(alias_ids.len())
+            .map_err(|_| "dictionary image entry alias range exceeded u32 length".to_owned())?;
+        write_u32(&mut refs, start);
+        write_u32(&mut refs, count);
+        for id in alias_ids {
+            write_u32(&mut ids, *id);
+        }
+    }
+    Ok((refs, ids))
 }
 
 struct LegacyDictionaryIndexes {
