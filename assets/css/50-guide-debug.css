@@ -23,7 +23,7 @@
   padding: 10px 12px;
   border: 1px solid var(--line);
   border-radius: 14px;
-  background: rgba(255, 255, 255, 0.66);
+  background: rgba(255, 255, 255, 0.055);
 }
 
 .debug-label {
@@ -79,12 +79,12 @@ code.debug-value {
   align-items: center;
   gap: 6px;
   text-align: left;
-  background: var(--surface-strong);
+  background: rgba(255, 255, 255, 0.055);
 }
 
 .suggestion.active button {
   background: var(--active);
-  border-color: rgba(175, 79, 32, 0.35);
+  border-color: rgba(233, 138, 78, 0.35);
 }
 
 .suggestion-rank {
@@ -122,9 +122,9 @@ code.debug-value {
 .suggestion-recommended {
   margin-left: 4px;
   padding: 1px 5px;
-  border: 1px solid rgba(177, 77, 30, 0.3);
+  border: 1px solid rgba(233, 138, 78, 0.3);
   border-radius: 7px;
-  background: rgba(177, 77, 30, 0.12);
+  background: rgba(233, 138, 78, 0.12);
   color: var(--accent-strong);
   font-size: 0.64rem;
   font-weight: 700;
@@ -136,7 +136,7 @@ code.debug-value {
   padding: 16px;
   border: 1px dashed var(--line);
   border-radius: 18px;
-  background: rgba(255, 255, 255, 0.52);
+  background: rgba(255, 255, 255, 0.045);
 }
 
 .empty-state p {
@@ -175,7 +175,7 @@ code.debug-value {
   padding: 0;
   border: 1px solid var(--line);
   border-radius: 999px;
-  background: rgba(255, 251, 246, 0.96);
+  background: rgba(28, 22, 34, 0.96);
   color: var(--accent-strong);
   font-size: 1rem;
   font-weight: 700;
@@ -185,7 +185,7 @@ code.debug-value {
 }
 
 .guide-handle:hover {
-  border-color: rgba(177, 77, 30, 0.28);
+  border-color: rgba(233, 138, 78, 0.28);
   background: var(--hover);
 }
 
@@ -213,18 +213,21 @@ code.debug-value {
   justify-content: space-between;
   gap: 10px;
   padding: 11px 12px;
-  border: 1px solid var(--line);
+  border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 14px;
-  background: rgba(255, 255, 255, 0.7);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.075), rgba(255, 255, 255, 0.035)),
+    rgba(28, 22, 34, 0.72);
 }
 
 .chip-khmer,
 .chip-roman {
+  color: var(--ink);
   font-weight: 700;
 }
 
 .chip-arrow {
-  color: var(--muted);
+  color: rgba(244, 166, 97, 0.78);
 }
 
 .rule-list {
@@ -250,8 +253,11 @@ code.debug-value {
   gap: 12px;
   padding: 11px 12px;
   border-radius: 14px;
-  background: rgba(255, 255, 255, 0.7);
-  border: 1px solid var(--line);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.075), rgba(255, 255, 255, 0.035)),
+    rgba(28, 22, 34, 0.72);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: var(--ink);
 }
 
 .example-row code {

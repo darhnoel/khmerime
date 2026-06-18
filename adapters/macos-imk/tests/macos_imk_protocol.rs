@@ -64,7 +64,9 @@ fn session() -> std::sync::Arc<MacosIMKSession> {
     // timeout can fire before the lexicon loads. activate() returns is_ready:
     // false (default state) when inner is still None; loop until it's true.
     loop {
-        if s.activate().is_ready { break; }
+        if s.activate().is_ready {
+            break;
+        }
         std::thread::sleep(std::time::Duration::from_millis(100));
     }
     s
@@ -149,13 +151,13 @@ fn session_nida_mode_uses_evdev_top_letter_row() {
     s.toggle_input_mode();
     let keys: &[(u32, u16, &str)] = &[
         (113, 0x0C, "ឆ"), // Q: kVK_ANSI_Q → KEY_Q=16
-        (119, 0x0D, "ឹ"), // W: kVK_ANSI_W → KEY_W=17
+        (119, 0x0D, "ឹ"),  // W: kVK_ANSI_W → KEY_W=17
         (101, 0x0E, "េ"), // E: kVK_ANSI_E → KEY_E=18
         (114, 0x0F, "រ"), // R: kVK_ANSI_R → KEY_R=19
         (116, 0x11, "ត"), // T: kVK_ANSI_T → KEY_T=20  (mac 0x11, not 0x10)
         (121, 0x10, "យ"), // Y: kVK_ANSI_Y → KEY_Y=21  (mac 0x10, not 0x11)
-        (117, 0x20, "ុ"), // U: kVK_ANSI_U → KEY_U=22
-        (105, 0x22, "ិ"), // I: kVK_ANSI_I → KEY_I=23
+        (117, 0x20, "ុ"),  // U: kVK_ANSI_U → KEY_U=22
+        (105, 0x22, "ិ"),  // I: kVK_ANSI_I → KEY_I=23
         (111, 0x1F, "ោ"), // O: kVK_ANSI_O → KEY_O=24
         (112, 0x23, "ផ"), // P: kVK_ANSI_P → KEY_P=25
     ];
@@ -177,7 +179,10 @@ fn session_nida_mode_does_not_map_backspace_or_enter_evdev_keycodes() {
     let s = session();
     s.toggle_input_mode();
     let backspace = s.handle_event(0xFF08, 0x33, 0); // kVK_Delete
-    assert!(backspace.commit_text.is_none(), "backspace must not produce Khmer in NIDA mode");
+    assert!(
+        backspace.commit_text.is_none(),
+        "backspace must not produce Khmer in NIDA mode"
+    );
     let enter = s.handle_event(0xFF0D, 0x24, 0); // kVK_Return
     assert!(enter.commit_text.is_none(), "enter must not produce Khmer in NIDA mode");
 }
@@ -209,7 +214,10 @@ fn session_exposes_candidate_display_metadata() {
     // IBus: bridge_exposes_candidate_display_metadata
     let s = session();
     let state = type_str(&s, "jea");
-    assert!(!state.candidates.is_empty(), "typing 'jea' must produce at least one candidate");
+    assert!(
+        !state.candidates.is_empty(),
+        "typing 'jea' must produce at least one candidate"
+    );
     assert_eq!(
         state.candidate_display.len(),
         state.candidates.len(),
@@ -254,7 +262,11 @@ fn session_supports_segment_focus_and_full_phrase_commit() {
     // Enter commits the full Khmer phrase
     let committed = s.handle_event(0xFF0D, 0, 0);
     assert!(committed.commit_text.is_some(), "Enter must commit");
-    assert_ne!(committed.commit_text.as_deref(), Some("khnhomtov"), "commit must be Khmer, not roman");
+    assert_ne!(
+        committed.commit_text.as_deref(),
+        Some("khnhomtov"),
+        "commit must be Khmer, not roman"
+    );
 }
 
 #[test]
@@ -274,7 +286,10 @@ fn session_consumes_up_down_during_segmented_selection() {
     let s = session();
     type_str(&s, "khnhomtov");
     let down = s.handle_event(0xFF54, 0, 0); // KEY_DOWN
-    assert!(down.segments.len() >= 2, "segmented session must remain active after Down");
+    assert!(
+        down.segments.len() >= 2,
+        "segmented session must remain active after Down"
+    );
     assert_eq!(down.focused_segment_index, Some(0));
     let up = s.handle_event(0xFF52, 0, 0); // KEY_UP
     assert!(up.segments.len() >= 2, "segmented session must remain active after Up");
@@ -329,7 +344,10 @@ fn session_deferred_visible_refinement_updates_long_phrase_candidate() {
     let state = type_str(&s, "nihjeasnadaiborkbrae");
     assert!(state.segments.len() >= 2, "live segmentation must be active");
     let after_refine = s.refine_composition("nihjeasnadaiborkbrae".to_owned());
-    assert!(after_refine.segments.len() >= 2, "live segments must persist after no-op refine");
+    assert!(
+        after_refine.segments.len() >= 2,
+        "live segments must persist after no-op refine"
+    );
     let committed = s.handle_event(0xFF0D, 0, 0);
     assert_eq!(committed.commit_text.as_deref(), Some(PHRASE_NIHJEAS));
 }
@@ -379,7 +397,10 @@ fn session_ignores_stale_visible_refinement_request() {
     let s = session();
     type_str(&s, "nihjeasnadaiborkbrae");
     let stale = s.refine_composition("nihjeasnadai".to_owned()); // shorter → stale
-    assert_eq!(stale.preedit, "nihjeasnadaiborkbrae", "preedit must be unchanged after stale refine");
+    assert_eq!(
+        stale.preedit, "nihjeasnadaiborkbrae",
+        "preedit must be unchanged after stale refine"
+    );
     // Candidate list must not have been replaced with stale results
     assert!(stale.segments.len() >= 2 || !stale.candidates.is_empty());
 }
@@ -409,7 +430,11 @@ fn session_refinement_preserves_segment_focus() {
     let moved = s.handle_event(0xFF53, 0, 0); // KEY_RIGHT → segment 1
     assert_eq!(moved.focused_segment_index, Some(1));
     let after_refine = s.refine_composition("nihjeasnadaiborkbrae".to_owned());
-    assert_eq!(after_refine.focused_segment_index, Some(1), "segment focus must survive refine_composition");
+    assert_eq!(
+        after_refine.focused_segment_index,
+        Some(1),
+        "segment focus must survive refine_composition"
+    );
 }
 
 // ── macOS-specific ────────────────────────────────────────────────────────────
@@ -422,7 +447,7 @@ fn keycode_mac_to_evdev_covers_full_ansi_layout() {
         0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, // A S D F H G Z X
         0x08, 0x09, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F, 0x10, // C V B Q W E R Y
         0x11, 0x1F, 0x20, 0x22, 0x23, 0x25, 0x26, 0x28, // T O U I P L J K
-        0x2D, 0x2E,                                       // N M
+        0x2D, 0x2E, // N M
     ];
     for &mac_kc in letter_keys {
         assert_ne!(
@@ -457,7 +482,10 @@ fn session_segment_entries_populate_render_state() {
     // CandidatePanel uses this to render the chips row.
     let s = session();
     let state = type_str(&s, "khnhomtov");
-    assert!(state.segments.len() >= 2, "two-word composition must produce >= 2 segments");
+    assert!(
+        state.segments.len() >= 2,
+        "two-word composition must produce >= 2 segments"
+    );
     for seg in &state.segments {
         assert!(!seg.input.is_empty(), "segment input must be non-empty");
         assert!(!seg.output.is_empty(), "segment output must be non-empty");

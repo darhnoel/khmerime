@@ -81,7 +81,10 @@ sanitize_index_asset_paths() {
   fi
   # Some Dioxus builds emit "/./assets/..." when no explicit base path is set.
   # Normalize this to "/assets/..." to avoid brittle hosting behavior.
-  sed -i 's|/\./assets/|/assets/|g' "$index_html"
+  local tmp_file
+  tmp_file="$(mktemp)"
+  sed 's|/\./assets/|/assets/|g' "$index_html" > "$tmp_file"
+  mv "$tmp_file" "$index_html"
 }
 
 # Require a real wasm-opt in release builds.

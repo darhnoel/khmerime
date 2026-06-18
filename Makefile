@@ -1,7 +1,8 @@
-.PHONY: help web web-release web-phone desktop stats suggest suggest-wfst suggest-shadow shadow-eval data-split data-build data-check lexicon-editor visualize-lexicon visualize-lexicon-streamlit download-page fmt test test-golden test-ui platform-check platform-check-linux platform-check-android platform-check-ios platform-check-macos platform-check-windows platform-build-ios platform-test-ios platform-install-ios-sim platform-reinstall-ios-sim platform-install-ios-device platform-reinstall-ios-device platform-build-macos platform-diagnose-macos platform-install-macos platform-reinstall-macos platform-build-windows platform-install-windows platform-uninstall-windows platform-reinstall-windows platform-smoke-windows-notepad platform-smoke-windows-notepad-python windows-package linux-package ibus-install ibus-uninstall ibus-smoke paper-current paper-current-clean platform-test-android platform-build-android android-adb-device platform-install-android platform-reinstall-android setup-hooks
+.PHONY: help web web-release web-phone web-local desktop stats suggest suggest-wfst suggest-shadow shadow-eval data-split data-build data-check lexicon-editor visualize-lexicon visualize-lexicon-streamlit download-page fmt test test-golden test-ui platform-check platform-check-linux platform-check-android platform-check-ios platform-check-macos platform-check-windows platform-build-ios platform-test-ios platform-install-ios-sim platform-reinstall-ios-sim platform-install-ios-device platform-reinstall-ios-device platform-build-macos platform-diagnose-macos platform-install-macos platform-reinstall-macos platform-build-windows platform-install-windows platform-uninstall-windows platform-reinstall-windows platform-smoke-windows-notepad platform-smoke-windows-notepad-python windows-package linux-package ibus-install ibus-uninstall ibus-smoke paper-current paper-current-clean platform-test-android platform-build-android android-adb-device platform-install-android platform-reinstall-android setup-hooks
 
 DX ?= dx
 APP_DIR := apps/dioxus-app
+WEB_LOCAL_PORT ?= 4174
 CLI := cargo run -p khmerime_lookup_cli --bin lookup_cli --
 QUERY ?= tver
 MODE ?= shadow
@@ -80,6 +81,7 @@ help:
 	"  make web-release                 Build deployable web artifacts under dist/web-release" \
 	"                                   Optional: WEB_BASE_PATH=khmerime-beta (or KHMERIME_BASE_PATH=/khmerime-beta)" \
 	"  make web-phone                   Run the web app on a phone-accessible host" \
+	"  make web-local                   Run the web app on localhost with asset sync" \
 	"  make desktop                     Run the desktop app" \
 	"  make stats                       Print lexicon entry count" \
 	"  make suggest QUERY=tver          Print legacy-mode suggestions" \
@@ -138,6 +140,9 @@ web-release:
 
 web-phone:
 	bash scripts/web/serve_phone.sh
+
+web-local:
+	ADDR=127.0.0.1 PORT=$(WEB_LOCAL_PORT) bash scripts/web/serve_phone.sh
 
 desktop:
 	cd $(APP_DIR) && $(DX) serve --platform desktop

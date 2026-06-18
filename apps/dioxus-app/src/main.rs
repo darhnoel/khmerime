@@ -179,7 +179,7 @@ fn App() -> Element {
     });
 
     rsx! {
-        document::Stylesheet { href: "/assets/main.css" }
+        document::Stylesheet { href: "./assets/main.css" }
         div { class: "shell",
             div { class: if show_guide() { "board" } else { "board board-wide" },
                 section { class: "workspace",

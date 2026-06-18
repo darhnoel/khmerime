@@ -55,7 +55,7 @@
   align-items: center;
   justify-content: center;
   padding: 8px;
-  border: 1px solid rgba(177, 77, 30, 0.18);
+  border: 1px solid rgba(233, 138, 78, 0.18);
   border-radius: 12px;
   background: var(--active);
   color: var(--accent-strong);
@@ -68,7 +68,7 @@
   width: 14px;
   height: 14px;
   border-radius: 999px;
-  border: 2px solid rgba(177, 77, 30, 0.18);
+  border: 2px solid rgba(233, 138, 78, 0.18);
   border-top-color: var(--accent);
   animation: loading-spin 0.9s linear infinite;
 }
@@ -77,8 +77,8 @@
   display: block;
   height: 6px;
   border-radius: 999px;
-  border: 1px solid rgba(177, 77, 30, 0.14);
-  background: rgba(255, 255, 255, 0.75);
+  border: 1px solid rgba(233, 138, 78, 0.14);
+  background: rgba(255, 255, 255, 0.08);
   overflow: hidden;
 }
 
@@ -164,7 +164,7 @@
 .mode-pill:hover,
 .ghost:hover,
 .suggestion button:hover {
-  border-color: rgba(177, 77, 30, 0.28);
+  border-color: rgba(233, 138, 78, 0.28);
   background: var(--hover);
 }
 
@@ -176,7 +176,7 @@
 }
 
 .mode-pill.active {
-  border-color: rgba(177, 77, 30, 0.32);
+  border-color: rgba(233, 138, 78, 0.32);
   background: var(--accent-soft);
   color: var(--accent-strong);
 }
@@ -186,7 +186,7 @@
 }
 
 .ghost.active {
-  border-color: rgba(177, 77, 30, 0.32);
+  border-color: rgba(233, 138, 78, 0.32);
   background: var(--accent-soft);
   color: var(--accent-strong);
 }
