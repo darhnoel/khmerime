@@ -87,6 +87,14 @@ A two-stage warmup. Phase A builds a minimal **SharedTransliteratorData** fast e
 Two distinct `Transliterator` views built from the same **SharedTransliteratorData** but with different decoder configurations. The visible refiner has a 75 ms latency budget for in-flight preview refinement; the commit refiner has a larger budget and produces the final **Commit Text** on Enter. Both budgets are wall-clock deadlines; when the commit refiner's trips, the commit degrades to the visible result rather than waiting (see ADR-0005).
 _Avoid_: refiner (use the qualified form)
 
+**Download Landing Page**:
+The public KhmerIME page that helps users choose a platform download, try the online beta, and follow install steps. It is download-first, with the visitor's platform download as the primary action and the online beta as a secondary trial path.
+_Avoid_: homepage, product site
+
+**Silk Veil**:
+The visual identity for the **Download Landing Page**: a fully glassmorphic design language built around the refractive KhmerIME logo, soft translucent panes, subtle liquid distortion, and a new color system distinct from the current light download page.
+_Avoid_: Liquid Glass Theme, light download theme, glass accents
+
 ## Relationships
 
 - A **Lexicon** is built into one **SharedTransliteratorData** at startup
