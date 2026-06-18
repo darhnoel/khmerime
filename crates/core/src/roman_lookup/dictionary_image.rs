@@ -26,6 +26,13 @@ pub(crate) struct DictionaryImageView<'a> {
     legacy_target_frequencies: &'a [u8],
     entry_alias_refs: &'a [u8],
     entry_alias_ids: &'a [u8],
+    word_unigrams: &'a [u8],
+    word_bigrams: &'a [u8],
+    corpus_word_unigrams: &'a [u8],
+    corpus_word_bigrams: &'a [u8],
+    corpus_surface_unigrams: &'a [u8],
+    tag_unigrams: &'a [u8],
+    tag_bigrams: &'a [u8],
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -82,6 +89,13 @@ impl<'a> DictionaryImageView<'a> {
             legacy_target_frequencies: section(source, section_count, SECTION_LEGACY_TARGET_FREQUENCIES)?,
             entry_alias_refs: section(source, section_count, SECTION_ENTRY_ALIAS_REFS)?,
             entry_alias_ids: section(source, section_count, SECTION_ENTRY_ALIAS_IDS)?,
+            word_unigrams: section(source, section_count, SECTION_WORD_UNIGRAMS)?,
+            word_bigrams: section(source, section_count, SECTION_WORD_BIGRAMS)?,
+            corpus_word_unigrams: section(source, section_count, SECTION_CORPUS_WORD_UNIGRAMS)?,
+            corpus_word_bigrams: section(source, section_count, SECTION_CORPUS_WORD_BIGRAMS)?,
+            corpus_surface_unigrams: section(source, section_count, SECTION_CORPUS_SURFACE_UNIGRAMS)?,
+            tag_unigrams: section(source, section_count, SECTION_TAG_UNIGRAMS)?,
+            tag_bigrams: section(source, section_count, SECTION_TAG_BIGRAMS)?,
         };
         view.validate_record_sections()?;
         Ok(view)
@@ -137,7 +151,9 @@ impl<'a> DictionaryImageView<'a> {
             .checked_mul(ENTRY_ALIAS_REF_RECORD_LEN)
             .ok_or_else(|| LexiconError::Parse("dictionary image entry alias id overflow".to_owned()))?;
         if self.entry_alias_refs.len().saturating_sub(ref_offset) < ENTRY_ALIAS_REF_RECORD_LEN {
-            return Err(LexiconError::Parse("dictionary image entry alias id out of range".to_owned()));
+            return Err(LexiconError::Parse(
+                "dictionary image entry alias id out of range".to_owned(),
+            ));
         }
         let start = read_u32_at(self.entry_alias_refs, ref_offset)? as usize;
         let count = read_u32_at(self.entry_alias_refs, ref_offset + 4)? as usize;
@@ -202,6 +218,34 @@ impl<'a> DictionaryImageView<'a> {
         Ok(None)
     }
 
+    pub(crate) fn word_unigram_count(&self, word: &str) -> Result<u32> {
+        self.unigram_count(self.word_unigrams, word)
+    }
+
+    pub(crate) fn word_bigram_count(&self, left: &str, right: &str) -> Result<u32> {
+        self.bigram_count(self.word_bigrams, left, right)
+    }
+
+    pub(crate) fn corpus_word_unigram_count(&self, word: &str) -> Result<u32> {
+        self.unigram_count(self.corpus_word_unigrams, word)
+    }
+
+    pub(crate) fn corpus_word_bigram_count(&self, left: &str, right: &str) -> Result<u32> {
+        self.bigram_count(self.corpus_word_bigrams, left, right)
+    }
+
+    pub(crate) fn corpus_surface_unigram_count(&self, surface: &str) -> Result<u32> {
+        self.unigram_count(self.corpus_surface_unigrams, surface)
+    }
+
+    pub(crate) fn tag_unigram_count(&self, tag: &str) -> Result<u32> {
+        self.unigram_count(self.tag_unigrams, tag)
+    }
+
+    pub(crate) fn tag_bigram_count(&self, left: &str, right: &str) -> Result<u32> {
+        self.bigram_count(self.tag_bigrams, left, right)
+    }
+
     fn lookup_string_values(&self, keys: &'a [u8], postings: &'a [u8], query: &str) -> Result<Option<Vec<&'a str>>> {
         let Some(ids) = self.lookup_key(keys, postings, query)? else {
             return Ok(None);
@@ -219,6 +263,40 @@ impl<'a> DictionaryImageView<'a> {
             values.push(self.string(read_u32_at(keys, offset)?)?);
         }
         Ok(values)
+    }
+
+    fn unigram_count(&self, records: &'a [u8], query: &str) -> Result<u32> {
+        let mut low = 0usize;
+        let mut high = records.len() / STRING_U32_RECORD_LEN;
+        while low < high {
+            let mid = low + (high - low) / 2;
+            let offset = mid * STRING_U32_RECORD_LEN;
+            let key_id = read_u32_at(records, offset)?;
+            let key = self.string(key_id)?;
+            match key.cmp(query) {
+                Ordering::Less => low = mid + 1,
+                Ordering::Equal => return read_u32_at(records, offset + 4),
+                Ordering::Greater => high = mid,
+            }
+        }
+        Ok(0)
+    }
+
+    fn bigram_count(&self, records: &'a [u8], left: &str, right: &str) -> Result<u32> {
+        let mut low = 0usize;
+        let mut high = records.len() / BIGRAM_RECORD_LEN;
+        while low < high {
+            let mid = low + (high - low) / 2;
+            let offset = mid * BIGRAM_RECORD_LEN;
+            let actual_left = self.string(read_u32_at(records, offset)?)?;
+            let actual_right = self.string(read_u32_at(records, offset + 4)?)?;
+            match actual_left.cmp(left).then_with(|| actual_right.cmp(right)) {
+                Ordering::Less => low = mid + 1,
+                Ordering::Equal => return read_u32_at(records, offset + 8),
+                Ordering::Greater => high = mid,
+            }
+        }
+        Ok(0)
     }
 
     fn lookup_key(&self, keys: &'a [u8], postings: &'a [u8], query: &str) -> Result<Option<DictionaryPostings<'a>>> {
@@ -309,6 +387,26 @@ impl<'a> DictionaryImageView<'a> {
                 self.legacy_target_frequencies.len(),
                 STRING_U32_RECORD_LEN,
             ),
+            (
+                "entry alias refs",
+                self.entry_alias_refs.len(),
+                ENTRY_ALIAS_REF_RECORD_LEN,
+            ),
+            ("word unigrams", self.word_unigrams.len(), STRING_U32_RECORD_LEN),
+            ("word bigrams", self.word_bigrams.len(), BIGRAM_RECORD_LEN),
+            (
+                "corpus word unigrams",
+                self.corpus_word_unigrams.len(),
+                STRING_U32_RECORD_LEN,
+            ),
+            ("corpus word bigrams", self.corpus_word_bigrams.len(), BIGRAM_RECORD_LEN),
+            (
+                "corpus surface unigrams",
+                self.corpus_surface_unigrams.len(),
+                STRING_U32_RECORD_LEN,
+            ),
+            ("tag unigrams", self.tag_unigrams.len(), STRING_U32_RECORD_LEN),
+            ("tag bigrams", self.tag_bigrams.len(), BIGRAM_RECORD_LEN),
         ] {
             if len % record_len != 0 {
                 return Err(LexiconError::Parse(format!(
@@ -323,6 +421,7 @@ impl<'a> DictionaryImageView<'a> {
             || self.legacy_normalized_postings.len() % 4 != 0
             || self.legacy_target_postings.len() % 4 != 0
             || self.legacy_prefix_postings.len() % 4 != 0
+            || self.entry_alias_ids.len() % 4 != 0
         {
             return Err(LexiconError::Parse(
                 "dictionary image postings section has partial record".to_owned(),

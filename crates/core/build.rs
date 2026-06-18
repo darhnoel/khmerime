@@ -611,7 +611,10 @@ struct CompiledKhposStats {
 #[derive(Default)]
 struct BuildCorpusFrequencyStats {
     word_unigrams: HashMap<String, u32>,
+    word_bigrams: HashMap<(String, String), u32>,
     surface_unigrams: HashMap<String, u32>,
+    tag_unigrams: HashMap<String, u32>,
+    tag_bigrams: HashMap<(String, String), u32>,
     // word -> dominant POS tag, mirroring the runtime CorpusStats.dominant_word_tags
     // so the dictionary image can carry per-entry boundary tags.
     dominant_word_tags: HashMap<String, String>,
@@ -629,11 +632,22 @@ fn compile_dictionary_image(
     let mut exact_index = BTreeMap::<String, Vec<u32>>::new();
     let mut alias_index = BTreeMap::<String, Vec<u32>>::new();
     let mut gram_index = BTreeMap::<String, Vec<u32>>::new();
+    let mut word_unigrams = BTreeMap::<String, u32>::new();
+    let mut word_bigrams = BTreeMap::<(String, String), u32>::new();
     let mut target_frequency = HashMap::<(String, String), u32>::new();
 
     for entry in entries {
         if entry.roman.contains('\0') || entry.target.contains('\0') || entry.frequency_lang.contains('\0') {
             return Err("NUL byte is not supported in dictionary image entries".to_owned());
+        }
+        let words = entry.target.split_whitespace().collect::<Vec<_>>();
+        for word in &words {
+            *word_unigrams.entry((*word).to_owned()).or_default() += 1;
+        }
+        for pair in words.windows(2) {
+            *word_bigrams
+                .entry((pair[0].to_owned(), pair[1].to_owned()))
+                .or_default() += 1;
         }
         let normalized_key = normalize(&entry.roman);
         if normalized_key.is_empty() {
@@ -709,6 +723,28 @@ fn compile_dictionary_image(
     let (legacy_prefix_keys, legacy_prefix_postings) =
         compile_dictionary_string_index(&mut interner, legacy_indexes.roman_prefix_index)?;
     let legacy_target_frequencies = compile_dictionary_frequency_index(&mut interner, legacy_indexes.target_frequency)?;
+    let word_unigrams = compile_dictionary_frequency_index(&mut interner, word_unigrams)?;
+    let word_bigrams = compile_dictionary_bigram_frequency_index(&mut interner, word_bigrams)?;
+    let corpus_word_unigrams = compile_dictionary_frequency_index(
+        &mut interner,
+        btree_string_counts(corpus_stats.map(|stats| &stats.word_unigrams)),
+    )?;
+    let corpus_word_bigrams = compile_dictionary_bigram_frequency_index(
+        &mut interner,
+        btree_bigram_counts(corpus_stats.map(|stats| &stats.word_bigrams)),
+    )?;
+    let corpus_surface_unigrams = compile_dictionary_frequency_index(
+        &mut interner,
+        btree_string_counts(corpus_stats.map(|stats| &stats.surface_unigrams)),
+    )?;
+    let tag_unigrams = compile_dictionary_frequency_index(
+        &mut interner,
+        btree_string_counts(corpus_stats.map(|stats| &stats.tag_unigrams)),
+    )?;
+    let tag_bigrams = compile_dictionary_bigram_frequency_index(
+        &mut interner,
+        btree_bigram_counts(corpus_stats.map(|stats| &stats.tag_bigrams)),
+    )?;
 
     // Key-index compilation may intern late keys; write string sections after
     // all sections have had a chance to assign string IDs.
@@ -735,6 +771,13 @@ fn compile_dictionary_image(
         (SECTION_LEGACY_TARGET_FREQUENCIES, legacy_target_frequencies),
         (SECTION_ENTRY_ALIAS_REFS, entry_alias_refs),
         (SECTION_ENTRY_ALIAS_IDS, entry_alias_id_blob),
+        (SECTION_WORD_UNIGRAMS, word_unigrams),
+        (SECTION_WORD_BIGRAMS, word_bigrams),
+        (SECTION_CORPUS_WORD_UNIGRAMS, corpus_word_unigrams),
+        (SECTION_CORPUS_WORD_BIGRAMS, corpus_word_bigrams),
+        (SECTION_CORPUS_SURFACE_UNIGRAMS, corpus_surface_unigrams),
+        (SECTION_TAG_UNIGRAMS, tag_unigrams),
+        (SECTION_TAG_BIGRAMS, tag_bigrams),
     ])
 }
 
@@ -979,6 +1022,37 @@ fn compile_dictionary_frequency_index(
         write_u32(&mut records, frequency);
     }
     Ok(records)
+}
+
+fn compile_dictionary_bigram_frequency_index(
+    interner: &mut DictionaryImageInterner,
+    index: BTreeMap<(String, String), u32>,
+) -> Result<Vec<u8>, String> {
+    let mut records = Vec::with_capacity(index.len() * BIGRAM_RECORD_LEN);
+    for ((left, right), frequency) in index {
+        let left_id = interner.intern(&left)?;
+        let right_id = interner.intern(&right)?;
+        write_u32(&mut records, left_id);
+        write_u32(&mut records, right_id);
+        write_u32(&mut records, frequency);
+    }
+    Ok(records)
+}
+
+fn btree_string_counts(source: Option<&HashMap<String, u32>>) -> BTreeMap<String, u32> {
+    source
+        .map(|map| map.iter().map(|(key, count)| (key.clone(), *count)).collect())
+        .unwrap_or_default()
+}
+
+fn btree_bigram_counts(source: Option<&HashMap<(String, String), u32>>) -> BTreeMap<(String, String), u32> {
+    source
+        .map(|map| {
+            map.iter()
+                .map(|((left, right), count)| ((left.clone(), right.clone()), *count))
+                .collect()
+        })
+        .unwrap_or_default()
 }
 
 fn write_dictionary_image_sections(sections: &[(u32, Vec<u8>)]) -> Result<Vec<u8>, String> {
@@ -1334,7 +1408,10 @@ fn compile_khpos_stats(
         bytes: output,
         frequency_stats: BuildCorpusFrequencyStats {
             word_unigrams,
+            word_bigrams,
             surface_unigrams,
+            tag_unigrams,
+            tag_bigrams,
             dominant_word_tags,
         },
     })
