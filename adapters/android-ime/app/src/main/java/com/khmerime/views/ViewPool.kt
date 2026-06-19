@@ -14,6 +14,7 @@ class ViewPool<V>(
     private val createChild: () -> V,
     private val addChild: (V) -> Unit,
     private val setVisible: (V, Boolean) -> Unit,
+    private val removeChild: (V) -> Unit = {},
 ) {
     private val children = mutableListOf<V>()
 
@@ -27,5 +28,14 @@ class ViewPool<V>(
         }
         children.forEachIndexed { i, child -> setVisible(child, i < count) }
         return children.take(count)
+    }
+
+    // Detaches every pooled child from its parent and drops the references.
+    // Called when the input view is destroyed so this service-scoped pool does
+    // not pin the old view hierarchy; the next sync() rebuilds against the new
+    // input view.
+    fun clear() {
+        children.forEach(removeChild)
+        children.clear()
     }
 }

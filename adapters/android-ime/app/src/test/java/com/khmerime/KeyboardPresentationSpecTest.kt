@@ -3,6 +3,7 @@ package com.khmerime
 import com.khmerime.input.KhmerRenderState
 import com.khmerime.input.KhmerSegmentEntry
 import com.khmerime.input.KeyboardState
+import com.khmerime.layout.ChromeRows
 import com.khmerime.layout.KeyboardKey
 import com.khmerime.layout.KeyboardKeyAction
 import com.khmerime.layout.KeyboardLayer
@@ -208,7 +209,7 @@ class KeyboardPresentationSpecTest {
         val state = KhmerRenderState(candidates = listOf("ក", "ខ"), selectedIndex = null)
         assertNull(
             "selectedCandidateIndex must be null when session has no selection",
-            KeyboardPresentationSpec.selectedCandidateIndex(state),
+            KeyboardPresentationSpec.selectedCandidateIndex(KeyboardState.Qwerty, state),
         )
     }
 
@@ -218,7 +219,7 @@ class KeyboardPresentationSpecTest {
         assertEquals(
             "selectedCandidateIndex must reflect session selectedIndex",
             1 as Int?,
-            KeyboardPresentationSpec.selectedCandidateIndex(state),
+            KeyboardPresentationSpec.selectedCandidateIndex(KeyboardState.Qwerty, state),
         )
     }
 
@@ -228,7 +229,101 @@ class KeyboardPresentationSpecTest {
         assertEquals(
             "selectedIndex 0 must return 0, not null",
             0 as Int?,
-            KeyboardPresentationSpec.selectedCandidateIndex(state),
+            KeyboardPresentationSpec.selectedCandidateIndex(KeyboardState.Qwerty, state),
+        )
+    }
+
+    @Test
+    fun selectedCandidateIndexIsNullInSuggestCharacterEvenWhenSessionSelectsZero() {
+        // Suggest Character is tap-based: the Rust session reports selectedIndex 0,
+        // but Android must not highlight a default chip (parity with iOS CharPick).
+        val state = KhmerRenderState(candidates = listOf("ក", "ខ"), selectedIndex = 0)
+        assertNull(
+            "Suggest Character must not highlight any candidate",
+            KeyboardPresentationSpec.selectedCandidateIndex(KeyboardState.SuggestCharacter, state),
+        )
+    }
+
+    // ── Coeng Form display label (parity with iOS CandidateDisplayText) ──────────
+
+    @Test
+    fun candidateDisplayLabelPrefixesDottedCircleForCoengForm() {
+        // "្ក" = coeng sign + ka; the coeng sign is invisible on its own,
+        // so the display prefixes a dotted circle (U+25CC) as a visible base.
+        assertEquals(
+            "Coeng Form must display with a dotted-circle base",
+            "◌្ក",
+            KeyboardPresentationSpec.candidateDisplayLabel("្ក"),
+        )
+    }
+
+    @Test
+    fun candidateDisplayLabelLeavesNonCoengCandidateUnchanged() {
+        assertEquals(
+            "non-coeng candidates display exactly as-is",
+            "ក",
+            KeyboardPresentationSpec.candidateDisplayLabel("ក"),
+        )
+    }
+
+    @Test
+    fun candidateDisplayLabelLeavesEmptyCandidateUnchanged() {
+        assertEquals(
+            "empty candidate must not gain a dotted circle",
+            "",
+            KeyboardPresentationSpec.candidateDisplayLabel(""),
+        )
+    }
+
+    // ── Three-state chrome collapse (parity with iOS KeyboardChrome) ────────────
+
+    @Test
+    fun chromeRowsQwertyEmptyHintAndNoCandidatesIsNone() {
+        val state = KhmerRenderState(candidates = emptyList())
+        assertEquals(
+            "no roman hint and no candidates means nothing to show — chrome collapses",
+            ChromeRows.None,
+            KeyboardPresentationSpec.chromeRows(KeyboardState.Qwerty, "", state),
+        )
+    }
+
+    @Test
+    fun chromeRowsQwertyWithRomanHintShowsStripAndCandidate() {
+        val state = KhmerRenderState(candidates = emptyList())
+        assertEquals(
+            "a non-empty roman hint keeps the full roman composition chrome",
+            ChromeRows.StripAndCandidate,
+            KeyboardPresentationSpec.chromeRows(KeyboardState.Qwerty, "khn", state),
+        )
+    }
+
+    @Test
+    fun chromeRowsQwertyEmptyHintButCandidatesShowsStripAndCandidate() {
+        val state = KhmerRenderState(candidates = listOf("ក", "ខ"))
+        assertEquals(
+            "non-Suggest-Character candidate browsing reserves the full chrome",
+            ChromeRows.StripAndCandidate,
+            KeyboardPresentationSpec.chromeRows(KeyboardState.Qwerty, "", state),
+        )
+    }
+
+    @Test
+    fun chromeRowsSuggestCharacterWithoutCandidatesIsNone() {
+        val state = KhmerRenderState(candidates = emptyList())
+        assertEquals(
+            "entering Suggest Character alone must not reserve an empty row",
+            ChromeRows.None,
+            KeyboardPresentationSpec.chromeRows(KeyboardState.SuggestCharacter, "", state),
+        )
+    }
+
+    @Test
+    fun chromeRowsSuggestCharacterWithCandidatesShowsCandidateOnly() {
+        val state = KhmerRenderState(candidates = listOf("ក", "ខ"))
+        assertEquals(
+            "Suggest Character candidates need the candidate row, not the roman strip",
+            ChromeRows.CandidateOnly,
+            KeyboardPresentationSpec.chromeRows(KeyboardState.SuggestCharacter, "", state),
         )
     }
 }

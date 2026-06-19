@@ -45,9 +45,28 @@ Android view. The view renders suggestions; the handler owns behavior.
 
 The row above the suggestion bar showing the roman composition or hint text.
 
-For normal roman input, it may show the active preedit. In Suggest Character mode
-it stays empty because Suggest Character is direct character picking, not roman
-composition.
+For normal roman input, it shows the active preedit. In Suggest Character mode the
+Preedit Bar is collapsed — it gives up its height rather than showing a blank row —
+because Suggest Character is direct character picking, not roman composition. See
+**Input Chrome**.
+
+---
+
+## Input Chrome
+
+The Preedit Bar and Suggestion Bar are shown only when a mode has content for them;
+otherwise the keyboard reclaims their height (parity with iOS `KeyboardChrome`).
+Three states:
+
+- **None** — neither row. An idle keyboard, or Suggest Character mode with no
+  candidates yet.
+- **CandidateOnly** — Suggestion Bar only, Preedit Bar collapsed. Suggest Character
+  mode showing mapped-character candidates.
+- **StripAndCandidate** — both rows. Roman composition with a preedit hint and/or
+  candidates.
+
+This is presentation only; insertion behavior is unchanged. The policy lives in
+`KeyboardPresentationSpec.chromeRows`.
 
 ---
 

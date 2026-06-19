@@ -60,4 +60,40 @@ class ViewPoolTest {
         assertEquals(true, visibility["child1"])
         assertEquals(true, visibility["child2"])
     }
+
+    // clear() exists so the input view can be torn down without the
+    // service-scoped pool pinning the destroyed view hierarchy (memory leak
+    // across onCreateInputView/onDestroyInputView). It must detach every
+    // pooled child from its parent and drop the references, so a later sync
+    // rebuilds against the freshly created input view.
+
+    @Test
+    fun clearRemovesEveryChildFromParentAndDropsReferences() {
+        val added = mutableListOf<String>()
+        val removed = mutableListOf<String>()
+        var nextId = 0
+        val pool = ViewPool<String>(
+            createChild = { "child${nextId++}" },
+            addChild = { added.add(it) },
+            setVisible = { _, _ -> },
+            removeChild = { removed.add(it) },
+        )
+        pool.sync(3)
+
+        pool.clear()
+
+        assertEquals(
+            "clear must detach every pooled child from its parent",
+            listOf("child0", "child1", "child2"),
+            removed,
+        )
+
+        val visible = pool.sync(2)
+        assertEquals(
+            "after clear the pool must create fresh children, not reuse the cleared ones",
+            listOf("child3", "child4"),
+            visible,
+        )
+        assertEquals("the fresh children must be re-added to the parent", 5, added.size)
+    }
 }

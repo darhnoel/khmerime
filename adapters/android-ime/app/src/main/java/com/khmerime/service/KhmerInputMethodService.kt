@@ -5,6 +5,7 @@ import com.khmerime.input.KhmerInputHandler
 import com.khmerime.input.KhmerImeSession
 import com.khmerime.input.KhmerRenderState
 import com.khmerime.input.KeyboardState
+import com.khmerime.layout.ChromeRows
 import com.khmerime.layout.KeyboardKey
 import com.khmerime.layout.KeyboardKeyAction
 import com.khmerime.layout.KeyboardLayer
@@ -52,6 +53,7 @@ class KhmerInputMethodService : InputMethodService() {
     private var keyboardLayer: LinearLayout? = null
     private var preeditStrip: PreeditStripView? = null
     private var systemBottomSpacer: View? = null
+    private var candidateScroll: View? = null
     private var currentLayer = KeyboardLayer.Qwerty
 
     private val candidateChipPool = ViewPool<SuggestionChipView>(
@@ -71,6 +73,7 @@ class KhmerInputMethodService : InputMethodService() {
         },
         addChild = { candidateStrip?.addView(it) },
         setVisible = { view, visible -> view.visibility = if (visible) View.VISIBLE else View.GONE },
+        removeChild = { candidateStrip?.removeView(it) },
     )
 
     // ── IME lifecycle ──────────────────────────────────────────────────────────
@@ -96,6 +99,12 @@ class KhmerInputMethodService : InputMethodService() {
     // ── View creation ──────────────────────────────────────────────────────────
 
     override fun onCreateInputView(): View {
+        // The framework builds a fresh input view on a config change (rotation,
+        // theme switch) while this service instance lives on. Drop the
+        // service-scoped chip pool's references to the previous view's chips so
+        // the old hierarchy can be garbage-collected, and so sync() re-adds
+        // chips to the new candidate strip instead of leaving them on the old.
+        candidateChipPool.clear()
         applyWindowBlur()
         val root = layoutInflater.inflate(R.layout.keyboard, null)
         root.setBackgroundColor(Color.TRANSPARENT)
@@ -103,6 +112,7 @@ class KhmerInputMethodService : InputMethodService() {
             strip.onSegmentFocused = { index -> handler?.focusSegment(index) }
         }
         candidateStrip = root.findViewById(R.id.candidate_strip)
+        candidateScroll = root.findViewById(R.id.candidate_scroll)
         keyboardLayer = root.findViewById(R.id.keyboard_layer)
         systemBottomSpacer = root.findViewById(R.id.system_bottom_spacer)
         applySystemBottomSpacing(root)
@@ -204,11 +214,24 @@ class KhmerInputMethodService : InputMethodService() {
 
     private fun renderKeyboardState(state: KeyboardState) {
         renderKeyboardLayer(KeyboardPresentationSpec.keyboardLayerForState(state))
+        // A bare mode transition (enter/exit Suggest Character, toggle English)
+        // has no composition to show; content-ful transitions are always
+        // followed by a render that re-applies the real chrome.
+        applyChrome(ChromeRows.None)
+    }
+
+    // Three-state input chrome (parity with iOS): collapse the rows a mode is not
+    // using so the keyboard reclaims their height. See KeyboardPresentationSpec.chromeRows.
+    private fun applyChrome(rows: ChromeRows) {
+        preeditStrip?.visibility = if (rows == ChromeRows.StripAndCandidate) View.VISIBLE else View.GONE
+        candidateScroll?.visibility = if (rows == ChromeRows.None) View.GONE else View.VISIBLE
     }
 
     private fun resetSuggestCharacterSuggestions() {
         preeditStrip?.clear()
         candidateChipPool.sync(0)
+        // A reset always means Suggest Character with no candidates yet → collapse.
+        applyChrome(ChromeRows.None)
     }
 
     // ── Render ─────────────────────────────────────────────────────────────────
@@ -217,14 +240,15 @@ class KhmerInputMethodService : InputMethodService() {
         val keyboardState = handler?.keyboardState
         val romanHint = KeyboardPresentationSpec.preeditText(keyboardState, state)
         preeditStrip?.render(state, romanHint)
+        applyChrome(KeyboardPresentationSpec.chromeRows(keyboardState, romanHint, state))
 
         if (candidateStrip == null) return
-        val selectedIndex = KeyboardPresentationSpec.selectedCandidateIndex(state)
+        val selectedIndex = KeyboardPresentationSpec.selectedCandidateIndex(keyboardState, state)
         val candidates = KeyboardPresentationSpec.suggestionCandidates(state)
         val chips = candidateChipPool.sync(candidates.size)
         candidates.forEachIndexed { index, candidate ->
             chips[index].update(
-                text = candidate,
+                text = KeyboardPresentationSpec.candidateDisplayLabel(candidate),
                 isSelected = index == selectedIndex,
                 onClick = { handler?.selectCandidate(index) },
             )
