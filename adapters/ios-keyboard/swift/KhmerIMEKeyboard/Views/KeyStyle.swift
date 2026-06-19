@@ -37,7 +37,10 @@ class GlassKeyButton: UIButton {
 
     // Inject a synchronous runner for testing before any touch event fires.
     func configureForTesting(runner: @escaping AnimatorRunner) {
-        pressAnimator = GlassKeyPressAnimator(onUpdate: applySquish(_:), runner: runner)
+        pressAnimator = GlassKeyPressAnimator(
+            onUpdate: { [weak self] squish in self?.applySquish(squish) },
+            runner: runner
+        )
     }
 
     override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
@@ -93,7 +96,9 @@ class GlassKeyButton: UIButton {
 
     private func ensurePressAnimator() -> GlassKeyPressAnimator {
         if let existing = pressAnimator { return existing }
-        let animator = GlassKeyPressAnimator(onUpdate: applySquish(_:))
+        let animator = GlassKeyPressAnimator { [weak self] squish in
+            self?.applySquish(squish)
+        }
         pressAnimator = animator
         return animator
     }

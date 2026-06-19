@@ -190,6 +190,23 @@ final class GlassKeyButtonTests: XCTestCase {
             "inactive button background must be transparent — UIVisualEffectView provides the glass depth")
     }
 
+    // MARK: - lifetime
+
+    func test_pressAnimatorDoesNotRetainButton() {
+        weak var weakButton: GlassKeyButton?
+
+        autoreleasepool {
+            var button: GlassKeyButton? = GlassKeyButton()
+            button?.configureForTesting(runner: synchronousRunner)
+            button?.touchesBegan(Set(), with: nil)
+            weakButton = button
+            button = nil
+        }
+
+        XCTAssertNil(weakButton,
+            "GlassKeyButton must not be retained by its press animator closure")
+    }
+
     // MARK: - helpers
 
     private var synchronousRunner: AnimatorRunner {
