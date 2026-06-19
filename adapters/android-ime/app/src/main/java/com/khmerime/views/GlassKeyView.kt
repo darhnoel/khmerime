@@ -32,11 +32,18 @@ open class GlassKeyView(
 
     private var squish = 0f
 
-    private val animator = GlassKeyPressAnimator(onUpdate = { s ->
-        squish = s
-        scaleX = squishScale
-        scaleY = squishScale
-    })
+    // Drives the press "squish" as a draw-time effect, not a view transform.
+    // Scaling the View via scaleX/scaleY shrinks its touch geometry too:
+    // Android hit-tests a child through its inverse matrix, so a key held
+    // mid-squish (220 ms release) grows a ~4% dead ring on every edge, and
+    // off-beat rapid taps land in it and are silently dropped. Painting the
+    // squish in onDraw keeps the hit rect full-size.
+    protected fun applySquish(amount: Float) {
+        squish = amount
+        invalidate()
+    }
+
+    private val animator = GlassKeyPressAnimator(onUpdate = { applySquish(it) })
 
     override fun onDraw(canvas: Canvas) {
         val dark = isDark
@@ -50,10 +57,13 @@ open class GlassKeyView(
             TypedValue.COMPLEX_UNIT_SP, spSize, resources.displayMetrics,
         )
 
+        val save = canvas.save()
+        canvas.scale(squishScale, squishScale, width / 2f, height / 2f)
         rect.set(0f, 0f, width.toFloat(), height.toFloat())
         canvas.drawRoundRect(rect, cornerRadius, cornerRadius, bgPaint)
         canvas.drawRoundRect(rect, cornerRadius, cornerRadius, borderPaint)
         canvas.drawText(key.label, width / 2f, height / 2f - (textPaint.descent() + textPaint.ascent()) / 2f, textPaint)
+        canvas.restoreToCount(save)
     }
 
     override fun onTouchEvent(event: MotionEvent): Boolean {
