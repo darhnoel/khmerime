@@ -546,9 +546,7 @@ athletics,អត្តពលកម្ម
 atlanta,អាត្លង់តា
 atlantic,អាត្លង់ទិក
 atlas,អាត្លាស
-atm,ATM
 atmosphere,បរិយាកាស
-atmospheric,បរិយាកាស
 atom,អាតូម
 atomic,អាតូម
 attach,ភ្ជាប់
@@ -1751,7 +1749,7 @@ considered,ពិចារណា
 considering,ពិចារណា
 considers,ពិចារណា
 consist,រួមមាន
-consistency,សង្គត់ភាព
+consistency,សង្គតិភាព
 consistent,ស្រប
 consistently,ជាប់លាប់
 consisting,មាន
@@ -2938,7 +2936,6 @@ extras,បន្ថែម
 extreme,ខ្លាំង
 extremely,យ៉ាងខ្លាំង
 eye,ភ្នែក
-eyed,ភ្នែក
 eyes,ភ្នែក
 fabric,ក្រណាត់
 fabrics,ផលិតផល
@@ -4827,7 +4824,6 @@ match,ការប្រកួត
 matched,ធនាគារត្រូវគ្នា
 matches,ការប្រកួត
 matching,ផ្គូផ្គង
-mate,មិត្ត
 material,សម្ភារៈ
 materials,សម្ភារៈ
 maternity,មាតុភាព
@@ -7332,18 +7328,12 @@ something,អ្វីមួយ
 sometimes,ពេលខ្លះ
 somewhat,បន្តិច
 somewhere,កន្លែងណាមួយ
-son,កូនប្រុស
-song,ចម្រៀង
-songs,ចម្រៀង
-sons,កូនប្រុស
 sony,សូនី
 soon,ឆាប់ៗនេះ
 soonest,លឿនបំផុត
 sophisticated,ភាពស្មុគស្មាញ
 sorry,សុំទោស
 sort,តម្រៀប
-sorted,តម្រៀប
-sorts,ប្រភេទ
 sought,បានស្វែងរក
 soul,ព្រលឹង
 souls,ព្រលឹង
@@ -8254,7 +8244,7 @@ twisted,រមួល
 twisted,កំពីកកំពក
 two,ពីរ
 type,ប្រភេទ
-types,ប្រភេទ
+type,វាយ
 typical,ធម្មតា
 typically,ជាធម្មតា
 typing,វាយបញ្ចូល
@@ -8332,7 +8322,6 @@ upload,ផ្ទុកឡើង
 uploaded,បានផ្ទុកឡើង
 upon,លើ
 upper,ខាងលើ
-ups,ឡើង
 upset,រកាំចិត្ត
 upskirt,អាវទ្រនាប់
 upskirts,ទីក្រុងខាងលើ
@@ -8797,6 +8786,7 @@ yeast,មេដំបែ
 yellow,លឿង
 yen,យ៉េន
 yes,បាទ
+yes,ចាស
 yesterday,ម្សិលមិញ
 yet,នៅឡើយ
 yield,ទិន្នផល
