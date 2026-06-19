@@ -5,6 +5,7 @@ const CHARACTER_RELATION_CSV: &str = include_str!(concat!(
     env!("CARGO_MANIFEST_DIR"),
     "/../../data/khmer_character_relation.csv"
 ));
+const COENG_SIGN: char = '\u{17D2}';
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ManualComposeKind {
@@ -210,7 +211,8 @@ fn relation_entries() -> &'static [CharacterRelationEntry] {
 }
 
 fn parse_character_relation_entries() -> Vec<CharacterRelationEntry> {
-    let mut parsed = Vec::new();
+    let mut csv_entries = Vec::new();
+    let mut csv_texts = HashSet::new();
     for line in CHARACTER_RELATION_CSV.lines().skip(1) {
         let Some((raw_text, raw_relation)) = line.split_once(',') else {
             continue;
@@ -227,11 +229,30 @@ fn parse_character_relation_entries() -> Vec<CharacterRelationEntry> {
         if patterns.is_empty() {
             continue;
         }
-        parsed.push(CharacterRelationEntry {
+        csv_texts.insert(text.to_owned());
+        csv_entries.push(CharacterRelationEntry {
             text: text.to_owned(),
             kind,
             patterns,
         });
+    }
+
+    let mut parsed = Vec::new();
+    for entry in csv_entries {
+        let generated_coeng = if entry.kind == ManualComposeKind::BaseConsonant {
+            coeng_form_for_base_consonant(&entry.text).filter(|text| !csv_texts.contains(text))
+        } else {
+            None
+        };
+        let patterns = entry.patterns.clone();
+        parsed.push(entry);
+        if let Some(text) = generated_coeng {
+            parsed.push(CharacterRelationEntry {
+                text,
+                kind: ManualComposeKind::Subscript,
+                patterns,
+            });
+        }
     }
     parsed
 }
@@ -301,7 +322,16 @@ fn is_base_consonant(ch: char) -> bool {
 }
 
 fn is_subscript_text(chars: &[char]) -> bool {
-    chars.first() == Some(&'\u{17D2}') && chars.get(1).is_some_and(|ch| is_base_consonant(*ch))
+    chars.first() == Some(&COENG_SIGN) && chars.get(1).is_some_and(|ch| is_base_consonant(*ch))
+}
+
+fn coeng_form_for_base_consonant(text: &str) -> Option<String> {
+    let mut chars = text.chars();
+    let ch = chars.next()?;
+    if chars.next().is_some() || !is_base_consonant(ch) {
+        return None;
+    }
+    Some(format!("{COENG_SIGN}{ch}"))
 }
 
 fn is_vowel(ch: char) -> bool {
@@ -446,4 +476,21 @@ fn normalize_roman_piece(input: &str) -> String {
             }
         })
         .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn subscript_candidates_include_generated_coeng_ka() {
+        let candidates = suggest_manual_character_candidates("k", ManualComposeKind::Subscript, 32);
+
+        assert!(
+            candidates
+                .iter()
+                .any(|candidate| candidate.kind == ManualComposeKind::Subscript && candidate.insert_text == "្ក"),
+            "expected ្ក in subscript candidates for 'k', got: {candidates:?}"
+        );
+    }
 }

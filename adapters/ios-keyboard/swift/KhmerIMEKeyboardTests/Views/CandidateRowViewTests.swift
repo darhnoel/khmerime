@@ -12,6 +12,15 @@ final class CandidateRowViewTests: XCTestCase {
         XCTAssertEqual(visibleLabelTexts(in: row), ["ខ្ញុំ", "ញុំ", "ណុំ"])
     }
 
+    func test_render_prefixesCoengCandidateWithDottedCircleForVisibility() {
+        let row = CandidateRowView()
+
+        row.render(makeState(candidates: ["្ក"], selectedIndex: 0))
+
+        XCTAssertEqual(visibleLabelTexts(in: row), ["◌្ក"],
+            "candidate row should make leading coeng signs visible without changing the inserted candidate")
+    }
+
     func test_render_highlightsSelectedIndexOnly() {
         let row = CandidateRowView()
 
@@ -20,6 +29,19 @@ final class CandidateRowViewTests: XCTestCase {
         let labels = visibleLabels(in: row)
         XCTAssertEqual(labels.map { $0.textColor }, [.secondaryLabel, .label, .secondaryLabel],
             "only the selected candidate's label should use the highlighted (.label) color")
+    }
+
+    func test_render_charPickPresentationUsesUniformRegularLabels() {
+        let row = CandidateRowView()
+
+        row.render(makeState(candidates: ["ក", "្ក", "ខ"], selectedIndex: 0), presentation: .charPick)
+
+        let labels = visibleLabels(in: row)
+        let regularFontName = UIFont.systemFont(ofSize: 18, weight: .regular).fontName
+        XCTAssertEqual(labels.map { $0.textColor }, [.label, .label, .label],
+            "CharPick candidates are equally tappable and should not look disabled or lower confidence")
+        XCTAssertEqual(labels.map { $0.font.fontName }, [regularFontName, regularFontName, regularFontName],
+            "CharPick candidates should not imply a default candidate with semibold text")
     }
 
     func test_tapAtPoint_onACandidateLabel_invokesOnCandidateSelected() {

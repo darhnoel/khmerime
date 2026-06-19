@@ -4,9 +4,9 @@
 //! Arc<Mutex<_>> handle. Swift calls one method per key tap; each returns a fresh
 //! `IosRenderState` that drives the strip + candidate panel.
 
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, OnceLock};
 
-use khmerime_core::{DecoderConfig, Transliterator};
+use khmerime_core::{DecoderConfig, SharedTransliteratorData, Transliterator};
 use khmerime_session::{
     ImeSession, ImeSessionOptions, NativeKeyEvent, SegmentPreviewEntry, SegmentedPreviewMode, SessionResult,
     SessionSnapshot,
@@ -29,6 +29,13 @@ fn key_event(keyval: u32) -> NativeKeyEvent {
         keycode: 0,
         state: 0,
     }
+}
+
+static SHARED_TRANSLITERATOR_DATA: OnceLock<SharedTransliteratorData> = OnceLock::new();
+
+fn shared_transliterator_data() -> &'static SharedTransliteratorData {
+    SHARED_TRANSLITERATOR_DATA
+        .get_or_init(|| Transliterator::from_default_shared_data().expect("compiled-in lexicon data must be valid"))
 }
 
 // ── Public UniFFI types ───────────────────────────────────────────────────────
@@ -103,8 +110,10 @@ impl KhmerIMESession {
     /// data (no external files needed on iOS).
     #[uniffi::constructor]
     pub fn new() -> Arc<Self> {
-        let transliterator = Transliterator::from_default_data_with_config(DecoderConfig::shadow_interactive())
-            .expect("compiled-in lexicon data must be valid");
+        let transliterator = Transliterator::from_shared_data_with_config(
+            shared_transliterator_data(),
+            DecoderConfig::shadow_interactive(),
+        );
         let session = ImeSession::builder(transliterator, std::collections::HashMap::new())
             .input_mode(khmerime_session::InputMode::Roman)
             .options(ImeSessionOptions {
@@ -424,6 +433,11 @@ mod tests {
         assert!(
             state.candidates.iter().any(|c| c == "ក"),
             "candidates must include ក for 'k', got: {:?}",
+            state.candidates
+        );
+        assert!(
+            state.candidates.iter().any(|c| c == "្ក"),
+            "candidates must include ្ក for 'k', got: {:?}",
             state.candidates
         );
         assert!(state.preedit.is_empty(), "preedit must stay empty in CharPick mode");

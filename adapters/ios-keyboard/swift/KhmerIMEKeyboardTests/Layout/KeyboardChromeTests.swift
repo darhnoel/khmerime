@@ -3,31 +3,45 @@ import XCTest
 
 // KeyboardChromeTests
 // ===================
-// The chrome (strip + candidate row) is only shown while there's something to
-// display. isComposing decides expand vs collapse from the rendered content,
-// not the keyboard state — so focusIn (empty render) collapses, and CharPick
-// with candidates but no roman hint still expands.
+// The chrome rows are shown only when a mode has content for them. Roman
+// composition owns the strip + candidate row; CharPick owns only the candidate
+// row.
 
 final class KeyboardChromeTests: XCTestCase {
 
-    func test_isComposing_emptyHintAndNoCandidates_isFalse() {
+    func test_rows_qwertyEmptyHintAndNoCandidates_isNone() {
         let state = makeState(candidates: [])
-        XCTAssertFalse(KeyboardChrome.isComposing(romanHint: "", state: state),
+
+        XCTAssertEqual(KeyboardChrome.rows(for: .qwerty, romanHint: "", state: state), .none,
             "no roman hint and no candidates means nothing to show — chrome must collapse")
     }
 
-    func test_isComposing_withRomanHint_isTrue() {
+    func test_rows_qwertyWithRomanHint_showsStripAndCandidateRows() {
         let state = makeState(candidates: [])
-        XCTAssertTrue(KeyboardChrome.isComposing(romanHint: "khn", state: state),
-            "a non-empty roman hint fills the strip — chrome must expand")
+
+        XCTAssertEqual(KeyboardChrome.rows(for: .qwerty, romanHint: "khn", state: state), .stripAndCandidate,
+            "a non-empty roman hint fills the strip, so roman composition keeps the full chrome")
     }
 
-    func test_isComposing_emptyHintButCandidates_isTrue() {
-        // CharPick: a letter is tapped, candidates populate the candidate row, but
-        // the strip (roman hint) stays empty because CharPick doesn't touch romanBuffer.
+    func test_rows_qwertyEmptyHintButCandidates_showsStripAndCandidateRows() {
         let state = makeState(candidates: ["ក", "ខ"])
-        XCTAssertTrue(KeyboardChrome.isComposing(romanHint: "", state: state),
-            "candidates fill the candidate row even with an empty strip — chrome must expand")
+
+        XCTAssertEqual(KeyboardChrome.rows(for: .qwerty, romanHint: "", state: state), .stripAndCandidate,
+            "non-CharPick candidate browsing still reserves the full composition chrome")
+    }
+
+    func test_rows_charPickWithoutCandidates_isNone() {
+        let state = makeState(candidates: [])
+
+        XCTAssertEqual(KeyboardChrome.rows(for: .charPick, romanHint: "", state: state), .none,
+            "entering CharPick alone should not reserve an empty row")
+    }
+
+    func test_rows_charPickWithCandidates_showsCandidateRowOnly() {
+        let state = makeState(candidates: ["ក", "ខ"])
+
+        XCTAssertEqual(KeyboardChrome.rows(for: .charPick, romanHint: "", state: state), .candidateOnly,
+            "CharPick candidates need the candidate row, not the roman strip")
     }
 
     // MARK: - helpers

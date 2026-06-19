@@ -40,6 +40,10 @@ _Avoid_: composition text (ambiguous with **Composition**), inline Khmer preview
 The visible Khmer choices for the active **Composition** or focused **Segmented Session** segment. In romanization mode, the Candidate List should remain visible even when there is only one obvious choice, because it tells the user what Enter will commit while the inline **Preedit** stays roman.
 _Avoid_: suggestions (too broad), inline candidates
 
+**Coeng Form**:
+A Khmer subscript consonant used to type consonant clusters. A Coeng Form is the invisible coeng sign plus a base consonant, rendered together as a subscript shape (for example `្ក`). In **CharPick Mode**, Coeng Forms appear under the same roman letters as their base consonants so users can build clusters quickly.
+_Avoid_: bare coeng sign when you mean the full subscript consonant
+
 **Roman Hint**:
 The exact romanized key or keys displayed beside a Khmer candidate to show why that candidate is available. Roman Hints are display metadata for the **Candidate List**; they do not replace the raw roman **Preedit** and do not change the **Commit Text**. If no exact Roman Hint exists for a candidate, the UI must not invent one; it should show a derived marker instead.
 _Avoid_: invented hint, transliteration label, candidate subtitle
@@ -77,7 +81,7 @@ An input mode in which all keystrokes (letters, symbols, numbers, space, backspa
 _Avoid_: latin mode, passthrough mode, direct-input mode
 
 **CharPick Mode**:
-An input mode (`InputMode::CharPick`) for typing Khmer text that is not in the **Lexicon** — names, place names, loanwords. The user types one roman letter; the session looks up all Khmer characters whose phonetic relation includes that letter (from `khmer_character_relation.csv`) and returns them as the **Candidate List**. Tapping a candidate commits that single Khmer character immediately to the host application with no **Composition** or preedit accumulation. Each keystroke is an independent lookup; there is no progressive multi-letter narrowing. On iOS and Android, the ✦ key toggles CharPick Mode: pressing ✦ enters it (abandoning any active **Composition** and clearing the roman buffer), pressing ✦ again exits it. While in CharPick Mode the keyboard layer remains unchanged (qwerty stays visible) and the ✦ key is visually highlighted. Letter keypresses are routed to the session without inserting text into the host field — only the **Candidate List** updates. Backspace while candidates are visible clears them and resets for a new lookup; backspace with an empty **Candidate List** deletes one character from the host text field.
+An input mode (`InputMode::CharPick`) for typing Khmer text that is not in the **Lexicon** — names, place names, loanwords. The user types one roman letter; the session looks up all Khmer characters and **Coeng Forms** whose phonetic relation includes that letter and returns them as the **Candidate List**. Tapping a candidate commits that single Khmer character or Coeng Form immediately to the host application with no **Composition** or preedit accumulation. Each keystroke is an independent lookup; there is no progressive multi-letter narrowing. On iOS and Android, the ✦ key toggles CharPick Mode: pressing ✦ enters it (abandoning any active **Composition** and clearing the roman buffer), pressing ✦ again exits it. While in CharPick Mode the keyboard layer remains unchanged (qwerty stays visible) and the ✦ key is visually highlighted. Letter keypresses are routed to the session without inserting text into the host field — only the **Candidate List** updates. Backspace while candidates are visible clears them and resets for a new lookup; backspace with an empty **Candidate List** deletes one character from the host text field.
 _Avoid_: name mode, character picker, direct character input
 
 **Phase A / Phase B startup**:

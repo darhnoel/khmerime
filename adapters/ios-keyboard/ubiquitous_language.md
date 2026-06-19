@@ -13,9 +13,15 @@ The currently visible keyboard view. Exactly one state is active at all times.
 | **QWERTY** | Default roman-input view. 123 in shift position, `✦ space . ⏎` bottom row. |
 | **123** | Number/symbol layer. Native iOS layout. All keys go through the session. |
 | **#+=** | Secondary symbol layer, reached from 123. Full native iOS layout. |
-| **Panel** | Candidate panel. Replaces QWERTY area. Shows segment chips + candidate row. |
+| **CharPick** | Character-picking mode. QWERTY stays visible; the `✦` key is highlighted, and letter keys browse Khmer characters and Coeng Forms without inserting roman text. |
 
-Transitions: `QWERTY ↔ 123 ↔ #+=` and `QWERTY ↔ Panel` (via ✦).
+Transitions: `QWERTY ↔ 123 ↔ #+=` and `QWERTY ↔ CharPick` (via ✦).
+
+---
+
+## System Khmer Fallback
+
+The state where iOS replaces the KhmerIME keyboard extension with Apple's built-in Khmer keyboard. This means the KhmerIME extension process is no longer active, usually because iOS terminated the extension under system pressure.
 
 ---
 
@@ -26,7 +32,7 @@ The two-row display pinned above the key rows, visible in all keyboard states.
 - **Roman Row** — top line. Shows the segmented roman input, e.g. `nhom · ttov · salarien`. When there are no segments yet, shows the raw roman buffer.
 - **Khmer Row** — bottom line. Shows the best Khmer candidate per segment, e.g. `ខ្ញុំ  ទៅ  សាលារៀន`. When there are no segments, shows the top-ranked candidate for the whole composition.
 
-The strip is always visible. It does not hide when the keyboard switches to 123, #+= , or Panel.
+The strip is always visible while composing. It does not hide when the keyboard switches to 123, #+= , or CharPick.
 
 ---
 
@@ -50,9 +56,11 @@ The Roman Buffer is always in sync with what is physically in the text field —
 
 ## Session
 
-The Rust-side `KhmerImeSession` (UniFFI-exported `KhmerIMESession`). Receives every key event and returns a `RenderState`. Owns romanization, segmentation, and candidate ranking.
+The Rust-side `KhmerImeSession` (UniFFI-exported `KhmerIMESession`). Receives every key event and returns a `RenderState`. Owns the active composition state for one keyboard controller.
 
 Every key tap — letter, digit, symbol, space, backspace, return — is forwarded to the session. The session decides what to emit.
+
+Multiple Sessions in the same extension process share the process-wide transliterator data. A new Session must not reload the full lexicon, decoder models, or composer table.
 
 ---
 
@@ -84,39 +92,31 @@ A segment has:
 
 ## Focused Segment
 
-The segment currently receiving candidate navigation. Tapping a Segment Chip in the Panel moves focus to that segment. ← / → key events move focus left/right between segments.
+The segment currently receiving candidate navigation. Tapping a different Segment Chip moves focus to that segment. ← / → key events move focus left/right between segments.
 
 ---
 
 ## Segment Chip
 
-A tappable button in the Panel representing one segment. Displays the segment's Khmer output. Tapping it moves focus to that segment and updates the Candidate Row.
+A tappable segment in the Strip representing one segment. Displays the segment's Khmer output. Tapping a different segment moves focus to that segment and updates the Candidate Row; tapping the already-focused segment enters Segment Edit Mode.
 
 ---
 
 ## Candidate Row
 
-The horizontally scrollable row in the Panel showing all Khmer candidates for the focused segment. Tapping a candidate commits that segment immediately.
+The persistent horizontally scrollable row between the Strip and key rows. It shows Khmer candidates for the active Composition or Focused Segment. Tapping a candidate selects it; it does not commit text by itself. The row is cleared when CharPick is active so CharPick's character candidates are the only visible candidates.
 
 ---
 
-## Panel (✦ Panel / Candidate Panel)
+## Coeng Form
 
-The full-replacement keyboard view activated by the ✦ button. Layout:
+A Khmer subscript consonant used to type consonant clusters. A Coeng Form is selected as one CharPick candidate and inserts the coeng sign plus the base consonant, rendered together as a subscript shape.
 
-```
-┌──────────────────────────────────────────────┐
-│  strip (roman row / khmer row)               │
-├──────────────────────────────────────────────┤
-│  [ ខ្ញុំ ]  [ ទៅ ]  [ សាលារៀន ]   ← chips      │
-├──────────────────────────────────────────────┤
-│  ខ្ញុំ   ញុំ   ណុំ   ណ៉ំ  …          ← candidates │
-├──────────────────────────────────────────────┤
-│   ✦    │        space        │  .  │   ⏎   │
-└──────────────────────────────────────────────┘
-```
+---
 
-Tapping ✦ again (or a letter key) returns to QWERTY.
+## CharPick
+
+The character-picking mode activated by the ✦ button. QWERTY stays visible. Letter keys browse related Khmer characters and Coeng Forms; tapping a candidate commits that single character or Coeng Form immediately. Tapping ✦ again exits CharPick and returns to QWERTY.
 
 ---
 
@@ -129,7 +129,7 @@ The act of finalizing a composition into the text field:
 
 Khmer segments are concatenated **without spaces** (Khmer script convention).
 
-Commit is triggered by ⏎. Tapping a candidate in the Panel commits only that segment (partial commit), not the entire composition.
+Commit is triggered by ⏎. Tapping a candidate in the Candidate Row selects only; it does not commit the segment or the entire Composition.
 
 ---
 
@@ -141,7 +141,7 @@ A key event that the session emits unchanged. Symbols (`-`, `/`, `(`, etc.) have
 
 ## ✦ Button
 
-The toggle button on the bottom row (between EN and space). Switches between QWERTY and Panel states. Does not send any event to the session.
+The toggle button on the bottom row (between EN and space). Switches between QWERTY and CharPick states. Does not send a roman key event to the session.
 
 ---
 
@@ -153,7 +153,7 @@ The return/submit key. Label: `⏎` glyph. Triggers a full Commit of the current
 
 ## 123 Button
 
-Mode-switch button in row 3 (leftmost position). Switches keyboard state from QWERTY → 123 (or Panel → 123). Label: `123`. Does not send any event to the session.
+Mode-switch button in row 3 (leftmost position). Switches keyboard state from QWERTY → 123. Label: `123`. Does not send any event to the session.
 
 ---
 

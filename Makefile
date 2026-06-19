@@ -32,6 +32,9 @@ IOS_TARGET_SIM      := aarch64-apple-ios-sim
 IOS_LIB_NAME        := libkhmerime_ios_keyboard.a
 IOS_BINDGEN_OUT     := $(IOS_ADAPTER_DIR)/swift/KhmerIMEKeyboard/Generated
 IOS_XCFRAMEWORK_OUT := $(IOS_ADAPTER_DIR)/swift/Frameworks/KhmerIME.xcframework
+IOS_DERIVED_DATA    ?= /tmp/khmerime-ios-build
+IOS_DEVICE_ID       ?=
+IOS_DEVICE_APP      := $(IOS_DERIVED_DATA)/Build/Products/Debug-iphoneos/KhmerIME.app
 IOS_SIM_ID          ?= $(shell xcrun simctl list devices available | grep 'iPhone' | head -1 | sed 's/.*(\([A-F0-9-]*\)).*/\1/')
 IOS_SIM_BUNDLE_ID   := com.khmerime.KhmerIME
 IOS_SIM_APP         := $(HOME)/Library/Developer/Xcode/DerivedData/KhmerIME-*/Build/Products/Debug-iphonesimulator/KhmerIME.app
@@ -250,11 +253,18 @@ platform-install-ios-device: platform-build-ios
 
 # Fast loop: rebuild Swift app only and install to connected physical device.
 platform-reinstall-ios-device:
+	@if [ -z "$(IOS_DEVICE_ID)" ]; then \
+		echo "Set IOS_DEVICE_ID to the connected device name, UDID, serial number, or ECID."; \
+		echo "Example: make platform-reinstall-ios-device IOS_DEVICE_ID=iPhonak"; \
+		exit 2; \
+	fi
 	xcodegen generate --spec $(IOS_ADAPTER_DIR)/swift/project.yml --project $(IOS_ADAPTER_DIR)/swift
 	xcodebuild build \
 		-project $(IOS_XCPROJECT) \
 		-scheme $(IOS_APP_SCHEME) \
-		-destination 'generic/platform=iOS'
+		-destination 'generic/platform=iOS' \
+		-derivedDataPath $(IOS_DERIVED_DATA)
+	xcrun devicectl device install app --device "$(IOS_DEVICE_ID)" "$(IOS_DEVICE_APP)"
 	@echo "Installed. On device: Settings → General → Keyboard → Keyboards → Add New Keyboard → KhmerIME"
 
 platform-test-android:

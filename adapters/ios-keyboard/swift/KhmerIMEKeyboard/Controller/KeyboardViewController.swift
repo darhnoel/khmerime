@@ -1,4 +1,5 @@
 import UIKit
+import os
 
 // KeyboardViewController
 // ======================
@@ -21,6 +22,19 @@ import UIKit
 
 class KeyboardViewController: UIInputViewController {
 
+    // MARK: - Temporary Diagnostics
+
+    private static var nextDebugID = 0
+    private static var activeDebugControllerCount = 0
+
+    private let debugID = KeyboardViewController.allocateDebugID()
+
+    private static func allocateDebugID() -> Int {
+        nextDebugID += 1
+        activeDebugControllerCount += 1
+        return nextDebugID
+    }
+
     // MARK: - Handler
 
     private var handler: KeyboardInputHandler!
@@ -31,9 +45,9 @@ class KeyboardViewController: UIInputViewController {
     // appears/disappears (e.g. on iPhone X or on iPad when the bar changes).
     private var heightConstraint: NSLayoutConstraint!
 
-    // Whether the strip + candidate row are currently expanded. Starts collapsed:
-    // the keyboard appears keys-only and grows on the first keystroke.
-    private var isChromeComposing = false
+    // Which chrome rows are currently reserved. Starts collapsed: the keyboard
+    // appears keys-only and grows only when a mode has row content.
+    private var chromeRows: KeyboardChrome.Rows = .none
 
     var isIPad: Bool { traitCollection.userInterfaceIdiom == .pad }
     var layoutMetrics: KeyboardLayoutMetrics {
@@ -64,6 +78,7 @@ class KeyboardViewController: UIInputViewController {
     // MARK: - Views
 
     private var stripView: StripView!
+    private var candidateRowView: CandidateRowView!
     private var qwertyView: UIView!
     private var numericView: UIView!
     private var symbolsView: UIView!
@@ -73,44 +88,69 @@ class KeyboardViewController: UIInputViewController {
 
     override func viewDidLoad() {
         super.viewDidLoad()
-        handler = KeyboardInputHandler(proxy: DocumentProxyWrapper(textDocumentProxy), session: KeyboardSession())
-        setupLayout()
-        wireHandlerCallbacks()
+        setupKeyboardResources(reason: "launch")
+    }
+
+    deinit {
+        Self.activeDebugControllerCount -= 1
+        logMemory("deinit vc=\(debugID) active=\(Self.activeDebugControllerCount)")
     }
 
     override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
-        handler.focusIn()
+        ensureKeyboardResources()
+        logMemory("viewDidAppear vc=\(debugID) active=\(Self.activeDebugControllerCount)")
+        handler?.focusIn()
     }
 
     override func viewWillDisappear(_ animated: Bool) {
         super.viewWillDisappear(animated)
-        handler.focusOut()
+        logMemory("viewWillDisappear vc=\(debugID) active=\(Self.activeDebugControllerCount)")
+        handler?.focusOut()
+    }
+
+    override func viewDidDisappear(_ animated: Bool) {
+        super.viewDidDisappear(animated)
+        logMemory("viewDidDisappear vc=\(debugID) active=\(Self.activeDebugControllerCount)")
+        teardownKeyboardResources()
+        logMemory("after teardown vc=\(debugID) active=\(Self.activeDebugControllerCount)")
+    }
+
+    override func didReceiveMemoryWarning() {
+        super.didReceiveMemoryWarning()
+        logMemory("didReceiveMemoryWarning vc=\(debugID) active=\(Self.activeDebugControllerCount)")
     }
 
     override func viewSafeAreaInsetsDidChange() {
         super.viewSafeAreaInsetsDidChange()
-        heightConstraint.constant = keyboardHeight(composing: isChromeComposing)
+        heightConstraint?.constant = keyboardHeight(rows: chromeRows)
     }
 
     // MARK: - Chrome collapse / expand
 
-    // Total keyboard height for the current chrome state. Idle drops the strip +
-    // candidate row (88pt); composing reserves them. Keys keep the same height in
-    // both, so only the total shrinks.
-    private func keyboardHeight(composing: Bool) -> CGFloat {
-        let base = composing ? layoutMetrics.baseKeyboardHeight : layoutMetrics.idleKeyboardHeight
-        return base + view.safeAreaInsets.bottom
+    // Total keyboard height for the current chrome state. Keys keep the same
+    // height in every state; only the chrome rows add height above them.
+    private func keyboardHeight(rows: KeyboardChrome.Rows) -> CGFloat {
+        let chromeHeight: CGFloat
+        switch rows {
+        case .none:
+            chromeHeight = 0
+        case .candidateOnly:
+            chromeHeight = layoutMetrics.candidateRowHeight
+        case .stripAndCandidate:
+            chromeHeight = layoutMetrics.stripHeight + layoutMetrics.candidateRowHeight
+        }
+        return layoutMetrics.idleKeyboardHeight + chromeHeight + view.safeAreaInsets.bottom
     }
 
-    // Expands or collapses the two chrome rows and the host height together. Only
-    // acts on a real transition, so the per-keystroke renders during composition
-    // don't re-trigger the animation.
-    private func setComposingChrome(_ composing: Bool, animated: Bool) {
-        guard composing != isChromeComposing else { return }
-        isChromeComposing = composing
-        rootView.setChromeVisible(composing)
-        heightConstraint.constant = keyboardHeight(composing: composing)
+    // Applies row constraints and host height together. Only acts on a real
+    // transition, so per-keystroke renders do not re-trigger the animation.
+    private func setChromeRows(_ rows: KeyboardChrome.Rows, animated: Bool) {
+        guard rows != chromeRows else { return }
+        chromeRows = rows
+        guard let rootView, let heightConstraint else { return }
+        rootView.setChromeRows(rows)
+        heightConstraint.constant = keyboardHeight(rows: rows)
         guard animated else { view.layoutIfNeeded(); return }
         UIView.animate(withDuration: 0.2, delay: 0, options: [.curveEaseOut, .beginFromCurrentState]) {
             self.view.layoutIfNeeded()
@@ -125,29 +165,91 @@ class KeyboardViewController: UIInputViewController {
     }
 
     override func textDidChange(_ textInput: UITextInput?) {
-        handler.textDidChange()
+        handler?.textDidChange()
+    }
+
+    // TEMPORARY: device-only memory probe for diagnosing System Khmer Fallback.
+    // Remove after the current jetsam investigation is resolved.
+    private func logMemory(_ label: String) {
+        var info = task_vm_info_data_t()
+        var count = mach_msg_type_number_t(MemoryLayout<task_vm_info_data_t>.stride / MemoryLayout<integer_t>.stride)
+        let result = withUnsafeMutablePointer(to: &info) { pointer in
+            pointer.withMemoryRebound(to: integer_t.self, capacity: Int(count)) { rebound in
+                task_info(mach_task_self_, task_flavor_t(TASK_VM_INFO), rebound, &count)
+            }
+        }
+        guard result == KERN_SUCCESS else {
+            NSLog("MEM %@ unavailable kern_return=%d", label, result)
+            return
+        }
+
+        let footprintMB = Double(info.phys_footprint) / 1_048_576.0
+        let availableMB = Double(os_proc_available_memory()) / 1_048_576.0
+        NSLog("MEM %@ footprint=%.1f MB headroom=%.1f MB", label, footprintMB, availableMB)
     }
 
     // MARK: - Handler Callbacks
 
+    private func setupKeyboardResources(reason: String) {
+        logMemory("\(reason) vc=\(debugID) active=\(Self.activeDebugControllerCount)")
+        let session = KeyboardSession()
+        logMemory("after KeyboardSession() vc=\(debugID) active=\(Self.activeDebugControllerCount)")
+        handler = KeyboardInputHandler(proxy: DocumentProxyWrapper(textDocumentProxy), session: session)
+        setupLayout()
+        logMemory("after layout vc=\(debugID) active=\(Self.activeDebugControllerCount)")
+        wireHandlerCallbacks()
+    }
+
+    private func ensureKeyboardResources() {
+        guard handler == nil || rootView == nil else { return }
+        setupKeyboardResources(reason: "rebuild")
+    }
+
+    private func teardownKeyboardResources() {
+        guard handler != nil || rootView != nil else { return }
+
+        handler?.onTransition = nil
+        handler?.onRender = nil
+        handler?.onStripClear = nil
+        handler?.onEnglishModeChanged = nil
+
+        if let rootView {
+            KeyboardResourceTeardown.releaseInteractions(in: rootView)
+            rootView.removeFromSuperview()
+        }
+
+        heightConstraint?.isActive = false
+        handler = nil
+        heightConstraint = nil
+        stripView = nil
+        candidateRowView = nil
+        qwertyView = nil
+        numericView = nil
+        symbolsView = nil
+        rootView = nil
+        chromeRows = .none
+    }
+
     private func wireHandlerCallbacks() {
         handler.onTransition = { [weak self] state in
             guard let self else { return }
-            self.rootView.apply(state)
+            self.rootView?.apply(state)
             let isCharPick = state == .charPick
-            self.rootView.allDescendants(ofType: GlassKeyButton.self)
+            self.rootView?.allDescendants(ofType: GlassKeyButton.self)
                 .filter { $0.title(for: .normal) == "✦" }
                 .forEach { $0.isGlassActive = isCharPick }
         }
         handler.onRender = { [weak self] state, romanHint in
             guard let self else { return }
-            self.rootView.render(state, romanHint: romanHint)
-            self.setComposingChrome(KeyboardChrome.isComposing(romanHint: romanHint, state: state), animated: true)
+            let keyboardState = self.handler.keyboardState
+            self.rootView?.render(state, romanHint: romanHint, keyboardState: keyboardState)
+            let rows = KeyboardChrome.rows(for: keyboardState, romanHint: romanHint, state: state)
+            self.setChromeRows(rows, animated: true)
         }
         handler.onStripClear = { [weak self] in
             guard let self else { return }
-            self.rootView.clearStrip()
-            self.setComposingChrome(false, animated: true)
+            self.rootView?.clearStrip()
+            self.setChromeRows(.none, animated: true)
         }
         handler.onEnglishModeChanged = { [weak self] isEnglish in
             guard let self else { return }
@@ -159,33 +261,33 @@ class KeyboardViewController: UIInputViewController {
 
     // MARK: - Key Actions (forward to handler)
 
-    @objc func toggleEnglishTapped()   { handler.toggleEnglish() }
+    @objc func toggleEnglishTapped()   { handler?.toggleEnglish() }
 
     @objc func letterTapped(_ sender: UIButton) {
         guard let ch = sender.title(for: .normal)?.lowercased(), !ch.isEmpty else { return }
-        handler.sendChar(ch)
+        handler?.sendChar(ch)
     }
 
     @objc func symbolKeyTapped(_ sender: UIButton) {
         guard let ch = sender.title(for: .normal), !ch.isEmpty else { return }
-        handler.sendChar(ch)
+        handler?.sendChar(ch)
     }
 
-    @objc func periodTapped()      { handler.sendChar(".") }
-    @objc func backspaceTapped()   { handler.backspaceTapped() }
-    @objc func spaceTapped()       { handler.spaceTapped() }
-    @objc func returnTapped()      { handler.returnTapped() }
-    @objc func togglePanelTapped() { handler.togglePanel() }
-    @objc func numericTapped()     { handler.switchLayer(to: .numeric) }
-    @objc func symbolsTapped()     { handler.switchLayer(to: .symbols) }
-    @objc func abcTapped()         { handler.switchLayer(to: .qwerty) }
+    @objc func periodTapped()      { handler?.sendChar(".") }
+    @objc func backspaceTapped()   { handler?.backspaceTapped() }
+    @objc func spaceTapped()       { handler?.spaceTapped() }
+    @objc func returnTapped()      { handler?.returnTapped() }
+    @objc func togglePanelTapped() { handler?.togglePanel() }
+    @objc func numericTapped()     { handler?.switchLayer(to: .numeric) }
+    @objc func symbolsTapped()     { handler?.switchLayer(to: .symbols) }
+    @objc func abcTapped()         { handler?.switchLayer(to: .qwerty) }
 
     // MARK: - Strip Callbacks
 
     private func setupStripCallbacks() {
-        stripView.onKhmerRowTapped      = { [weak self] in self?.handler.commitComposition() }
-        stripView.onKhmerRowLongPressed = { [weak self] in self?.handler.togglePanel() }
-        stripView.onSegmentFocused      = { [weak self] index in self?.handler.chipTapped(at: index) }
+        stripView.onKhmerRowTapped      = { [weak self] in self?.handler?.commitComposition() }
+        stripView.onKhmerRowLongPressed = { [weak self] in self?.handler?.togglePanel() }
+        stripView.onSegmentFocused      = { [weak self] index in self?.handler?.chipTapped(at: index) }
     }
 
     // MARK: - Layout
@@ -200,11 +302,12 @@ class KeyboardViewController: UIInputViewController {
             actions: layerActions
         ).build(
             candidateRowSelection: { [weak self] index in
-                self?.handler.selectCandidate(at: index)
+                self?.handler?.selectCandidate(at: index)
             }
         )
 
         stripView = hierarchy.stripView
+        candidateRowView = hierarchy.candidateRowView
         qwertyView = hierarchy.qwertyView
         numericView = hierarchy.numericView
         symbolsView = hierarchy.symbolsView
@@ -221,14 +324,14 @@ class KeyboardViewController: UIInputViewController {
         )
         // rootView starts with its chrome collapsed, so the host begins at idle
         // height — keys-only — and expands on the first keystroke.
-        heightConstraint.constant = keyboardHeight(composing: false)
+        heightConstraint.constant = keyboardHeight(rows: .none)
     }
 
     private func wireBackspaceButtons() {
         rootView.allDescendants(ofType: BackspaceButton.self).forEach { btn in
-            btn.onTap      = { [weak self] in self?.handler.backspaceTapped() }
-            btn.onHoldFire = { [weak self] in self?.handler.backspaceHoldFired() }
-            btn.onHoldEnd  = { [weak self] in self?.handler.backspaceHoldEnded() }
+            btn.onTap      = { [weak self] in self?.handler?.backspaceTapped() }
+            btn.onHoldFire = { [weak self] in self?.handler?.backspaceHoldFired() }
+            btn.onHoldEnd  = { [weak self] in self?.handler?.backspaceHoldEnded() }
         }
     }
 

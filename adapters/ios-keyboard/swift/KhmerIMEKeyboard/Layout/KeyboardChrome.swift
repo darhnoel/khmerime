@@ -2,16 +2,21 @@ import Foundation
 
 // KeyboardChrome
 // ==============
-// Decides whether the input chrome (strip + candidate row) is worth its height.
-// The two rows reserve 88pt, so the keyboard collapses to keys-only when idle and
-// expands while composing — reclaiming screen space when there's nothing to show.
-//
-// Content-driven, not state-driven: focusIn renders an empty state (collapsed),
-// while CharPick can populate candidates with an empty strip (expanded). The rows
-// move together as one unit, so either row having content expands both.
+// Decides which input chrome rows are worth their height. Roman composition owns
+// the strip + candidate row; CharPick owns only the candidate row and only while
+// candidates exist.
 
 enum KeyboardChrome {
-    static func isComposing(romanHint: String, state: IosRenderState) -> Bool {
-        !romanHint.isEmpty || !state.candidates.isEmpty
+    enum Rows: Equatable {
+        case none
+        case candidateOnly
+        case stripAndCandidate
+    }
+
+    static func rows(for keyboardState: KeyboardState, romanHint: String, state: IosRenderState) -> Rows {
+        if keyboardState == .charPick {
+            return state.candidates.isEmpty ? .none : .candidateOnly
+        }
+        return (!romanHint.isEmpty || !state.candidates.isEmpty) ? .stripAndCandidate : .none
     }
 }

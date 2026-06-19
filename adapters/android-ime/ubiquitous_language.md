@@ -34,6 +34,7 @@ All candidates appear here on Android:
 - roman composition candidates
 - focused-segment candidates
 - Suggest Character mapped-character candidates
+- Suggest Character Coeng Form candidates
 
 Candidate selection is handled through `KhmerInputHandler`, not directly by the
 Android view. The view renders suggestions; the handler owns behavior.
@@ -100,6 +101,8 @@ QWERTY letters do not insert roman text while Suggest Character mode is on.
 
 Selecting a Suggest Character candidate inserts the chosen Khmer character into
 the text field and resets suggestions so the user can pick another character.
+Coeng Forms appear under the same roman letters as their base consonants so the
+user can type consonant clusters quickly.
 
 ---
 
