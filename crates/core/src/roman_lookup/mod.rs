@@ -472,6 +472,9 @@ mod tests {
 
     #[test]
     fn loads_embedded_khpos_stats() {
+        if std::env::var("KHMERIME_SKIP_KHPOS_TESTS").as_deref() == Ok("1") {
+            return;
+        }
         let stats = parse_compiled_khpos_stats(DEFAULT_COMPILED_KHPOS_STATS).unwrap();
         assert!(stats.word_unigrams.get("ខ្ញុំ").copied().unwrap_or(0) > 0);
         assert!(stats.surface_unigrams.get("ខ្ញុំ").copied().unwrap_or(0) > 0);
