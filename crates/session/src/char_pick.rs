@@ -4,12 +4,14 @@
 //! contains that letter. The caller picks one and commits it immediately —
 //! no Composition, no preedit accumulation.
 
+use std::collections::HashSet;
 use std::sync::OnceLock;
 
 use crate::adapter_contract::SessionResult;
 use crate::ime_session::ImeSession;
 
 const CHAR_RELATION_CSV: &str = include_str!("../../../data/khmer_character_relation.csv");
+const COENG_SIGN: char = '\u{17D2}';
 
 struct CharRelationEntry {
     text: String,
@@ -24,7 +26,8 @@ fn relations() -> &'static [CharRelationEntry] {
 }
 
 fn parse_relations() -> Vec<CharRelationEntry> {
-    let mut entries = Vec::new();
+    let mut csv_entries = Vec::new();
+    let mut csv_texts = HashSet::new();
     for line in CHAR_RELATION_CSV.lines().skip(1) {
         let line = line.trim();
         if line.is_empty() {
@@ -45,10 +48,21 @@ fn parse_relations() -> Vec<CharRelationEntry> {
             .filter_map(|s| s.chars().next())
             .collect();
         if !relations.is_empty() {
-            entries.push(CharRelationEntry {
+            csv_texts.insert(text.to_owned());
+            csv_entries.push(CharRelationEntry {
                 text: text.to_owned(),
                 relations,
             });
+        }
+    }
+
+    let mut entries = Vec::new();
+    for entry in csv_entries {
+        let generated_coeng = coeng_form_for_base_consonant(&entry.text).filter(|text| !csv_texts.contains(text));
+        let relations = entry.relations.clone();
+        entries.push(entry);
+        if let Some(text) = generated_coeng {
+            entries.push(CharRelationEntry { text, relations });
         }
     }
     entries
@@ -59,6 +73,19 @@ fn parse_relations() -> Vec<CharRelationEntry> {
 /// in the picker.
 fn is_selectable(text: &str) -> bool {
     !text.is_empty()
+}
+
+fn coeng_form_for_base_consonant(text: &str) -> Option<String> {
+    let mut chars = text.chars();
+    let ch = chars.next()?;
+    if chars.next().is_some() || !is_base_consonant(ch) {
+        return None;
+    }
+    Some(format!("{COENG_SIGN}{ch}"))
+}
+
+fn is_base_consonant(ch: char) -> bool {
+    ('\u{1780}'..='\u{17A2}').contains(&ch)
 }
 
 /// Returns all Khmer characters whose relation list contains `letter`.
@@ -108,6 +135,15 @@ mod tests {
         assert!(
             candidates.contains(&"ក"),
             "expected ក in candidates for 'k', got: {candidates:?}"
+        );
+    }
+
+    #[test]
+    fn k_includes_coeng_ka() {
+        let candidates = char_pick_candidates('k');
+        assert!(
+            candidates.contains(&"្ក"),
+            "expected ្ក in candidates for 'k', got: {candidates:?}"
         );
     }
 

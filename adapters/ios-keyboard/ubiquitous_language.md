@@ -13,7 +13,7 @@ The currently visible keyboard view. Exactly one state is active at all times.
 | **QWERTY** | Default roman-input view. 123 in shift position, `✦ space . ⏎` bottom row. |
 | **123** | Number/symbol layer. Native iOS layout. All keys go through the session. |
 | **#+=** | Secondary symbol layer, reached from 123. Full native iOS layout. |
-| **CharPick** | Character-picking mode. QWERTY stays visible; the `✦` key is highlighted, and letter keys browse Khmer characters without inserting roman text. |
+| **CharPick** | Character-picking mode. QWERTY stays visible; the `✦` key is highlighted, and letter keys browse Khmer characters and Coeng Forms without inserting roman text. |
 
 Transitions: `QWERTY ↔ 123 ↔ #+=` and `QWERTY ↔ CharPick` (via ✦).
 
@@ -108,9 +108,15 @@ The persistent horizontally scrollable row between the Strip and key rows. It sh
 
 ---
 
+## Coeng Form
+
+A Khmer subscript consonant used to type consonant clusters. A Coeng Form is selected as one CharPick candidate and inserts the coeng sign plus the base consonant, rendered together as a subscript shape.
+
+---
+
 ## CharPick
 
-The character-picking mode activated by the ✦ button. QWERTY stays visible. Letter keys browse related Khmer characters; tapping a candidate commits that single character immediately. Tapping ✦ again exits CharPick and returns to QWERTY.
+The character-picking mode activated by the ✦ button. QWERTY stays visible. Letter keys browse related Khmer characters and Coeng Forms; tapping a candidate commits that single character or Coeng Form immediately. Tapping ✦ again exits CharPick and returns to QWERTY.
 
 ---
 

@@ -44,11 +44,22 @@ final class KeyboardRootViewTests: XCTestCase {
         let fixture = makeRootView()
         let state = makeRenderState(candidates: ["ក", "ខ"])
 
-        fixture.rootView.render(state, romanHint: "k")
+        fixture.rootView.render(state, romanHint: "k", keyboardState: .qwerty)
 
         XCTAssertEqual(fixture.stripView.renderedRomanHint, "k")
         XCTAssertEqual(fixture.stripView.renderedState, state)
         XCTAssertEqual(fixture.candidateRowView.renderedState, state)
+        XCTAssertEqual(fixture.candidateRowView.renderedPresentation, .composition)
+    }
+
+    func test_renderInCharPickUsesCharPickCandidatePresentation() {
+        let fixture = makeRootView()
+        let state = makeRenderState(candidates: ["ក", "ខ"])
+
+        fixture.rootView.render(state, romanHint: "", keyboardState: .charPick)
+
+        XCTAssertEqual(fixture.candidateRowView.renderedState, state)
+        XCTAssertEqual(fixture.candidateRowView.renderedPresentation, .charPick)
     }
 
     func test_clearStrip_alsoClearsCandidateRow() {
@@ -62,10 +73,10 @@ final class KeyboardRootViewTests: XCTestCase {
 
     // MARK: - chrome collapse / expand
 
-    func test_setChromeVisibleFalse_collapsesStripAndCandidateRowToZero() {
+    func test_setChromeRowsNone_collapsesStripAndCandidateRowToZero() {
         let fixture = makeRootView()
 
-        fixture.rootView.setChromeVisible(false)
+        fixture.rootView.setChromeRows(.none)
 
         XCTAssertEqual(fixture.rootView.stripHeightConstraint.constant, 0,
             "collapsed chrome must drop the strip height to zero")
@@ -73,11 +84,11 @@ final class KeyboardRootViewTests: XCTestCase {
             "collapsed chrome must drop the candidate row height to zero")
     }
 
-    func test_setChromeVisibleTrue_restoresReservedRowHeights() {
+    func test_setChromeRowsStripAndCandidate_restoresReservedRowHeights() {
         let fixture = makeRootView()
-        fixture.rootView.setChromeVisible(false)
+        fixture.rootView.setChromeRows(.none)
 
-        fixture.rootView.setChromeVisible(true)
+        fixture.rootView.setChromeRows(.stripAndCandidate)
 
         XCTAssertEqual(fixture.rootView.stripHeightConstraint.constant, 44,
             "expanded chrome must restore the strip to its reserved height")
@@ -85,17 +96,28 @@ final class KeyboardRootViewTests: XCTestCase {
             "expanded chrome must restore the candidate row to its reserved height")
     }
 
+    func test_setChromeRowsCandidateOnly_keepsStripCollapsedAndShowsCandidateRow() {
+        let fixture = makeRootView()
+
+        fixture.rootView.setChromeRows(.candidateOnly)
+
+        XCTAssertEqual(fixture.rootView.stripHeightConstraint.constant, 0,
+            "CharPick candidates should not reserve the roman strip row")
+        XCTAssertEqual(fixture.rootView.candidateRowHeightConstraint.constant, 44,
+            "CharPick candidates should reserve only the candidate row")
+    }
+
     func test_keyLayerHeightIsFixedAndUnaffectedByChromeCollapse() {
         let fixture = makeRootView()
         let metrics = KeyboardLayoutMetrics(device: .phone)
         fixture.rootView.frame = CGRect(x: 0, y: 0, width: 320, height: metrics.baseKeyboardHeight)
 
-        fixture.rootView.setChromeVisible(true)
+        fixture.rootView.setChromeRows(.stripAndCandidate)
         fixture.rootView.layoutIfNeeded()
         XCTAssertEqual(fixture.qwertyView.bounds.height, metrics.idleKeyboardHeight, accuracy: 0.5,
             "key area must equal the fixed idle height while composing")
 
-        fixture.rootView.setChromeVisible(false)
+        fixture.rootView.setChromeRows(.none)
         fixture.rootView.layoutIfNeeded()
         XCTAssertEqual(fixture.qwertyView.bounds.height, metrics.idleKeyboardHeight, accuracy: 0.5,
             "key area height must not change when the chrome collapses — the keys never resize or move")
@@ -158,10 +180,12 @@ private final class SpyStripView: UIView, KeyboardStripDisplaying {
 
 private final class SpyCandidateRowView: UIView, KeyboardCandidateRowDisplaying {
     var renderedState: IosRenderState?
+    var renderedPresentation: CandidateRowPresentation?
     var clearCount = 0
 
-    func render(_ state: IosRenderState) {
+    func render(_ state: IosRenderState, presentation: CandidateRowPresentation) {
         renderedState = state
+        renderedPresentation = presentation
     }
 
     func clear() {

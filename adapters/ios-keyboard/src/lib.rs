@@ -34,9 +34,8 @@ fn key_event(keyval: u32) -> NativeKeyEvent {
 static SHARED_TRANSLITERATOR_DATA: OnceLock<SharedTransliteratorData> = OnceLock::new();
 
 fn shared_transliterator_data() -> &'static SharedTransliteratorData {
-    SHARED_TRANSLITERATOR_DATA.get_or_init(|| {
-        Transliterator::from_default_shared_data().expect("compiled-in lexicon data must be valid")
-    })
+    SHARED_TRANSLITERATOR_DATA
+        .get_or_init(|| Transliterator::from_default_shared_data().expect("compiled-in lexicon data must be valid"))
 }
 
 // ── Public UniFFI types ───────────────────────────────────────────────────────
@@ -434,6 +433,11 @@ mod tests {
         assert!(
             state.candidates.iter().any(|c| c == "ក"),
             "candidates must include ក for 'k', got: {:?}",
+            state.candidates
+        );
+        assert!(
+            state.candidates.iter().any(|c| c == "្ក"),
+            "candidates must include ្ក for 'k', got: {:?}",
             state.candidates
         );
         assert!(state.preedit.is_empty(), "preedit must stay empty in CharPick mode");

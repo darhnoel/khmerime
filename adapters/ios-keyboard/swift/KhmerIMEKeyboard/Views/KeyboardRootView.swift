@@ -13,10 +13,9 @@ final class KeyboardRootView: UIView {
     private let symbolsView: UIView
     private let candidateRowView: UIView
 
-    // Height constraints for the two chrome rows. Driven to 0 when idle (no
-    // composition) and back to their reserved heights while composing — see
-    // setChromeVisible(_:). Internal so the view controller can animate the
-    // host height alongside them.
+    // Height constraints for the two chrome rows. Driven by KeyboardChrome.Rows
+    // so roman composition can reserve both rows while CharPick reserves only
+    // the candidate row.
     let stripHeightConstraint: NSLayoutConstraint
     let candidateRowHeightConstraint: NSLayoutConstraint
     private let stripReservedHeight: CGFloat
@@ -85,17 +84,25 @@ final class KeyboardRootView: UIView {
         ])
 
         apply(.qwerty)
-        setChromeVisible(false)   // appear collapsed; expands on first keystroke
+        setChromeRows(.none)   // appear collapsed; expands on first keystroke
     }
 
     required init?(coder: NSCoder) { fatalError("use init(metrics:stripView:qwertyView:numericView:symbolsView:candidateRowView:)") }
 
-    // Collapses (false) or restores (true) the strip + candidate row heights. The
-    // caller animates layout and adjusts the host height; this only flips the two
-    // row constraints so the rows move together as one unit.
-    func setChromeVisible(_ visible: Bool) {
-        stripHeightConstraint.constant = visible ? stripReservedHeight : 0
-        candidateRowHeightConstraint.constant = visible ? candidateRowReservedHeight : 0
+    // Applies exact chrome row heights. The caller animates layout and adjusts
+    // the host height alongside these constraints.
+    func setChromeRows(_ rows: KeyboardChrome.Rows) {
+        switch rows {
+        case .none:
+            stripHeightConstraint.constant = 0
+            candidateRowHeightConstraint.constant = 0
+        case .candidateOnly:
+            stripHeightConstraint.constant = 0
+            candidateRowHeightConstraint.constant = candidateRowReservedHeight
+        case .stripAndCandidate:
+            stripHeightConstraint.constant = stripReservedHeight
+            candidateRowHeightConstraint.constant = candidateRowReservedHeight
+        }
     }
 
     func apply(_ state: KeyboardState) {
@@ -106,9 +113,10 @@ final class KeyboardRootView: UIView {
         candidateRowView.isHidden = !visibility.showsCandidateRow
     }
 
-    func render(_ state: IosRenderState, romanHint: String) {
+    func render(_ state: IosRenderState, romanHint: String, keyboardState: KeyboardState) {
         stripDisplay.render(state, romanBuffer: romanHint)
-        candidateRowDisplay.render(state)
+        let presentation: CandidateRowPresentation = keyboardState == .charPick ? .charPick : .composition
+        candidateRowDisplay.render(state, presentation: presentation)
     }
 
     func clearStrip() {

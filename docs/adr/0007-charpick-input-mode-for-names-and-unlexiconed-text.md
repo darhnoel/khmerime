@@ -20,6 +20,12 @@ out Khmer text character by character without relying on the decoder.
   scan on a mobile strip, and single-char lookup keeps the session API stateless
   between keystrokes.
 
+- **Coeng Forms share their base consonant's roman relation.**
+  CharPick is optimized for typing Khmer quickly, not for exposing only standalone
+  letters. When a base consonant is available for a roman letter, its Coeng Form
+  must also be available for the same roman letter so users can build clusters
+  without hunting for a separate "choeng" mode or typing the bare coeng sign.
+
 - **Immediate commit per candidate tap — no preedit accumulation.**
   Each tap commits one Khmer character directly to the host text field. There is
   nothing to refine or rank across multiple characters; an accumulation step would
@@ -47,11 +53,13 @@ out Khmer text character by character without relying on the decoder.
 2. `ImeSession` must handle `InputMode::CharPick` in its key-event dispatch path,
    returning a candidate list from the character-relation data rather than running
    the roman decoder.
-3. `IosRenderState.candidates` carries the CharPick results; `preedit` is empty in
+3. CharPick candidate generation must include Coeng Forms for base consonant
+   entries even when the relation CSV only lists the base consonant explicitly.
+4. `IosRenderState.candidates` carries the CharPick results; `preedit` is empty in
    this mode. No new fields on `IosRenderState` are required.
-4. `adapters/ios-keyboard/src/lib.rs` must expose a way for `KhmerIMESession` to
+5. `adapters/ios-keyboard/src/lib.rs` must expose a way for `KhmerIMESession` to
    signal the current mode so Swift can drive the ⊞ context-sensitivity correctly.
-5. The `khmer_character_relation.csv` path moves (or is copied) into
+6. The `khmer_character_relation.csv` path moves (or is copied) into
    `crates/session/data/` so it can be reached by `include_str!`.
 
 ## When to revisit

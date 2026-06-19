@@ -1,8 +1,13 @@
 import UIKit
 
 protocol KeyboardCandidateRowDisplaying: AnyObject {
-    func render(_ state: IosRenderState)
+    func render(_ state: IosRenderState, presentation: CandidateRowPresentation)
     func clear()
+}
+
+enum CandidateRowPresentation {
+    case composition
+    case charPick
 }
 
 final class CandidateRowView: UIView, KeyboardCandidateRowDisplaying {
@@ -26,13 +31,19 @@ final class CandidateRowView: UIView, KeyboardCandidateRowDisplaying {
 
     // MARK: - Public API
 
-    func render(_ state: IosRenderState) {
-        let selectedIndex = state.selectedIndex.map { Int($0) } ?? 0
-        rebuild(candidates: state.candidates, selectedIndex: selectedIndex)
+    func render(_ state: IosRenderState, presentation: CandidateRowPresentation = .composition) {
+        let selectedIndex: Int?
+        switch presentation {
+        case .composition:
+            selectedIndex = state.selectedIndex.map { Int($0) } ?? (state.candidates.isEmpty ? nil : 0)
+        case .charPick:
+            selectedIndex = nil
+        }
+        rebuild(candidates: state.candidates, selectedIndex: selectedIndex, presentation: presentation)
     }
 
     func clear() {
-        rebuild(candidates: [], selectedIndex: 0)
+        rebuild(candidates: [], selectedIndex: nil, presentation: .composition)
     }
 
     // MARK: - Setup
@@ -91,18 +102,20 @@ final class CandidateRowView: UIView, KeyboardCandidateRowDisplaying {
 
     // MARK: - Chips
 
-    private func rebuild(candidates: [String], selectedIndex: Int) {
+    private func rebuild(candidates: [String], selectedIndex: Int?, presentation: CandidateRowPresentation) {
         let visible = pool.sync(count: candidates.count, in: stack)
         for (idx, label) in visible.enumerated() {
-            label.text = candidates[idx]
-            let selected = idx == selectedIndex
+            label.text = CandidateDisplayText.text(for: candidates[idx])
+            let selected = selectedIndex == idx
             label.font = .systemFont(ofSize: 18, weight: selected ? .semibold : .regular)
-            label.textColor = selected ? .label : .secondaryLabel
+            label.textColor = presentation == .charPick ? .label : (selected ? .label : .secondaryLabel)
         }
         tappableLabels = visible
         // Chip set changed → recompute the centering / edge inset.
         setNeedsLayout()
-        scrollSelectedIntoView(selectedIndex: selectedIndex, in: visible)
+        if let selectedIndex {
+            scrollSelectedIntoView(selectedIndex: selectedIndex, in: visible)
+        }
     }
 
     private func scrollSelectedIntoView(selectedIndex: Int, in labels: [UILabel]) {
@@ -128,5 +141,14 @@ final class CandidateRowView: UIView, KeyboardCandidateRowDisplaying {
 
     @objc private func rowTapped(_ gr: UITapGestureRecognizer) {
         handleTap(at: gr.location(in: stack), in: stack)
+    }
+}
+
+private enum CandidateDisplayText {
+    static func text(for candidate: String) -> String {
+        if candidate.unicodeScalars.first?.value == 0x17D2 {
+            return "\u{25CC}\(candidate)"
+        }
+        return candidate
     }
 }
