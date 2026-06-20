@@ -2,6 +2,7 @@ import UIKit
 
 class SceneDelegate: UIResponder, UIWindowSceneDelegate {
     var window: UIWindow?
+    private var nav: UINavigationController?
 
     func scene(
         _ scene: UIScene,
@@ -15,23 +16,26 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         window.rootViewController = nav
         window.makeKeyAndVisible()
         self.window = window
+        self.nav = nav
     }
 
     // Intro-flow state machine (docs/mobile-app-intro-flow.md):
-    //   !hasSeenWelcome  -> Brand Landing
-    //   else (Iter 2-3)  -> Setup Guide if the keyboard isn't enabled, else Dashboard
-    // Only the Brand Landing exists today; the later branches are stubbed to it.
+    //   !hasSeenWelcome  -> Brand Landing -> Setup Guide
+    //   else (Iter 3)    -> Setup Guide if the keyboard isn't enabled, else Dashboard
+    // The Dashboard (Iteration 3) doesn't exist yet, so post-enable is stubbed.
     private func makeRootViewController() -> UIViewController {
         let welcome = WelcomeViewController()
-        welcome.onGetStarted = { [weak self] in
-            // TODO(Iteration 2): push SetupGuideViewController here, then route to
-            // DashboardTabController once UITextInputMode reports the keyboard enabled.
-            self?.advanceFromWelcome()
-        }
+        welcome.onGetStarted = { [weak self] in self?.pushSetupGuide() }
         return welcome
     }
 
-    private func advanceFromWelcome() {
-        // Placeholder until the Setup Guide exists (Iteration 2).
+    private func pushSetupGuide() {
+        let guide = SetupGuideViewController()
+        guide.onKeyboardEnabled = { [weak self] in self?.handleKeyboardEnabled() }
+        nav?.pushViewController(guide, animated: true)
+    }
+
+    private func handleKeyboardEnabled() {
+        // TODO(Iteration 3): replace the stack root with DashboardTabController.
     }
 }
