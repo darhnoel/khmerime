@@ -339,6 +339,12 @@ impl ImeSession {
         self.visible_refined_segments = None;
     }
 
+    /// Clears all learned per-user history (backs the Settings "Clear Learned
+    /// History" action). Callers persist the cleared state with `save_history`.
+    pub fn reset_history(&mut self) {
+        self.history.clear();
+    }
+
     pub fn set_cursor_location(&mut self, x: i32, y: i32, width: i32, height: i32) {
         self.cursor_location = CursorLocation { x, y, width, height };
     }
@@ -824,6 +830,21 @@ mod tests {
         assert!(update.commit_text.is_none());
         let committed = session.process_key_event(0xFF0D, 0, 0);
         assert_eq!(committed.commit_text.as_deref(), Some("ជា"));
+    }
+
+    #[test]
+    fn reset_history_clears_learned_history() {
+        let mut session = session();
+        type_ascii(&mut session, "jea");
+        session.process_key_event(0xFF0D, 0, 0); // commit learns "ជា" into history
+        assert!(!session.history().is_empty(), "committing a word must learn history");
+
+        session.reset_history();
+
+        assert!(
+            session.history().is_empty(),
+            "reset_history must clear all learned history",
+        );
     }
 
     #[test]
