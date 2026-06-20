@@ -14,7 +14,7 @@
         <!-- Customize your theme here. -->
     </style>
 
-    <style name="Theme.Khmerime.Welcome" parent="Theme.MaterialComponents.DayNight.NoActionBar">
+    <style name="Theme.Khmerime.Dashboard" parent="Theme.MaterialComponents.DayNight.NoActionBar">
         <item name="colorPrimary">@color/brand_amber</item>
         <item name="colorPrimaryVariant">@color/brand_ink</item>
         <item name="colorOnPrimary">@color/brand_ink</item>
@@ -25,6 +25,8 @@
         <item name="android:navigationBarColor">@color/brand_ink</item>
         <item name="android:windowNoTitle">true</item>
     </style>
+
+    <style name="Theme.Khmerime.Welcome" parent="Theme.Khmerime.Dashboard" />
 
     <style name="KeyButton" parent="Widget.AppCompat.Button">
         <item name="android:background">#FFFFFF</item>

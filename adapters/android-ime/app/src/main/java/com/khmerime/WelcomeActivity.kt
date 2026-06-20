@@ -10,6 +10,13 @@ import androidx.appcompat.app.AppCompatActivity
 class WelcomeActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        if (hasSeenWelcome()) {
+            startActivity(Intent(this, DashboardActivity::class.java))
+            finish()
+            return
+        }
+
         setContentView(R.layout.activity_welcome)
 
         findViewById<View>(R.id.getStartedButton).setOnClickListener {
@@ -21,6 +28,10 @@ class WelcomeActivity : AppCompatActivity() {
             inputMethodManager()?.showInputMethodPicker()
         }
     }
+
+    private fun hasSeenWelcome(): Boolean =
+        getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
+            .getBoolean(KEY_HAS_SEEN_WELCOME, false)
 
     private fun markWelcomeSeen() {
         getSharedPreferences(PREFS_NAME, MODE_PRIVATE)

@@ -28,6 +28,11 @@
             android:exported="true"
             android:theme="@style/Theme.Khmerime.Welcome" />
 
+        <activity
+            android:name=".DashboardActivity"
+            android:exported="true"
+            android:theme="@style/Theme.Khmerime.Dashboard" />
+
         <service
             android:name="com.khmerime.service.KhmerInputMethodService"
             android:label="@string/ime_name"

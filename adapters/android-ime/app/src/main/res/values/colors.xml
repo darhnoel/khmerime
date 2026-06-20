@@ -12,4 +12,6 @@
     <color name="brand_ivory">#F4ECE2</color>
     <color name="brand_mist">#AFA8B4</color>
     <color name="brand_ivory_dim">#9F9896</color>
+    <color name="brand_glass_bg">#0FFFFFFF</color>
+    <color name="brand_glass_border">#2EFFFFFF</color>
 </resources>

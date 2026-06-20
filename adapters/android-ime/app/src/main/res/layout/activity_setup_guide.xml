@@ -239,9 +239,28 @@
             android:textColor="@color/brand_ivory_dim"
             android:textSize="14sp" />
 
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/continueButton"
+            android:layout_width="match_parent"
+            android:layout_height="52dp"
+            android:layout_marginTop="14dp"
+            android:backgroundTint="@color/brand_glass_bg"
+            android:fontFamily="sans-serif"
+            android:insetTop="0dp"
+            android:insetBottom="0dp"
+            android:letterSpacing="0"
+            android:text="@string/setup_continue"
+            android:textAllCaps="false"
+            android:textColor="@color/brand_ivory"
+            android:textSize="18sp"
+            android:textStyle="bold"
+            app:cornerRadius="26dp"
+            app:strokeColor="@color/brand_glass_border"
+            app:strokeWidth="1dp" />
+
         <Space
             android:layout_width="1dp"
             android:layout_height="0dp"
-            android:layout_weight="0.45" />
+            android:layout_weight="0.55" />
     </LinearLayout>
 </FrameLayout>

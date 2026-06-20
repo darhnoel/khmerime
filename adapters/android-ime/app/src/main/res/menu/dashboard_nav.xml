@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android">
+    <item
+        android:id="@+id/nav_settings"
+        android:title="@string/dashboard_tab_settings"
+        android:icon="@android:drawable/ic_menu_preferences" />
+    <item
+        android:id="@+id/nav_tips"
+        android:title="@string/dashboard_tab_tips"
+        android:icon="@android:drawable/ic_menu_info_details" />
+    <item
+        android:id="@+id/nav_support"
+        android:title="@string/dashboard_tab_support"
+        android:icon="@android:drawable/ic_menu_help" />
+</menu>

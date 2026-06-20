@@ -20,6 +20,11 @@ class SetupGuideActivity : AppCompatActivity() {
         findViewById<View>(R.id.openKeyboardPickerLink).setOnClickListener {
             inputMethodManager()?.showInputMethodPicker()
         }
+
+        findViewById<View>(R.id.continueButton).setOnClickListener {
+            startActivity(Intent(this, DashboardActivity::class.java))
+            finish()
+        }
     }
 
     private fun inputMethodManager(): InputMethodManager? =
