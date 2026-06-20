@@ -9,43 +9,43 @@
     <string name="welcome_get_started">ចាប់ផ្ដើម</string>
     <string name="welcome_already_enabled">បើកដំណើរការរួចហើយ? បើកក្ដារចុច &#8594;</string>
 
-    <string name="setup_guide_title">បើកដំណើរការ KhmerIME</string>
-    <string name="setup_guide_subtitle">បើកក្ដារចុចនៅក្នុងការកំណត់ Android រួចប្ដូរទៅវាពីវាលអត្ថបទណាមួយ។</string>
+    <string name="setup_guide_title">របៀបបើកដំណើរការ KhmerIME</string>
+    <string name="setup_guide_subtitle">ដើម្បីបើកដំណើរការ KhmerIME សូមចូលទៅកាន់ Settings រួចប្រតិបត្តិតាមជំហានខាងក្រោម</string>
     <string name="setup_step_1_title">បើកការកំណត់ក្ដារចុច</string>
     <string name="setup_step_1_body">ចូលទៅ System, Languages &amp; input, Virtual keyboard រួច Manage keyboards។</string>
     <string name="setup_step_2_title">បើក KhmerIME</string>
-    <string name="setup_step_2_body">Android នឹងសួរអ្នកឱ្យបញ្ជាក់ថា KhmerIME អាចទទួលអត្ថបទដែលបានវាយបាន។</string>
+    <string name="setup_step_2_body">Android នឹងសួរបញ្ជាក់ថា KhmerIME អាចមានសិទ្ធិទទួលអត្ថបទដែលបានវាយបាន។</string>
     <string name="setup_step_3_title">ប្ដូរទៅ KhmerIME</string>
-    <string name="setup_step_3_body">បើកកម្មវិធីណាមួយ ប៉ះវាលអត្ថបទ រួចជ្រើស KhmerIME ពីកុងតាក់ក្ដារចុច (&#9881; &#8594; &#9000;)។</string>
+    <string name="setup_step_3_body">បើកកម្មវិធីណាមួយរួចជ្រើស KhmerIME ពីកុងតាក់ក្ដារចុច (&#9881; &#8594; &#9000;)។</string>
     <string name="setup_open_settings">បើកការកំណត់</string>
     <string name="setup_open_keyboard_picker">បើកដំណើរការរួចហើយ? បើកកុងតាក់ក្ដារចុច &#8594;</string>
     <string name="setup_continue">បន្តទៅ KhmerIME &#8594;</string>
 
     <string name="dashboard_tab_settings">ការកំណត់</string>
     <string name="dashboard_tab_tips">គន្លឹះ</string>
-    <string name="dashboard_tab_support">ជំនួយ</string>
+    <string name="dashboard_tab_support">គាំទ្រក្រុមការងារ</string>
 
-    <string name="settings_section_prediction">ទស្សន៍ទាយ</string>
-    <string name="settings_section_words">ពាក្យ</string>
-    <string name="settings_section_data">ទិន្នន័យ</string>
+    <string name="settings_section_prediction">មុខងារទស្សន៍ទាយ</string>
+    <string name="settings_section_words">មុខងារបញ្ចូលពាក្យ</string>
+    <string name="settings_section_data">មុខងារទិន្នន័យ</string>
     <string name="settings_section_about">អំពី</string>
     <string name="settings_next_word">ទស្សន៍ទាយពាក្យបន្ទាប់</string>
-    <string name="settings_custom_words">ពាក្យផ្ទាល់ខ្លួន</string>
-    <string name="settings_clear_history">សម្អាតប្រវត្តិរៀន</string>
-    <string name="settings_coming_soon">នឹងដាក់បញ្ចូលឆាប់ៗ</string>
+    <string name="settings_custom_words">បញ្ចូលពាក្យផ្ទាល់ខ្លួន</string>
+    <string name="settings_clear_history">សម្អាតប្រវត្តិពាក្យ</string>
+    <string name="settings_coming_soon">កំពុងអភិវឌ្ឍ</string>
     <string name="settings_version">ជំនាន់</string>
 
-    <string name="tip_1_headline">វាយឡាតាំង បានខ្មែរ</string>
-    <string name="tip_1_body">វាយ somreach KhmerIME នឹងណែនាំ សម្រាក។ ប៉ះពាក្យណែនាំ ឬចុច Enter ដើម្បីបញ្ចូល។</string>
-    <string name="tip_2_headline">ពាក្យវែង បំបែកជាផ្នែក</string>
-    <string name="tip_2_body">សម្រាប់ពាក្យវែង KhmerIME បង្ហាញការបំបែកជាផ្នែកដែលអ្នកអាចរុករកបានដោយប្រើព្រួញឆ្វេង និងស្ដាំ។</string>
+    <string name="tip_1_headline">វាយអក្សរខ្មែរ ដោយប្រើអក្សរឡាតាំង</string>
+    <string name="tip_1_body">វាយ "somrak" KhmerIME នឹងណែនាំនូវពាក្យ "សម្រាក"។ បន្ទាប់មកអ្នកគ្រាន់តែចុចលើពាក្យដែលបានណែនាំ ឬចុច Enter ដើម្បីសម្រេចបញ្ចូល។</string>
+    <string name="tip_2_headline">វាយពាក្យវែង ដោយមិនចាំបាច់ប្រើ space</string>
+    <string name="tip_2_body">សម្រាប់ពាក្យវែង KhmerIME បង្ហាញការបំបែកជាផ្នែកដែលអ្នកអាចកែសម្រួលបានដោយមិនចាំបាច់វាយម្ដងមួយពាក្យ។</string>
     <string name="tip_3_headline">ឈ្មោះ និងពាក្យកម្ចី</string>
-    <string name="tip_3_body">ចុចកូនសោផ្កាយសម្រាប់ CharPick។ វាយអក្សរឡាតាំងមួយដើម្បីមើលតួអក្សរខ្មែរ រួចប៉ះមួយដើម្បីបញ្ចូល។</string>
-    <string name="tip_4_headline">អង់គ្លេសពេលត្រូវការ</string>
-    <string name="tip_4_body">ចុច EN ដើម្បីបញ្ជូនគ្រាប់ចុចទៅកម្មវិធីផ្ទាល់។ ចុច EN ម្ដងទៀតដើម្បីត្រឡប់ទៅខ្មែរវិញ។</string>
+    <string name="tip_3_body">ចុចកូនសោដើម្បីវាយពាក្យ ឬឈ្មោះដែលម៉ាស៊ីនមិនអាចស្មានបាន។ វាយអក្សរឡាតាំងមួយដើម្បីមើលតួអក្សរខ្មែរ រួចជ្រើសរើសដើម្បីបញ្ចូល។</string>
+    <string name="tip_4_headline">ប្រើក្ដារចុចរួមមួយ</string>
+    <string name="tip_4_body">ចុច EN ដើម្បីប្រើប្រាស់ភាសាអង់គ្លេស។ ចុច EN ម្ដងទៀតដើម្បីត្រឡប់ទៅប្រើភាសាខ្មែរវិញ។</string>
 
     <string name="support_heading">គាំទ្រ KhmerIME</string>
-    <string name="support_body">KhmerIME ជាគម្រោងប្រភពបើកចំហ។ ការគាំទ្ររបស់អ្នកជួយរក្សាការអភិវឌ្ឍ ការសាកល្បង ការវេចខ្ចប់ និងការកែលម្អនាពេលអនាគត។</string>
+    <string name="support_body">KhmerIME ជាគម្រោងស្ម័គ្រចិត្ត។ ការគាំទ្ររបស់អ្នកជួយឲ្យក្រុមការងារយើងខ្ញុំអាចបន្តការអភិវឌ្ឍ ការរចនា និងការថែទាំជាបន្តបន្ទាប់។</string>
     <string name="support_qr_caption">ABA Mobile</string>
-    <string name="support_qr_description">QR កូដ ABA Mobile សម្រាប់ការបរិច្ចាគ</string>
+    <string name="support_qr_description">អ្នកអាចចូលរួមដោយការបរិច្ចាគតាមរយៈ QR កូដ ABA</string>
 </resources>
