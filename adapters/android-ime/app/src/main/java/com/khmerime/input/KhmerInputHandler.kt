@@ -191,6 +191,12 @@ class KhmerInputHandler(
     fun focusSegment(index: Int) {
         val current = lastState ?: return
         val segments = current.segments
+        if (segments.isEmpty()) {
+            // Single word: the preedit word is tappable and commits the shown
+            // (selected) candidate directly — mirrors iOS chipTapped (ADR-0012).
+            commitComposition()
+            return
+        }
         if (index < 0 || index >= segments.size) return
         val focusedIndex = current.focusedSegmentIndex ?: 0
         if (index == focusedIndex && !current.segmentEditActive) {

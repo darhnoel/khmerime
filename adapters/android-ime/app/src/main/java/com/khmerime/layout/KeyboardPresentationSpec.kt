@@ -3,6 +3,11 @@ package com.khmerime.layout
 import com.khmerime.input.KhmerRenderState
 import com.khmerime.input.KeyboardState
 
+// Which input-chrome rows are worth their height (parity with iOS KeyboardChrome):
+// roman composition owns the preedit strip + candidate row; Suggest Character owns
+// only the candidate row, and only while candidates exist.
+enum class ChromeRows { None, CandidateOnly, StripAndCandidate }
+
 object KeyboardPresentationSpec {
     fun suggestionCandidates(state: KhmerRenderState): List<String> = state.candidates
 
@@ -38,7 +43,10 @@ object KeyboardPresentationSpec {
         else -> false
     }
 
-    fun selectedCandidateIndex(state: KhmerRenderState): Int? = state.selectedIndex
+    // Suggest Character is tap-based: suppress the session's default selection so
+    // no chip is highlighted (parity with iOS CharPick). Other modes pass through.
+    fun selectedCandidateIndex(keyboardState: KeyboardState?, state: KhmerRenderState): Int? =
+        if (keyboardState == KeyboardState.SuggestCharacter) null else state.selectedIndex
 
     fun keyboardLayerForState(keyboardState: KeyboardState?): KeyboardLayer = when (keyboardState) {
         KeyboardState.SuggestCharacter,
@@ -46,5 +54,33 @@ object KeyboardPresentationSpec {
         KeyboardState.English,
         null -> KeyboardLayer.Qwerty
         KeyboardState.Panel -> KeyboardLayer.Qwerty
+    }
+
+    // Display-only: a candidate beginning with the Khmer coeng sign (U+17D2) is
+    // an invisible subscript joiner, so prefix a dotted circle (U+25CC) to make
+    // the Coeng Form legible on the chip. Insertion still uses the raw candidate
+    // (selection is by index). Mirrors iOS CandidateDisplayText.
+    fun candidateDisplayLabel(candidate: String): String =
+        if (candidate.firstOrNull() == COENG_SIGN) "$DOTTED_CIRCLE$candidate" else candidate
+
+    private const val COENG_SIGN = '្'
+    private const val DOTTED_CIRCLE = "◌"
+
+    // Mirrors iOS KeyboardChrome.rows: Suggest Character shows only the candidate
+    // row and only while candidates exist; roman composition keeps strip +
+    // candidate together whenever it has a hint or candidates; otherwise nothing.
+    fun chromeRows(
+        keyboardState: KeyboardState?,
+        romanHint: String,
+        state: KhmerRenderState,
+    ): ChromeRows {
+        if (keyboardState == KeyboardState.SuggestCharacter) {
+            return if (state.candidates.isEmpty()) ChromeRows.None else ChromeRows.CandidateOnly
+        }
+        return if (romanHint.isNotEmpty() || state.candidates.isNotEmpty()) {
+            ChromeRows.StripAndCandidate
+        } else {
+            ChromeRows.None
+        }
     }
 }

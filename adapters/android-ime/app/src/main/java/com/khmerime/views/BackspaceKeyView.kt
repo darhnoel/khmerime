@@ -27,11 +27,7 @@ class BackspaceKeyView(
     var onHoldFire: (() -> Unit)? = null
     var onHoldEnd: (() -> Unit)? = null
 
-    private val pressAnimator = GlassKeyPressAnimator(onUpdate = { s ->
-        val scale = 1f - s * 0.08f
-        scaleX = scale
-        scaleY = scale
-    })
+    private val pressAnimator = GlassKeyPressAnimator(onUpdate = { applySquish(it) })
 
     init {
         repeater.onFire = { onHoldFire?.invoke() }

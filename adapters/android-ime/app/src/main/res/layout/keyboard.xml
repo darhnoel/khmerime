@@ -10,12 +10,15 @@
         android:id="@+id/preedit_strip"
         android:layout_width="match_parent"
         android:layout_height="52dp"
+        android:visibility="gone"
         android:background="@android:color/transparent" />
 
     <!-- Candidate strip -->
     <HorizontalScrollView
+        android:id="@+id/candidate_scroll"
         android:layout_width="match_parent"
         android:layout_height="52dp"
+        android:visibility="gone"
         android:background="@android:color/transparent"
         android:scrollbars="none">
 

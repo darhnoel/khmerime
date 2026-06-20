@@ -45,9 +45,33 @@ Android view. The view renders suggestions; the handler owns behavior.
 
 The row above the suggestion bar showing the roman composition or hint text.
 
-For normal roman input, it may show the active preedit. In Suggest Character mode
-it stays empty because Suggest Character is direct character picking, not roman
-composition.
+For normal roman input, it shows the active preedit. In Suggest Character mode the
+Preedit Bar is collapsed — it gives up its height rather than showing a blank row —
+because Suggest Character is direct character picking, not roman composition. See
+**Input Chrome**.
+
+Below the roman row, the Preedit Bar shows the chosen Khmer and is tappable: a single
+word — tap it to **commit** the shown candidate — or one chip per segment of a phrase
+— tap a chip to **focus** that segment and choose its candidate in the **Suggestion
+Bar** (see ADR-0012).
+
+---
+
+## Input Chrome
+
+The Preedit Bar and Suggestion Bar are shown only when a mode has content for them;
+otherwise the keyboard reclaims their height (parity with iOS `KeyboardChrome`).
+Three states:
+
+- **None** — neither row. An idle keyboard, or Suggest Character mode with no
+  candidates yet.
+- **CandidateOnly** — Suggestion Bar only, Preedit Bar collapsed. Suggest Character
+  mode showing mapped-character candidates.
+- **StripAndCandidate** — both rows. Roman composition with a preedit hint and/or
+  candidates.
+
+This is presentation only; insertion behavior is unchanged. The policy lives in
+`KeyboardPresentationSpec.chromeRows`.
 
 ---
 
@@ -115,6 +139,8 @@ On Android, candidate placement is platform-specific:
 - Candidates are always rendered in the suggestion bar.
 - Candidate buttons are not rendered inside the keyboard area.
 - Candidate taps route through `KhmerInputHandler.selectCandidate`.
+- A candidate tap **selects** it (updating the preedit), never commits. For a single
+  word, commit by tapping the word in the **Preedit Bar** (see ADR-0012).
 
 ---
 
