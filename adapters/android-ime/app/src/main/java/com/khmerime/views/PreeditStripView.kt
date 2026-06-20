@@ -101,7 +101,9 @@ class PreeditStripView @JvmOverloads constructor(
         label.setTextColor(primaryTextColor())
         label.setTypeface(label.typeface, Typeface.BOLD)
         label.paintFlags = label.paintFlags and Paint.UNDERLINE_TEXT_FLAG.inv()
-        label.setOnClickListener(null)
+        // A single word has no segments, so tapping it commits the shown candidate
+        // directly (the handler's focusSegment treats no-segments as commit).
+        label.setOnClickListener { onSegmentFocused?.invoke(0) }
     }
 
     private fun isDark(): Boolean =

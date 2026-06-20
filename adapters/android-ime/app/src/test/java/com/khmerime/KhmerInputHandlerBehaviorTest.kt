@@ -468,4 +468,38 @@ class KhmerInputHandlerBehaviorTest {
             isKhmer,
         )
     }
+
+    // ── Preedit word tap (roman) ──────────────────────────────────────────────
+    // A single word has no segments, so tapping the word shown in the preedit
+    // commits the selected candidate directly (ADR-0012). The Suggestion Bar
+    // stays select-only, so a different spelling can be chosen first.
+
+    @Test
+    fun tappingSingleWordInPreeditCommitsKhmer() {
+        val (handler, textField) = makeHandler()
+        type("nhom", into = handler)
+
+        handler.focusSegment(0)
+
+        assertFalse("single-word preedit tap must commit", textField.text.isEmpty())
+        assertFalse("committed text must not stay roman", textField.text.contains("nhom"))
+        assertTrue(
+            "preedit tap must commit Khmer; got '${textField.text}'",
+            textField.text.all { it.code in 0x1780..0x17FF },
+        )
+    }
+
+    @Test
+    fun suggestionBarTapOnSingleWordSelectsWithoutCommitting() {
+        val (handler, textField) = makeHandler()
+        type("nhom", into = handler)
+
+        handler.selectCandidate(1)
+
+        assertEquals(
+            "a single-word Suggestion Bar tap must only select, not commit",
+            "nhom",
+            textField.text,
+        )
+    }
 }

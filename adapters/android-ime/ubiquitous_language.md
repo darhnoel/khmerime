@@ -50,6 +50,11 @@ Preedit Bar is collapsed — it gives up its height rather than showing a blank 
 because Suggest Character is direct character picking, not roman composition. See
 **Input Chrome**.
 
+Below the roman row, the Preedit Bar shows the chosen Khmer and is tappable: a single
+word — tap it to **commit** the shown candidate — or one chip per segment of a phrase
+— tap a chip to **focus** that segment and choose its candidate in the **Suggestion
+Bar** (see ADR-0012).
+
 ---
 
 ## Input Chrome
@@ -134,6 +139,8 @@ On Android, candidate placement is platform-specific:
 - Candidates are always rendered in the suggestion bar.
 - Candidate buttons are not rendered inside the keyboard area.
 - Candidate taps route through `KhmerInputHandler.selectCandidate`.
+- A candidate tap **selects** it (updating the preedit), never commits. For a single
+  word, commit by tapping the word in the **Preedit Bar** (see ADR-0012).
 
 ---
 

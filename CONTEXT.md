@@ -57,7 +57,7 @@ The rule that when a **Segmented Session** is visible, Enter commits the current
 _Avoid_: WYSIWYG commit, segment preview commit
 
 **Visible Candidate Commit**:
-The rule that when the candidate list has a selected visible candidate, Enter commits that candidate exactly. Hidden refinement may fill in when no visible candidate is available, but must not replace the candidate the user can see.
+The rule that when the candidate list has a selected visible candidate, committing takes that candidate exactly. Enter commits it; for a single-word **Composition** (no **Segmented Session**), tapping the shown word in the **Preedit** commits it directly (see ADR-0012). Hidden refinement may fill in when no visible candidate is available, but must not replace the candidate the user can see.
 _Avoid_: hidden override, invisible correction
 
 **Hidden Commit Fallback**:
