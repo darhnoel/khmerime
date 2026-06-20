@@ -1,10 +1,10 @@
 <resources>
     <string name="app_name">KhmerIME</string>
     <string name="ime_name">KhmerIME</string>
-    <string name="ime_subtype_label">Khmer (Roman)</string>
-    <string name="key_space">space</string>
-    <string name="welcome_logo_content_description">KhmerIME ឡូហ្គោ</string>
-    <string name="welcome_subtitle">roman &#8594; ខ្មែរ</string>
+    <string name="ime_subtype_label">ខ្មែរ (ឡាតាំង)</string>
+    <string name="key_space">ដកឃ្លា</string>
+    <string name="welcome_logo_content_description">ឡូហ្គោ KhmerIME</string>
+    <string name="welcome_subtitle">ឡាតាំង &#8594; ខ្មែរ</string>
     <string name="welcome_tagline">កម្មវិធីវាយអក្សរខ្មែរដោយប្រើអក្សរឡាតាំង</string>
     <string name="welcome_get_started">ចាប់ផ្ដើម</string>
     <string name="welcome_already_enabled">បើកដំណើរការរួចហើយ? បើកក្ដារចុច &#8594;</string>
@@ -47,5 +47,5 @@
     <string name="support_heading">គាំទ្រ KhmerIME</string>
     <string name="support_body">KhmerIME ជាគម្រោងប្រភពបើកចំហ។ ការគាំទ្ររបស់អ្នកជួយរក្សាការអភិវឌ្ឍ ការសាកល្បង ការវេចខ្ចប់ និងការកែលម្អនាពេលអនាគត។</string>
     <string name="support_qr_caption">ABA Mobile</string>
-    <string name="support_qr_description">ABA Mobile QR សម្រាប់ការបរិច្ចាគ</string>
+    <string name="support_qr_description">QR កូដ ABA Mobile សម្រាប់ការបរិច្ចាគ</string>
 </resources>
