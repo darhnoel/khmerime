@@ -7,4 +7,9 @@
     <color name="teal_700">#FF018786</color>
     <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
+    <color name="brand_ink">#14101B</color>
+    <color name="brand_amber">#E98A4E</color>
+    <color name="brand_ivory">#F4ECE2</color>
+    <color name="brand_mist">#AFA8B4</color>
+    <color name="brand_ivory_dim">#9F9896</color>
 </resources>

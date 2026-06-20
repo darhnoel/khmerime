@@ -3,4 +3,19 @@
     <string name="ime_name">KhmerIME</string>
     <string name="ime_subtype_label">Khmer (Roman)</string>
     <string name="key_space">space</string>
+    <string name="welcome_logo_content_description">KhmerIME logo</string>
+    <string name="welcome_subtitle">roman &#8594; ខ្មែរ</string>
+    <string name="welcome_tagline">កម្មវិធីវាយអក្សរខ្មែរដោយប្រើអក្សរឡាតាំង</string>
+    <string name="welcome_get_started">Get Started</string>
+    <string name="welcome_already_enabled">Already enabled? Open keyboard &#8594;</string>
+    <string name="setup_guide_title">Enable KhmerIME</string>
+    <string name="setup_guide_subtitle">Turn on the keyboard in Android settings, then switch to it from any text field.</string>
+    <string name="setup_step_1_title">Open keyboard settings</string>
+    <string name="setup_step_1_body">Go to System, Languages &amp; input, Virtual keyboard, then Manage keyboards.</string>
+    <string name="setup_step_2_title">Toggle KhmerIME on</string>
+    <string name="setup_step_2_body">Android will ask you to confirm that KhmerIME can receive typed text.</string>
+    <string name="setup_step_3_title">Switch to KhmerIME</string>
+    <string name="setup_step_3_body">Open any app, tap a text field, then select KhmerIME from the keyboard switcher (&#9881; &#8594; &#9000;).</string>
+    <string name="setup_open_settings">Open Settings</string>
+    <string name="setup_open_keyboard_picker">Already enabled? Open keyboard picker &#8594;</string>
 </resources>

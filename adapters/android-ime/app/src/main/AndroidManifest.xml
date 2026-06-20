@@ -12,6 +12,22 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.Khmerime">
 
+        <activity
+            android:name=".WelcomeActivity"
+            android:exported="true"
+            android:theme="@style/Theme.Khmerime.Welcome">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <activity
+            android:name=".SetupGuideActivity"
+            android:exported="true"
+            android:theme="@style/Theme.Khmerime.Welcome" />
+
         <service
             android:name="com.khmerime.service.KhmerInputMethodService"
             android:label="@string/ime_name"
