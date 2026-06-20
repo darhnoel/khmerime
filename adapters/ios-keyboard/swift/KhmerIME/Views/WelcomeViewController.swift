@@ -19,7 +19,7 @@ final class WelcomeViewController: UIViewController {
     }
 
     private func buildLayout() {
-        let logo = makePlaceholderLogo()
+        let logo = makeLogo()
         let wordmark = makeLabel("KhmerIME", size: 34, weight: .heavy, color: Brand.ivory)
         let romanKhmer = makeLabel("roman → ខ្មែរ", size: 20, weight: .semibold, color: Brand.amber)
         let tagline = makeLabel("កម្មវិធីវាយអក្សរខ្មែរដោយប្រើអក្សរឡាតាំង", size: 16, weight: .regular, color: Brand.ivoryDim)
@@ -58,25 +58,11 @@ final class WelcomeViewController: UIViewController {
 
     // MARK: - Builders
 
-    // PLACEHOLDER logo — a glass-card "ខ" approximating the CSS logo in
-    // site/download/styles.css. Replace with the exported khmerime-logo PNG
-    // (Iteration 1 pre-work) once the asset is available.
-    private func makePlaceholderLogo() -> UIView {
-        let card = UIView()
-        card.backgroundColor = UIColor.white.withAlphaComponent(0.06)
-        card.layer.cornerRadius = 30
-        card.layer.cornerCurve = .continuous
-        card.layer.borderWidth = 1
-        card.layer.borderColor = UIColor.white.withAlphaComponent(0.18).cgColor
-
-        let glyph = makeLabel("ខ", size: 66, weight: .semibold, color: Brand.ivory)
-        glyph.translatesAutoresizingMaskIntoConstraints = false
-        card.addSubview(glyph)
-        NSLayoutConstraint.activate([
-            glyph.centerXAnchor.constraint(equalTo: card.centerXAnchor),
-            glyph.centerYAnchor.constraint(equalTo: card.centerYAnchor),
-        ])
-        return card
+    // The Silk Veil glass-card logo, rendered from the download-page source.
+    private func makeLogo() -> UIView {
+        let imageView = UIImageView(image: UIImage(named: "LogoCard"))
+        imageView.contentMode = .scaleAspectFit
+        return imageView
     }
 
     private func makeLabel(_ text: String, size: CGFloat, weight: UIFont.Weight, color: UIColor) -> UILabel {

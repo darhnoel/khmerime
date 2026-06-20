@@ -1,8 +1,8 @@
 import UIKit
 
 // SupportViewController — Iteration 5 content, built alongside the Dashboard. A
-// single glass card inviting support, with the ABA QR. The QR is a placeholder
-// box until site/download/assets/my-aba-cropped.png is bundled as an asset.
+// single glass card inviting support, with the ABA QR bundled through the iOS
+// asset-generation step.
 final class SupportViewController: UIViewController {
 
     override func viewDidLoad() {
@@ -26,7 +26,7 @@ final class SupportViewController: UIViewController {
             size: 16, weight: .regular, color: Brand.ivoryDim
         )
 
-        let qr = makeQRPlaceholder()
+        let qr = makeQR()
         let caption = makeLabel("ABA Mobile", size: 14, weight: .semibold, color: Brand.amber)
 
         let stack = UIStackView(arrangedSubviews: [heading, body, qr, caption])
@@ -55,21 +55,12 @@ final class SupportViewController: UIViewController {
         ])
     }
 
-    // PLACEHOLDER — replace with a UIImageView of the bundled ABA QR asset.
-    private func makeQRPlaceholder() -> UIView {
-        let box = UIView()
-        box.backgroundColor = UIColor.white.withAlphaComponent(0.04)
-        box.layer.cornerRadius = 12
-        box.layer.borderWidth = 1
-        box.layer.borderColor = Brand.amber.withAlphaComponent(0.5).cgColor
-        let label = makeLabel("ABA QR", size: 14, weight: .regular, color: Brand.ivoryDim)
-        label.translatesAutoresizingMaskIntoConstraints = false
-        box.addSubview(label)
-        NSLayoutConstraint.activate([
-            label.centerXAnchor.constraint(equalTo: box.centerXAnchor),
-            label.centerYAnchor.constraint(equalTo: box.centerYAnchor),
-        ])
-        return box
+    private func makeQR() -> UIView {
+        let imageView = UIImageView(image: UIImage(named: "ABAQR"))
+        imageView.contentMode = .scaleAspectFit
+        imageView.layer.cornerRadius = 12
+        imageView.clipsToBounds = true
+        return imageView
     }
 
     private func makeLabel(_ text: String, size: CGFloat, weight: UIFont.Weight, color: UIColor) -> UILabel {

@@ -49,6 +49,7 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.khmerime.KhmerIME
         INFOPLIST_FILE: KhmerIME/Info.plist
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
     dependencies:
       - target: KhmerIMEKeyboard
         embed: true
