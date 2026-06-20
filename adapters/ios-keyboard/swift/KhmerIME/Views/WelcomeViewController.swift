@@ -22,7 +22,7 @@ final class WelcomeViewController: UIViewController {
         let logo = makePlaceholderLogo()
         let wordmark = makeLabel("KhmerIME", size: 34, weight: .heavy, color: Brand.ivory)
         let romanKhmer = makeLabel("roman → ខ្មែរ", size: 20, weight: .semibold, color: Brand.amber)
-        let tagline = makeLabel("Type Khmer using the Latin alphabet", size: 16, weight: .regular, color: Brand.ivoryDim)
+        let tagline = makeLabel("កម្មវិធីវាយអក្សរខ្មែរដោយប្រើអក្សរឡាតាំង", size: 16, weight: .regular, color: Brand.ivoryDim)
         tagline.numberOfLines = 0
 
         let getStarted = makePrimaryButton("Get Started")

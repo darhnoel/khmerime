@@ -8,15 +8,14 @@ import UIKit
 final class SetupGuideViewController: UIViewController {
 
     static let keyboardEnabledKey = "keyboard_enabled"
-    private static let keyboardBundleID = "com.khmerime.KhmerIME.Keyboard"
 
     /// Called once the keyboard is detected as enabled (flag already persisted).
     var onKeyboardEnabled: (() -> Void)?
 
     private let steps: [(number: Int, instruction: String)] = [
-        (1, "Go to **Settings → General → Keyboard → Keyboards**"),
-        (2, "Tap **Add New Keyboard…** and choose **KhmerIME**"),
-        (3, "Tap **KhmerIME** in the list and turn on **Allow Full Access**"),
+        (1, "ចូលទៅកាន់ **Settings → General → Keyboard → Keyboards**"),
+        (2, "ចុច **Add New Keyboard…** ហើយជ្រើស **KhmerIME**"),
+        (3, "ចុច **KhmerIME** បញ្ចូលក្នុងបញ្ជី រួចបើក **Allow Full Access**"),
     ]
 
     private let pageVC = UIPageViewController(transitionStyle: .scroll, navigationOrientation: .horizontal)
@@ -39,9 +38,9 @@ final class SetupGuideViewController: UIViewController {
     override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
         // The user leaves to Settings and returns; poll until KhmerIME turns on.
-        if isKeyboardEnabled() { finishEnabled(); return }
+        if KeyboardStatus.isEnabled { finishEnabled(); return }
         pollTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
-            guard let self, self.isKeyboardEnabled() else { return }
+            guard let self, KeyboardStatus.isEnabled else { return }
             self.finishEnabled()
         }
     }
@@ -126,13 +125,6 @@ final class SetupGuideViewController: UIViewController {
 
     @objc private func backTapped() {
         navigationController?.popViewController(animated: true)
-    }
-
-    private func isKeyboardEnabled() -> Bool {
-        // UITextInputMode exposes the keyboard's bundle id only via KVC ("identifier").
-        UITextInputMode.activeInputModes.contains {
-            ($0.value(forKey: "identifier") as? String) == Self.keyboardBundleID
-        }
     }
 
     private func finishEnabled() {

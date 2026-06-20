@@ -20,22 +20,35 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
     }
 
     // Intro-flow state machine (docs/mobile-app-intro-flow.md):
-    //   !hasSeenWelcome  -> Brand Landing -> Setup Guide
-    //   else (Iter 3)    -> Setup Guide if the keyboard isn't enabled, else Dashboard
-    // The Dashboard (Iteration 3) doesn't exist yet, so post-enable is stubbed.
+    //   !hasSeenWelcome   -> Brand Landing -> Setup Guide -> Dashboard
+    //   !keyboardEnabled  -> Setup Guide -> Dashboard
+    //   else              -> Dashboard
     private func makeRootViewController() -> UIViewController {
-        let welcome = WelcomeViewController()
-        welcome.onGetStarted = { [weak self] in self?.pushSetupGuide() }
-        return welcome
+        if !UserDefaults.standard.bool(forKey: WelcomeViewController.hasSeenWelcomeKey) {
+            let welcome = WelcomeViewController()
+            welcome.onGetStarted = { [weak self] in self?.advanceFromWelcome() }
+            return welcome
+        }
+        return KeyboardStatus.isEnabled ? DashboardTabController() : makeSetupGuide()
+    }
+
+    // Get Started skips the Setup Guide when the keyboard is already enabled, so
+    // it doesn't flash past on the way to the Dashboard.
+    private func advanceFromWelcome() {
+        if KeyboardStatus.isEnabled { showDashboard() } else { pushSetupGuide() }
     }
 
     private func pushSetupGuide() {
-        let guide = SetupGuideViewController()
-        guide.onKeyboardEnabled = { [weak self] in self?.handleKeyboardEnabled() }
-        nav?.pushViewController(guide, animated: true)
+        nav?.pushViewController(makeSetupGuide(), animated: true)
     }
 
-    private func handleKeyboardEnabled() {
-        // TODO(Iteration 3): replace the stack root with DashboardTabController.
+    private func makeSetupGuide() -> SetupGuideViewController {
+        let guide = SetupGuideViewController()
+        guide.onKeyboardEnabled = { [weak self] in self?.showDashboard() }
+        return guide
+    }
+
+    private func showDashboard() {
+        nav?.setViewControllers([DashboardTabController()], animated: true)
     }
 }
