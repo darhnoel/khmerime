@@ -22,6 +22,7 @@ final class SetupGuideViewController: UIViewController {
     private let pageControl = UIPageControl()
     private var stepControllers: [UIViewController] = []
     private var pollTimer: Timer?
+    private let backButton = UIButton(type: .system)
 
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -33,6 +34,9 @@ final class SetupGuideViewController: UIViewController {
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
         navigationController?.setNavigationBarHidden(true, animated: animated)
+        // No "back" when the Setup Guide is the nav root (relaunch path before the
+        // keyboard is enabled) — there's nothing to pop to.
+        backButton.isHidden = (navigationController?.viewControllers.count ?? 1) <= 1
     }
 
     override func viewDidAppear(_ animated: Bool) {
@@ -52,7 +56,7 @@ final class SetupGuideViewController: UIViewController {
     }
 
     private func buildLayout() {
-        let back = UIButton(type: .system)
+        let back = backButton
         back.setTitle("‹ Back", for: .normal)
         back.setTitleColor(Brand.ivoryDim, for: .normal)
         back.titleLabel?.font = .systemFont(ofSize: 16, weight: .regular)
