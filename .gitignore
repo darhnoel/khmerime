@@ -60,6 +60,7 @@ adapters/android-ime/.idea/
 adapters/android-ime/build/
 adapters/android-ime/app/build/
 adapters/android-ime/local.properties
+adapters/android-ime/app/src/main/res/drawable-nodpi/khmerime_logo_card.png
 
 # macOS build artifacts and local Xcode state
 adapters/macos-imk/macos-signing.local.mk
