@@ -27,6 +27,10 @@ allowing platform-specific development to move independently.
 
 ```mermaid
 flowchart TB
+    classDef host fill:#2d1b3d,stroke:#ffffff40,color:#f5e8d8
+    classDef adapter fill:#1f8a7a,stroke:#ffffff40,color:#f5e8d8
+    classDef engine fill:#d97736,stroke:#ffffff50,color:#1a1220
+
     subgraph Hosts["Host IME frameworks"]
         IBus["IBus (Linux)"]
         TSF["TSF (Windows)"]
@@ -65,6 +69,10 @@ flowchart TB
 
     Session --> Core
     Core --> Data
+
+    class IBus,TSF,IMK,iOS,Android,Web host
+    class A_IBus,A_TSF,A_IMK,A_iOS,A_Android,A_Web adapter
+    class Session,Core,Data engine
 ```
 
 In short:
@@ -106,28 +114,28 @@ docs/              Development, architecture, platform, and design documentation
 - Prioritize low-latency typing behavior.
 - Make platform development possible without changing the core typing experience.
 
-## How a keystroke flows (Linux IBus)
+## How a keystroke flows
 
-The Linux path runs the engine as a Rust subprocess. The Python IBus engine owns
-the desktop integration and talks to the `khmerime_ibus_bridge` binary over a JSON
-line protocol; the bridge drives the shared session and returns a snapshot.
+Every platform adapter receives key events from its host IME framework and routes
+them into the shared `ImeSession`. The session drives the `Transliterator` core,
+which decodes roman input, ranks candidates, and segments phrases. The result
+flows back through the adapter to update the preedit or commit text in the
+application. The adapter and the bridge mechanism differ per platform (see
+[docs/platforms/](docs/platforms/)).
 
 ```mermaid
 sequenceDiagram
     participant User
-    participant Py as khmerime_ibus_engine.py (IBus engine)
-    participant Bridge as khmerime_ibus_bridge (Rust subprocess)
+    participant Adapter as Platform Adapter
     participant Sess as ImeSession
     participant Core as Transliterator
 
-    User->>Py: key event
-    Py->>Bridge: process_key_event {keyval, keycode, state} (JSON line)
-    Bridge->>Sess: process_key_event(...)
+    User->>Adapter: key event
+    Adapter->>Sess: process_key_event(...)
     Sess->>Core: decode / suggest / refine
     Core-->>Sess: candidates / segments
-    Sess-->>Bridge: SessionResult + SessionSnapshot
-    Bridge-->>Py: {consumed, commit_text, snapshot} (JSON line)
-    Py-->>User: update preedit / commit text
+    Sess-->>Adapter: SessionResult + SessionSnapshot
+    Adapter-->>User: update preedit / commit text
 ```
 
 ## Docs
