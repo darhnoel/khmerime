@@ -2,6 +2,7 @@
 members = [
   ".",
   "crates/core",
+  "crates/khmerime_config",
   "crates/session",
   "adapters/linux-ibus",
   "adapters/macos-imk",

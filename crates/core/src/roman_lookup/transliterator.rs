@@ -356,6 +356,64 @@ impl Transliterator {
         self.decoder.suggest(input, history)
     }
 
+    pub fn suggest_with_lexicon_packs(
+        &self,
+        input: &str,
+        history: &HashMap<String, usize>,
+        packs: &[LexiconPack],
+    ) -> Vec<String> {
+        Self::merge_lexicon_packs(input, history, packs, &self.suggest(input, history))
+    }
+
+    pub fn lexicon_pack_exact_matches(input: &str, packs: &[LexiconPack]) -> Vec<String> {
+        let key = normalize_pack_key(input.strip_suffix(' ').unwrap_or(input));
+        if key.is_empty() {
+            return Vec::new();
+        }
+        let mut matches = Vec::<String>::new();
+        for pack in packs {
+            let mut values = pack.entries.get(&key).cloned().unwrap_or_default();
+            values.dedup();
+            for value in values {
+                if !matches.iter().any(|candidate| candidate == &value) {
+                    matches.push(value);
+                }
+            }
+        }
+        matches
+    }
+
+    pub fn merge_lexicon_packs(
+        input: &str,
+        history: &HashMap<String, usize>,
+        packs: &[LexiconPack],
+        fallback: &[String],
+    ) -> Vec<String> {
+        let mut suggestions = Self::lexicon_pack_exact_matches(input, packs);
+        suggestions.sort_by(|left, right| {
+            let left_pack_index = pack_candidate_index(left, packs);
+            let right_pack_index = pack_candidate_index(right, packs);
+            left_pack_index
+                .cmp(&right_pack_index)
+                .then_with(|| {
+                    history
+                        .get(right)
+                        .copied()
+                        .unwrap_or(0)
+                        .cmp(&history.get(left).copied().unwrap_or(0))
+                })
+                .then_with(|| left.cmp(right))
+        });
+
+        for value in fallback {
+            if !suggestions.iter().any(|candidate| candidate == value) {
+                suggestions.push(value.clone());
+            }
+        }
+        suggestions.truncate(MAX_SUGGESTIONS);
+        suggestions
+    }
+
     pub fn next_word_suggestions(
         &self,
         previous_token: &str,
@@ -449,6 +507,17 @@ impl Transliterator {
 
         AppliedSuggestion { text: output, caret }
     }
+}
+
+fn pack_candidate_index(candidate: &str, packs: &[LexiconPack]) -> usize {
+    packs
+        .iter()
+        .position(|pack| {
+            pack.entries
+                .values()
+                .any(|values| values.iter().any(|value| value == candidate))
+        })
+        .unwrap_or(usize::MAX)
 }
 
 fn is_roman_letter(ch: char) -> bool {

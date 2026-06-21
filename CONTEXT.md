@@ -73,12 +73,20 @@ The Rust subprocess (`khmerime-ibus-bridge`) that owns the **SharedTransliterato
 _Avoid_: backend, service
 
 **Learned History**:
-The per-user `HashMap<String, usize>` counting how often each Khmer **unigram** has been committed. Boosts ranking in `suggest()` and `next_word_suggestions()` alongside the static corpus statistics. Persisted via `HistoryStore` (TSV today; see ADR-0002). Keys are individual Khmer words, never concatenated multi-word phrases — when a **Commit Text** spans multiple segments (from a **Segmented Session** or the **Commit Refiner**'s WFST output), each segment is learned separately.
+The per-user `HashMap<String, usize>` counting how often each Khmer **unigram** has been committed. Boosts ranking in `suggest()` and `next_word_suggestions()` alongside the static corpus statistics. Persisted via `HistoryStore` (TSV today; see ADR-0002). Keys are individual Khmer words, never concatenated multi-word phrases — when a **Commit Text** spans multiple segments (from a **Segmented Session** or the **Commit Refiner**'s WFST output), each segment is learned separately. Distinct from a **Lexicon Pack**: history is implicitly-counted usage that re-ranks existing candidates; a pack is an explicit set of roman→Khmer entries the user opts into.
 _Avoid_: user dictionary, learned words (ambiguous with corpus)
 
 **English Mode**:
 An input mode in which all keystrokes (letters, symbols, numbers, space, backspace, return) are routed directly to the host text field without Khmer processing or roman-buffer accumulation. Toggled by the EN key, which occupies the globe-key slot when the system keyboard switcher is not needed. English Mode is orthogonal to the visual layer — switching between QWERTY, 123, and #+= does not exit English Mode. Pressing ✦ while in English Mode exits English Mode and enters CharPick (since no Composition is active). Pressing EN while composing abandons the active Composition silently: the Rust session resets, the roman Preedit remains in the host text field as literal text, and English Mode begins.
 _Avoid_: latin mode, passthrough mode, direct-input mode
+
+**Lexicon Pack**:
+A named, versioned overlay of exact-match roman→Khmer entries the engine consults alongside the base **Lexicon**. Two kinds, one mechanism: the always-on, editable **personal pack** (the user's own added words) and read-only **curated packs** (tech, medical, loanword sets) the user toggles on. Packs match only on an exact roman key (no fuzzy **Search Index** participation); pack candidates rank above base **Lexicon** candidates, personal pack first, then enabled curated packs in user-defined order, with **Learned History** still applied as a cross-cutting boost. Each pack carries a stable ID and version so a future remote registry can deliver and update packs without a format change. Stored as one `roman\tKhmer` TSV file per pack in the **Config Store**.
+_Avoid_: user dictionary, secondary lexicon, word list, code-switching
+
+**Config Store**:
+The shared, cross-platform per-user configuration read by the engine at runtime: a `config.toml` (next-word suggestion on/off, count, learn-from-typing flag, and the ordered list of enabled **Lexicon Pack** IDs) plus the per-pack TSV files. Owned by a dedicated `khmerime_config` crate so persistence is not tied to any one platform adapter. Reachable by Desktop/Linux/Windows via the XDG config dir (`~/.config/khmerime/`, the existing **Learned History** location) and by the macOS IME and iOS keyboard via a shared **App Group** container. The web app does not read the Config Store — browser storage is origin-sandboxed and stays islanded.
+_Avoid_: settings file, preferences, user dictionary
 
 **CharPick Mode**:
 An input mode (`InputMode::CharPick`) for typing Khmer text that is not in the **Lexicon** — names, place names, loanwords. The user types one roman letter; the session looks up all Khmer characters and **Coeng Forms** whose phonetic relation includes that letter and returns them as the **Candidate List**. Tapping a candidate commits that single Khmer character or Coeng Form immediately to the host application with no **Composition** or preedit accumulation. Each keystroke is an independent lookup; there is no progressive multi-letter narrowing. On iOS and Android, the ✦ key toggles CharPick Mode: pressing ✦ enters it (abandoning any active **Composition** and clearing the roman buffer), pressing ✦ again exits it. While in CharPick Mode the keyboard layer remains unchanged (qwerty stays visible) and the ✦ key is visually highlighted. Letter keypresses are routed to the session without inserting text into the host field — only the **Candidate List** updates. Backspace while candidates are visible clears them and resets for a new lookup; backspace with an empty **Candidate List** deletes one character from the host text field.
@@ -118,3 +126,7 @@ _Avoid_: Liquid Glass Theme, light download theme, glass accents
 - A **Bridge** owns exactly one **SharedTransliteratorData** for its lifetime
 - The **Download Landing Page** and the **Online Beta** share the **Silk Veil** visual identity
 - The **Download Landing Page** links to the **Online Beta** as its secondary trial path
+- A **Config Store** holds zero or more **Lexicon Pack**s plus the next-word suggestion settings
+- A **Lexicon Pack** overlays the base **Lexicon** at lookup time; it does not modify **SharedTransliteratorData**
+- The engine applies the **Config Store** so every adapter (IBus, TSF, macOS IMK, iOS) inherits identical pack and suggestion behavior
+- **Learned History** and the **Config Store** are sibling per-user state; both live in `~/.config/khmerime/` on desktop and a shared **App Group** container on Apple platforms

@@ -24,3 +24,4 @@ pub use crate::segment_refine::{
     normalized_suggestion_key, reflow_segmented_session_from_selection, SegmentedChoice, SegmentedSession,
 };
 pub use crate::utils::khnormal;
+pub use khmerime_config::{normalize_pack_key, LexiconPack};

@@ -3,6 +3,7 @@ package com.khmerime
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.view.inputmethod.InputMethod
+import com.khmerime.service.KhmerInputMethodService
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import org.junit.Assert.assertEquals

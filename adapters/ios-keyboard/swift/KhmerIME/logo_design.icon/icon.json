@@ -1,0 +1,50 @@
+{
+  "fill" : {
+    "linear-gradient" : [
+      "display-p3:0.81274,0.29469,0.06259,1.00000",
+      "display-p3:0.91917,0.86763,0.77528,1.00000"
+    ],
+    "orientation" : {
+      "start" : {
+        "x" : 0.5,
+        "y" : 0
+      },
+      "stop" : {
+        "x" : 0.5,
+        "y" : 0.7
+      }
+    }
+  },
+  "groups" : [
+    {
+      "layers" : [
+        {
+          "hidden" : false,
+          "image-name" : "icon-foreground.png",
+          "name" : "icon-foreground",
+          "position" : {
+            "scale" : 0.5,
+            "translation-in-points" : [
+              0,
+              5.6875
+            ]
+          }
+        }
+      ],
+      "shadow" : {
+        "kind" : "neutral",
+        "opacity" : 0.5
+      },
+      "translucency" : {
+        "enabled" : true,
+        "value" : 0.5
+      }
+    }
+  ],
+  "supported-platforms" : {
+    "circles" : [
+      "watchOS"
+    ],
+    "squares" : "shared"
+  }
+}

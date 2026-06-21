@@ -11,6 +11,11 @@ settings:
     CODE_SIGN_STYLE: Automatic
     CODE_SIGN_IDENTITY: "Apple Development"
     DEVELOPMENT_TEAM: "9289LTXAT7"
+    # Xcode 26 ships Debug code in a separate .debug.dylib with a stub executable.
+    # Such builds install as unlaunchable "placeholders" outside Xcode's own run
+    # path (simctl install, and even Run here) — "Application failed preflight
+    # checks". Disable it so every target builds a single normal executable.
+    ENABLE_DEBUG_DYLIB: "NO"
 
 schemes:
   KhmerIME:
@@ -44,6 +49,7 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.khmerime.KhmerIME
         INFOPLIST_FILE: KhmerIME/Info.plist
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
     dependencies:
       - target: KhmerIMEKeyboard
         embed: true

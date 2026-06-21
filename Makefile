@@ -1,4 +1,4 @@
-.PHONY: help web web-release web-phone web-local desktop stats suggest suggest-wfst suggest-shadow shadow-eval data-split data-build data-check lexicon-editor visualize-lexicon visualize-lexicon-streamlit download-page fmt test test-golden test-ui platform-check platform-check-linux platform-check-android platform-check-ios platform-check-macos platform-check-windows platform-build-ios platform-test-ios platform-install-ios-sim platform-reinstall-ios-sim platform-install-ios-device platform-reinstall-ios-device platform-build-macos platform-diagnose-macos platform-install-macos platform-reinstall-macos platform-build-windows platform-install-windows platform-uninstall-windows platform-reinstall-windows platform-smoke-windows-notepad platform-smoke-windows-notepad-python windows-package linux-package ibus-install ibus-uninstall ibus-smoke paper-current paper-current-clean platform-test-android platform-build-android android-adb-device platform-install-android platform-reinstall-android setup-hooks
+.PHONY: help web web-release web-phone web-local desktop stats suggest suggest-wfst suggest-shadow shadow-eval data-split data-build data-check lexicon-editor visualize-lexicon visualize-lexicon-streamlit download-page fmt test test-golden test-ui platform-check platform-check-linux platform-check-android platform-check-ios platform-check-macos platform-check-windows platform-ios-assets platform-android-assets platform-build-ios platform-test-ios platform-install-ios-sim platform-reinstall-ios-sim platform-install-ios-device platform-reinstall-ios-device platform-build-macos platform-diagnose-macos platform-install-macos platform-reinstall-macos platform-build-windows platform-install-windows platform-uninstall-windows platform-reinstall-windows platform-smoke-windows-notepad platform-smoke-windows-notepad-python windows-package linux-package ibus-install ibus-uninstall ibus-smoke paper-current paper-current-clean platform-test-android platform-build-android android-adb-device platform-install-android platform-reinstall-android setup-hooks
 
 DX ?= dx
 APP_DIR := apps/dioxus-app
@@ -237,7 +237,8 @@ platform-install-ios-sim: platform-build-ios
 	$(MAKE) platform-reinstall-ios-sim
 
 # Fast loop: rebuild Swift app only (assumes xcframework already built) and install.
-platform-reinstall-ios-sim:
+platform-reinstall-ios-sim: platform-ios-assets
+	xcodegen generate --spec $(IOS_ADAPTER_DIR)/swift/project.yml --project $(IOS_ADAPTER_DIR)/swift
 	xcodebuild build \
 		-project $(IOS_XCPROJECT) \
 		-scheme $(IOS_APP_SCHEME) \
@@ -252,7 +253,7 @@ platform-install-ios-device: platform-build-ios
 	$(MAKE) platform-reinstall-ios-device
 
 # Fast loop: rebuild Swift app only and install to connected physical device.
-platform-reinstall-ios-device:
+platform-reinstall-ios-device: platform-ios-assets
 	@if [ -z "$(IOS_DEVICE_ID)" ]; then \
 		echo "Set IOS_DEVICE_ID to the connected device name, UDID, serial number, or ECID."; \
 		echo "Example: make platform-reinstall-ios-device IOS_DEVICE_ID=iPhonak"; \
@@ -267,14 +268,14 @@ platform-reinstall-ios-device:
 	xcrun devicectl device install app --device "$(IOS_DEVICE_ID)" "$(IOS_DEVICE_APP)"
 	@echo "Installed. On device: Settings → General → Keyboard → Keyboards → Add New Keyboard → KhmerIME"
 
-platform-test-android:
+platform-test-android: platform-android-assets
 	cargo build -p khmerime_android_ime
 	cd $(ANDROID_ADAPTER_DIR) && JAVA_HOME="$(ANDROID_JAVA_HOME)" PATH="$(ANDROID_JAVA_HOME)/bin:$(PATH)" ./gradlew :app:testDebugUnitTest
 
 # Cross-compile Rust for the device ABI via cargo-ndk, then assemble the APK.
 # Prerequisites: cargo install cargo-ndk && rustup target add aarch64-linux-android
 # Override ABI with: make platform-build-android ANDROID_ABI=x86_64
-platform-build-android:
+platform-build-android: platform-android-assets
 	cargo ndk -t $(ANDROID_ABI) -o $(ANDROID_JNI_LIBS) build -p khmerime_android_ime
 	cd $(ANDROID_ADAPTER_DIR) && JAVA_HOME="$(ANDROID_JAVA_HOME)" PATH="$(ANDROID_JAVA_HOME)/bin:$(PATH)" ./gradlew :app:assembleDebug
 
@@ -294,7 +295,7 @@ platform-install-android: android-adb-device platform-build-android
 	@echo "Installed. Tap any text field on the device to open KhmerIME."
 
 # Fast loop: rebuild Rust + APK and reinstall (assumes cargo-ndk already set up).
-platform-reinstall-android: android-adb-device
+platform-reinstall-android: android-adb-device platform-android-assets
 	cargo ndk -t $(ANDROID_ABI) -o $(ANDROID_JNI_LIBS) build -p khmerime_android_ime
 	cd $(ANDROID_ADAPTER_DIR) && JAVA_HOME="$(ANDROID_JAVA_HOME)" PATH="$(ANDROID_JAVA_HOME)/bin:$(PATH)" ./gradlew :app:assembleDebug
 	-adb uninstall $(ANDROID_LEGACY_PACKAGE) >/dev/null 2>&1
@@ -302,7 +303,13 @@ platform-reinstall-android: android-adb-device
 	adb shell ime enable $(ANDROID_IME_SERVICE)
 	adb shell ime set $(ANDROID_IME_SERVICE)
 
-platform-build-ios:
+platform-ios-assets:
+	.venv/bin/python scripts/dev/render_mobile_logo_assets.py ios
+
+platform-android-assets:
+	.venv/bin/python scripts/dev/render_mobile_logo_assets.py android
+
+platform-build-ios: platform-ios-assets
 	cargo build -p khmerime_ios_keyboard --target $(IOS_TARGET_DEVICE) --release
 	cargo build -p khmerime_ios_keyboard --target $(IOS_TARGET_SIM) --release
 	mkdir -p $(IOS_BINDGEN_OUT)
