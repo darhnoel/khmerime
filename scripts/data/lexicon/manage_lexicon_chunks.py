@@ -7,6 +7,7 @@ import argparse
 import csv
 import io
 import sys
+from collections import Counter
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -209,6 +210,42 @@ def split_runtime(args: argparse.Namespace) -> None:
         print(f"marked {disabled_duplicates} duplicate runtime rows as disabled")
 
 
+def sort_chunks(args: argparse.Namespace) -> None:
+    """Sort every chunk row globally and rewrite the chunks, so duplicates sit adjacently.
+
+    Rows are ordered by (normalized roman, roman, target, freq_lang) -- identical
+    (roman, target, freq_lang) rows land next to each other for easy duplicate review.
+    No rows are added or removed; this only reorders and re-chunks.
+    """
+    chunks_dir = Path(args.chunks_dir)
+    chunk_size = args.chunk_size
+    if chunk_size <= 0:
+        raise DataError("--chunk-size must be positive")
+    paths = sorted(chunks_dir.glob("chunk_*.csv"))
+    if not paths:
+        raise DataError(f"no chunk_*.csv files in {chunks_dir}")
+
+    rows: list[dict[str, str]] = []
+    for path in paths:
+        for raw_row, _ in read_chunk_dicts(path):
+            rows.append(raw_row)
+
+    rows.sort(key=lambda r: (normalize_roman(r["roman"]), r["roman"], r["target"], r["freq_lang"]))
+
+    duplicate_keys = Counter((r["roman"], r["target"], r["freq_lang"]) for r in rows)
+    dup_rows = sum(count - 1 for count in duplicate_keys.values() if count > 1)
+    dup_groups = sum(1 for count in duplicate_keys.values() if count > 1)
+
+    for path in paths:
+        path.unlink()
+    for chunk_index, start in enumerate(range(0, len(rows), chunk_size), 1):
+        write_csv(chunks_dir / f"chunk_{chunk_index:04}.csv", rows[start : start + chunk_size], CHUNK_COLUMNS)
+
+    n_chunks = (len(rows) + chunk_size - 1) // chunk_size
+    print(f"sorted {len(rows)} rows into {n_chunks} chunks (chunk-size {chunk_size}) in {chunks_dir}")
+    print(f"adjacent exact duplicates (roman,target,freq_lang): {dup_rows} extra rows across {dup_groups} keys")
+
+
 def read_chunk_rows(chunks_dir: Path) -> list[ChunkRow]:
     rows: list[ChunkRow] = []
     chunk_paths = sorted(chunks_dir.glob("*.csv"))
@@ -316,6 +353,11 @@ def build_parser() -> argparse.ArgumentParser:
     build.add_argument("--runtime", default=str(DEFAULT_RUNTIME_PATH))
     build.add_argument("--chunks-dir", default=str(DEFAULT_CHUNKS_DIR))
     build.set_defaults(func=build_runtime)
+
+    sort = subparsers.add_parser("sort", help="sort all chunk rows and rewrite chunks (groups duplicates adjacently)")
+    sort.add_argument("--chunks-dir", default=str(DEFAULT_CHUNKS_DIR))
+    sort.add_argument("--chunk-size", type=int, default=1000)
+    sort.set_defaults(func=sort_chunks)
 
     check = subparsers.add_parser("check", help="validate chunks and generated runtime lexicon")
     check.add_argument("--runtime", default=str(DEFAULT_RUNTIME_PATH))
