@@ -1,6 +1,7 @@
 package com.khmerime.service
 
 import com.khmerime.input.InputConnectionProxy
+import com.khmerime.input.resolveEnterBehavior
 import com.khmerime.input.KhmerInputHandler
 import com.khmerime.input.KhmerImeSession
 import com.khmerime.input.KhmerRenderState
@@ -83,12 +84,16 @@ class KhmerInputMethodService : InputMethodService() {
         val ic = currentInputConnection ?: return
         val proxy = InputConnectionProxy(ic)
         handler = KhmerInputHandler(proxy, session).also { h ->
+            h.enterBehavior = resolveEnterBehavior(info.imeOptions, info.inputType)
             h.onRender = ::renderState
             h.onTransition = ::renderKeyboardState
             h.onSuggestCharacterReset = ::resetSuggestCharacterSuggestions
             h.focusIn()
         }
     }
+
+    // Enter behavior is resolved by the shared, unit-tested resolveEnterBehavior()
+    // in the input package. See CONTEXT.md "Editor Action".
 
     override fun onFinishInput() {
         handler?.focusOut()

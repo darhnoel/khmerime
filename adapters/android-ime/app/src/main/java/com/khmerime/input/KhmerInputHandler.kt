@@ -29,6 +29,11 @@ class KhmerInputHandler(
     var keyboardState: KeyboardState = KeyboardState.Qwerty
         private set
 
+    // What Enter does in the current host field, set from the field's Editor
+    // Action by KhmerInputMethodService. Defaults to a plain newline so fields
+    // with no action (and tests) behave as before. See CONTEXT.md "Editor Action".
+    var enterBehavior: EnterBehavior = EnterBehavior.Newline
+
     var onRender: ((KhmerRenderState) -> Unit)? = null
     var onTransition: ((KeyboardState) -> Unit)? = null
     var onSuggestCharacterReset: (() -> Unit)? = null
@@ -147,7 +152,10 @@ class KhmerInputHandler(
 
     fun sendReturn() {
         if (keyboardState == KeyboardState.English) {
-            proxy.insertText("\n")
+            // Passthrough mode still honors the field's Editor Action, so Enter
+            // searches/sends rather than dropping a newline (which a single-line
+            // field renders as a space — the Google Search bug).
+            performEnterTerminal()
             return
         }
         if (keyboardState == KeyboardState.SuggestCharacter) {
@@ -155,14 +163,28 @@ class KhmerInputHandler(
             return
         }
         if (romanBuffer.isNotEmpty()) {
+            // Two-step: Enter while composing only COMMITS the Khmer (the confirm
+            // step). The field's action / newline happens on the next Enter, once
+            // the buffer is empty — so a search isn't fired on an unconfirmed word.
             commitComposition()
             return
         }
+        performEnterTerminal()
+    }
+
+    // Enter with nothing left to commit: perform the field's Editor Action, or
+    // insert a newline when the field has none / is multiline. Strips an
+    // auto-inserted trailing space first so a search query has no stray space.
+    private fun performEnterTerminal() {
         if (trailingSpace) {
             proxy.deleteBackward()
             trailingSpace = false
         }
-        proxy.insertText("\n")
+        when (val behavior = enterBehavior) {
+            is EnterBehavior.PerformAction -> proxy.performEditorAction(behavior.actionId)
+            EnterBehavior.SendEnterKey -> proxy.sendEnterKey()
+            EnterBehavior.Newline -> proxy.insertText("\n")
+        }
     }
 
     fun toggleSuggestCharacter() {

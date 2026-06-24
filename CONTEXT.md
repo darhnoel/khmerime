@@ -68,6 +68,10 @@ _Avoid_: final refinement, commit correction
 The ordered precedence applied at commit time to pick the **Commit Text** from a **Composition**: **Visible Segmented Commit** first, then **Visible Candidate Commit**, then **Hidden Commit Fallback**, with the raw roman string as the final floor. Each step is one of the rules above; the earliest one that yields useful Khmer wins, so visible state always outranks hidden refinement.
 _Avoid_: commit resolution, commit policy, commit precedence
 
+**Editor Action**:
+The action a host text field asks the keyboard's Enter/Return key to perform — Android's `imeOptions` action (Search, Go, Send, Done, Next, …) or the iOS return-key type. When a field declares an Editor Action and is not multiline (and does not suppress it), Enter performs that action instead of inserting a newline; multiline fields, fields that suppress the action, and fields with no declared action take a literal newline. During an active **Composition**, one Enter first applies the **Commit Rules** and then performs the Editor Action if present — so a single Enter both commits the Khmer **Commit Text** and runs the field's action (e.g. a search). The keyboard never inserts a newline in place of a declared action; doing so is the cause of the Android "Enter outputs a space in Google Search" bug (a committed newline collapses to a space in a single-line field).
+_Avoid_: enter key / return key (those are the physical key, not the requested action), submit, search action (too narrow)
+
 **Bridge**:
 The Rust subprocess (`khmerime-ibus-bridge`) that owns the **SharedTransliteratorData** and serves commands from the Python IBus adapter over stdin/stdout JSON. One bridge per `KhmerIMEEngine` instance.
 _Avoid_: backend, service

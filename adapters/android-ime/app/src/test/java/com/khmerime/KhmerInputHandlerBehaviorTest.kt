@@ -1,5 +1,7 @@
 package com.khmerime
 
+import android.view.inputmethod.EditorInfo
+import com.khmerime.input.EnterBehavior
 import com.khmerime.input.KhmerDispatcher
 import com.khmerime.input.KhmerInputHandler
 import com.khmerime.input.KhmerImeSession
@@ -73,6 +75,117 @@ class KhmerInputHandlerBehaviorTest {
         handler.sendReturn()
 
         assertEquals("empty preedit + Return must insert newline", "\n", textField.text)
+    }
+
+    // ── Editor Action (Enter honors the field's Search/Go/Send action) ──────────
+
+    @Test
+    fun returnWithoutCompositionPerformsEditorActionWhenFieldDeclaresOne() {
+        val (handler, textField) = makeHandler()
+        handler.enterBehavior = EnterBehavior.PerformAction(EditorInfo.IME_ACTION_SEARCH)
+
+        handler.sendReturn()
+
+        assertEquals(
+            "Enter must perform the field's Editor Action",
+            EditorInfo.IME_ACTION_SEARCH,
+            textField.lastEditorAction,
+        )
+        assertEquals("performing an action must not insert a newline/space", "", textField.text)
+    }
+
+    @Test
+    fun returnWhileComposingCommitsOnly_thenSecondEnterPerformsAction() {
+        val (handler, textField) = makeHandler()
+        handler.enterBehavior = EnterBehavior.PerformAction(EditorInfo.IME_ACTION_SEARCH)
+
+        type("nhom", into = handler)
+        handler.sendReturn() // first Enter: confirm/commit only
+
+        assertFalse("first Enter must commit the Khmer", textField.text.isEmpty())
+        assertFalse("committed text must not be roman", textField.text.contains("nhom"))
+        assertNull(
+            "first Enter must NOT perform the action — that's the two-step confirm",
+            textField.lastEditorAction,
+        )
+
+        handler.sendReturn() // second Enter: now perform the action
+
+        assertEquals(
+            "second Enter (buffer empty) performs the Editor Action",
+            EditorInfo.IME_ACTION_SEARCH,
+            textField.lastEditorAction,
+        )
+    }
+
+    @Test
+    fun returnInEnglishModePerformsEditorActionWhenFieldDeclaresOne() {
+        val (handler, textField) = makeHandler()
+        handler.enterBehavior = EnterBehavior.PerformAction(EditorInfo.IME_ACTION_SEARCH)
+        handler.toggleEnglish()
+
+        handler.sendReturn()
+
+        assertEquals(
+            "English-mode Enter must perform the Editor Action, not insert a newline",
+            EditorInfo.IME_ACTION_SEARCH,
+            textField.lastEditorAction,
+        )
+    }
+
+    @Test
+    fun returnRemovesTrailingSpaceBeforePerformingEditorAction() {
+        val (handler, textField) = makeHandler()
+        handler.enterBehavior = EnterBehavior.PerformAction(EditorInfo.IME_ACTION_SEARCH)
+
+        type("nhom", into = handler)
+        handler.sendSpace()
+        handler.sendReturn()
+
+        assertEquals(
+            "Editor Action must fire",
+            EditorInfo.IME_ACTION_SEARCH,
+            textField.lastEditorAction,
+        )
+        assertFalse(
+            "trailing space must be stripped before the action; got '${textField.text}'",
+            textField.text.endsWith(" "),
+        )
+    }
+
+    @Test
+    fun returnSendsRealEnterKeyForSingleLineFieldWithNoAction() {
+        val (handler, textField) = makeHandler()
+        handler.enterBehavior = EnterBehavior.SendEnterKey
+
+        handler.sendReturn()
+
+        assertEquals("Enter must send a real KEYCODE_ENTER key event", 1, textField.enterKeyCount)
+        assertEquals("it must not commit a literal newline (the bug)", "", textField.text)
+    }
+
+    @Test
+    fun returnInEnglishModeSendsRealEnterKeyForNoActionField() {
+        val (handler, textField) = makeHandler()
+        handler.enterBehavior = EnterBehavior.SendEnterKey
+        handler.toggleEnglish()
+
+        handler.sendReturn()
+
+        assertEquals("English-mode Enter must send a real Enter key event", 1, textField.enterKeyCount)
+    }
+
+    @Test
+    fun returnStripsTrailingSpaceBeforeSendingEnterKey() {
+        val (handler, textField) = makeHandler()
+        handler.enterBehavior = EnterBehavior.SendEnterKey
+
+        type("nhom", into = handler)
+        handler.sendSpace()
+        handler.sendReturn()
+
+        assertEquals("Enter key must be sent", 1, textField.enterKeyCount)
+        assertFalse("trailing space must be stripped first", textField.text.endsWith(" "))
     }
 
     @Test
