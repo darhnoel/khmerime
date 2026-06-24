@@ -1,5 +1,6 @@
 package com.khmerime.input
 
+import android.view.KeyEvent
 import android.view.inputmethod.InputConnection
 
 // InputConnectionProxy
@@ -20,4 +21,11 @@ class InputConnectionProxy(private val ic: InputConnection) : TextProxy {
 
     override val textBeforeCursor: String?
         get() = ic.getTextBeforeCursor(256, 0)?.toString()
+
+    override fun performEditorAction(actionId: Int): Boolean = ic.performEditorAction(actionId)
+
+    override fun sendEnterKey() {
+        ic.sendKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_ENTER))
+        ic.sendKeyEvent(KeyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_ENTER))
+    }
 }
