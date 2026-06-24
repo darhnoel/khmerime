@@ -1,4 +1,6 @@
-package com.khmerime
+package com.khmerime.intro
+
+import com.khmerime.R
 
 import androidx.test.espresso.Espresso.onView
 import androidx.test.espresso.assertion.ViewAssertions.matches
@@ -43,7 +45,7 @@ class WelcomeActivityScreenTest {
     fun getStartedRemembersWelcomeAndOpensSetupGuide() {
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         val setupGuideMonitor = instrumentation.addMonitor(
-            "com.khmerime.SetupGuideActivity",
+            "com.khmerime.intro.SetupGuideActivity",
             null,
             false,
         )

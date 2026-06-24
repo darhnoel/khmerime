@@ -13,7 +13,7 @@
         android:theme="@style/Theme.Khmerime">
 
         <activity
-            android:name=".WelcomeActivity"
+            android:name=".intro.WelcomeActivity"
             android:exported="true"
             android:theme="@style/Theme.Khmerime.Welcome">
             <intent-filter>
@@ -24,12 +24,12 @@
         </activity>
 
         <activity
-            android:name=".SetupGuideActivity"
+            android:name=".intro.SetupGuideActivity"
             android:exported="true"
             android:theme="@style/Theme.Khmerime.Welcome" />
 
         <activity
-            android:name=".DashboardActivity"
+            android:name=".dashboard.DashboardActivity"
             android:exported="true"
             android:theme="@style/Theme.Khmerime.Dashboard" />
 
