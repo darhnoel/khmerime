@@ -1,4 +1,6 @@
-package com.khmerime
+package com.khmerime.dashboard
+
+import com.khmerime.R
 
 import android.os.Bundle
 import androidx.appcompat.app.AppCompatActivity

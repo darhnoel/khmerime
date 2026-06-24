@@ -1,4 +1,4 @@
-package com.khmerime
+package com.khmerime.intro
 
 import java.io.File
 import javax.xml.parsers.DocumentBuilderFactory
@@ -17,7 +17,7 @@ class WelcomeActivityManifestTest {
         val welcomeActivity = manifest
             .getElementsByTagName("activity")
             .asElements()
-            .singleOrNull { it.androidAttribute("name") == ".WelcomeActivity" }
+            .singleOrNull { it.androidAttribute("name") == ".intro.WelcomeActivity" }
 
         assertNotNull("WelcomeActivity must be declared in the app manifest", welcomeActivity)
         assertEquals(

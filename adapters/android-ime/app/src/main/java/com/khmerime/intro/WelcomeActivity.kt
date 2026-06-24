@@ -1,4 +1,7 @@
-package com.khmerime
+package com.khmerime.intro
+
+import com.khmerime.R
+import com.khmerime.dashboard.DashboardActivity
 
 import android.content.Context
 import android.content.Intent
