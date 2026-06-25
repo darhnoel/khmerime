@@ -336,9 +336,11 @@ platform-build-ios: platform-ios-assets
 	rm -rf /tmp/khmerime-xcfw-headers
 	cd $(IOS_ADAPTER_DIR)/swift && xcodegen generate
 
+# Optional extra cargo flags for the macOS build, e.g. CARGO_MACOS_FEATURES="--features byt5".
+CARGO_MACOS_FEATURES ?=
 platform-build-macos:
-	cargo build -p khmerime_macos_imk --target $(MACOS_TARGET) --release
-	cargo build -p khmerime_macos_imk --target $(MACOS_TARGET_X86) --release
+	cargo build -p khmerime_macos_imk --target $(MACOS_TARGET) --release $(CARGO_MACOS_FEATURES)
+	cargo build -p khmerime_macos_imk --target $(MACOS_TARGET_X86) --release $(CARGO_MACOS_FEATURES)
 	mkdir -p $(MACOS_BINDGEN_OUT)
 	cargo run -p khmerime_macos_imk --bin uniffi-bindgen -- \
 		--swift-sources target/$(MACOS_TARGET)/release/$(MACOS_LIB_NAME) $(MACOS_BINDGEN_OUT)

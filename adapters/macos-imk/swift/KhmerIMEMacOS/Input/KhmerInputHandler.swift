@@ -27,6 +27,14 @@ final class KhmerInputHandler {
     /// Panel must hide (no candidates, no segments).
     var onPanelHide: (() -> Void)?
 
+    // MARK: - Debounced visible refine
+    //
+    // Live keystrokes stay on the cheap deterministic engine. ~200ms after the user
+    // pauses, we run the heavier visible refiner (incl. the byT5 model) once and update
+    // the panel — keeping typing instant while still surfacing the model's candidates.
+    private var refineTimer: Timer?
+    private let refineDelay: TimeInterval = 0.2
+
     // MARK: - Init
 
     init(client: TextClient, session: MacosImkSession) {
@@ -42,12 +50,16 @@ final class KhmerInputHandler {
     }
 
     func deactivate() {
+        refineTimer?.invalidate()
+        refineTimer = nil
         _ = session.deactivate()
         onPanelHide?()
     }
 
     /// Host app forces a commit (focus moves, mouse click in the document, …).
     func cancelComposition() {
+        refineTimer?.invalidate()
+        refineTimer = nil
         render(session.cancelComposition())
     }
 
@@ -56,7 +68,33 @@ final class KhmerInputHandler {
     func handleKey(keyval: UInt32, macKeycode: UInt16, modifierFlags: UInt32) -> Bool {
         let state = session.handleEvent(keyval: keyval, macKeycode: macKeycode, modifierFlags: modifierFlags)
         render(state)
+        // Only (re)arm the pause-refine when the key actually extends the composition
+        // (a roman letter). Navigation/selection keys (arrows, digits, space, enter, tab…)
+        // CANCEL any pending refine so it can never fire mid-selection and reset focus.
+        if isComposingLetter(keyval) {
+            scheduleVisibleRefine(state)
+        } else {
+            refineTimer?.invalidate()
+            refineTimer = nil
+        }
         return state.consumed
+    }
+
+    /// True for ASCII a–z / A–Z, the only keys that extend a roman composition.
+    private func isComposingLetter(_ keyval: UInt32) -> Bool {
+        (keyval >= 0x61 && keyval <= 0x7A) || (keyval >= 0x41 && keyval <= 0x5A)
+    }
+
+    /// Arm the debounce: ~200ms after the last typed letter (no further keys), run the
+    /// visible refiner once. Only active while a composition is showing.
+    private func scheduleVisibleRefine(_ state: MacosRenderState) {
+        refineTimer?.invalidate()
+        refineTimer = nil
+        guard !state.preedit.isEmpty else { return }
+        refineTimer = Timer.scheduledTimer(withTimeInterval: refineDelay, repeats: false) { [weak self] _ in
+            guard let self = self else { return }
+            self.render(self.session.refineVisible())
+        }
     }
 
     // MARK: - Cursor / mode

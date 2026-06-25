@@ -1,12 +1,17 @@
+#[cfg(feature = "byt5")]
+mod byt5_provider;
+#[cfg(feature = "byt5")]
+mod byt5_t5;
 mod config;
 mod legacy;
 mod manager;
 mod manual_character_typing;
 mod observer;
+mod span_proposal;
 mod types;
 mod weighted_span;
 
-pub use self::config::DecoderConfig;
+pub use self::config::{DecoderConfig, SpanProposalMode};
 pub(crate) use self::legacy::LegacyDecoder;
 pub(crate) use self::manager::DecoderManager;
 pub use self::manual_character_typing::{
@@ -14,6 +19,7 @@ pub use self::manual_character_typing::{
 };
 pub(crate) use self::observer::{build_shadow_observation, ShadowReport};
 pub use self::observer::{ShadowMismatch, ShadowObservation, ShadowSummary};
+pub(crate) use self::span_proposal::{provider_for_mode, SpanProposal, SpanProposalProvider, SpanProposalRequest};
 pub use self::types::{DecodeCandidate, DecodeFailure, DecodeRequest, DecodeResult, DecodeSegment, DecoderMode};
 pub(crate) use self::weighted_span::WeightedSpanDecoder;
 

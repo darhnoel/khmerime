@@ -71,7 +71,7 @@
 use std::sync::{Arc, Condvar, Mutex};
 use std::time::Duration;
 
-use khmerime_core::{DecoderConfig, Transliterator};
+use khmerime_core::{DecoderConfig, DecoderMode, SpanProposalMode, Transliterator};
 use khmerime_session::{
     CandidateDisplayEntry, ImeSession, ImeSessionOptions, NativeKeyEvent, SegmentPreviewEntry, SegmentedPreviewMode,
     SessionResult, SessionSnapshot,
@@ -90,6 +90,38 @@ const KEY_UP: u32 = 0xFF52;
 const KEY_DOWN: u32 = 0xFF54;
 const KEY_TAB: u32 = 0xFF09;
 const KEY_ESCAPE: u32 = 0xFF1B;
+
+fn macos_live_decoder_config() -> DecoderConfig {
+    let mut config = DecoderConfig::shadow_interactive();
+    if let Ok(mode) = std::env::var("KHMERIME_DECODER_MODE") {
+        let mode = match mode.as_str() {
+            "hybrid" => DecoderMode::Hybrid,
+            "weighted-span" | "weighted_span" | "wfst" => DecoderMode::Wfst,
+            "legacy" => DecoderMode::Legacy,
+            "shadow" => DecoderMode::Shadow,
+            _ => config.mode,
+        };
+        config = config.with_mode(mode);
+    }
+    // Live keystroke path stays deterministic. Only the instant static-test provider may
+    // attach here; the byT5 model runs on the debounced visible refiner instead.
+    if std::env::var("KHMERIME_SPAN_PROPOSALS").ok().as_deref() == Some("static-test") {
+        config = config.with_static_span_proposals();
+    }
+    config
+}
+
+// Debounced visible refiner config — runs the heavier model off the keystroke hot path.
+fn macos_visible_refiner_config() -> DecoderConfig {
+    let mut config = DecoderConfig::shadow_interactive().with_mode(DecoderMode::Hybrid);
+    config.wfst_max_latency_ms = 250;
+    match std::env::var("KHMERIME_SPAN_PROPOSALS").ok().as_deref() {
+        Some("byt5") => config = config.with_span_proposal_mode(SpanProposalMode::Byt5),
+        Some("static-test") => config = config.with_static_span_proposals(),
+        _ => {}
+    }
+    config
+}
 
 fn key_event(keyval: u32, keycode: u32, state: u32) -> NativeKeyEvent {
     NativeKeyEvent { keyval, keycode, state }
@@ -216,22 +248,21 @@ impl MacosIMKSession {
             let history = std::collections::HashMap::new();
             let input_mode = khmerime_session::InputMode::Roman;
 
-            let live = Transliterator::from_default_data_with_config(DecoderConfig::shadow_interactive())
+            let live = Transliterator::from_default_data_with_config(macos_live_decoder_config())
                 .expect("compiled-in lexicon data must be valid");
 
-            // TODO: wire visible and commit refiners once ImeSession refiner
-            // constructor is available (mirrors IBus bridge Phase B).
-            // let visible_refiner = ...;
-            // let commit_refiner  = ...;
+            // Visible refiner runs the heavier engine (incl. byT5) on the debounced pause,
+            // off the keystroke hot path. Loading it warms the model once here.
+            let visible_refiner = Transliterator::from_default_data_with_config(macos_visible_refiner_config())
+                .expect("compiled-in lexicon data must be valid");
 
-            let ime = ImeSession::new_with_input_mode_and_options(
-                live,
-                history,
-                input_mode,
-                ImeSessionOptions {
+            let ime = ImeSession::builder(live, history)
+                .visible_refiner(visible_refiner)
+                .input_mode(input_mode)
+                .options(ImeSessionOptions {
                     segmented_preview: SegmentedPreviewMode::Enabled,
-                },
-            );
+                })
+                .build();
 
             *s.inner.lock().unwrap() = Some(ime);
             let (lock, cvar) = &*s.ready;
@@ -308,7 +339,18 @@ impl MacosIMKSession {
     /// `raw_preedit` still matches and no candidate has been touched.
     pub fn refresh_segmented_preview(&self, raw_preedit: String) -> MacosRenderState {
         self.with_session(|s| {
-            s.refresh_segmented_preview(&raw_preedit);
+            s.refine_segmented_with_visible_refiner(&raw_preedit);
+            render_state(&s.snapshot(), &SessionResult::default(), true)
+        })
+    }
+
+    /// Debounced visible refine: re-run the segmented preview through the visible refiner
+    /// (the byT5 model) on the *current* composition. Called by Swift ~200ms after the last
+    /// keystroke, so the model runs once on pause rather than on every key.
+    pub fn refine_visible(&self) -> MacosRenderState {
+        self.with_session(|s| {
+            let raw = s.snapshot().raw_preedit.clone();
+            s.refine_segmented_with_visible_refiner(&raw);
             render_state(&s.snapshot(), &SessionResult::default(), true)
         })
     }

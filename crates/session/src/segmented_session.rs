@@ -201,6 +201,42 @@ impl ImeSession {
         self.segmented_session.is_some()
     }
 
+    /// Deferred/debounced refine: rebuild the segmented preview using the VISIBLE refiner
+    /// (e.g. the byT5 span-proposal engine) instead of the cheap live engine. Called off
+    /// the keystroke hot path. Falls back to the live rebuild if no visible refiner is set.
+    pub fn refine_segmented_with_visible_refiner(&mut self, raw_preedit: &str) -> bool {
+        if self.options.segmented_preview != SegmentedPreviewMode::Enabled {
+            return false;
+        }
+        if self.segment_edit_state.is_some() {
+            return self.segmented_session.is_some();
+        }
+        if self.composition_raw.is_empty() || self.composition_raw != raw_preedit {
+            return false;
+        }
+        if self.segmented_session.is_some() && self.selection_touched {
+            return true;
+        }
+        let Some(refiner) = self.visible_refiner.as_ref() else {
+            self.rebuild_segmented_session_from_observation();
+            return self.segmented_session.is_some();
+        };
+        // Compute everything with immutable borrows first, then assign (borrow-checker friendly).
+        let observation = refiner.shadow_observation(&self.composition_raw, &self.history);
+        let built = build_segmented_session(&observation, &self.composition_raw, &self.history, &|input, history| {
+            exact_matches_first(refiner, input, normalize_visible_suggestions(refiner.suggest(input, history)))
+        });
+        let flat = exact_matches_first(
+            refiner,
+            &self.composition_raw,
+            normalize_visible_suggestions(refiner.suggest(&self.composition_raw, &self.history)),
+        );
+        self.segmented_session = built;
+        self.candidates = flat;
+        self.selected_index = 0;
+        self.segmented_session.is_some()
+    }
+
     fn rebuild_segmented_session_from_observation(&mut self) {
         let observation = self
             .transliterator
@@ -307,5 +343,40 @@ mod tests {
         let right = session.process_key_event(0xFF53, 0, 0);
         assert!(!left.consumed);
         assert!(!right.consumed);
+    }
+
+    #[test]
+    fn visible_refine_does_not_clobber_a_touched_selection() {
+        // Regression (macOS debounced pause-refine): a visible refine must NOT reset the
+        // user's in-progress candidate selection. The selection_touched guard protects it.
+        let mut session = session();
+        type_ascii(&mut session, "khnhomtov");
+        assert!(session.snapshot().segmented_active);
+        let raw = session.snapshot().raw_preedit.clone();
+
+        let down = session.process_key_event(0xFF54, 0, 0); // Down -> select candidate 1
+        assert!(down.consumed);
+        assert_eq!(session.snapshot().selected_index, Some(1));
+
+        // Simulate the debounced pause-refine firing after the selection.
+        session.refine_segmented_with_visible_refiner(&raw);
+
+        assert_eq!(
+            session.snapshot().selected_index,
+            Some(1),
+            "visible refine must not reset a selection the user already made"
+        );
+    }
+
+    #[test]
+    fn visible_refine_rebuilds_segmented_preview_when_untouched() {
+        // Happy path: with no manual selection yet, the pause-refine (re)builds the
+        // segmented preview through the visible refiner and stays segmented.
+        let mut session = segmented_default_session_like_ibus_bridge();
+        type_ascii(&mut session, "khnhomtov");
+        let raw = session.snapshot().raw_preedit.clone();
+        let changed = session.refine_segmented_with_visible_refiner(&raw);
+        assert!(changed, "refine should build a segmented preview when untouched");
+        assert!(session.snapshot().segmented_active);
     }
 }

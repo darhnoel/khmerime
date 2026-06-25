@@ -3,6 +3,9 @@ name = "khmerime_lookup_cli"
 version = "0.1.0"
 edition = "2021"
 
+[features]
+byt5 = ["roman_lookup/byt5"]
+
 [dependencies]
 roman_lookup = { path = "../.." }
 

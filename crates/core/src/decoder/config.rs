@@ -1,5 +1,16 @@
 use super::DecoderMode;
 
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum SpanProposalMode {
+    #[default]
+    Disabled,
+    /// Test-only built-in provider used to prove that external span proposals
+    /// can participate in the weighted-span lattice before wiring a real model.
+    StaticTest,
+    /// Real byT5 span-proposal provider (requires the `byt5` feature; loads from env).
+    Byt5,
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct DecoderConfig {
     pub mode: DecoderMode,
@@ -20,6 +31,7 @@ pub struct DecoderConfig {
     pub pos_score_weight: i32,
     pub history_score_weight: i32,
     pub interactive_mode: bool,
+    pub span_proposal_mode: SpanProposalMode,
 }
 
 impl DecoderConfig {
@@ -42,6 +54,15 @@ impl DecoderConfig {
         self
     }
 
+    pub fn with_span_proposal_mode(mut self, mode: SpanProposalMode) -> Self {
+        self.span_proposal_mode = mode;
+        self
+    }
+
+    pub fn with_static_span_proposals(self) -> Self {
+        self.with_span_proposal_mode(SpanProposalMode::StaticTest)
+    }
+
     pub fn shadow_interactive() -> Self {
         Self {
             mode: DecoderMode::Shadow,
@@ -61,6 +82,7 @@ impl DecoderConfig {
             pos_score_weight: 1,
             history_score_weight: 1,
             interactive_mode: true,
+            span_proposal_mode: SpanProposalMode::Disabled,
         }
     }
 }
@@ -85,6 +107,7 @@ impl Default for DecoderConfig {
             pos_score_weight: 1,
             history_score_weight: 1,
             interactive_mode: false,
+            span_proposal_mode: SpanProposalMode::Disabled,
         }
     }
 }
