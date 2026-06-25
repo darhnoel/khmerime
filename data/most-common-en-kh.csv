@@ -538,8 +538,6 @@ asthma,ជម្ងឺហឺត
 astrology,ហោរាសាស្រ្ត
 astronomy,តារាវិទ្យា
 asylum,សិទ្ធិជ្រកកោន
-at,នៅ
-ate,បរិភោគ
 athletes,អត្តពលិក
 athletic,អត្តពលិក
 athletics,អត្តពលកម្ម
@@ -1338,7 +1336,6 @@ charter,ធម្មនុញ្ញ
 charts,តារាង
 chase,ដេញតាម
 chassis,សាក់ស៊ីរថយន្ត
-chat,ជជែក
 cheap,ថោក
 cheaper,ថោកជាង
 cheapest,ដែលថោកបំផុត
@@ -1360,7 +1357,6 @@ cheque,មូលប្បទានបត្រ
 cherry,ឈៀររី
 chess,ចត្រង្គ
 chest,ទ្រូង
-chevrolet,
 chevy,ឆេវឆាវ
 chicago,ឈីកាហ្គោ
 chicken,មាន់
@@ -1404,7 +1400,6 @@ church,ព្រះវិហារ
 churches,ព្រះវិហារ
 cia,ស្ថាប័នCIA
 cialis,ស៊ីលីស
-ciao,សួស្តី
 cigarette,បារី
 cigarettes,បារី
 cincinnati,ស៊ីនស៊ីនណាទី
@@ -1519,7 +1514,6 @@ coffee,កាហ្វេ
 cognitive,យល់ដឹង
 coin,កាក់
 coins,កាក់
-col,ជួរឈរ
 cold,ត្រជាក់
 coleman,ខូលមែន
 colin,កូលីន
@@ -1991,8 +1985,6 @@ cruise,ដំណើរកម្សាន្ត
 cruises,នាវាទេសចរណ៍
 cry,យំ
 crystal,គ្រីស្តាល់
-ct,ការស្កេនCT
-ctrl,ctrl
 cuba,គុយបា
 cube,គូប
 cubic,គូប
@@ -2041,7 +2033,6 @@ daisy,daisy
 dakota,ដាកូតា
 dale,ដេលនិងស៊ូហ្សានដាវីស
 dallas,ដាឡាស
-dam,ទំនប់
 damage,ការខូចខាត
 damaged,ខូច
 damages,ការខូចខាត
@@ -2441,7 +2432,6 @@ door,ទ្វារ
 doors,ទ្វារ
 dosage,ការប្រើប្រាស់
 dose,កម្រិតថ្នាំ
-dot,ចំណុច
 double,ទ្វេ
 doubt,សង្ស័យ
 dover,ដូវើ
@@ -2454,7 +2444,6 @@ downloads,ទាញយក
 downtown,ទីប្រជុំជន
 dozen,មួយឡូ
 dozens,រាប់សិបនាក់
-dr,បណ្ឌិត
 draft,សេចក្តីព្រាង
 drag,អូស
 dragon,នាគ
@@ -3069,7 +3058,6 @@ fill,បំពេញ
 filled,បំពេញ
 filling,ការបំពេញ
 film,ខ្សែភាពយន្ត
-filme,ភាពយន្ត
 films,ភាពយន្ត
 filter,តម្រង
 filtering,តម្រង
@@ -3767,11 +3755,8 @@ honors,កិត្តិយស
 hood,ក្រណាត់
 hook,ទំពក់
 hop,លោត
-hope,ក្តីសង្ឃឹម
-hoped,សង្ឃឹម
-hopefully,សង្ឃឹមថាអញ្ចឹង
+hope,សង្ឃឹម
 hopes,ក្តីសង្ឃឹម
-hoping,សង្ឃឹម
 hopkins,សាកលវិទ្យាល័យHopkins
 horizon,ផ្ដេក
 horizontal,ផ្តេក
@@ -7647,12 +7632,10 @@ suite,ឈុត
 suited,សម
 suites,ឈុត
 suits,ឈុត
-sum,ផលបូក
 summaries,សេចក្ដីសង្ខេប
 summary,សង្ខេប
 summer,រដូវក្តៅ
 summit,កិច្ចប្រជុំកំពូល
-sun,ព្រះអាទិត្យ
 sunday,ថ្ងៃអាទិត្យ
 sunglasses,វ៉ែនតាខ្មៅ
 sunny,មានពន្លឺថ្ងៃ
@@ -7754,7 +7737,6 @@ syria,ប្រទេសស៊ីរី
 system,ប្រព័ន្ធ
 systematic,ប្រព័ន្ធ
 systems,ប្រព័ន្ធ
-tab,ផ្ទាំង
 table,តារាង
 tables,តារាង
 tablet,ថេប្លិត
@@ -7762,9 +7744,6 @@ tablets,ថេប្លេត
 tabs,ផ្ទាំង
 tackle,ដោះស្រាយ
 tactics,យុទ្ធវិធី
-tag,ស្លាក
-tagged,ដាក់ស្លាក
-tags,ស្លាក
 tail,កន្ទុយ
 taiwan,តៃវ៉ាន់
 take,យក

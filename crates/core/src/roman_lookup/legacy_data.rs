@@ -629,7 +629,7 @@ impl LegacyData {
         self.by_normalized.get(normalized).cloned().unwrap_or_default()
     }
 
-    fn romans_for_target(&self, target: &str) -> Vec<String> {
+    pub(crate) fn romans_for_target(&self, target: &str) -> Vec<String> {
         if let Some(image) = self.dictionary_image {
             return image
                 .legacy_target_romans(target)
@@ -639,6 +639,10 @@ impl LegacyData {
                 .unwrap_or_default();
         }
         self.by_target.get(target).cloned().unwrap_or_default()
+    }
+
+    pub(crate) fn has_target(&self, target: &str) -> bool {
+        !self.romans_for_target(target).is_empty()
     }
 
     fn prefix_romans(&self, prefix: &str) -> Option<Vec<String>> {
@@ -672,7 +676,7 @@ impl LegacyData {
             .unwrap_or_else(|| normalize(roman))
     }
 
-    fn target_frequency_for(&self, target: &str) -> u32 {
+    pub(crate) fn target_frequency_for(&self, target: &str) -> u32 {
         if let Some(image) = self.dictionary_image {
             return image.legacy_target_frequency(target).ok().flatten().unwrap_or(1);
         }
