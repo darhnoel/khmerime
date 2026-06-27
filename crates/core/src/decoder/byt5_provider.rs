@@ -185,13 +185,10 @@ impl Byt5SpanProposalProvider {
 
 impl SpanProposalProvider for Byt5SpanProposalProvider {
     fn candidate_ends(&self, _full_input: &str, start: usize, chars: &[char]) -> Vec<usize> {
-        // v1: only offer the whole remaining input as one span (single-word recovery).
-        // Multi-span selective querying is future work (see HANDOFF.md).
-        if start == 0 && !chars.is_empty() {
-            vec![chars.len()]
-        } else {
-            Vec::new()
-        }
+        // Offer sub-word spans so the lattice can assemble multi-word segmentations
+        // (knhmttvsalarien -> knhm|ttv|salarien), not just a whole-input span. The decoder's
+        // over_budget bail caps the per-span model calls.
+        super::span_proposal::candidate_span_ends(start, chars.len())
     }
 
     fn propose(&self, request: &SpanProposalRequest<'_>) -> Vec<SpanProposal> {

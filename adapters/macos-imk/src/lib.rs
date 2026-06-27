@@ -79,18 +79,6 @@ use khmerime_session::{
 
 uniffi::setup_scaffolding!("khmerime_macos_imk");
 
-// ── Key constants (XKB / X11 keyval space, same as all other adapters) ────────
-
-const KEY_BACKSPACE: u32 = 0xFF08;
-const KEY_RETURN: u32 = 0xFF0D;
-const KEY_SPACE: u32 = 0x20;
-const KEY_LEFT: u32 = 0xFF51;
-const KEY_RIGHT: u32 = 0xFF53;
-const KEY_UP: u32 = 0xFF52;
-const KEY_DOWN: u32 = 0xFF54;
-const KEY_TAB: u32 = 0xFF09;
-const KEY_ESCAPE: u32 = 0xFF1B;
-
 fn macos_live_decoder_config() -> DecoderConfig {
     let mut config = DecoderConfig::shadow_interactive();
     if let Ok(mode) = std::env::var("KHMERIME_DECODER_MODE") {

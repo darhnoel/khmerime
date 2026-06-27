@@ -35,6 +35,18 @@ pub(crate) fn provider_for_mode(mode: SpanProposalMode) -> Option<Arc<dyn SpanPr
     }
 }
 
+/// Max roman span length a model provider is asked to transliterate — covers the longest
+/// single Lexicon words (salarien=8, vinichchhai=11). Longer would blow up the query count;
+/// the decoder's `over_budget` bail caps the rest.
+const MAX_MODEL_SPAN_LEN: usize = 12;
+
+/// Span ends a model provider offers from `start`: every length 2..=MAX that still fits in
+/// `n` chars. Lets the lattice assemble multi-word segmentations (knhm|ttv|salarien) instead
+/// of one whole-input span.
+pub(crate) fn candidate_span_ends(start: usize, n: usize) -> Vec<usize> {
+    ((start + 2)..=(start + MAX_MODEL_SPAN_LEN).min(n)).collect()
+}
+
 struct StaticTestSpanProposalProvider;
 
 impl StaticTestSpanProposalProvider {
@@ -68,5 +80,29 @@ impl SpanProposalProvider for StaticTestSpanProposalProvider {
                 })
             })
             .collect()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::candidate_span_ends;
+
+    #[test]
+    fn candidate_span_ends_covers_subword_lengths() {
+        // "knhmttvsalarien" (15 chars): from the start, offer spans of length 2..=12 so the
+        // lattice can assemble knhm|ttv|salarien instead of one whole-input span.
+        assert_eq!(candidate_span_ends(0, 15), (2..=12).collect::<Vec<usize>>());
+    }
+
+    #[test]
+    fn candidate_span_ends_caps_and_truncates() {
+        // mid-phrase (knhm+ttv = 7): salarien (len 8 -> end 15) is reachable
+        assert_eq!(candidate_span_ends(7, 15), vec![9, 10, 11, 12, 13, 14, 15]);
+        // near the end: only the spans that still fit
+        assert_eq!(candidate_span_ends(13, 15), vec![15]);
+        // no room for even a length-2 span -> empty
+        assert!(candidate_span_ends(14, 15).is_empty());
+        // long input: never exceed MAX span length from a start
+        assert_eq!(*candidate_span_ends(0, 100).last().unwrap(), 12);
     }
 }

@@ -59,6 +59,8 @@
 //! Took 303.766583ms
 //! ```
 
+#![allow(dead_code)] // vendored candle-transformers T5: we only call part of the API
+
 use candle_core::{DType, Device, Module, Result, Tensor, D};
 use candle_nn::{Activation, VarBuilder};
 use serde::Deserialize;

@@ -103,6 +103,10 @@ A two-stage warmup. Phase A builds a minimal **SharedTransliteratorData** fast e
 Two distinct `Transliterator` views built from the same **SharedTransliteratorData** but with different decoder configurations. The visible refiner has a 75 ms latency budget for in-flight preview refinement; the commit refiner has a larger budget and produces the final **Commit Text** on Enter. Both budgets are wall-clock deadlines; when the commit refiner's trips, the commit degrades to the visible result rather than waiting (see ADR-0005).
 _Avoid_: refiner (use the qualified form)
 
+**Span Proposal**:
+An advisory Khmer candidate for one contiguous roman slice of a **Composition**. A Span Proposal can help recover a misspelled or uncommon roman form, but it does not decide phrase boundaries, replace the **Candidate List**, or bypass the **Commit Rules**; the normal decoder and session rules still decide whether the proposal becomes visible or committed.
+_Avoid_: model output, final correction, phrase decode
+
 **Download Landing Page**:
 The public KhmerIME page that helps users choose a platform download, try the **Online Beta**, and follow install steps. It is download-first, with the visitor's platform download as the primary action and the **Online Beta** as a secondary trial path.
 _Avoid_: homepage, product site
@@ -146,3 +150,4 @@ _Avoid_: home screen, main menu, settings (the Dashboard is more than settings)
 - A **Lexicon Pack** overlays the base **Lexicon** at lookup time; it does not modify **SharedTransliteratorData**
 - The engine applies the **Config Store** so every adapter (IBus, TSF, macOS IMK, iOS) inherits identical pack and suggestion behavior
 - **Learned History** and the **Config Store** are sibling per-user state; both live in `~/.config/khmerime/` on desktop and a shared **App Group** container on Apple platforms
+- A **Span Proposal** is advisory input to decoding; it never outranks **Visible Segmented Commit**, **Visible Candidate Commit**, or the **Commit Rules**
