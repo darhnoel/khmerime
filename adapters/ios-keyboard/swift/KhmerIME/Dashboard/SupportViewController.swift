@@ -20,9 +20,9 @@ final class SupportViewController: UIViewController {
         card.layer.borderColor = UIColor.white.withAlphaComponent(0.18).cgColor
         card.translatesAutoresizingMaskIntoConstraints = false
 
-        let heading = makeLabel("Support KhmerIME", size: 22, weight: .bold, color: Brand.ivory)
+        let heading = makeLabel(String(localized: "support.heading"), size: 22, weight: .bold, color: Brand.ivory)
         let body = makeLabel(
-            "KhmerIME is an open-source project. Your support keeps development, testing, packaging, and future improvements going.",
+            String(localized: "support.body"),
             size: 16, weight: .regular, color: Brand.ivoryDim
         )
 

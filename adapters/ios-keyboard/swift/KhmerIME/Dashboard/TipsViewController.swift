@@ -12,17 +12,17 @@ final class TipsViewController: UIViewController {
 
     private let tips: [Tip] = [
         Tip(symbol: "keyboard",
-            headline: "Type roman, get Khmer",
-            body: "Type somreach and KhmerIME suggests សម្រាក. Tap a candidate or press return to commit."),
+            headline: String(localized: "tips.roman.headline"),
+            body: String(localized: "tips.roman.body")),
         Tip(symbol: "text.append",
-            headline: "Long words, split up",
-            body: "For long compositions KhmerIME shows segmented previews you can step through with ‹ and ›."),
+            headline: String(localized: "tips.split.headline"),
+            body: String(localized: "tips.split.body")),
         Tip(symbol: "character",
-            headline: "Names and loanwords",
-            body: "Press ✦ for CharPick. Type a roman letter to see matching Khmer characters, then tap one to insert it."),
+            headline: String(localized: "tips.charpick.headline"),
+            body: String(localized: "tips.charpick.body")),
         Tip(symbol: "globe",
-            headline: "English when you need it",
-            body: "Press EN to pass keys straight through to the app. Press EN again to return to Khmer."),
+            headline: String(localized: "tips.english.headline"),
+            body: String(localized: "tips.english.body")),
     ]
 
     private let pageVC = UIPageViewController(transitionStyle: .scroll, navigationOrientation: .horizontal)

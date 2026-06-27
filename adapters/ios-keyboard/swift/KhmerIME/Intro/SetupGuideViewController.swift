@@ -13,9 +13,9 @@ final class SetupGuideViewController: UIViewController {
     var onKeyboardEnabled: (() -> Void)?
 
     private let steps: [(number: Int, instruction: String)] = [
-        (1, "ចូលទៅកាន់ **Settings → General → Keyboard → Keyboards**"),
-        (2, "ចុច **Add New Keyboard…** ហើយជ្រើស **KhmerIME**"),
-        (3, "ចុច **KhmerIME** បញ្ចូលក្នុងបញ្ជី រួចបើក **Allow Full Access**"),
+        (1, String(localized: "setup.step1")),
+        (2, String(localized: "setup.step2")),
+        (3, String(localized: "setup.step3")),
     ]
 
     private let pageVC = UIPageViewController(transitionStyle: .scroll, navigationOrientation: .horizontal)
@@ -57,7 +57,7 @@ final class SetupGuideViewController: UIViewController {
 
     private func buildLayout() {
         let back = backButton
-        back.setTitle("‹ Back", for: .normal)
+        back.setTitle(String(localized: "setup.back"), for: .normal)
         back.setTitleColor(Brand.ivoryDim, for: .normal)
         back.titleLabel?.font = .systemFont(ofSize: 16, weight: .regular)
         back.translatesAutoresizingMaskIntoConstraints = false
@@ -65,7 +65,7 @@ final class SetupGuideViewController: UIViewController {
         view.addSubview(back)
 
         let title = UILabel()
-        title.text = "Enable KhmerIME"
+        title.text = String(localized: "setup.title")
         title.font = .systemFont(ofSize: 22, weight: .bold)
         title.textColor = Brand.ivory
         title.textAlignment = .center
@@ -89,7 +89,7 @@ final class SetupGuideViewController: UIViewController {
         view.addSubview(pageControl)
 
         let openSettings = UIButton(type: .system)
-        openSettings.setTitle("Open Settings", for: .normal)
+        openSettings.setTitle(String(localized: "setup.openSettings"), for: .normal)
         openSettings.setTitleColor(Brand.ink, for: .normal)
         openSettings.titleLabel?.font = .systemFont(ofSize: 18, weight: .semibold)
         openSettings.backgroundColor = Brand.amber
