@@ -62,8 +62,20 @@ adapters/android-ime/app/build/
 adapters/android-ime/local.properties
 adapters/android-ime/app/src/main/res/drawable-nodpi/khmerime_logo_card.png
 
-# macOS build artifacts and local Xcode state
+# Local signing secrets (keep the committed *.example templates; ignore the real ones)
 adapters/macos-imk/macos-signing.local.mk
+adapters/android-ime/keystore.properties
+adapters/ios-keyboard/ExportOptions.plist
+adapters/windows-tsf/signing.local.ps1
+# signing key material — never commit, anywhere in the tree
+*.jks
+*.keystore
+*.p12
+*.pfx
+*.mobileprovision
+dist/
+
+# macOS build artifacts and local Xcode state
 adapters/macos-imk/swift/Frameworks/KhmerIME.xcframework/macos-arm64_x86_64/libkhmerime_macos_imk.a
 adapters/macos-imk/swift/**/xcuserdata/
 adapters/macos-imk/swift/**/*.xcuserdata/
