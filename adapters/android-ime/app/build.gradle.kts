@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
 }
@@ -20,6 +22,22 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
+    // Release signing is opt-in: drop a filled keystore.properties in this module root
+    // (git-ignored — see keystore.properties.example) to sign. Without it, release stays
+    // unsigned, which is fine for Google Play (Play App Signing re-signs on upload).
+    signingConfigs {
+        val keystoreProps = rootProject.file("keystore.properties")
+        if (keystoreProps.exists()) {
+            create("release") {
+                val props = Properties().apply { keystoreProps.inputStream().use { load(it) } }
+                storeFile = file(props.getProperty("storeFile"))
+                storePassword = props.getProperty("storePassword")
+                keyAlias = props.getProperty("keyAlias")
+                keyPassword = props.getProperty("keyPassword")
+            }
+        }
+    }
+
     buildTypes {
         debug {
             applicationIdSuffix = ".debug"
@@ -28,6 +46,7 @@ android {
             optimization {
                 enable = false
             }
+            signingConfig = signingConfigs.findByName("release")
         }
     }
     compileOptions {

@@ -1,4 +1,4 @@
-.PHONY: help web web-release web-phone web-local desktop stats suggest suggest-wfst suggest-shadow shadow-eval data-split data-build data-check lexicon-editor visualize-lexicon visualize-lexicon-streamlit download-page fmt test test-golden test-ui platform-check platform-check-linux platform-check-android platform-check-ios platform-check-macos platform-check-windows platform-ios-assets platform-android-assets platform-build-ios platform-test-ios platform-install-ios-sim platform-reinstall-ios-sim platform-install-ios-device platform-reinstall-ios-device platform-build-macos platform-diagnose-macos platform-install-macos platform-reinstall-macos platform-build-windows platform-install-windows platform-uninstall-windows platform-reinstall-windows platform-smoke-windows-notepad platform-smoke-windows-notepad-python windows-package linux-package ibus-install ibus-uninstall ibus-smoke paper-current paper-current-clean platform-test-android platform-build-android android-adb-device platform-install-android platform-reinstall-android setup-hooks
+.PHONY: help web web-release web-phone web-local desktop stats suggest suggest-wfst suggest-shadow shadow-eval data-split data-build data-check lexicon-editor visualize-lexicon visualize-lexicon-streamlit download-page fmt test test-golden test-ui platform-check platform-check-linux platform-check-android platform-check-ios platform-check-macos platform-check-windows platform-ios-assets platform-android-assets platform-build-ios platform-test-ios platform-install-ios-sim platform-reinstall-ios-sim platform-install-ios-device platform-reinstall-ios-device platform-build-macos platform-diagnose-macos platform-install-macos platform-reinstall-macos platform-build-windows platform-install-windows platform-uninstall-windows platform-reinstall-windows platform-smoke-windows-notepad platform-smoke-windows-notepad-python windows-package linux-package macos-package android-package ios-package package ibus-install ibus-uninstall ibus-smoke paper-current paper-current-clean platform-test-android platform-build-android android-adb-device platform-install-android platform-reinstall-android setup-hooks
 
 DX ?= dx
 APP_DIR := apps/dioxus-app
@@ -125,6 +125,10 @@ help:
 	"  make platform-smoke-windows-notepad-python  Python Notepad smoke with clipboard/log output" \
 	"  make windows-package            Build the Windows TSF MSI under dist/windows/" \
 	"  make linux-package               Build the Linux IBus .deb package under dist/linux/" \
+	"  make macos-package               Build the macOS .pkg (unsigned) under dist/macos/" \
+	"  make android-package             Build the Android release .aab under dist/android/" \
+	"  make ios-package                 Build the iOS .xcarchive (unsigned) under dist/ios/" \
+	"  make package                     Build every artifact this host can, into dist/ (see PACKAGING.md)" \
 	"  make ibus-install                Build and install KhmerIME IBus engine files (may use sudo)" \
 	"  make ibus-uninstall              Remove KhmerIME IBus engine files" \
 	"  make ibus-smoke                  Run bridge + IBus discovery smoke checks" \
@@ -458,6 +462,25 @@ windows-package:
 
 linux-package:
 	bash scripts/platforms/linux/ibus/build_deb.sh
+
+macos-package:
+	bash scripts/platforms/macos/imk/build_pkg.sh
+
+android-package:
+	bash scripts/platforms/android/ime/build_aab.sh
+
+ios-package:
+	bash scripts/platforms/ios/keyboard/build_archive.sh
+
+# One command: build every distributable artifact THIS host can produce, into dist/.
+# No single host does all five — Apple targets need macOS, .deb needs Linux, .msi needs Windows.
+package:
+	@case "$$(uname)" in \
+	  Darwin) $(MAKE) macos-package android-package ios-package ;; \
+	  Linux)  $(MAKE) linux-package ;; \
+	  *)      echo "On Windows run: make windows-package" >&2; exit 1 ;; \
+	esac
+	@echo "==> artifacts:"; ls -1 dist/*/ 2>/dev/null || true
 
 ibus-install:
 	bash scripts/platforms/linux/ibus/install_engine.sh
