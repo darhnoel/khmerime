@@ -105,7 +105,7 @@ fn macos_visible_refiner_config() -> DecoderConfig {
     let mut config = DecoderConfig::shadow_interactive().with_mode(DecoderMode::Hybrid);
     config.wfst_max_latency_ms = 250;
     match std::env::var("KHMERIME_SPAN_PROPOSALS").ok().as_deref() {
-        Some("byt5") => config = config.with_span_proposal_mode(SpanProposalMode::Byt5),
+        Some("model") => config = config.with_span_proposal_mode(SpanProposalMode::Model),
         Some("static-test") => config = config.with_static_span_proposals(),
         _ => {}
     }

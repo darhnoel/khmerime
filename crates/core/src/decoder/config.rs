@@ -7,8 +7,9 @@ pub enum SpanProposalMode {
     /// Test-only built-in provider used to prove that external span proposals
     /// can participate in the weighted-span lattice before wiring a real model.
     StaticTest,
-    /// Real byT5 span-proposal provider (requires the `byt5` feature; loads from env).
-    Byt5,
+    /// A pluggable model span-proposal provider, loaded from env when a model-provider impl is
+    /// compiled in (see the `model-provider` feature); `None` otherwise.
+    Model,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
