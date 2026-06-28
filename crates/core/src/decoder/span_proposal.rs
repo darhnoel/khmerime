@@ -85,7 +85,19 @@ impl SpanProposalProvider for StaticTestSpanProposalProvider {
 
 #[cfg(test)]
 mod tests {
-    use super::candidate_span_ends;
+    use super::{candidate_span_ends, provider_for_mode, SpanProposalMode};
+
+    // Inert-by-default invariant: no provider unless one is configured/compiled in, so
+    // dev-default decoding keeps its existing no-provider path (one `is_some()` branch, no model).
+    #[test]
+    fn seam_is_inert_without_a_configured_provider() {
+        assert!(provider_for_mode(SpanProposalMode::Disabled).is_none());
+        #[cfg(not(feature = "model-provider"))]
+        assert!(
+            provider_for_mode(SpanProposalMode::Model).is_none(),
+            "Model must resolve to None without the model-provider feature"
+        );
+    }
 
     #[test]
     fn candidate_span_ends_covers_subword_lengths() {

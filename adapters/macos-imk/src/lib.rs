@@ -112,6 +112,16 @@ fn macos_visible_refiner_config() -> DecoderConfig {
     config
 }
 
+/// Whether a span-proposal provider is configured. When false (dev default), the debounced
+/// visible refiner is not built at all — the pause does no work, so the seam stays inert until
+/// a provider is plugged in.
+fn span_provider_active() -> bool {
+    matches!(
+        std::env::var("KHMERIME_SPAN_PROPOSALS").ok().as_deref(),
+        Some("model") | Some("static-test")
+    )
+}
+
 fn key_event(keyval: u32, keycode: u32, state: u32) -> NativeKeyEvent {
     NativeKeyEvent { keyval, keycode, state }
 }
@@ -244,18 +254,21 @@ impl MacosIMKSession {
             let live = Transliterator::from_default_data_with_config(macos_live_decoder_config())
                 .expect("compiled-in lexicon data must be valid");
 
-            // Visible refiner runs the heavier engine (incl. the model) on the debounced pause,
-            // off the keystroke hot path. Loading it warms the model once here.
-            let visible_refiner = Transliterator::from_default_data_with_config(macos_visible_refiner_config())
-                .expect("compiled-in lexicon data must be valid");
-
-            let ime = ImeSession::builder(live, history)
-                .visible_refiner(visible_refiner)
+            // The visible refiner (heavier engine + any provider) runs on the debounced pause.
+            // Built ONLY when a provider is configured — otherwise the seam is inert: no refiner,
+            // so the pause does no work and dev-default behaves exactly as before the seam.
+            let mut builder = ImeSession::builder(live, history)
                 .input_mode(input_mode)
                 .options(ImeSessionOptions {
                     segmented_preview: SegmentedPreviewMode::Enabled,
-                })
-                .build();
+                });
+            if span_provider_active() {
+                let visible_refiner =
+                    Transliterator::from_default_data_with_config(macos_visible_refiner_config())
+                        .expect("compiled-in lexicon data must be valid");
+                builder = builder.visible_refiner(visible_refiner);
+            }
+            let ime = builder.build();
 
             *s.inner.lock().unwrap() = Some(ime);
             let (lock, cvar) = &*s.ready;
