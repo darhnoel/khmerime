@@ -68,12 +68,13 @@
 //! by name (prefixed `session_` instead of `bridge_`), plus macOS-specific tests for
 //! the keycode translation table.
 
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Condvar, Mutex};
 use std::time::Duration;
 
 use khmerime_core::{DecoderConfig, DecoderMode, SpanProposalMode, Transliterator};
 use khmerime_session::{
-    CandidateDisplayEntry, ImeSession, ImeSessionOptions, NativeKeyEvent, SegmentPreviewEntry, SegmentedPreviewMode,
+    compute_segmented_refinement, CandidateDisplayEntry, ImeSession, ImeSessionOptions, NativeKeyEvent, SegmentPreviewEntry, SegmentedPreviewMode,
     SessionResult, SessionSnapshot,
 };
 
@@ -216,6 +217,9 @@ fn render_state(snapshot: &SessionSnapshot, result: &SessionResult, ready: bool)
 pub struct MacosIMKSession {
     inner: Mutex<Option<ImeSession>>,
     ready: Arc<(Mutex<bool>, Condvar)>,
+    // Bumped on every keystroke. A lock-free refine captures it at snapshot and re-checks at
+    // apply, so a refinement made stale by newer typing is dropped instead of clobbering.
+    generation: AtomicU64,
 }
 
 #[uniffi::export]
@@ -229,6 +233,7 @@ impl MacosIMKSession {
         let session = Arc::new(MacosIMKSession {
             inner: Mutex::new(None),
             ready: Arc::new((Mutex::new(false), Condvar::new())),
+            generation: AtomicU64::new(0),
         });
         let s = session.clone();
         std::thread::spawn(move || {
@@ -295,6 +300,7 @@ impl MacosIMKSession {
     /// NIDA mode via `keycode_mac_to_evdev`. `modifier_flags` is the raw
     /// `NSEvent.modifierFlags.rawValue` mapped to XKB-style modifier bits.
     pub fn handle_event(&self, keyval: u32, mac_keycode: u16, modifier_flags: u32) -> MacosRenderState {
+        self.generation.fetch_add(1, Ordering::Relaxed); // invalidates any in-flight refine
         let evdev_keycode = keycode_mac_to_evdev(mac_keycode);
         let xkb_state = modifier_flags_to_xkb_state(modifier_flags);
         self.with_session(|s| {
@@ -326,21 +332,15 @@ impl MacosIMKSession {
     /// segmented preview (deferred mode). Rebuilds the segmented session if
     /// `raw_preedit` still matches and no candidate has been touched.
     pub fn refresh_segmented_preview(&self, raw_preedit: String) -> MacosRenderState {
-        self.with_session(|s| {
-            s.refine_segmented_with_visible_refiner(&raw_preedit);
-            render_state(&s.snapshot(), &SessionResult::default(), true)
-        })
+        self.refine_off_lock(&raw_preedit)
     }
 
     /// Debounced visible refine: re-run the segmented preview through the visible refiner
     /// (the byT5 model) on the *current* composition. Called by Swift ~200ms after the last
-    /// keystroke, so the model runs once on pause rather than on every key.
+    /// keystroke. The model runs OFF the session lock, so it never blocks keystrokes.
     pub fn refine_visible(&self) -> MacosRenderState {
-        self.with_session(|s| {
-            let raw = s.snapshot().raw_preedit.clone();
-            s.refine_segmented_with_visible_refiner(&raw);
-            render_state(&s.snapshot(), &SessionResult::default(), true)
-        })
+        let raw = self.with_session(|s| s.snapshot().raw_preedit.clone());
+        self.refine_off_lock(&raw)
     }
 
     /// Input mode toggle (Roman ↔ NIDA). Clears composition.
@@ -355,9 +355,9 @@ impl MacosIMKSession {
 impl MacosIMKSession {
     /// Waits up to 500 ms for the warmup thread, then calls `f` with the session.
     /// Returns a default (empty) render state if warmup times out — extremely rare.
-    fn with_session<F>(&self, f: F) -> MacosRenderState
+    fn with_session<T: Default, F>(&self, f: F) -> T
     where
-        F: FnOnce(&mut ImeSession) -> MacosRenderState,
+        F: FnOnce(&mut ImeSession) -> T,
     {
         let (lock, cvar) = &*self.ready;
         let ready = lock.lock().unwrap();
@@ -366,8 +366,27 @@ impl MacosIMKSession {
         let mut guard = self.inner.lock().unwrap();
         match guard.as_mut() {
             Some(session) => f(session),
-            None => MacosRenderState::default(),
+            None => T::default(),
         }
+    }
+
+    /// Run the byT5 visible refine WITHOUT holding the session lock across the model.
+    /// Snapshot inputs under a brief lock, run the model off-lock, then apply under a brief lock —
+    /// dropping the result if a newer keystroke (generation bump) arrived while it computed.
+    fn refine_off_lock(&self, raw: &str) -> MacosRenderState {
+        let my_gen = self.generation.load(Ordering::Relaxed);
+        let snapshot = self.with_session(|s| s.refine_inputs(raw));
+        let Some((refiner, raw_owned, history)) = snapshot else {
+            return self.with_session(|s| render_state(&s.snapshot(), &SessionResult::default(), true));
+        };
+        // The model time is spent HERE, holding no session lock — keystrokes run unblocked.
+        let refinement = compute_segmented_refinement(&refiner, &raw_owned, &history);
+        self.with_session(|s| {
+            if self.generation.load(Ordering::Relaxed) == my_gen {
+                s.apply_segmented_refinement(&raw_owned, refinement);
+            }
+            render_state(&s.snapshot(), &SessionResult::default(), true)
+        })
     }
 }
 

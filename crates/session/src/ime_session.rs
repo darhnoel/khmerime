@@ -10,6 +10,7 @@
 //! are in [`crate::adapter_contract`].
 
 use std::collections::HashSet;
+use std::sync::Arc;
 
 use khmerime_core::Transliterator;
 
@@ -44,7 +45,7 @@ const STATE_RELEASE_MASK: u32 = 1 << 30;
 
 pub struct ImeSession {
     pub(crate) transliterator: Transliterator,
-    pub(crate) visible_refiner: Option<Transliterator>,
+    pub(crate) visible_refiner: Option<Arc<Transliterator>>,
     pub(crate) commit_refiner: Option<Transliterator>,
     pub(crate) history: HashMap<String, usize>,
     pub(crate) enabled: bool,
@@ -63,7 +64,7 @@ pub struct ImeSession {
 
 pub struct ImeSessionBuilder {
     transliterator: Transliterator,
-    visible_refiner: Option<Transliterator>,
+    visible_refiner: Option<Arc<Transliterator>>,
     commit_refiner: Option<Transliterator>,
     history: HashMap<String, usize>,
     input_mode: InputMode,
@@ -72,7 +73,7 @@ pub struct ImeSessionBuilder {
 
 impl ImeSessionBuilder {
     pub fn visible_refiner(mut self, visible_refiner: Transliterator) -> Self {
-        self.visible_refiner = Some(visible_refiner);
+        self.visible_refiner = Some(Arc::new(visible_refiner));
         self
     }
 
@@ -186,7 +187,7 @@ impl ImeSession {
         commit_refiner: Transliterator,
         history: HashMap<String, usize>,
     ) -> Self {
-        Self::new_with_optional_refiners(transliterator, Some(visible_refiner), Some(commit_refiner), history)
+        Self::new_with_optional_refiners(transliterator, Some(Arc::new(visible_refiner)), Some(commit_refiner), history)
     }
 
     #[deprecated(
@@ -201,7 +202,7 @@ impl ImeSession {
         options: ImeSessionOptions,
     ) -> Self {
         let mut session =
-            Self::new_with_optional_refiners(transliterator, Some(visible_refiner), Some(commit_refiner), history);
+            Self::new_with_optional_refiners(transliterator, Some(Arc::new(visible_refiner)), Some(commit_refiner), history);
         session.input_mode = input_mode;
         session.options = options;
         session
@@ -209,7 +210,7 @@ impl ImeSession {
 
     fn new_with_optional_refiners(
         transliterator: Transliterator,
-        visible_refiner: Option<Transliterator>,
+        visible_refiner: Option<Arc<Transliterator>>,
         commit_refiner: Option<Transliterator>,
         history: HashMap<String, usize>,
     ) -> Self {
@@ -264,7 +265,7 @@ impl ImeSession {
 
     #[deprecated(note = "install live, visible, and commit engines together with replace_engines_with_refiners")]
     pub fn set_visible_refiner(&mut self, visible_refiner: Transliterator) {
-        self.visible_refiner = Some(visible_refiner);
+        self.visible_refiner = Some(Arc::new(visible_refiner));
     }
 
     pub fn replace_engines(
@@ -285,7 +286,7 @@ impl ImeSession {
     pub fn replace_engines_with_refiners(
         &mut self,
         transliterator: Transliterator,
-        visible_refiner: Option<Transliterator>,
+        visible_refiner: Option<Arc<Transliterator>>,
         commit_refiner: Option<Transliterator>,
         segmented_preview: SegmentedPreviewMode,
     ) {

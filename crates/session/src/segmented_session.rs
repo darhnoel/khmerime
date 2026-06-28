@@ -8,6 +8,9 @@
 //! [`crate::segment_edit_mode`].
 
 use std::collections::HashMap;
+use std::sync::Arc;
+
+use khmerime_core::Transliterator;
 
 use crate::adapter_contract::{SegmentedPreviewMode, SessionResult};
 use crate::ime_session::{exact_matches_first, offset_index, recompute_segment_ranges_and_raw, ImeSession};
@@ -15,6 +18,39 @@ use crate::segment_model::{
     build_segmented_session, move_session_focus, normalize_visible_suggestions,
     reflow_segmented_session_from_selection, SegmentedSession,
 };
+
+/// A segmented refinement computed *off* the session lock (the byT5 model runs while producing
+/// this), then applied back under a brief lock. Carries exactly what `apply_segmented_refinement`
+/// assigns, so the slow model compute never holds the session mutex.
+pub struct SegmentedRefinement {
+    pub(crate) segmented_session: Option<SegmentedSession>,
+    pub(crate) candidates: Vec<String>,
+}
+
+/// The model compute for a segmented refinement — **pure**: reads the refiner + input + history,
+/// returns the result, mutates nothing. This is where the byT5 model time is spent, so it is the
+/// part that must run OFF the session lock. The adapter calls it between
+/// [`ImeSession::refine_inputs`] (snapshot under a brief lock) and
+/// [`ImeSession::apply_segmented_refinement`] (apply under a brief lock).
+pub fn compute_segmented_refinement(
+    refiner: &Transliterator,
+    raw: &str,
+    history: &HashMap<String, usize>,
+) -> SegmentedRefinement {
+    let observation = refiner.shadow_observation(raw, history);
+    let segmented_session = build_segmented_session(&observation, raw, history, &|input, hist| {
+        exact_matches_first(refiner, input, normalize_visible_suggestions(refiner.suggest(input, hist)))
+    });
+    let candidates = exact_matches_first(
+        refiner,
+        raw,
+        normalize_visible_suggestions(refiner.suggest(raw, history)),
+    );
+    SegmentedRefinement {
+        segmented_session,
+        candidates,
+    }
+}
 
 impl ImeSession {
     pub(crate) fn handle_left(&mut self) -> SessionResult {
@@ -217,22 +253,57 @@ impl ImeSession {
         if self.segmented_session.is_some() && self.selection_touched {
             return true;
         }
-        let Some(refiner) = self.visible_refiner.as_ref() else {
+        let Some(refiner) = self.visible_refiner.clone() else {
             self.rebuild_segmented_session_from_observation();
             return self.segmented_session.is_some();
         };
-        // Compute everything with immutable borrows first, then assign (borrow-checker friendly).
-        let observation = refiner.shadow_observation(&self.composition_raw, &self.history);
-        let built = build_segmented_session(&observation, &self.composition_raw, &self.history, &|input, history| {
-            exact_matches_first(refiner, input, normalize_visible_suggestions(refiner.suggest(input, history)))
-        });
-        let flat = exact_matches_first(
-            refiner,
-            &self.composition_raw,
-            normalize_visible_suggestions(refiner.suggest(&self.composition_raw, &self.history)),
-        );
-        self.segmented_session = built;
-        self.candidates = flat;
+        // Same compute as the lock-free path; synchronous here so the apply always matches.
+        let refinement = compute_segmented_refinement(&refiner, &self.composition_raw, &self.history);
+        self.segmented_session = refinement.segmented_session;
+        self.candidates = refinement.candidates;
+        self.selected_index = 0;
+        self.segmented_session.is_some()
+    }
+
+    /// Snapshot the inputs a lock-free refine needs (all cheap clones — `Arc` bump, two small
+    /// copies), or `None` if a refine shouldn't run. The caller runs [`compute_segmented_refinement`]
+    /// OFF the session lock, then re-locks for [`Self::apply_segmented_refinement`].
+    pub fn refine_inputs(&self, raw: &str) -> Option<(Arc<Transliterator>, String, HashMap<String, usize>)> {
+        if self.options.segmented_preview != SegmentedPreviewMode::Enabled {
+            return None;
+        }
+        if self.segment_edit_state.is_some() {
+            return None;
+        }
+        if self.composition_raw.is_empty() || self.composition_raw != raw {
+            return None;
+        }
+        if self.segmented_session.is_some() && self.selection_touched {
+            return None;
+        }
+        let refiner = self.visible_refiner.clone()?;
+        Some((refiner, self.composition_raw.clone(), self.history.clone()))
+    }
+
+    /// Apply a refinement computed off-lock (see [`SegmentedRefinement`]). Re-validates the same
+    /// guards as the inline path against the *current* session state: if the composition changed
+    /// while the model ran (`composition_raw != raw`), the stale refinement is discarded rather
+    /// than clobbering the candidates the user is now looking at.
+    pub fn apply_segmented_refinement(&mut self, raw: &str, refinement: SegmentedRefinement) -> bool {
+        if self.options.segmented_preview != SegmentedPreviewMode::Enabled {
+            return false;
+        }
+        if self.segment_edit_state.is_some() {
+            return self.segmented_session.is_some();
+        }
+        if self.composition_raw.is_empty() || self.composition_raw != raw {
+            return false; // staleness guard
+        }
+        if self.segmented_session.is_some() && self.selection_touched {
+            return true;
+        }
+        self.segmented_session = refinement.segmented_session;
+        self.candidates = refinement.candidates;
         self.selected_index = 0;
         self.segmented_session.is_some()
     }
@@ -258,6 +329,30 @@ mod tests {
     use crate::test_support::{
         phase_a_session_without_segmented_preview, segmented_default_session_like_ibus_bridge, session, type_ascii,
     };
+
+    // Lock-free refine: the model runs OFF the session lock, then the result is applied. If the
+    // user typed more while it computed, the composition no longer matches and the stale
+    // refinement must be discarded rather than clobber the current candidates.
+    #[test]
+    fn apply_discards_refinement_when_composition_changed() {
+        let mut session = session();
+        type_ascii(&mut session, "khnhomtov");
+        let before = session.snapshot().candidates.clone();
+
+        // A refinement computed against an older composition ("oldraw" != current "khnhomtov").
+        let stale = super::SegmentedRefinement {
+            segmented_session: None,
+            candidates: vec!["STALE".to_string()],
+        };
+        let applied = session.apply_segmented_refinement("oldraw", stale);
+
+        assert!(!applied, "stale refinement must be discarded");
+        assert_eq!(
+            session.snapshot().candidates,
+            before,
+            "candidates must not be clobbered by a stale apply"
+        );
+    }
 
     #[test]
     fn segmented_preview_can_be_disabled_for_phase_a_sessions() {

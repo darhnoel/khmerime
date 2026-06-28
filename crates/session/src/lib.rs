@@ -39,3 +39,4 @@ pub use crate::adapter_contract::{
     SessionCommand, SessionResult, SessionSnapshot, MAX_PERSISTED_HISTORY_WORD_CHARS,
 };
 pub use crate::ime_session::{ImeSession, ImeSessionBuilder};
+pub use crate::segmented_session::{compute_segmented_refinement, SegmentedRefinement};
