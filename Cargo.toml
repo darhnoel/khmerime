@@ -32,6 +32,7 @@ autobins = false
 default = []
 wfst-decoder = ["khmerime_core/wfst-decoder"]
 fetch-data = ["khmerime_core/fetch-data"]
+model-provider = ["khmerime_core/model-provider"]
 cli = []
 
 [dependencies]

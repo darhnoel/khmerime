@@ -11,6 +11,10 @@ path = "src/lib.rs"
 name = "uniffi-bindgen"
 path = "src/bin/uniffi-bindgen.rs"
 
+[features]
+# Bundle the optional model span-proposal provider into the macOS IME.
+model-provider = ["khmerime_core/model-provider"]
+
 [dependencies]
 khmerime_core    = { path = "../../crates/core" }
 khmerime_session = { path = "../../crates/session" }

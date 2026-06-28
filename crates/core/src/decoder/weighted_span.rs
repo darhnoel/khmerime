@@ -5,7 +5,7 @@ use crate::roman_lookup::{char_ngrams, roman_search_variants, LegacyData, Ranked
 
 use super::{
     elapsed_decode_us, start_decode_timer, DecodeCandidate, DecodeFailure, DecodeRequest, DecodeResult, DecodeSegment,
-    Decoder, DecoderConfig,
+    provider_for_mode, Decoder, DecoderConfig, SpanProposal, SpanProposalProvider, SpanProposalRequest,
 };
 
 const MIN_SPAN_LEN: usize = 3;
@@ -85,14 +85,20 @@ impl BeamItem {
     }
 }
 
+
+const WHOLE_DICTIONARY_TARGET_MIN_SPAN_LEN: usize = 5;
+const WHOLE_DICTIONARY_TARGET_MIN_EDIT: f64 = 0.72;
+
 pub(crate) struct WeightedSpanDecoder {
+    span_proposer: Option<std::sync::Arc<dyn SpanProposalProvider>>,
     data: Arc<LegacyData>,
     config: DecoderConfig,
 }
 
 impl WeightedSpanDecoder {
     pub(crate) fn new(data: Arc<LegacyData>, config: DecoderConfig) -> Self {
-        Self { data, config }
+        let span_proposer = provider_for_mode(config.span_proposal_mode);
+        Self { data, config, span_proposer }
     }
 
     fn decode_with_beam(&self, request: &DecodeRequest<'_>, started_at: super::DecodeTimer) -> Vec<BeamItem> {
@@ -101,6 +107,18 @@ impl WeightedSpanDecoder {
             return Vec::new();
         }
         let exact_full_span = self.decode_exact_full_span(request, &chars, started_at);
+
+        if self.config.interactive_mode && self.span_proposer.is_some() {
+            let proposed = self.decode_with_span_proposals(request, &chars, started_at);
+            if !proposed.is_empty() {
+                let mut finals = proposed;
+                finals.extend(self.decode_whole_dictionary_span(request, &chars, started_at));
+                finals.extend(exact_full_span);
+                finals.sort_by(|left, right| compare_beam_items(left, right, &self.config));
+                finals.truncate(self.config.max_candidates.max(self.config.beam_width));
+                return finals;
+            }
+        }
 
         if self.config.interactive_mode && self.has_anchor_chunks(request) {
             let anchored = self.decode_with_anchors(request, &chars, started_at);
@@ -683,6 +701,217 @@ impl WeightedSpanDecoder {
             })
             .collect()
     }
+
+    fn decode_whole_dictionary_span(
+        &self,
+        request: &DecodeRequest<'_>,
+        chars: &[char],
+        started_at: super::DecodeTimer,
+    ) -> Vec<BeamItem> {
+        if self.over_budget(started_at) {
+            return Vec::new();
+        }
+        let span = chars.iter().collect::<String>();
+        self.rerank_span_candidates_with_context(0, chars.len(), &span, &request.composer.normalized)
+            .into_iter()
+            .filter(|candidate| self.is_strong_whole_dictionary_target(candidate, chars.len()))
+            .map(|candidate| {
+                let mut beam = self.extend_beam(BeamItem::default(), &candidate, request);
+                beam.scores.segmentation += 26_000;
+                beam.scores.history += final_history_score(request.history, &beam.final_text());
+                beam
+            })
+            .collect()
+    }
+
+    fn is_strong_whole_dictionary_target(&self, candidate: &SpanCandidate, full_len: usize) -> bool {
+        candidate.start == 0
+            && candidate.end == full_len
+            && full_len >= WHOLE_DICTIONARY_TARGET_MIN_SPAN_LEN
+            && candidate.edit_similarity >= WHOLE_DICTIONARY_TARGET_MIN_EDIT
+            && candidate.output.split_whitespace().count() == 1
+            && self.data.target_frequency_for(&candidate.output) > RARE_ENTRY_FREQUENCY_MAX
+    }
+
+    fn apply_whole_dictionary_target_bonus(&self, candidate: &mut SpanCandidate, full_input: &str) {
+        let full_len = full_input.chars().count();
+        let span_len = candidate.end.saturating_sub(candidate.start);
+        if candidate.start != 0
+            || candidate.end != full_len
+            || span_len < WHOLE_DICTIONARY_TARGET_MIN_SPAN_LEN
+            || candidate.edit_similarity < WHOLE_DICTIONARY_TARGET_MIN_EDIT
+            || candidate.output.split_whitespace().count() != 1
+        {
+            return;
+        }
+
+        let frequency = self.data.target_frequency_for(&candidate.output);
+        if frequency <= RARE_ENTRY_FREQUENCY_MAX {
+            return;
+        }
+
+        let frequency_bonus = (((frequency + 1) as f64).ln() * 420.0).round() as i32;
+        candidate.score += 2_800 + frequency_bonus.min(2_400);
+        candidate.score_bps = score_to_bps(candidate.score);
+    }
+
+    fn decode_with_span_proposals(
+        &self,
+        request: &DecodeRequest<'_>,
+        chars: &[char],
+        started_at: super::DecodeTimer,
+    ) -> Vec<BeamItem> {
+        let Some(provider) = &self.span_proposer else {
+            return Vec::new();
+        };
+
+        let mut beams = vec![Vec::<BeamItem>::new(); chars.len() + 1];
+        beams[0].push(BeamItem::default());
+
+        for start in 0..chars.len() {
+            if self.over_budget(started_at) {
+                break;
+            }
+            if beams[start].is_empty() {
+                continue;
+            }
+
+            let current = beams[start].clone();
+            for end in provider.candidate_ends(&request.composer.normalized, start, chars) {
+                if end <= start || end > chars.len() {
+                    continue;
+                }
+                let span = chars[start..end].iter().collect::<String>();
+                let candidates = self.proposed_span_candidates(start, end, &span, &request.composer.normalized);
+                for beam in &current {
+                    for candidate in &candidates {
+                        let next = self.extend_beam(beam.clone(), candidate, request);
+                        let bucket = &mut beams[candidate.end];
+                        bucket.push(next);
+                        prune_beam(bucket, self.config.beam_width, &self.config);
+                    }
+                }
+            }
+        }
+
+        let mut finals = beams[chars.len()]
+            .iter()
+            .cloned()
+            .map(|mut item| {
+                item.scores.segmentation += 18_000;
+                item.scores.history += final_history_score(request.history, &item.final_text());
+                item
+            })
+            .collect::<Vec<_>>();
+        finals.sort_by(|left, right| compare_beam_items(left, right, &self.config));
+        finals.truncate(self.config.max_candidates.max(self.config.beam_width));
+        finals
+    }
+
+    fn rerank_span_candidates_with_context(
+        &self,
+        start: usize,
+        end: usize,
+        span: &str,
+        full_input: &str,
+    ) -> Vec<SpanCandidate> {
+        let search_keys = roman_search_variants(span);
+        if search_keys.is_empty() {
+            return Vec::new();
+        }
+
+        let raw_key = search_keys.first().map(String::as_str).unwrap_or(span);
+        let retrieved = self.retrieve_candidates(&search_keys, raw_key);
+        let has_raw_exact_hit = retrieved.iter().any(|(_, signals)| signals.raw_exact_hit);
+        let has_exact_hit = retrieved.iter().any(|(_, signals)| signals.exact_hit);
+
+        let mut best_by_output = HashMap::<String, SpanCandidate>::new();
+        for (entry_index, signals) in retrieved {
+            if has_raw_exact_hit && !signals.raw_exact_hit {
+                continue;
+            }
+            if has_exact_hit && !signals.exact_hit {
+                continue;
+            }
+            let entry = self.data.ranked_entry(entry_index);
+            if let Some(mut candidate) = self.score_span_candidate(start, end, span, &entry, &search_keys, &signals) {
+                self.apply_whole_dictionary_target_bonus(&mut candidate, full_input);
+                match best_by_output.get(candidate.output.as_str()) {
+                    Some(current) if !compare_span_candidates(current, &candidate).is_gt() => {}
+                    _ => {
+                        best_by_output.insert(candidate.output.clone(), candidate);
+                    }
+                }
+            }
+        }
+        for candidate in self.proposed_span_candidates(start, end, span, full_input) {
+            match best_by_output.get(candidate.output.as_str()) {
+                Some(current) if !compare_span_candidates(current, &candidate).is_gt() => {}
+                _ => {
+                    best_by_output.insert(candidate.output.clone(), candidate);
+                }
+            }
+        }
+
+        let mut ranked = best_by_output.into_values().collect::<Vec<_>>();
+        ranked.sort_by(|left, right| compare_span_candidates(left, right));
+        ranked.truncate(self.config.beam_candidates_per_span);
+        ranked
+    }
+
+    fn proposed_span_candidates(&self, start: usize, end: usize, span: &str, full_input: &str) -> Vec<SpanCandidate> {
+        let Some(provider) = &self.span_proposer else {
+            return Vec::new();
+        };
+        provider
+            .propose(&SpanProposalRequest {
+                full_input,
+                span,
+                start,
+                end,
+            })
+            .into_iter()
+            .filter_map(|proposal| self.span_candidate_from_proposal(start, end, span, proposal))
+            .collect()
+    }
+
+    fn span_candidate_from_proposal(
+        &self,
+        start: usize,
+        end: usize,
+        span: &str,
+        proposal: SpanProposal,
+    ) -> Option<SpanCandidate> {
+        if proposal.output.is_empty() || !self.data.has_target(&proposal.output) {
+            return None;
+        }
+
+        let confidence = proposal.confidence_bps.min(10_000);
+        let span_len = end.saturating_sub(start) as i32;
+        let score = 3_200
+            + (i32::from(confidence) * 5_200 / 10_000)
+            + frequency_prior(self.data.target_frequency_for(&proposal.output))
+            + span_len * 220;
+
+        Some(SpanCandidate {
+            start,
+            end,
+            input: span.to_owned(),
+            output: proposal.output,
+            recovered_roman: if proposal.recovered_roman.is_empty() {
+                span.to_owned()
+            } else {
+                proposal.recovered_roman
+            },
+            first_tag: None,
+            last_tag: None,
+            score,
+            score_bps: score_to_bps(score),
+            edit_similarity: f64::from(confidence) / 10_000.0,
+        })
+    }
+
+
 }
 
 impl Decoder for WeightedSpanDecoder {

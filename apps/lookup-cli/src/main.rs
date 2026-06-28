@@ -12,7 +12,7 @@ use std::process;
 
 use roman_lookup::{
     DecoderConfig, DecoderMode, ImeSession, ImeSessionOptions, SegmentedPreviewMode, ShadowObservation, ShadowSummary,
-    Transliterator,
+    SpanProposalMode, Transliterator,
 };
 
 fn main() {
@@ -75,6 +75,17 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                         });
                 index += 2;
             }
+            "--span-proposals" => {
+                let Some(mode) = args.get(index + 1) else {
+                    print_usage(&args[0]);
+                    process::exit(2);
+                };
+                config.span_proposal_mode = parse_span_proposal_mode(mode).unwrap_or_else(|| {
+                    eprintln!("invalid span proposal mode: {}", mode);
+                    process::exit(2);
+                });
+                index += 2;
+            }
             "--emit-shadow-rows" => {
                 emit_shadow_rows = true;
                 index += 1;
@@ -118,7 +129,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                 print_usage(&args[0]);
                 process::exit(2);
             };
-            run_segmented_dump(data_path, query)?;
+            run_segmented_dump(data_path, config, query)?;
         }
         "shadow-eval" => {
             let Some(path) = args.get(index) else {
@@ -151,18 +162,21 @@ fn load_transliterator(
 fn print_usage(bin: &str) {
     eprintln!("Usage:");
     eprintln!(
-        "  {} [--data <path/to/data.csv|data.tsv>] [--decoder-mode legacy|shadow|weighted-span|wfst|hybrid] [--shadow-log] [--shadow-sample-bps 0..10000] stats",
+        "  {} [--data <path/to/data.csv|data.tsv>] [--decoder-mode legacy|shadow|weighted-span|wfst|hybrid] [--shadow-log] [--shadow-sample-bps 0..10000] [--span-proposals disabled|static-test] stats",
         bin
     );
     eprintln!(
-        "  {} [--data <path/to/data.csv|data.tsv>] [--decoder-mode legacy|shadow|weighted-span|wfst|hybrid] [--shadow-log] [--shadow-sample-bps 0..10000] suggest <roman>",
+        "  {} [--data <path/to/data.csv|data.tsv>] [--decoder-mode legacy|shadow|weighted-span|wfst|hybrid] [--shadow-log] [--shadow-sample-bps 0..10000] [--span-proposals disabled|static-test] suggest <roman>",
         bin
     );
     eprintln!(
-        "  {} [--data <path/to/data.csv|data.tsv>] [--decoder-mode legacy|shadow|weighted-span|wfst|hybrid] [--emit-shadow-rows] [--output <report.txt>] shadow-eval <queries.txt>",
+        "  {} [--data <path/to/data.csv|data.tsv>] [--decoder-mode legacy|shadow|weighted-span|wfst|hybrid] [--span-proposals disabled|static-test] [--emit-shadow-rows] [--output <report.txt>] shadow-eval <queries.txt>",
         bin
     );
-    eprintln!("  {} [--data <path/to/data.csv|data.tsv>] segmented <roman>", bin);
+    eprintln!(
+        "  {} [--data <path/to/data.csv|data.tsv>] [--span-proposals disabled|static-test] segmented <roman>",
+        bin
+    );
 }
 
 fn parse_decoder_mode(value: &str) -> Option<DecoderMode> {
@@ -175,15 +189,40 @@ fn parse_decoder_mode(value: &str) -> Option<DecoderMode> {
     }
 }
 
-fn run_segmented_dump(data_path: Option<String>, roman: &str) -> Result<(), Box<dyn std::error::Error>> {
+fn parse_span_proposal_mode(value: &str) -> Option<SpanProposalMode> {
+    match value {
+        "disabled" | "none" | "off" => Some(SpanProposalMode::Disabled),
+        "static-test" | "static_test" | "static" => Some(SpanProposalMode::StaticTest),
+        "model" => Some(SpanProposalMode::Model),
+        _ => None,
+    }
+}
+
+fn run_segmented_dump(
+    data_path: Option<String>,
+    config: DecoderConfig,
+    roman: &str,
+) -> Result<(), Box<dyn std::error::Error>> {
     // Match the ibus bridge's full-engine configuration.
-    let live = load_transliterator(data_path.clone(), DecoderConfig::shadow_interactive())?;
+    let live_mode = if config.mode == DecoderMode::Legacy {
+        DecoderMode::Shadow
+    } else {
+        config.mode
+    };
+    let live = load_transliterator(
+        data_path.clone(),
+        DecoderConfig::shadow_interactive()
+            .with_mode(live_mode)
+            .with_span_proposal_mode(config.span_proposal_mode),
+    )?;
     let mut visible_config = DecoderConfig::shadow_interactive().with_mode(DecoderMode::Hybrid);
+    visible_config.span_proposal_mode = config.span_proposal_mode;
     visible_config.wfst_max_latency_ms = 75;
     let visible_refiner = load_transliterator(data_path.clone(), visible_config)?;
     let mut commit_config = DecoderConfig::default()
         .with_mode(DecoderMode::Hybrid)
         .with_shadow_log(false);
+    commit_config.span_proposal_mode = config.span_proposal_mode;
     commit_config.wfst_max_latency_ms = 150;
     let commit_refiner = load_transliterator(data_path, commit_config)?;
     let mut session = ImeSession::builder(live, HashMap::new())

@@ -8,6 +8,9 @@
 //! [`crate::segment_edit_mode`].
 
 use std::collections::HashMap;
+use std::sync::Arc;
+
+use khmerime_core::Transliterator;
 
 use crate::adapter_contract::{SegmentedPreviewMode, SessionResult};
 use crate::ime_session::{exact_matches_first, offset_index, recompute_segment_ranges_and_raw, ImeSession};
@@ -15,6 +18,39 @@ use crate::segment_model::{
     build_segmented_session, move_session_focus, normalize_visible_suggestions,
     reflow_segmented_session_from_selection, SegmentedSession,
 };
+
+/// A segmented refinement computed *off* the session lock (the model runs while producing
+/// this), then applied back under a brief lock. Carries exactly what `apply_segmented_refinement`
+/// assigns, so the slow model compute never holds the session mutex.
+pub struct SegmentedRefinement {
+    pub(crate) segmented_session: Option<SegmentedSession>,
+    pub(crate) candidates: Vec<String>,
+}
+
+/// The model compute for a segmented refinement — **pure**: reads the refiner + input + history,
+/// returns the result, mutates nothing. This is where the model time is spent, so it is the
+/// part that must run OFF the session lock. The adapter calls it between
+/// [`ImeSession::refine_inputs`] (snapshot under a brief lock) and
+/// [`ImeSession::apply_segmented_refinement`] (apply under a brief lock).
+pub fn compute_segmented_refinement(
+    refiner: &Transliterator,
+    raw: &str,
+    history: &HashMap<String, usize>,
+) -> SegmentedRefinement {
+    let observation = refiner.shadow_observation(raw, history);
+    let segmented_session = build_segmented_session(&observation, raw, history, &|input, hist| {
+        exact_matches_first(refiner, input, normalize_visible_suggestions(refiner.suggest(input, hist)))
+    });
+    let candidates = exact_matches_first(
+        refiner,
+        raw,
+        normalize_visible_suggestions(refiner.suggest(raw, history)),
+    );
+    SegmentedRefinement {
+        segmented_session,
+        candidates,
+    }
+}
 
 impl ImeSession {
     pub(crate) fn handle_left(&mut self) -> SessionResult {
@@ -201,6 +237,77 @@ impl ImeSession {
         self.segmented_session.is_some()
     }
 
+    /// Deferred/debounced refine: rebuild the segmented preview using the VISIBLE refiner
+    /// (e.g. the model span-proposal provider) instead of the cheap live engine. Called off
+    /// the keystroke hot path. Falls back to the live rebuild if no visible refiner is set.
+    pub fn refine_segmented_with_visible_refiner(&mut self, raw_preedit: &str) -> bool {
+        if self.options.segmented_preview != SegmentedPreviewMode::Enabled {
+            return false;
+        }
+        if self.segment_edit_state.is_some() {
+            return self.segmented_session.is_some();
+        }
+        if self.composition_raw.is_empty() || self.composition_raw != raw_preedit {
+            return false;
+        }
+        if self.segmented_session.is_some() && self.selection_touched {
+            return true;
+        }
+        let Some(refiner) = self.visible_refiner.clone() else {
+            self.rebuild_segmented_session_from_observation();
+            return self.segmented_session.is_some();
+        };
+        // Same compute as the lock-free path; synchronous here so the apply always matches.
+        let refinement = compute_segmented_refinement(&refiner, &self.composition_raw, &self.history);
+        self.segmented_session = refinement.segmented_session;
+        self.candidates = refinement.candidates;
+        self.selected_index = 0;
+        self.segmented_session.is_some()
+    }
+
+    /// Snapshot the inputs a lock-free refine needs (all cheap clones — `Arc` bump, two small
+    /// copies), or `None` if a refine shouldn't run. The caller runs [`compute_segmented_refinement`]
+    /// OFF the session lock, then re-locks for [`Self::apply_segmented_refinement`].
+    pub fn refine_inputs(&self, raw: &str) -> Option<(Arc<Transliterator>, String, HashMap<String, usize>)> {
+        if self.options.segmented_preview != SegmentedPreviewMode::Enabled {
+            return None;
+        }
+        if self.segment_edit_state.is_some() {
+            return None;
+        }
+        if self.composition_raw.is_empty() || self.composition_raw != raw {
+            return None;
+        }
+        if self.segmented_session.is_some() && self.selection_touched {
+            return None;
+        }
+        let refiner = self.visible_refiner.clone()?;
+        Some((refiner, self.composition_raw.clone(), self.history.clone()))
+    }
+
+    /// Apply a refinement computed off-lock (see [`SegmentedRefinement`]). Re-validates the same
+    /// guards as the inline path against the *current* session state: if the composition changed
+    /// while the model ran (`composition_raw != raw`), the stale refinement is discarded rather
+    /// than clobbering the candidates the user is now looking at.
+    pub fn apply_segmented_refinement(&mut self, raw: &str, refinement: SegmentedRefinement) -> bool {
+        if self.options.segmented_preview != SegmentedPreviewMode::Enabled {
+            return false;
+        }
+        if self.segment_edit_state.is_some() {
+            return self.segmented_session.is_some();
+        }
+        if self.composition_raw.is_empty() || self.composition_raw != raw {
+            return false; // staleness guard
+        }
+        if self.segmented_session.is_some() && self.selection_touched {
+            return true;
+        }
+        self.segmented_session = refinement.segmented_session;
+        self.candidates = refinement.candidates;
+        self.selected_index = 0;
+        self.segmented_session.is_some()
+    }
+
     fn rebuild_segmented_session_from_observation(&mut self) {
         let observation = self
             .transliterator
@@ -222,6 +329,30 @@ mod tests {
     use crate::test_support::{
         phase_a_session_without_segmented_preview, segmented_default_session_like_ibus_bridge, session, type_ascii,
     };
+
+    // Lock-free refine: the model runs OFF the session lock, then the result is applied. If the
+    // user typed more while it computed, the composition no longer matches and the stale
+    // refinement must be discarded rather than clobber the current candidates.
+    #[test]
+    fn apply_discards_refinement_when_composition_changed() {
+        let mut session = session();
+        type_ascii(&mut session, "khnhomtov");
+        let before = session.snapshot().candidates.clone();
+
+        // A refinement computed against an older composition ("oldraw" != current "khnhomtov").
+        let stale = super::SegmentedRefinement {
+            segmented_session: None,
+            candidates: vec!["STALE".to_string()],
+        };
+        let applied = session.apply_segmented_refinement("oldraw", stale);
+
+        assert!(!applied, "stale refinement must be discarded");
+        assert_eq!(
+            session.snapshot().candidates,
+            before,
+            "candidates must not be clobbered by a stale apply"
+        );
+    }
 
     #[test]
     fn segmented_preview_can_be_disabled_for_phase_a_sessions() {
@@ -307,5 +438,40 @@ mod tests {
         let right = session.process_key_event(0xFF53, 0, 0);
         assert!(!left.consumed);
         assert!(!right.consumed);
+    }
+
+    #[test]
+    fn visible_refine_does_not_clobber_a_touched_selection() {
+        // Regression (macOS debounced pause-refine): a visible refine must NOT reset the
+        // user's in-progress candidate selection. The selection_touched guard protects it.
+        let mut session = session();
+        type_ascii(&mut session, "khnhomtov");
+        assert!(session.snapshot().segmented_active);
+        let raw = session.snapshot().raw_preedit.clone();
+
+        let down = session.process_key_event(0xFF54, 0, 0); // Down -> select candidate 1
+        assert!(down.consumed);
+        assert_eq!(session.snapshot().selected_index, Some(1));
+
+        // Simulate the debounced pause-refine firing after the selection.
+        session.refine_segmented_with_visible_refiner(&raw);
+
+        assert_eq!(
+            session.snapshot().selected_index,
+            Some(1),
+            "visible refine must not reset a selection the user already made"
+        );
+    }
+
+    #[test]
+    fn visible_refine_rebuilds_segmented_preview_when_untouched() {
+        // Happy path: with no manual selection yet, the pause-refine (re)builds the
+        // segmented preview through the visible refiner and stays segmented.
+        let mut session = segmented_default_session_like_ibus_bridge();
+        type_ascii(&mut session, "khnhomtov");
+        let raw = session.snapshot().raw_preedit.clone();
+        let changed = session.refine_segmented_with_visible_refiner(&raw);
+        assert!(changed, "refine should build a segmented preview when untouched");
+        assert!(session.snapshot().segmented_active);
     }
 }
