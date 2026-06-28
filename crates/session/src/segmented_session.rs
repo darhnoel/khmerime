@@ -19,7 +19,7 @@ use crate::segment_model::{
     reflow_segmented_session_from_selection, SegmentedSession,
 };
 
-/// A segmented refinement computed *off* the session lock (the byT5 model runs while producing
+/// A segmented refinement computed *off* the session lock (the model runs while producing
 /// this), then applied back under a brief lock. Carries exactly what `apply_segmented_refinement`
 /// assigns, so the slow model compute never holds the session mutex.
 pub struct SegmentedRefinement {
@@ -28,7 +28,7 @@ pub struct SegmentedRefinement {
 }
 
 /// The model compute for a segmented refinement — **pure**: reads the refiner + input + history,
-/// returns the result, mutates nothing. This is where the byT5 model time is spent, so it is the
+/// returns the result, mutates nothing. This is where the model time is spent, so it is the
 /// part that must run OFF the session lock. The adapter calls it between
 /// [`ImeSession::refine_inputs`] (snapshot under a brief lock) and
 /// [`ImeSession::apply_segmented_refinement`] (apply under a brief lock).
@@ -238,7 +238,7 @@ impl ImeSession {
     }
 
     /// Deferred/debounced refine: rebuild the segmented preview using the VISIBLE refiner
-    /// (e.g. the byT5 span-proposal engine) instead of the cheap live engine. Called off
+    /// (e.g. the model span-proposal provider) instead of the cheap live engine. Called off
     /// the keystroke hot path. Falls back to the live rebuild if no visible refiner is set.
     pub fn refine_segmented_with_visible_refiner(&mut self, raw_preedit: &str) -> bool {
         if self.options.segmented_preview != SegmentedPreviewMode::Enabled {

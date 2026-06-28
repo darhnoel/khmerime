@@ -193,7 +193,7 @@ fn parse_span_proposal_mode(value: &str) -> Option<SpanProposalMode> {
     match value {
         "disabled" | "none" | "off" => Some(SpanProposalMode::Disabled),
         "static-test" | "static_test" | "static" => Some(SpanProposalMode::StaticTest),
-        "byt5" | "byT5" => Some(SpanProposalMode::Byt5),
+        "model" => Some(SpanProposalMode::Model),
         _ => None,
     }
 }

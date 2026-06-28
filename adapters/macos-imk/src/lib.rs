@@ -93,7 +93,7 @@ fn macos_live_decoder_config() -> DecoderConfig {
         config = config.with_mode(mode);
     }
     // Live keystroke path stays deterministic. Only the instant static-test provider may
-    // attach here; the byT5 model runs on the debounced visible refiner instead.
+    // attach here; the model runs on the debounced visible refiner instead.
     if std::env::var("KHMERIME_SPAN_PROPOSALS").ok().as_deref() == Some("static-test") {
         config = config.with_static_span_proposals();
     }
@@ -244,7 +244,7 @@ impl MacosIMKSession {
             let live = Transliterator::from_default_data_with_config(macos_live_decoder_config())
                 .expect("compiled-in lexicon data must be valid");
 
-            // Visible refiner runs the heavier engine (incl. byT5) on the debounced pause,
+            // Visible refiner runs the heavier engine (incl. the model) on the debounced pause,
             // off the keystroke hot path. Loading it warms the model once here.
             let visible_refiner = Transliterator::from_default_data_with_config(macos_visible_refiner_config())
                 .expect("compiled-in lexicon data must be valid");
@@ -336,7 +336,7 @@ impl MacosIMKSession {
     }
 
     /// Debounced visible refine: re-run the segmented preview through the visible refiner
-    /// (the byT5 model) on the *current* composition. Called by Swift ~200ms after the last
+    /// (the model) on the *current* composition. Called by Swift ~200ms after the last
     /// keystroke. The model runs OFF the session lock, so it never blocks keystrokes.
     pub fn refine_visible(&self) -> MacosRenderState {
         let raw = self.with_session(|s| s.snapshot().raw_preedit.clone());
@@ -370,7 +370,7 @@ impl MacosIMKSession {
         }
     }
 
-    /// Run the byT5 visible refine WITHOUT holding the session lock across the model.
+    /// Run the model visible refine WITHOUT holding the session lock across the model.
     /// Snapshot inputs under a brief lock, run the model off-lock, then apply under a brief lock —
     /// dropping the result if a newer keystroke (generation bump) arrived while it computed.
     fn refine_off_lock(&self, raw: &str) -> MacosRenderState {
