@@ -12,8 +12,8 @@ name = "uniffi-bindgen"
 path = "src/bin/uniffi-bindgen.rs"
 
 [features]
-# Spike: bundle the byT5 span-proposal model into the macOS IME (candle).
-byt5 = ["khmerime_core/byt5"]
+# Bundle the optional model span-proposal provider into the macOS IME.
+model-provider = ["khmerime_core/model-provider"]
 
 [dependencies]
 khmerime_core    = { path = "../../crates/core" }

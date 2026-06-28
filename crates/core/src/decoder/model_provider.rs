@@ -17,7 +17,8 @@ use std::sync::{Arc, Mutex};
 use candle_core::{DType, Device, Tensor};
 use candle_nn::VarBuilder;
 
-use super::byt5_t5::{Config, T5ForConditionalGeneration};
+mod byt5_t5;
+use byt5_t5::{Config, T5ForConditionalGeneration};
 use super::span_proposal::{SpanProposal, SpanProposalProvider, SpanProposalRequest};
 
 const EOS: u32 = 1; // ByT5: pad=0, eos=1, unk=2, byte -> id = byte + 3
@@ -143,14 +144,14 @@ impl Model {
     }
 }
 
-pub(crate) struct Byt5SpanProposalProvider {
+pub(crate) struct ModelSpanProposalProvider {
     model: Mutex<Model>,
     trie: Node,
     beam_width: usize,
     top_k: usize,
 }
 
-impl Byt5SpanProposalProvider {
+impl ModelSpanProposalProvider {
     /// Build from env paths. Returns None (provider disabled) if anything is missing.
     pub(crate) fn load_from_env() -> Option<Arc<dyn SpanProposalProvider>> {
         let dir = std::env::var("KHMERIME_MODEL_DIR").ok()?;
@@ -183,7 +184,7 @@ impl Byt5SpanProposalProvider {
     }
 }
 
-impl SpanProposalProvider for Byt5SpanProposalProvider {
+impl SpanProposalProvider for ModelSpanProposalProvider {
     fn candidate_ends(&self, _full_input: &str, start: usize, chars: &[char]) -> Vec<usize> {
         // Offer sub-word spans so the lattice can assemble multi-word segmentations
         // (knhmttvsalarien -> knhm|ttv|salarien), not just a whole-input span. The decoder's
@@ -205,7 +206,7 @@ impl SpanProposalProvider for Byt5SpanProposalProvider {
                 output,
                 recovered_roman: request.span.to_owned(),
                 confidence_bps: 9_000u16.saturating_sub((rank as u16) * 1_000).max(5_000),
-                source: "byt5",
+                source: "model",
             })
             .collect()
     }

@@ -28,9 +28,9 @@ pub(crate) fn provider_for_mode(mode: SpanProposalMode) -> Option<Arc<dyn SpanPr
     match mode {
         SpanProposalMode::Disabled => None,
         SpanProposalMode::StaticTest => Some(Arc::new(StaticTestSpanProposalProvider)),
-        #[cfg(feature = "byt5")]
-        SpanProposalMode::Model => super::byt5_provider::Byt5SpanProposalProvider::load_from_env(),
-        #[cfg(not(feature = "byt5"))]
+        #[cfg(feature = "model-provider")]
+        SpanProposalMode::Model => super::model_provider::ModelSpanProposalProvider::load_from_env(),
+        #[cfg(not(feature = "model-provider"))]
         SpanProposalMode::Model => None,
     }
 }

@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [features]
-byt5 = ["roman_lookup/byt5"]
+model-provider = ["roman_lookup/model-provider"]
 
 [dependencies]
 roman_lookup = { path = "../.." }

@@ -8,8 +8,8 @@ default = []
 wfst-decoder = []
 fetch-data = []
 no-search-index = []
-# Spike: byT5 span-proposal provider (candle). Off by default so other platforms stay ML-free.
-byt5 = ["dep:candle-core", "dep:candle-nn", "dep:serde_json", "dep:serde_plain", "dep:tracing", "dep:anyhow"]
+# Optional model span-proposal provider. Off by default so other platforms stay model-free.
+model-provider = ["dep:candle-core", "dep:candle-nn", "dep:serde_json", "dep:serde_plain", "dep:tracing", "dep:anyhow"]
 
 [dependencies]
 khmerime_config = { path = "../khmerime_config" }

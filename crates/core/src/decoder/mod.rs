@@ -1,7 +1,5 @@
-#[cfg(feature = "byt5")]
-mod byt5_provider;
-#[cfg(feature = "byt5")]
-mod byt5_t5;
+#[cfg(feature = "model-provider")]
+mod model_provider;
 mod config;
 mod legacy;
 mod manager;
