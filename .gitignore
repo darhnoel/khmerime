@@ -69,3 +69,13 @@ adapters/macos-imk/swift/**/xcuserdata/
 adapters/macos-imk/swift/**/*.xcuserdata/
 adapters/macos-imk/swift/**/*.xcuserdatad/
 adapters/macos-imk/swift/**/*.xcuserstate
+
+# Local signing secrets — never commit (keep committed *.example templates)
+adapters/android-ime/keystore.properties
+adapters/ios-keyboard/ExportOptions.plist
+adapters/windows-tsf/signing.local.ps1
+*.jks
+*.keystore
+*.p12
+*.pfx
+*.mobileprovision
