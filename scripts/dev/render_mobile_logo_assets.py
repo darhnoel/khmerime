@@ -9,10 +9,12 @@ from __future__ import annotations
 
 import argparse
 import binascii
+import os
 import shutil
 import struct
 import subprocess
 import sys
+import tempfile
 import zlib
 from pathlib import Path
 
@@ -48,8 +50,9 @@ def main(argv: list[str] | None = None) -> int:
 
 
 def generate_ios_assets() -> None:
-    copy_square_png(ICON_DEFAULT_EXPORT, IOS_LOGO_PNG, "LogoCard")
-    flatten_png_alpha(ICON_DEFAULT_EXPORT, IOS_APPICON_PNG)
+    icon_source = default_icon_source()
+    copy_square_png(icon_source, IOS_LOGO_PNG, "LogoCard")
+    flatten_png_alpha(icon_source, IOS_APPICON_PNG)
     verify_app_icon(IOS_APPICON_PNG)
     print(f"generated {IOS_APPICON_PNG.relative_to(ROOT)}")
 
@@ -59,7 +62,54 @@ def generate_ios_assets() -> None:
 
 
 def generate_android_assets() -> None:
-    copy_square_png(ICON_DEFAULT_EXPORT, ANDROID_LOGO_PNG, "Android LogoCard")
+    copy_square_png(default_icon_source(), ANDROID_LOGO_PNG, "Android LogoCard")
+
+
+def default_icon_source() -> Path:
+    override = os.environ.get("KHMERIME_LOGO_SOURCE")
+    if override:
+        override_path = Path(override)
+        if override_path.exists():
+            return override_path
+        print(f"warning: KHMERIME_LOGO_SOURCE does not exist: {override_path}", file=sys.stderr)
+    if ICON_DEFAULT_EXPORT.exists():
+        return ICON_DEFAULT_EXPORT
+
+    fallback = Path(tempfile.gettempdir()) / "khmerime-mobile-logo-fallback-1024.png"
+    write_temporary_logo(fallback)
+    print(
+        "warning: local logo design export is missing; "
+        f"using temporary generated logo at {fallback}",
+        file=sys.stderr,
+    )
+    return fallback
+
+
+def write_temporary_logo(path: Path) -> None:
+    """Write a dependency-free temporary logo for CI/bootstrap builds.
+
+    The real source lives under local design exports and is intentionally not
+    required for Xcode Cloud post-clone. This keeps package builds unblocked;
+    designers can still override with KHMERIME_LOGO_SOURCE.
+    """
+    size = 1024
+    background = (226, 143, 88)
+    dark = (33, 29, 42)
+    ivory = (255, 248, 232)
+    rows: list[bytes] = []
+    for y in range(size):
+        row = bytearray()
+        for x in range(size):
+            pixel = background
+            if 200 <= x <= 824 and 200 <= y <= 824:
+                pixel = dark
+            if 280 <= x <= 744 and 280 <= y <= 744:
+                pixel = ivory
+            if 360 <= x <= 664 and 360 <= y <= 664:
+                pixel = dark
+            row.extend(pixel)
+        rows.append(bytes(row))
+    write_rgb_png(path, size, size, rows)
 
 
 def copy_square_png(source: Path, dest: Path, label: str) -> None:

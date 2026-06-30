@@ -1,6 +1,7 @@
 .PHONY: help web web-release web-phone web-local desktop stats suggest suggest-wfst suggest-shadow shadow-eval data-split data-build data-check lexicon-editor visualize-lexicon visualize-lexicon-streamlit download-page fmt test test-golden test-ui platform-check platform-check-linux platform-check-android platform-check-ios platform-check-macos platform-check-windows platform-ios-assets platform-android-assets platform-build-ios platform-test-ios platform-install-ios-sim platform-reinstall-ios-sim platform-install-ios-device platform-reinstall-ios-device platform-build-macos platform-diagnose-macos platform-install-macos platform-reinstall-macos platform-build-windows platform-install-windows platform-uninstall-windows platform-reinstall-windows platform-smoke-windows-notepad platform-smoke-windows-notepad-python windows-package linux-package macos-package android-package ios-package package ibus-install ibus-uninstall ibus-smoke paper-current paper-current-clean platform-test-android platform-build-android android-adb-device platform-install-android platform-reinstall-android setup-hooks
 
 DX ?= dx
+PYTHON ?= python3
 APP_DIR := apps/dioxus-app
 WEB_LOCAL_PORT ?= 4174
 CLI := cargo run -p khmerime_lookup_cli --bin lookup_cli --
@@ -308,10 +309,10 @@ platform-reinstall-android: android-adb-device platform-android-assets
 	adb shell ime set $(ANDROID_IME_SERVICE)
 
 platform-ios-assets:
-	.venv/bin/python scripts/dev/render_mobile_logo_assets.py ios
+	$(PYTHON) scripts/dev/render_mobile_logo_assets.py ios
 
 platform-android-assets:
-	.venv/bin/python scripts/dev/render_mobile_logo_assets.py android
+	$(PYTHON) scripts/dev/render_mobile_logo_assets.py android
 
 platform-build-ios: platform-ios-assets
 	cargo build -p khmerime_ios_keyboard --target $(IOS_TARGET_DEVICE) --release
