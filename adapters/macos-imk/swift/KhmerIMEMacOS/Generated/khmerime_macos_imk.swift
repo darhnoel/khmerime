@@ -593,6 +593,13 @@ public protocol MacosImkSessionProtocol: AnyObject, Sendable {
     func refineComposition(rawPreedit: String)  -> MacosRenderState
     
     /**
+     * Debounced visible refine: re-run the segmented preview through the visible refiner
+     * (the model) on the *current* composition. Called by Swift ~200ms after the last
+     * keystroke. The model runs OFF the session lock, so it never blocks keystrokes.
+     */
+    func refineVisible()  -> MacosRenderState
+    
+    /**
      * Called by the Swift layer when the visible refiner finishes building a
      * segmented preview (deferred mode). Rebuilds the segmented session if
      * `raw_preedit` still matches and no candidate has been touched.
@@ -753,6 +760,19 @@ open func refineComposition(rawPreedit: String) -> MacosRenderState  {
 }
     
     /**
+     * Debounced visible refine: re-run the segmented preview through the visible refiner
+     * (the model) on the *current* composition. Called by Swift ~200ms after the last
+     * keystroke. The model runs OFF the session lock, so it never blocks keystrokes.
+     */
+open func refineVisible() -> MacosRenderState  {
+    return try!  FfiConverterTypeMacosRenderState_lift(try! rustCall() {
+    uniffi_khmerime_macos_imk_fn_method_macosimksession_refine_visible(
+            self.uniffiCloneHandle(),$0
+    )
+})
+}
+    
+    /**
      * Called by the Swift layer when the visible refiner finishes building a
      * segmented preview (deferred mode). Rebuilds the segmented session if
      * `raw_preedit` still matches and no candidate has been touched.
@@ -859,6 +879,10 @@ public struct MacosCandidateDisplayEntry: Equatable, Hashable {
         self.recommended = recommended
         self.romanHints = romanHints
     }
+
+    
+
+    
 }
 
 #if compiler(>=6)
@@ -872,8 +896,8 @@ public struct FfiConverterTypeMacosCandidateDisplayEntry: FfiConverterRustBuffer
     public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> MacosCandidateDisplayEntry {
         return
             try MacosCandidateDisplayEntry(
-                output: FfiConverterString.read(from: &buf),
-                recommended: FfiConverterBool.read(from: &buf),
+                output: FfiConverterString.read(from: &buf), 
+                recommended: FfiConverterBool.read(from: &buf), 
                 romanHints: FfiConverterSequenceString.read(from: &buf)
         )
     }
@@ -936,7 +960,7 @@ public struct MacosRenderState: Equatable, Hashable {
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
-    public init(candidates: [String], candidateDisplay: [MacosCandidateDisplayEntry], selectedIndex: UInt64?,
+    public init(candidates: [String], candidateDisplay: [MacosCandidateDisplayEntry], selectedIndex: UInt64?, 
         /**
          * Raw roman preedit — used as marked text content (see ADR-0003).
          */preedit: String, segments: [MacosSegmentEntry], focusedSegmentIndex: UInt64?, 
@@ -980,7 +1004,7 @@ public struct FfiConverterTypeMacosRenderState: FfiConverterRustBuffer {
         return
             try MacosRenderState(
                 candidates: FfiConverterSequenceString.read(from: &buf), 
-                candidateDisplay: FfiConverterSequenceTypeMacosCandidateDisplayEntry.read(from: &buf),
+                candidateDisplay: FfiConverterSequenceTypeMacosCandidateDisplayEntry.read(from: &buf), 
                 selectedIndex: FfiConverterOptionUInt64.read(from: &buf), 
                 preedit: FfiConverterString.read(from: &buf), 
                 segments: FfiConverterSequenceTypeMacosSegmentEntry.read(from: &buf), 
@@ -1236,6 +1260,9 @@ private let initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_khmerime_macos_imk_checksum_method_macosimksession_refine_composition() != 53892) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_khmerime_macos_imk_checksum_method_macosimksession_refine_visible() != 52067) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_khmerime_macos_imk_checksum_method_macosimksession_refresh_segmented_preview() != 3180) {
