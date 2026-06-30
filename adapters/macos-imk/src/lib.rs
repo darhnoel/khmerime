@@ -68,28 +68,59 @@
 //! by name (prefixed `session_` instead of `bridge_`), plus macOS-specific tests for
 //! the keycode translation table.
 
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Condvar, Mutex};
 use std::time::Duration;
 
-use khmerime_core::{DecoderConfig, Transliterator};
+use khmerime_core::{DecoderConfig, DecoderMode, SpanProposalMode, Transliterator};
 use khmerime_session::{
-    CandidateDisplayEntry, ImeSession, ImeSessionOptions, NativeKeyEvent, SegmentPreviewEntry, SegmentedPreviewMode,
+    compute_segmented_refinement, CandidateDisplayEntry, ImeSession, ImeSessionOptions, NativeKeyEvent, SegmentPreviewEntry, SegmentedPreviewMode,
     SessionResult, SessionSnapshot,
 };
 
 uniffi::setup_scaffolding!("khmerime_macos_imk");
 
-// ── Key constants (XKB / X11 keyval space, same as all other adapters) ────────
+fn macos_live_decoder_config() -> DecoderConfig {
+    let mut config = DecoderConfig::shadow_interactive();
+    if let Ok(mode) = std::env::var("KHMERIME_DECODER_MODE") {
+        let mode = match mode.as_str() {
+            "hybrid" => DecoderMode::Hybrid,
+            "weighted-span" | "weighted_span" | "wfst" => DecoderMode::Wfst,
+            "legacy" => DecoderMode::Legacy,
+            "shadow" => DecoderMode::Shadow,
+            _ => config.mode,
+        };
+        config = config.with_mode(mode);
+    }
+    // Live keystroke path stays deterministic. Only the instant static-test provider may
+    // attach here; the model runs on the debounced visible refiner instead.
+    if std::env::var("KHMERIME_SPAN_PROPOSALS").ok().as_deref() == Some("static-test") {
+        config = config.with_static_span_proposals();
+    }
+    config
+}
 
-const KEY_BACKSPACE: u32 = 0xFF08;
-const KEY_RETURN: u32 = 0xFF0D;
-const KEY_SPACE: u32 = 0x20;
-const KEY_LEFT: u32 = 0xFF51;
-const KEY_RIGHT: u32 = 0xFF53;
-const KEY_UP: u32 = 0xFF52;
-const KEY_DOWN: u32 = 0xFF54;
-const KEY_TAB: u32 = 0xFF09;
-const KEY_ESCAPE: u32 = 0xFF1B;
+// Debounced visible refiner config — runs the heavier model off the keystroke hot path.
+fn macos_visible_refiner_config() -> DecoderConfig {
+    let mut config = DecoderConfig::shadow_interactive().with_mode(DecoderMode::Hybrid);
+    config.wfst_max_latency_ms = 250;
+    match std::env::var("KHMERIME_SPAN_PROPOSALS").ok().as_deref() {
+        Some("model") => config = config.with_span_proposal_mode(SpanProposalMode::Model),
+        Some("static-test") => config = config.with_static_span_proposals(),
+        _ => {}
+    }
+    config
+}
+
+/// Whether a span-proposal provider is configured. When false (dev default), the debounced
+/// visible refiner is not built at all — the pause does no work, so the seam stays inert until
+/// a provider is plugged in.
+fn span_provider_active() -> bool {
+    matches!(
+        std::env::var("KHMERIME_SPAN_PROPOSALS").ok().as_deref(),
+        Some("model") | Some("static-test")
+    )
+}
 
 fn key_event(keyval: u32, keycode: u32, state: u32) -> NativeKeyEvent {
     NativeKeyEvent { keyval, keycode, state }
@@ -196,6 +227,9 @@ fn render_state(snapshot: &SessionSnapshot, result: &SessionResult, ready: bool)
 pub struct MacosIMKSession {
     inner: Mutex<Option<ImeSession>>,
     ready: Arc<(Mutex<bool>, Condvar)>,
+    // Bumped on every keystroke. A lock-free refine captures it at snapshot and re-checks at
+    // apply, so a refinement made stale by newer typing is dropped instead of clobbering.
+    generation: AtomicU64,
 }
 
 #[uniffi::export]
@@ -209,6 +243,7 @@ impl MacosIMKSession {
         let session = Arc::new(MacosIMKSession {
             inner: Mutex::new(None),
             ready: Arc::new((Mutex::new(false), Condvar::new())),
+            generation: AtomicU64::new(0),
         });
         let s = session.clone();
         std::thread::spawn(move || {
@@ -216,22 +251,24 @@ impl MacosIMKSession {
             let history = std::collections::HashMap::new();
             let input_mode = khmerime_session::InputMode::Roman;
 
-            let live = Transliterator::from_default_data_with_config(DecoderConfig::shadow_interactive())
+            let live = Transliterator::from_default_data_with_config(macos_live_decoder_config())
                 .expect("compiled-in lexicon data must be valid");
 
-            // TODO: wire visible and commit refiners once ImeSession refiner
-            // constructor is available (mirrors IBus bridge Phase B).
-            // let visible_refiner = ...;
-            // let commit_refiner  = ...;
-
-            let ime = ImeSession::new_with_input_mode_and_options(
-                live,
-                history,
-                input_mode,
-                ImeSessionOptions {
+            // The visible refiner (heavier engine + any provider) runs on the debounced pause.
+            // Built ONLY when a provider is configured — otherwise the seam is inert: no refiner,
+            // so the pause does no work and dev-default behaves exactly as before the seam.
+            let mut builder = ImeSession::builder(live, history)
+                .input_mode(input_mode)
+                .options(ImeSessionOptions {
                     segmented_preview: SegmentedPreviewMode::Enabled,
-                },
-            );
+                });
+            if span_provider_active() {
+                let visible_refiner =
+                    Transliterator::from_default_data_with_config(macos_visible_refiner_config())
+                        .expect("compiled-in lexicon data must be valid");
+                builder = builder.visible_refiner(visible_refiner);
+            }
+            let ime = builder.build();
 
             *s.inner.lock().unwrap() = Some(ime);
             let (lock, cvar) = &*s.ready;
@@ -276,6 +313,7 @@ impl MacosIMKSession {
     /// NIDA mode via `keycode_mac_to_evdev`. `modifier_flags` is the raw
     /// `NSEvent.modifierFlags.rawValue` mapped to XKB-style modifier bits.
     pub fn handle_event(&self, keyval: u32, mac_keycode: u16, modifier_flags: u32) -> MacosRenderState {
+        self.generation.fetch_add(1, Ordering::Relaxed); // invalidates any in-flight refine
         let evdev_keycode = keycode_mac_to_evdev(mac_keycode);
         let xkb_state = modifier_flags_to_xkb_state(modifier_flags);
         self.with_session(|s| {
@@ -307,10 +345,15 @@ impl MacosIMKSession {
     /// segmented preview (deferred mode). Rebuilds the segmented session if
     /// `raw_preedit` still matches and no candidate has been touched.
     pub fn refresh_segmented_preview(&self, raw_preedit: String) -> MacosRenderState {
-        self.with_session(|s| {
-            s.refresh_segmented_preview(&raw_preedit);
-            render_state(&s.snapshot(), &SessionResult::default(), true)
-        })
+        self.refine_off_lock(&raw_preedit)
+    }
+
+    /// Debounced visible refine: re-run the segmented preview through the visible refiner
+    /// (the model) on the *current* composition. Called by Swift ~200ms after the last
+    /// keystroke. The model runs OFF the session lock, so it never blocks keystrokes.
+    pub fn refine_visible(&self) -> MacosRenderState {
+        let raw = self.with_session(|s| s.snapshot().raw_preedit.clone());
+        self.refine_off_lock(&raw)
     }
 
     /// Input mode toggle (Roman ↔ NIDA). Clears composition.
@@ -325,9 +368,9 @@ impl MacosIMKSession {
 impl MacosIMKSession {
     /// Waits up to 500 ms for the warmup thread, then calls `f` with the session.
     /// Returns a default (empty) render state if warmup times out — extremely rare.
-    fn with_session<F>(&self, f: F) -> MacosRenderState
+    fn with_session<T: Default, F>(&self, f: F) -> T
     where
-        F: FnOnce(&mut ImeSession) -> MacosRenderState,
+        F: FnOnce(&mut ImeSession) -> T,
     {
         let (lock, cvar) = &*self.ready;
         let ready = lock.lock().unwrap();
@@ -336,8 +379,27 @@ impl MacosIMKSession {
         let mut guard = self.inner.lock().unwrap();
         match guard.as_mut() {
             Some(session) => f(session),
-            None => MacosRenderState::default(),
+            None => T::default(),
         }
+    }
+
+    /// Run the model visible refine WITHOUT holding the session lock across the model.
+    /// Snapshot inputs under a brief lock, run the model off-lock, then apply under a brief lock —
+    /// dropping the result if a newer keystroke (generation bump) arrived while it computed.
+    fn refine_off_lock(&self, raw: &str) -> MacosRenderState {
+        let my_gen = self.generation.load(Ordering::Relaxed);
+        let snapshot = self.with_session(|s| s.refine_inputs(raw));
+        let Some((refiner, raw_owned, history)) = snapshot else {
+            return self.with_session(|s| render_state(&s.snapshot(), &SessionResult::default(), true));
+        };
+        // The model time is spent HERE, holding no session lock — keystrokes run unblocked.
+        let refinement = compute_segmented_refinement(&refiner, &raw_owned, &history);
+        self.with_session(|s| {
+            if self.generation.load(Ordering::Relaxed) == my_gen {
+                s.apply_segmented_refinement(&raw_owned, refinement);
+            }
+            render_state(&s.snapshot(), &SessionResult::default(), true)
+        })
     }
 }
 

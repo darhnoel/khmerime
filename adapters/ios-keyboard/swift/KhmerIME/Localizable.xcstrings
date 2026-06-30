@@ -1,0 +1,150 @@
+{
+  "sourceLanguage" : "km",
+  "strings" : {
+    "chars.section.consonants" : {
+      "extractionState" : "manual",
+      "localizations" : { "km" : { "stringUnit" : { "state" : "translated", "value" : "ព្យញ្ជនៈទាំង ៣៣ តួ" } } }
+    },
+    "chars.section.dependentVowels" : {
+      "extractionState" : "manual",
+      "localizations" : { "km" : { "stringUnit" : { "state" : "translated", "value" : "ស្រៈនិស្ស័យ" } } }
+    },
+    "chars.section.independentVowels" : {
+      "extractionState" : "manual",
+      "localizations" : { "km" : { "stringUnit" : { "state" : "translated", "value" : "ស្រៈពេញតួ" } } }
+    },
+    "chars.tab" : {
+      "extractionState" : "manual",
+      "localizations" : { "km" : { "stringUnit" : { "state" : "translated", "value" : "តួអក្សរ" } } }
+    },
+    "dashboard.tab.settings" : {
+      "extractionState" : "manual",
+      "localizations" : { "km" : { "stringUnit" : { "state" : "translated", "value" : "ការកំណត់" } } }
+    },
+    "dashboard.tab.support" : {
+      "extractionState" : "manual",
+      "localizations" : { "km" : { "stringUnit" : { "state" : "translated", "value" : "គាំទ្រក្រុមការងារ" } } }
+    },
+    "dashboard.tab.tips" : {
+      "extractionState" : "manual",
+      "localizations" : { "km" : { "stringUnit" : { "state" : "translated", "value" : "គន្លឹះ" } } }
+    },
+    "settings.comingSoon" : {
+      "extractionState" : "manual",
+      "localizations" : { "km" : { "stringUnit" : { "state" : "translated", "value" : "នឹងមកដល់ឆាប់ៗ" } } }
+    },
+    "settings.item.clearHistory" : {
+      "extractionState" : "manual",
+      "localizations" : { "km" : { "stringUnit" : { "state" : "translated", "value" : "សម្អាតប្រវត្តិដែលបានរៀន" } } }
+    },
+    "settings.item.customWords" : {
+      "extractionState" : "manual",
+      "localizations" : { "km" : { "stringUnit" : { "state" : "translated", "value" : "ពាក្យផ្ទាល់ខ្លួន" } } }
+    },
+    "settings.item.nextWord" : {
+      "extractionState" : "manual",
+      "localizations" : { "km" : { "stringUnit" : { "state" : "translated", "value" : "ការទស្សន៍ទាយពាក្យបន្ទាប់" } } }
+    },
+    "settings.item.version" : {
+      "extractionState" : "manual",
+      "localizations" : { "km" : { "stringUnit" : { "state" : "translated", "value" : "ជំនាន់" } } }
+    },
+    "settings.section.about" : {
+      "extractionState" : "manual",
+      "localizations" : { "km" : { "stringUnit" : { "state" : "translated", "value" : "អំពី" } } }
+    },
+    "settings.section.data" : {
+      "extractionState" : "manual",
+      "localizations" : { "km" : { "stringUnit" : { "state" : "translated", "value" : "មុខងារទិន្នន័យ" } } }
+    },
+    "settings.section.prediction" : {
+      "extractionState" : "manual",
+      "localizations" : { "km" : { "stringUnit" : { "state" : "translated", "value" : "មុខងារទស្សន៍ទាយ" } } }
+    },
+    "settings.section.words" : {
+      "extractionState" : "manual",
+      "localizations" : { "km" : { "stringUnit" : { "state" : "translated", "value" : "មុខងារបញ្ចូលពាក្យ" } } }
+    },
+    "settings.title" : {
+      "extractionState" : "manual",
+      "localizations" : { "km" : { "stringUnit" : { "state" : "translated", "value" : "ការកំណត់" } } }
+    },
+    "setup.back" : {
+      "extractionState" : "manual",
+      "localizations" : { "km" : { "stringUnit" : { "state" : "translated", "value" : "‹ ត្រឡប់" } } }
+    },
+    "setup.openSettings" : {
+      "extractionState" : "manual",
+      "localizations" : { "km" : { "stringUnit" : { "state" : "translated", "value" : "បើកការកំណត់" } } }
+    },
+    "setup.step1" : {
+      "extractionState" : "manual",
+      "localizations" : { "km" : { "stringUnit" : { "state" : "translated", "value" : "ចូលទៅកាន់ **Settings → General → Keyboard → Keyboards**" } } }
+    },
+    "setup.step2" : {
+      "extractionState" : "manual",
+      "localizations" : { "km" : { "stringUnit" : { "state" : "translated", "value" : "ចុច **Add New Keyboard…** ហើយជ្រើស **KhmerIME**" } } }
+    },
+    "setup.step3" : {
+      "extractionState" : "manual",
+      "localizations" : { "km" : { "stringUnit" : { "state" : "translated", "value" : "ចុច **KhmerIME** បញ្ចូលក្នុងបញ្ជី រួចបើក **Allow Full Access**" } } }
+    },
+    "setup.title" : {
+      "extractionState" : "manual",
+      "localizations" : { "km" : { "stringUnit" : { "state" : "translated", "value" : "បើកដំណើរការ KhmerIME" } } }
+    },
+    "support.body" : {
+      "extractionState" : "manual",
+      "localizations" : { "km" : { "stringUnit" : { "state" : "translated", "value" : "KhmerIME គឺជាគម្រោងប្រភពកូដចំហ។ ការគាំទ្ររបស់អ្នកជួយឱ្យការអភិវឌ្ឍ ការសាកល្បង ការខ្ចប់ និងភាពប្រសើរឡើងនាពេលអនាគតបន្តដំណើរ។" } } }
+    },
+    "support.heading" : {
+      "extractionState" : "manual",
+      "localizations" : { "km" : { "stringUnit" : { "state" : "translated", "value" : "គាំទ្រ KhmerIME" } } }
+    },
+    "tips.charpick.body" : {
+      "extractionState" : "manual",
+      "localizations" : { "km" : { "stringUnit" : { "state" : "translated", "value" : "ចុច ✦ សម្រាប់វាយពាក្យឬឈ្មោះដែល KhmerIMEមិនអាចព្យាករណ៍បាន។" } } }
+    },
+    "tips.charpick.headline" : {
+      "extractionState" : "manual",
+      "localizations" : { "km" : { "stringUnit" : { "state" : "translated", "value" : "ឈ្មោះ និងពាក្យកម្ចី" } } }
+    },
+    "tips.english.body" : {
+      "extractionState" : "manual",
+      "localizations" : { "km" : { "stringUnit" : { "state" : "translated", "value" : "ចុច EN ដើម្បីអាចបញ្ចូលពាក្យអង់គ្លេស។ ចុច EN ម្ដងទៀតដើម្បីត្រឡប់មកភាសាខ្មែរវិញ។" } } }
+    },
+    "tips.english.headline" : {
+      "extractionState" : "manual",
+      "localizations" : { "km" : { "stringUnit" : { "state" : "translated", "value" : "ពេលអ្នកត្រូវការភាសាអង់គ្លេស" } } }
+    },
+    "tips.roman.body" : {
+      "extractionState" : "manual",
+      "localizations" : { "km" : { "stringUnit" : { "state" : "translated", "value" : "វាយ somreach នោះ KhmerIME នឹងស្នើ សម្រាក។ ប៉ះពាក្យដែលជ្រើស ឬចុច return ដើម្បីបញ្ចូល។" } } }
+    },
+    "tips.roman.headline" : {
+      "extractionState" : "manual",
+      "localizations" : { "km" : { "stringUnit" : { "state" : "translated", "value" : "វាយអក្សរខ្មែរដោយប្រើអក្សរឡាតាំង" } } }
+    },
+    "tips.split.body" : {
+      "extractionState" : "manual",
+      "localizations" : { "km" : { "stringUnit" : { "state" : "translated", "value" : "អ្នកអាចវាយ​មិនត្រឹមតែម្ដងមួយពាក្យៗនោះទេ​​​ អ្នកក៏អាចវាយជាកន្សោមពាក្យផងដែរ" } } }
+    },
+    "tips.split.headline" : {
+      "extractionState" : "manual",
+      "localizations" : { "km" : { "stringUnit" : { "state" : "translated", "value" : "សរសេរកន្សោមពាក្យតែម្ដង" } } }
+    },
+    "welcome.alreadyEnabled" : {
+      "extractionState" : "manual",
+      "localizations" : { "km" : { "stringUnit" : { "state" : "translated", "value" : "រួចហើយ? បើកក្តារចុច →" } } }
+    },
+    "welcome.getStarted" : {
+      "extractionState" : "manual",
+      "localizations" : { "km" : { "stringUnit" : { "state" : "translated", "value" : "ចាប់ផ្ដើម" } } }
+    },
+    "welcome.tagline" : {
+      "extractionState" : "manual",
+      "localizations" : { "km" : { "stringUnit" : { "state" : "translated", "value" : "កម្មវិធីវាយអក្សរខ្មែរដោយប្រើអក្សរឡាតាំង" } } }
+    }
+  },
+  "version" : "1.0"
+}

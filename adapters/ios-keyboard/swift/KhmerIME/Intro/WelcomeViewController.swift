@@ -22,13 +22,13 @@ final class WelcomeViewController: UIViewController {
         let logo = makeLogo()
         let wordmark = makeLabel("KhmerIME", size: 34, weight: .heavy, color: Brand.ivory)
         let romanKhmer = makeLabel("roman → ខ្មែរ", size: 20, weight: .semibold, color: Brand.amber)
-        let tagline = makeLabel("កម្មវិធីវាយអក្សរខ្មែរដោយប្រើអក្សរឡាតាំង", size: 16, weight: .regular, color: Brand.ivoryDim)
+        let tagline = makeLabel(String(localized: "welcome.tagline"), size: 16, weight: .regular, color: Brand.ivoryDim)
         tagline.numberOfLines = 0
 
-        let getStarted = makePrimaryButton("Get Started")
+        let getStarted = makePrimaryButton(String(localized: "welcome.getStarted"))
         getStarted.addTarget(self, action: #selector(getStartedTapped), for: .touchUpInside)
 
-        let alreadyEnabled = makeLabel("Already enabled? Open keyboard →", size: 14, weight: .regular, color: Brand.ivoryDim)
+        let alreadyEnabled = makeLabel(String(localized: "welcome.alreadyEnabled"), size: 14, weight: .regular, color: Brand.ivoryDim)
 
         let stack = UIStackView(arrangedSubviews: [logo, wordmark, romanKhmer, tagline, getStarted, alreadyEnabled])
         stack.axis = .vertical

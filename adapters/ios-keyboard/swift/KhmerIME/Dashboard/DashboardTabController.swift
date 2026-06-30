@@ -9,9 +9,10 @@ final class DashboardTabController: UITabBarController {
         super.viewDidLoad()
         view.backgroundColor = Brand.ink
         viewControllers = [
-            tab(SettingsViewController(), title: "Settings", symbol: "gearshape"),
-            tab(TipsViewController(), title: "Tips", symbol: "lightbulb"),
-            tab(SupportViewController(), title: "Support", symbol: "heart"),
+            tab(SettingsViewController(), title: String(localized: "dashboard.tab.settings"), symbol: "gearshape"),
+            tab(TipsViewController(), title: String(localized: "dashboard.tab.tips"), symbol: "lightbulb"),
+            tab(CharacterTableViewController(), title: String(localized: "chars.tab"), symbol: "tablecells"),
+            tab(SupportViewController(), title: String(localized: "dashboard.tab.support"), symbol: "heart"),
         ]
         styleTabBar()
     }

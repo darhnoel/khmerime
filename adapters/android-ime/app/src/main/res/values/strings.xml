@@ -25,6 +25,11 @@
     <string name="dashboard_tab_tips">គន្លឹះ</string>
     <string name="dashboard_tab_support">គាំទ្រក្រុមការងារ</string>
 
+    <string name="chars_tab">តួអក្សរ</string>
+    <string name="chars_section_consonants">ព្យញ្ជនៈទាំង ៣៣ តួ</string>
+    <string name="chars_section_dependent_vowels">ស្រៈនិស្ស័យ</string>
+    <string name="chars_section_independent_vowels">ស្រៈពេញតួ</string>
+
     <string name="settings_section_prediction">មុខងារទស្សន៍ទាយ</string>
     <string name="settings_section_words">មុខងារបញ្ចូលពាក្យ</string>
     <string name="settings_section_data">មុខងារទិន្នន័យ</string>

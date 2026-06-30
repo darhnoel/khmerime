@@ -1,6 +1,7 @@
 name: KhmerIME
 options:
   bundleIdPrefix: com.khmerime
+  developmentLanguage: km
   deploymentTarget:
     iOS: "16.0"
 

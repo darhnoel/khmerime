@@ -3,6 +3,9 @@ name = "khmerime_lookup_cli"
 version = "0.1.0"
 edition = "2021"
 
+[features]
+model-provider = ["roman_lookup/model-provider"]
+
 [dependencies]
 roman_lookup = { path = "../.." }
 

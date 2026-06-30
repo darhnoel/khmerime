@@ -10,6 +10,7 @@
 //! are in [`crate::adapter_contract`].
 
 use std::collections::HashSet;
+use std::sync::Arc;
 
 use khmerime_core::Transliterator;
 
@@ -44,7 +45,7 @@ const STATE_RELEASE_MASK: u32 = 1 << 30;
 
 pub struct ImeSession {
     pub(crate) transliterator: Transliterator,
-    pub(crate) visible_refiner: Option<Transliterator>,
+    pub(crate) visible_refiner: Option<Arc<Transliterator>>,
     pub(crate) commit_refiner: Option<Transliterator>,
     pub(crate) history: HashMap<String, usize>,
     pub(crate) enabled: bool,
@@ -215,7 +216,7 @@ impl ImeSession {
     ) -> Self {
         Self {
             transliterator,
-            visible_refiner,
+            visible_refiner: visible_refiner.map(Arc::new),
             commit_refiner,
             history,
             enabled: true,
@@ -264,7 +265,7 @@ impl ImeSession {
 
     #[deprecated(note = "install live, visible, and commit engines together with replace_engines_with_refiners")]
     pub fn set_visible_refiner(&mut self, visible_refiner: Transliterator) {
-        self.visible_refiner = Some(visible_refiner);
+        self.visible_refiner = Some(Arc::new(visible_refiner));
     }
 
     pub fn replace_engines(
@@ -290,7 +291,7 @@ impl ImeSession {
         segmented_preview: SegmentedPreviewMode,
     ) {
         self.transliterator = transliterator;
-        self.visible_refiner = visible_refiner;
+        self.visible_refiner = visible_refiner.map(Arc::new);
         self.commit_refiner = commit_refiner;
         self.options.segmented_preview = segmented_preview;
         if self.options.segmented_preview == SegmentedPreviewMode::Disabled {

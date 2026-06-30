@@ -17,10 +17,14 @@ final class SettingsViewController: UITableViewController {
     }
 
     private let sections: [Section] = [
-        Section(header: "Prediction", items: [Item(title: "Next Word Prediction", detail: "Coming soon", isMuted: true)]),
-        Section(header: "Words", items: [Item(title: "Custom Words", detail: "Coming soon", isMuted: true)]),
-        Section(header: "Data", items: [Item(title: "Clear Learned History", detail: "Coming soon", isMuted: true)]),
-        Section(header: "About", items: [Item(title: "Version", detail: SettingsViewController.versionString, isMuted: false)]),
+        Section(header: String(localized: "settings.section.prediction"),
+                items: [Item(title: String(localized: "settings.item.nextWord"), detail: String(localized: "settings.comingSoon"), isMuted: true)]),
+        Section(header: String(localized: "settings.section.words"),
+                items: [Item(title: String(localized: "settings.item.customWords"), detail: String(localized: "settings.comingSoon"), isMuted: true)]),
+        Section(header: String(localized: "settings.section.data"),
+                items: [Item(title: String(localized: "settings.item.clearHistory"), detail: String(localized: "settings.comingSoon"), isMuted: true)]),
+        Section(header: String(localized: "settings.section.about"),
+                items: [Item(title: String(localized: "settings.item.version"), detail: SettingsViewController.versionString, isMuted: false)]),
     ]
 
     init() { super.init(style: .insetGrouped) }
@@ -30,7 +34,7 @@ final class SettingsViewController: UITableViewController {
 
     override func viewDidLoad() {
         super.viewDidLoad()
-        title = "Settings"
+        title = String(localized: "settings.title")
         view.backgroundColor = Brand.ink
         tableView.backgroundColor = Brand.ink
         tableView.separatorColor = UIColor.white.withAlphaComponent(0.08)

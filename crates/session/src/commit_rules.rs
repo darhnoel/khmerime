@@ -95,7 +95,7 @@ impl ImeSession {
     }
 
     pub(crate) fn visible_refined_phrase_segments_for(&self, raw_input: &str) -> Option<Vec<String>> {
-        let refiner = self.visible_refiner.as_ref().or(self.commit_refiner.as_ref())?;
+        let refiner = self.visible_refiner.as_deref().or(self.commit_refiner.as_ref())?;
         self.refined_phrase_segments_for(refiner, raw_input)
     }
 

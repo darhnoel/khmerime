@@ -9,6 +9,10 @@
         android:title="@string/dashboard_tab_tips"
         android:icon="@android:drawable/ic_menu_info_details" />
     <item
+        android:id="@+id/nav_characters"
+        android:title="@string/chars_tab"
+        android:icon="@android:drawable/ic_menu_sort_alphabetically" />
+    <item
         android:id="@+id/nav_support"
         android:title="@string/dashboard_tab_support"
         android:icon="@android:drawable/ic_menu_help" />

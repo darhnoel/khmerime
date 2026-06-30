@@ -18,6 +18,7 @@ class DashboardActivity : AppCompatActivity() {
             when (item.itemId) {
                 R.id.nav_settings -> switchFragment(SettingsFragment())
                 R.id.nav_tips -> switchFragment(TipsFragment())
+                R.id.nav_characters -> switchFragment(CharacterTableFragment())
                 R.id.nav_support -> switchFragment(SupportFragment())
             }
             true
