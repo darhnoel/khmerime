@@ -15,7 +15,7 @@ from pathlib import Path
 CHUNK_COLUMNS = ["roman", "target", "freq", "freq_lang", "category", "status", "notes"]
 RUNTIME_COLUMNS = ["roman", "target", "freq", "freq_lang"]
 VALID_FREQ_LANGS = {"km", "en", "ja", "zh", "ko"}
-VALID_CATEGORIES = {"unclassified", "words", "names", "places", "phrases", "common"}
+VALID_CATEGORIES = {"unclassified", "words", "names", "places", "phrases", "common", "generated"}
 VALID_STATUSES = {"approved", "draft", "rejected", "disabled"}
 DEFAULT_CHUNKS_DIR = Path("data/lexicon/chunks")
 DEFAULT_RUNTIME_PATH = Path("data/roman_lookup.csv")
