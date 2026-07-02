@@ -16,6 +16,11 @@ pub enum SpanProposalMode {
 pub struct DecoderConfig {
     pub mode: DecoderMode,
     pub max_candidates: usize,
+    /// Size of the legacy suggestion pool collected before ranking, and the
+    /// resulting visible cap. Drives how many candidates the **Candidate List**
+    /// can show. Kept separate from `max_candidates` so raising the visible
+    /// count does not re-rank the weighted-span decoder's legacy pool.
+    pub max_suggestions: usize,
     pub shadow_log: bool,
     pub shadow_sample_bps: u16,
     // Compatibility field names: these limits apply to WeightedSpanDecoder.
@@ -67,7 +72,8 @@ impl DecoderConfig {
     pub fn shadow_interactive() -> Self {
         Self {
             mode: DecoderMode::Shadow,
-            max_candidates: 10,
+            max_candidates: 20,
+            max_suggestions: 20,
             shadow_log: false,
             shadow_sample_bps: 10_000,
             wfst_min_confidence_bps: 6500,
@@ -93,6 +99,7 @@ impl Default for DecoderConfig {
         Self {
             mode: DecoderMode::Legacy,
             max_candidates: 10,
+            max_suggestions: 15,
             shadow_log: false,
             shadow_sample_bps: 10_000,
             wfst_min_confidence_bps: 6500,

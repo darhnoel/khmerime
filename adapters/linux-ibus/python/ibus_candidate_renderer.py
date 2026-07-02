@@ -28,7 +28,14 @@ def candidate_rows(candidates: Any, candidate_display: Any) -> list[str]:
             continue
 
         output = str(entry.get("output", "")).strip() or text
-        if output.isascii():
+        is_raw_fallback = bool(entry.get("is_raw_fallback", False))
+        if output.isascii() and not is_raw_fallback:
+            continue
+        if is_raw_fallback:
+            # The raw roman escape hatch (the Commit Rules floor). Show it
+            # plainly, without a recommended/derived marker, so the user can
+            # always fall back to committing their literal input.
+            rendered.append(output)
             continue
         recommended = bool(entry.get("recommended", False))
         hints = [str(hint).strip() for hint in (entry.get("roman_hints") or []) if str(hint).strip()]

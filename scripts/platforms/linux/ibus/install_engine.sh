@@ -11,6 +11,7 @@ ENGINE_HELPER_SRCS=(
   "${ROOT_DIR}/adapters/linux-ibus/python/ibus_component.py"
   "${ROOT_DIR}/adapters/linux-ibus/python/ibus_debounced_bridge_work.py"
   "${ROOT_DIR}/adapters/linux-ibus/python/ibus_refinement_scheduler.py"
+  "${ROOT_DIR}/adapters/linux-ibus/python/ibus_render_plan.py"
   "${ROOT_DIR}/adapters/linux-ibus/python/ibus_segmented_preview_renderer.py"
   "${ROOT_DIR}/adapters/linux-ibus/python/ibus_segmented_preview_scheduler.py"
 )

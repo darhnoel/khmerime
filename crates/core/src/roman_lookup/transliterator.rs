@@ -297,7 +297,7 @@ impl Transliterator {
     fn from_shared_parts(legacy: Arc<LegacyData>, composer: Arc<ComposerTable>, config: DecoderConfig) -> Self {
         let decoder = DecoderManager::new_with_shared_composer(
             composer,
-            LegacyDecoder::new(Arc::clone(&legacy)),
+            LegacyDecoder::new(Arc::clone(&legacy), config.max_suggestions),
             (config.mode != DecoderMode::Legacy).then(|| WeightedSpanDecoder::new(Arc::clone(&legacy), config.clone())),
             config,
         );
@@ -330,7 +330,7 @@ impl Transliterator {
         let composer = ComposerTable::empty();
         let decoder = DecoderManager::new(
             composer,
-            LegacyDecoder::new(Arc::clone(&legacy)),
+            LegacyDecoder::new(Arc::clone(&legacy), config.max_suggestions),
             (config.mode != DecoderMode::Legacy).then(|| WeightedSpanDecoder::new(Arc::clone(&legacy), config.clone())),
             config,
         );

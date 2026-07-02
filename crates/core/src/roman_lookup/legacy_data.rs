@@ -417,6 +417,10 @@ impl LegacyData {
     }
 
     pub(crate) fn suggest(&self, input: &str, history: &HashMap<String, usize>) -> Vec<String> {
+        self.suggest_with_limit(input, history, MAX_SUGGESTIONS)
+    }
+
+    pub(crate) fn suggest_with_limit(&self, input: &str, history: &HashMap<String, usize>, limit: usize) -> Vec<String> {
         let query = input.strip_suffix(' ').unwrap_or(input);
         if query == "." {
             return vec!["។".to_owned(), "៕".to_owned(), ".".to_owned()];
@@ -510,12 +514,12 @@ impl LegacyData {
                         },
                     );
                     visit_index += 1;
-                    if suggestions.len() >= MAX_SUGGESTIONS {
+                    if suggestions.len() >= limit {
                         break;
                     }
                 }
             }
-            if suggestions.len() >= MAX_SUGGESTIONS {
+            if suggestions.len() >= limit {
                 break;
             }
         }
@@ -532,8 +536,8 @@ impl LegacyData {
                     right_meta.cmp_priority(left_meta)
                 })
         });
-        suggestions.truncate(MAX_SUGGESTIONS);
-        append_raw_query_fallback(&mut suggestions, query);
+        suggestions.truncate(limit);
+        append_raw_query_fallback(&mut suggestions, query, limit);
         suggestions
     }
 
@@ -807,14 +811,14 @@ impl LegacyData {
     }
 }
 
-fn append_raw_query_fallback(suggestions: &mut Vec<String>, query: &str) {
-    if !is_raw_query_fallback_token(query) || MAX_SUGGESTIONS == 0 {
+fn append_raw_query_fallback(suggestions: &mut Vec<String>, query: &str, limit: usize) {
+    if !is_raw_query_fallback_token(query) || limit == 0 {
         return;
     }
 
     suggestions.retain(|item| item != query);
-    if suggestions.len() >= MAX_SUGGESTIONS {
-        suggestions.truncate(MAX_SUGGESTIONS - 1);
+    if suggestions.len() >= limit {
+        suggestions.truncate(limit - 1);
     }
     suggestions.push(query.to_owned());
 }

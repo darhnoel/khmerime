@@ -615,16 +615,19 @@ mod tests {
                     output: "ជា".to_owned(),
                     recommended: true,
                     roman_hints: vec!["jea".to_owned(), "chea".to_owned()],
+                    ..Default::default()
                 },
                 CandidateDisplayEntry {
                     output: "ជៀ".to_owned(),
                     recommended: false,
                     roman_hints: vec!["jia".to_owned()],
+                    ..Default::default()
                 },
                 CandidateDisplayEntry {
                     output: "jea".to_owned(),
                     recommended: false,
                     roman_hints: vec![],
+                    is_raw_fallback: true,
                 },
             ],
         );

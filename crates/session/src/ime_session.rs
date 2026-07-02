@@ -577,7 +577,7 @@ impl ImeSession {
         }
     }
 
-    fn handle_digit(&mut self, index: usize, keyval: u32) -> SessionResult {
+    fn handle_digit(&mut self, slot: usize, keyval: u32) -> SessionResult {
         if self.composition_raw.is_empty() {
             if let Some(ch) = keyval_to_ascii_char(keyval) {
                 return self.handle_printable(ch);
@@ -585,8 +585,20 @@ impl ImeSession {
             return SessionResult::default();
         }
 
+        // A digit only selects a row the current page actually paints. On a
+        // 9-row page the '0' key (slot 9) is not a selector and falls through to
+        // being typed literally, so adapters that keep `page_size` at 9 behave
+        // exactly as they did before pagination existed.
+        let page_size = self.options.page_size.max(1);
+        if slot >= page_size {
+            if let Some(ch) = keyval_to_ascii_char(keyval) {
+                return self.handle_printable(ch);
+            }
+            return SessionResult::default();
+        }
+
         if let Some(edit_state) = &self.segment_edit_state {
-            self.select_segment_candidate_without_reflow(edit_state.index, index);
+            self.select_segment_candidate_without_reflow(edit_state.index, slot);
             self.selection_touched = true;
             return SessionResult {
                 consumed: true,
@@ -598,8 +610,8 @@ impl ImeSession {
             let Some(segment) = session.segments.get(session.focused) else {
                 return SessionResult::default();
             };
-            if index < segment.candidates.len() {
-                self.select_focused_segment_candidate(index);
+            if slot < segment.candidates.len() {
+                self.select_focused_segment_candidate(slot);
                 self.selection_touched = true;
             }
             return SessionResult {
@@ -615,8 +627,12 @@ impl ImeSession {
             return SessionResult::default();
         }
 
-        if index < self.candidates.len() {
-            self.selected_index = index;
+        // Flat Candidate List: the in-page slot maps to an absolute index using
+        // the page the selection currently sits on, so digits pick the row the
+        // user sees on the visible page rather than always page one.
+        let absolute = (self.selected_index / page_size) * page_size + slot;
+        if absolute < self.candidates.len() {
+            self.selected_index = absolute;
             self.selection_touched = true;
         }
         SessionResult {
@@ -676,10 +692,13 @@ fn is_key_release(state: u32) -> bool {
 
 fn keyval_to_digit_index(keyval: u32) -> Option<usize> {
     let ch = char::from_u32(keyval)?;
-    if !ch.is_ascii_digit() || ch == '0' {
+    if !ch.is_ascii_digit() {
         return None;
     }
-    Some((ch as u8 - b'1') as usize)
+    // In-page slot: '1'..='9' select rows 0..=8, '0' selects the tenth row.
+    // `handle_digit` gates the slot against the active page size and maps it to
+    // an absolute candidate index.
+    Some(if ch == '0' { 9 } else { (ch as u8 - b'1') as usize })
 }
 
 fn keyval_to_ascii_char(keyval: u32) -> Option<char> {
@@ -720,7 +739,7 @@ mod tests {
     use super::ImeSession;
 
     use crate::adapter_contract::{InputMode, NativeKeyEvent, SessionCommand};
-    use crate::test_support::{session, type_ascii};
+    use crate::test_support::{paged_session, session, type_ascii};
 
     #[test]
     fn command_surface_accepts_native_key_event() {
@@ -758,6 +777,7 @@ mod tests {
             .input_mode(InputMode::Nida)
             .options(crate::adapter_contract::ImeSessionOptions {
                 segmented_preview: crate::adapter_contract::SegmentedPreviewMode::Disabled,
+                ..Default::default()
             })
             .visible_refiner(visible_refiner)
             .commit_refiner(commit_refiner)
@@ -831,6 +851,62 @@ mod tests {
         assert!(update.commit_text.is_none());
         let committed = session.process_key_event(0xFF0D, 0, 0);
         assert_eq!(committed.commit_text.as_deref(), Some("ជា"));
+    }
+
+    #[test]
+    fn raw_fallback_is_flagged_as_last_candidate() {
+        let mut session = paged_session(10);
+        type_ascii(&mut session, "sa");
+        let snapshot = session.snapshot();
+        let flagged = snapshot
+            .candidate_display
+            .iter()
+            .enumerate()
+            .filter(|(_, entry)| entry.is_raw_fallback)
+            .collect::<Vec<_>>();
+        assert_eq!(flagged.len(), 1, "exactly one candidate is the raw fallback");
+        let (index, entry) = flagged[0];
+        assert_eq!(entry.output, "sa", "the raw fallback carries the literal roman input");
+        assert_eq!(index, snapshot.candidates.len() - 1, "the raw fallback is pinned last");
+    }
+
+    #[test]
+    fn digit_zero_selects_tenth_row_when_page_size_is_ten() {
+        let mut session = paged_session(10);
+        type_ascii(&mut session, "sa");
+        assert!(session.snapshot().candidates.len() >= 10, "need a full page");
+        let update = session.process_key_event('0' as u32, 0, 0);
+        assert!(update.consumed);
+        assert_eq!(session.snapshot().selected_index, Some(9), "'0' selects the tenth row");
+    }
+
+    #[test]
+    fn digit_zero_types_literal_when_page_size_is_nine() {
+        let mut session = paged_session(9);
+        type_ascii(&mut session, "sa");
+        let update = session.process_key_event('0' as u32, 0, 0);
+        assert!(update.consumed);
+        // Slot 9 is outside a 9-row page, so '0' falls through to being typed.
+        assert_eq!(session.snapshot().raw_preedit, "sa0");
+        assert_eq!(session.snapshot().selected_index, Some(0), "no selection changed");
+    }
+
+    #[test]
+    fn digit_selection_is_page_relative_on_the_second_page() {
+        let mut session = paged_session(10);
+        type_ascii(&mut session, "sa");
+        assert!(session.snapshot().candidates.len() >= 11, "need a second page");
+        // Cycle the selection onto the second page (index 10).
+        for _ in 0..10 {
+            session.process_key_event(0x20, 0, 0);
+        }
+        assert_eq!(session.snapshot().selected_index, Some(10));
+        // On page two, digit '1' selects the first visible row = absolute index 10.
+        session.process_key_event('1' as u32, 0, 0);
+        assert_eq!(session.snapshot().selected_index, Some(10));
+        // '2' selects the second visible row = absolute index 11.
+        session.process_key_event('2' as u32, 0, 0);
+        assert_eq!(session.snapshot().selected_index, Some(11));
     }
 
     #[test]

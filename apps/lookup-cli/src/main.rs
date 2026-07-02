@@ -230,6 +230,7 @@ fn run_segmented_dump(
         .commit_refiner(commit_refiner)
         .options(ImeSessionOptions {
             segmented_preview: SegmentedPreviewMode::Enabled,
+            ..Default::default()
         })
         .build();
     session.focus_in();

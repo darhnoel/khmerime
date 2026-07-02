@@ -93,6 +93,7 @@ fn build_session() -> ImeSession {
         .input_mode(InputMode::Roman)
         .options(ImeSessionOptions {
             segmented_preview: SegmentedPreviewMode::Enabled,
+            ..Default::default()
         })
         .build()
 }

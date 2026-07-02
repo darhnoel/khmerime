@@ -194,11 +194,13 @@ mod tests {
                     output: "candidate".to_owned(),
                     recommended: true,
                     roman_hints: vec!["chea".to_owned()],
+                    ..Default::default()
                 },
                 CandidateDisplayEntry {
                     output: "chea".to_owned(),
                     recommended: false,
                     roman_hints: vec![],
+                    ..Default::default()
                 },
             ],
             selected_index: Some(0),
@@ -248,6 +250,7 @@ mod tests {
                 output: "នេះជាស្នាដៃបកប្រែ".to_owned(),
                 recommended: true,
                 roman_hints: vec!["nih jea snadai borkbrae".to_owned()],
+                ..Default::default()
             }],
             selected_index: Some(0),
             segmented_active: true,

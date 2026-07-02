@@ -136,7 +136,7 @@ mod tests {
         let config = DecoderConfig::default();
         let decoder = DecoderManager::new(
             composer,
-            LegacyDecoder::new(Arc::clone(&legacy)),
+            LegacyDecoder::new(Arc::clone(&legacy), config.max_suggestions),
             (config.mode != crate::decoder::DecoderMode::Legacy)
                 .then(|| WeightedSpanDecoder::new(Arc::clone(&legacy), config.clone())),
             config,
