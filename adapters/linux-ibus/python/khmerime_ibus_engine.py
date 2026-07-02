@@ -27,6 +27,7 @@ from ibus_bridge_client import BridgeClient, BridgeResponse
 from ibus_candidate_renderer import candidate_rows
 from ibus_component import ENGINE_NAME, ENGINE_NIDA_NAME, SERVICE_NAME, component_xml, register_component
 from ibus_refinement_scheduler import RefinementScheduler
+from ibus_render_plan import CURSOR, RELOAD, RenderPlanner
 from ibus_segmented_preview_renderer import (
     FOCUSED_MARKER_MODE,
     SegmentSpan,
@@ -96,6 +97,7 @@ class KhmerIMEEngine(IBus.Engine):
         )
         self._bridge_lock = threading.Lock()
         self._table = IBus.LookupTable.new(10, 0, True, True)
+        self._render_plan = RenderPlanner()
         self._last_preedit = ""
         self._last_raw_preedit = ""
         self._last_readiness = "unknown"
@@ -220,13 +222,16 @@ class KhmerIMEEngine(IBus.Engine):
         segment_preview = snapshot.get("segment_preview") or []
         segmented_active = bool(snapshot.get("segmented_active", False))
         segment_edit_active = bool(snapshot.get("segment_edit_active", False))
-        preedit_text = IBus.Text.new_from_string(render_preedit)
+        focused_raw_span = None
         if segmented_active:
             focused_raw_span = focused_raw_input_span(
                 raw_preedit,
                 segment_preview,
                 snapshot.get("focused_segment_index"),
             )
+        preedit_key = (render_preedit, preedit_visible, focused_raw_span, segment_edit_active)
+        if self._render_plan.preedit_changed(preedit_key):
+            preedit_text = IBus.Text.new_from_string(render_preedit)
             if focused_raw_span is not None:
                 start, end = focused_raw_span
                 attrs = IBus.AttrList.new()
@@ -235,24 +240,39 @@ class KhmerIMEEngine(IBus.Engine):
                     attrs.append(IBus.attr_background_new(SEGMENT_EDIT_HIGHLIGHT_BG, start, end))
                     attrs.append(IBus.attr_foreground_new(SEGMENT_EDIT_HIGHLIGHT_FG, start, end))
                 preedit_text.set_attributes(attrs)
-        self.update_preedit_text(
-            preedit_text,
-            len(render_preedit),
-            preedit_visible,
-        )
+            self.update_preedit_text(
+                preedit_text,
+                len(render_preedit),
+                preedit_visible,
+            )
 
         candidates = snapshot.get("candidates") or []
         candidate_display = snapshot.get("candidate_display") or []
         rendered_candidates = candidate_rows(candidates, candidate_display)
-        self._table.clear()
-        for candidate in rendered_candidates:
-            self._table.append_candidate(IBus.Text.new_from_string(str(candidate)))
-
         selected = snapshot.get("selected_index")
-        if isinstance(selected, int) and rendered_candidates:
-            self._table.set_cursor_pos(min(selected, len(rendered_candidates) - 1))
-
-        self.update_lookup_table(self._table, bool(rendered_candidates))
+        cursor = (
+            min(selected, len(rendered_candidates) - 1)
+            if isinstance(selected, int) and rendered_candidates
+            else None
+        )
+        table_action = self._render_plan.candidate_list_action(rendered_candidates, cursor)
+        if table_action == RELOAD:
+            self._table.clear()
+            for candidate in rendered_candidates:
+                self._table.append_candidate(IBus.Text.new_from_string(str(candidate)))
+            if cursor is not None:
+                self._table.set_cursor_pos(cursor)
+            self.update_lookup_table(self._table, bool(rendered_candidates))
+        elif table_action == CURSOR:
+            if cursor is not None:
+                self._table.set_cursor_pos(cursor)
+            # Cursor-only move while cycling: the fast variant repaints the
+            # highlight without re-shipping the whole table to the panel.
+            fast_update = getattr(self, "update_lookup_table_fast", None)
+            if fast_update is not None:
+                fast_update(self._table, bool(rendered_candidates))
+            else:
+                self.update_lookup_table(self._table, bool(rendered_candidates))
 
         if segmented_active and segment_preview:
             auxiliary_text, chunk_spans, focused_chunk_index = build_segment_preview(segment_preview)
@@ -448,6 +468,7 @@ class KhmerIMEEngine(IBus.Engine):
         snapshot = response.snapshot or {}
         self._last_preedit = ""
         self._last_raw_preedit = str(snapshot.get("raw_preedit", ""))
+        self._render_plan.reset()
         self.update_preedit_text(IBus.Text.new_from_string(""), 0, False)
         self._table.clear()
         self.update_lookup_table(self._table, False)
@@ -614,6 +635,8 @@ class KhmerIMEEngine(IBus.Engine):
             return consumed
 
     def do_focus_in(self) -> None:
+        # The panel forgets its UI across focus changes; render fully next time.
+        self._render_plan.reset()
         self._focus_events += 1
         log_line(f"focus_in count={self._focus_events}")
         if self._mode_main_prop_list is not None:
@@ -626,6 +649,7 @@ class KhmerIMEEngine(IBus.Engine):
 
     def do_focus_out(self) -> None:
         self._cancel_pending_refinement()
+        self._render_plan.reset()
         self._focus_events += 1
         log_line(f"focus_out count={self._focus_events}")
         self._bridge_call({"cmd": "focus_out"})
@@ -636,6 +660,7 @@ class KhmerIMEEngine(IBus.Engine):
 
     def do_reset(self) -> None:
         self._cancel_pending_refinement()
+        self._render_plan.reset()
         self._reset_events += 1
         log_line(f"reset count={self._reset_events}")
         self._bridge_call({"cmd": "reset"})
@@ -648,6 +673,7 @@ class KhmerIMEEngine(IBus.Engine):
 
     def do_disable(self) -> None:
         self._cancel_pending_refinement()
+        self._render_plan.reset()
         log_line("disable")
         self._bridge_call({"cmd": "disable"})
 
