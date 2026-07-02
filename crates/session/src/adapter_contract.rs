@@ -140,6 +140,10 @@ pub struct CandidateDisplayEntry {
     pub recommended: bool,
     /// Roman hints that explain why this candidate matched the current input.
     pub roman_hints: Vec<String>,
+    /// True when this candidate is the raw roman string kept as the **Commit
+    /// Rules** floor. Renderers that hide ASCII candidates must still show this
+    /// one, so the user can always fall back to committing their literal input.
+    pub is_raw_fallback: bool,
 }
 
 /// Result of processing one adapter command.
@@ -166,7 +170,26 @@ pub enum SegmentedPreviewMode {
     Enabled,
 }
 
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+/// Default number of candidate rows a host paints per page. Adapters that
+/// paginate the **Candidate List** (IBus) override this; adapters that keep a
+/// single page or use a native candidate window leave it at the default, which
+/// keeps digit selection and `0`-row handling behaving exactly as before.
+pub const DEFAULT_PAGE_SIZE: usize = 9;
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct ImeSessionOptions {
     pub segmented_preview: SegmentedPreviewMode,
+    /// How many candidates the host displays per page. Selection math
+    /// (page-relative digits, the `0`-row gate) is derived from this, so it
+    /// must equal what the adapter actually paints.
+    pub page_size: usize,
+}
+
+impl Default for ImeSessionOptions {
+    fn default() -> Self {
+        Self {
+            segmented_preview: SegmentedPreviewMode::default(),
+            page_size: DEFAULT_PAGE_SIZE,
+        }
+    }
 }

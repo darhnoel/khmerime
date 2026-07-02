@@ -118,6 +118,7 @@ impl KhmerIMESession {
             .input_mode(khmerime_session::InputMode::Roman)
             .options(ImeSessionOptions {
                 segmented_preview: SegmentedPreviewMode::Enabled,
+                ..Default::default()
             })
             .build();
         Arc::new(KhmerIMESession {

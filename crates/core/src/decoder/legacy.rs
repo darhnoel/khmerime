@@ -12,11 +12,12 @@ const PHRASE_COMBINATION_LIMIT: usize = 8;
 #[derive(Clone)]
 pub(crate) struct LegacyDecoder {
     data: Arc<LegacyData>,
+    max_suggestions: usize,
 }
 
 impl LegacyDecoder {
-    pub(crate) fn new(data: Arc<LegacyData>) -> Self {
-        Self { data }
+    pub(crate) fn new(data: Arc<LegacyData>, max_suggestions: usize) -> Self {
+        Self { data, max_suggestions }
     }
 }
 
@@ -33,7 +34,7 @@ impl Decoder for LegacyDecoder {
         }
         for candidate in self
             .data
-            .suggest(request.input, request.history)
+            .suggest_with_limit(request.input, request.history, self.max_suggestions)
             .into_iter()
             .map(|text| DecodeCandidate {
                 text,

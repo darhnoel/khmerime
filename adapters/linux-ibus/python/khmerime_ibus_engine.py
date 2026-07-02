@@ -95,7 +95,7 @@ class KhmerIMEEngine(IBus.Engine):
             log=debug_log_line,
         )
         self._bridge_lock = threading.Lock()
-        self._table = IBus.LookupTable.new(9, 0, True, True)
+        self._table = IBus.LookupTable.new(10, 0, True, True)
         self._last_preedit = ""
         self._last_raw_preedit = ""
         self._last_readiness = "unknown"

@@ -53,6 +53,7 @@ impl ImeSession {
                     output: item.clone(),
                     recommended: recommended_keys.contains(&normalized_suggestion_key(item)),
                     roman_hints,
+                    is_raw_fallback: item.as_str() == candidate_input,
                 }
             })
             .collect::<Vec<_>>();

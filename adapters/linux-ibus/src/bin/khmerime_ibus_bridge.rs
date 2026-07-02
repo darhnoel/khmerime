@@ -47,6 +47,7 @@ impl BridgeRuntime {
             .input_mode(input_mode)
             .options(ImeSessionOptions {
                 segmented_preview: SegmentedPreviewMode::Disabled,
+                page_size: 10,
             })
             .build();
         eprintln!(
@@ -74,6 +75,7 @@ impl BridgeRuntime {
             .commit_refiner(engines.commit_refiner)
             .options(ImeSessionOptions {
                 segmented_preview: full_segmented_preview_mode,
+                page_size: 10,
             })
             .build();
         session.set_cursor_location(0, 0, 0, 0);

@@ -261,6 +261,7 @@ impl MacosIMKSession {
                 .input_mode(input_mode)
                 .options(ImeSessionOptions {
                     segmented_preview: SegmentedPreviewMode::Enabled,
+                    ..Default::default()
                 });
             if span_provider_active() {
                 let visible_refiner =

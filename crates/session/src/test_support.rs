@@ -27,6 +27,23 @@ pub(crate) fn type_ascii(session: &mut ImeSession, text: &str) {
     }
 }
 
+/// A session whose single roman key `sa` has enough exact Khmer targets to fill
+/// more than one page, so pagination and page-relative digit selection can be
+/// exercised at a chosen `page_size`. Base consonants are deliberately neutral.
+pub(crate) fn paged_session(page_size: usize) -> ImeSession {
+    let fixture = "sa\tសា\nsa\tមា\nsa\tបា\nsa\tកា\nsa\tគា\nsa\tតា\nsa\tទា\nsa\tនា\nsa\tផា\nsa\tពា\nsa\tរា\nsa\tលា\n";
+    let transliterator = Transliterator::from_tsv_str_with_config(fixture, DecoderConfig::shadow_interactive())
+        .expect("fixture must parse");
+    let mut session = ImeSession::builder(transliterator, HashMap::new())
+        .options(ImeSessionOptions {
+            page_size,
+            ..Default::default()
+        })
+        .build();
+    session.focus_in();
+    session
+}
+
 pub(crate) fn flat_default_session_with_commit_refiner() -> ImeSession {
     let transliterator =
         Transliterator::from_default_data_with_config(DecoderConfig::legacy()).expect("default data must load");
@@ -75,6 +92,7 @@ pub(crate) fn phase_a_session_without_segmented_preview() -> ImeSession {
         .input_mode(InputMode::Roman)
         .options(ImeSessionOptions {
             segmented_preview: SegmentedPreviewMode::Disabled,
+            ..Default::default()
         })
         .build();
     session.focus_in();
