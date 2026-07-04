@@ -124,8 +124,18 @@ while IFS= read -r file; do
 done < <(find "${RELEASE_DIR}" -maxdepth 1 -type f | sort)
 
 TITLE="KhmerIME ${VERSION}"
-NOTES="Draft release candidate for KhmerIME ${VERSION}."
+DEB_VERSION="${VERSION/-rc./~rc.}"
+if [[ "${DEB_VERSION}" != *-* ]]; then
+  DEB_VERSION="${DEB_VERSION}-1"
+fi
+NOTES="Draft release candidate for KhmerIME ${VERSION}.
+
+Artifacts are unsigned unless the filename or store pipeline says otherwise.
+Linux Debian package version: ${DEB_VERSION}."
 CMD=(gh release create "${TAG}" --draft --title "${TITLE}" --notes "${NOTES}")
+if [[ "${TAG}" == *-rc.* ]]; then
+  CMD+=(--prerelease --latest=false)
+fi
 CMD+=("${RELEASE_FILES[@]}")
 
 echo "Staged release assets:"
