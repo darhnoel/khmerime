@@ -30,7 +30,11 @@ jobs:
       - uses: Swatinem/rust-cache@v2
 
       - name: Build Debian package
-        run: make linux-package
+        shell: bash
+        run: |
+          version="${{ inputs.tag }}"
+          version="${version#v}"
+          KHMERIME_PACKAGE_VERSION="$version" make linux-package
 
       - name: Upload Debian package
         uses: actions/upload-artifact@v4
@@ -53,11 +57,18 @@ jobs:
 
       - name: Install WiX
         shell: pwsh
-        run: dotnet tool install --global wix
+        run: |
+          dotnet tool install --global wix --version 6.0.0
+          wix --version
 
       - name: Build Windows MSI
         shell: pwsh
-        run: ./scripts/platforms/windows/tsf/build_msi.ps1
+        run: |
+          $artifactVersion = "${{ inputs.tag }}" -replace '^v', ''
+          $productVersion = ($artifactVersion -split "[-+]")[0]
+          $env:KHMERIME_PACKAGE_VERSION = $artifactVersion
+          $env:KHMERIME_WINDOWS_PRODUCT_VERSION = $productVersion
+          ./scripts/platforms/windows/tsf/build_msi.ps1
 
       - name: Upload Windows MSI
         uses: actions/upload-artifact@v4
