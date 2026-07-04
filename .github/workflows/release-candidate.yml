@@ -234,16 +234,18 @@ jobs:
 Artifacts are unsigned unless the filename or store pipeline says otherwise.
 Linux Debian package version: ${deb_version}."
 
-          edit_flags=(--title "$title" --notes "$notes")
-          create_flags=(--draft --title "$title" --notes "$notes")
           if [[ "$TAG" == *-rc.* ]]; then
-            edit_flags+=(--prerelease)
-            create_flags+=(--prerelease --latest=false)
-          fi
-
-          if gh release view "$TAG" >/dev/null 2>&1; then
-            gh release edit "$TAG" "${edit_flags[@]}"
-            gh release upload "$TAG" release/* --clobber
+            if gh release view "$TAG" >/dev/null 2>&1; then
+              gh release edit "$TAG" --prerelease --title "$title" --notes "$notes"
+              gh release upload "$TAG" release/* --clobber
+            else
+              gh release create "$TAG" release/* --draft --prerelease --latest=false --title "$title" --notes "$notes"
+            fi
           else
-            gh release create "$TAG" release/* "${create_flags[@]}"
+            if gh release view "$TAG" >/dev/null 2>&1; then
+              gh release edit "$TAG" --title "$title" --notes "$notes"
+              gh release upload "$TAG" release/* --clobber
+            else
+              gh release create "$TAG" release/* --draft --title "$title" --notes "$notes"
+            fi
           fi
