@@ -50,19 +50,32 @@ if ($installedTargets -notcontains $Target) {
 
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $repoRoot = Resolve-Path (Join-Path $scriptDir "..\..\..\..")
-$cargoToml = Join-Path $repoRoot "adapters\windows-tsf\Cargo.toml"
+$cargoToml = Join-Path $repoRoot "Cargo.toml"
 $wxsPath = Join-Path $repoRoot "packaging\windows\wix\KhmerIME.wxs"
 $targetDir = Join-Path $repoRoot "target\windows-tsf-msi"
 $stagingDir = Join-Path $targetDir "staging"
 $distDir = Join-Path $repoRoot "dist\windows"
 
-$versionLine = Select-String -Path $cargoToml -Pattern '^\s*version\s*=\s*"([^"]+)"' | Select-Object -First 1
-if (-not $versionLine) {
-    throw "Could not read package version from $cargoToml."
+$artifactVersion = $env:KHMERIME_PACKAGE_VERSION
+if (-not $artifactVersion) {
+    $versionLine = Select-String -Path $cargoToml -Pattern '^\s*version\s*=\s*"([^"]+)"' | Select-Object -First 1
+    if (-not $versionLine) {
+        throw "Could not read package version from $cargoToml."
+    }
+    $artifactVersion = $versionLine.Matches[0].Groups[1].Value
 }
-$version = $versionLine.Matches[0].Groups[1].Value
+
+$productVersion = $env:KHMERIME_WINDOWS_PRODUCT_VERSION
+if (-not $productVersion) {
+    $productVersion = ($artifactVersion -split "[-+]")[0]
+}
+if ($productVersion -notmatch '^\d+\.\d+\.\d+(\.\d+)?$') {
+    throw "Windows ProductVersion must be numeric, got '$productVersion'. Set KHMERIME_WINDOWS_PRODUCT_VERSION."
+}
 
 Write-Host "[khmerime] building Windows TSF DLL for $Target..."
+Write-Host "[khmerime] artifact version: $artifactVersion"
+Write-Host "[khmerime] Windows ProductVersion: $productVersion"
 Push-Location $repoRoot
 try {
     & cargo build -p khmerime_windows_tsf --release --target $Target --target-dir $targetDir
@@ -85,14 +98,14 @@ New-Item -ItemType Directory -Force $distDir | Out-Null
 $stagedDll = Join-Path $stagingDir "khmerime_windows_tsf.dll"
 Copy-Item -Force $builtDll $stagedDll
 
-$msiPath = Join-Path $distDir "KhmerIME-$version-x64.msi"
+$msiPath = Join-Path $distDir "KhmerIME-$artifactVersion-windows-x64.msi"
 $wixIntermediate = Join-Path $targetDir "wix"
 New-Item -ItemType Directory -Force $wixIntermediate | Out-Null
 
 Write-Host "[khmerime] building MSI: $msiPath"
 & $wixCommand build `
     -arch x64 `
-    -d "ProductVersion=$version" `
+    -d "ProductVersion=$productVersion" `
     -d "KhmerImeDll=$stagedDll" `
     -intermediateFolder $wixIntermediate `
     -out $msiPath `
