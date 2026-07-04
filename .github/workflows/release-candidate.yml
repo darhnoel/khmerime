@@ -34,7 +34,11 @@ jobs:
         run: |
           version="${{ inputs.tag }}"
           version="${version#v}"
-          KHMERIME_PACKAGE_VERSION="$version" make linux-package
+          deb_version="${version/-rc./~rc.}"
+          if [[ "$deb_version" != *-* ]]; then
+            deb_version="${deb_version}-1"
+          fi
+          KHMERIME_PACKAGE_VERSION="$deb_version" make linux-package
 
       - name: Upload Debian package
         uses: actions/upload-artifact@v4

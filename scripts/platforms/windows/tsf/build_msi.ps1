@@ -98,7 +98,7 @@ New-Item -ItemType Directory -Force $distDir | Out-Null
 $stagedDll = Join-Path $stagingDir "khmerime_windows_tsf.dll"
 Copy-Item -Force $builtDll $stagedDll
 
-$msiPath = Join-Path $distDir "KhmerIME-$artifactVersion-x64.msi"
+$msiPath = Join-Path $distDir "KhmerIME-$artifactVersion-windows-x64.msi"
 $wixIntermediate = Join-Path $targetDir "wix"
 New-Item -ItemType Directory -Force $wixIntermediate | Out-Null
 
