@@ -231,8 +231,8 @@ jobs:
           fi
           notes="Draft release candidate for ${title}.
 
-Artifacts are unsigned unless the filename or store pipeline says otherwise.
-Linux Debian package version: ${deb_version}."
+          Artifacts are unsigned unless the filename or store pipeline says otherwise.
+          Linux Debian package version: ${deb_version}."
 
           if [[ "$TAG" == *-rc.* ]]; then
             if gh release view "$TAG" >/dev/null 2>&1; then
