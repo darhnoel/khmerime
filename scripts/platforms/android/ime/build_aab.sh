@@ -10,7 +10,7 @@ ROOT_DIR="$(git -C "$(dirname "${BASH_SOURCE[0]}")" rev-parse --show-toplevel)"
 VERSION="${KHMERIME_PACKAGE_VERSION:-$(awk -F '"' '/^version = / { print $2; exit }' "${ROOT_DIR}/Cargo.toml")}"
 ADAPTER="${ROOT_DIR}/adapters/android-ime"
 ABI="${ANDROID_ABI:-arm64-v8a}"
-JAVA_HOME_DIR="${ANDROID_JAVA_HOME:-/Applications/Android Studio.app/Contents/jbr/Contents/Home}"
+JAVA_HOME_DIR="${ANDROID_JAVA_HOME:-${JAVA_HOME:-/Applications/Android Studio.app/Contents/jbr/Contents/Home}}"
 DIST_DIR="${ROOT_DIR}/dist/android"
 
 command -v cargo-ndk >/dev/null 2>&1 || { echo "cargo-ndk required: cargo install cargo-ndk" >&2; exit 2; }
