@@ -136,6 +136,15 @@ def verify_square(path: Path, label: str) -> None:
 
 
 def image_metadata(path: Path, *keys: str) -> str:
+    if shutil.which("sips") is None:
+        width, height, _bit_depth, color_type, _rows = read_png_rows(path)
+        values = {
+            "pixelWidth": str(width),
+            "pixelHeight": str(height),
+            "hasAlpha": "yes" if color_type == 6 else "no",
+        }
+        return "\n".join(f"{key}: {values[key]}" for key in keys if key in values)
+
     args = ["sips"]
     for key in keys:
         args.extend(["-g", key])
