@@ -119,6 +119,14 @@ _Avoid_: Liquid Glass Theme, light download theme, glass accents
 The host application UI a user sees when they launch the KhmerIME icon — distinct from the keyboard itself (the IME service, input handling, and on-screen key views). It has two parts: the **Intro Flow** and the **Dashboard**, grouped as top-level `intro` and `dashboard` packages/folders (`com.khmerime.{intro,dashboard}` on Android, `KhmerIME/{Intro,Dashboard}/` on iOS) — kept separate from the keyboard code by the module/target itself (the Android `app` module, the iOS `KhmerIME` target vs `KhmerIMEKeyboard`).
 _Avoid_: settings app, host app (ambiguous with the OS host application a keyboard runs inside), welcome screen (too narrow)
 
+**Product Version**:
+The public KhmerIME release version shared by the engine, official platform adapters, release notes, and user-facing support language. It identifies the release family, not a particular packaged upload.
+_Avoid_: adapter version, crate version, development version
+
+**Build Number**:
+The monotonically increasing identifier for a concrete packaged KhmerIME artifact. It distinguishes repeated package uploads or review candidates within the same **Product Version** and is not the user-facing release name.
+_Avoid_: release version, product version, semantic version
+
 **Intro Flow**:
 The one-time onboarding shown on first launch of the **Companion App**: a Welcome (brand landing) screen followed by a Setup Guide that walks the user through enabling the keyboard, then hands off to the **Dashboard** (see ADR-0011). Shown once and remembered; not a recurring surface.
 _Avoid_: onboarding (generic), welcome flow, tutorial
