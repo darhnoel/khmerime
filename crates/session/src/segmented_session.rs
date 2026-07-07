@@ -12,7 +12,7 @@ use std::sync::Arc;
 
 use khmerime_core::Transliterator;
 
-use crate::adapter_contract::{SegmentedPreviewMode, SessionResult};
+use crate::adapter_contract::{PhraseCandidate, PhraseSegment, SegmentedPreviewMode, SessionResult};
 use crate::ime_session::{exact_matches_first, offset_index, recompute_segment_ranges_and_raw, ImeSession};
 use crate::segment_model::{
     build_segmented_session, move_session_focus, normalize_visible_suggestions,
@@ -193,6 +193,7 @@ impl ImeSession {
     pub(crate) fn recompute_composition_state(&mut self) {
         if self.composition_raw.is_empty() {
             self.candidates.clear();
+            self.phrase_candidates.clear();
             self.selected_index = 0;
             self.selection_touched = false;
             self.segmented_session = None;
@@ -206,6 +207,22 @@ impl ImeSession {
             &self.composition_raw,
             normalize_visible_suggestions(self.transliterator.suggest(&self.composition_raw, &self.history)),
         );
+        self.phrase_candidates = self
+            .transliterator
+            .phrase_candidates(&self.composition_raw, &self.history)
+            .into_iter()
+            .map(|candidate| PhraseCandidate {
+                text: candidate.text,
+                segments: candidate
+                    .segments
+                    .into_iter()
+                    .map(|segment| PhraseSegment {
+                        input: segment.input,
+                        output: segment.output,
+                    })
+                    .collect(),
+            })
+            .collect();
         self.selected_index = 0;
         self.selection_touched = false;
         self.visible_refined_segments = None;

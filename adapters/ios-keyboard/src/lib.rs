@@ -8,8 +8,8 @@ use std::sync::{Arc, Mutex, OnceLock};
 
 use khmerime_core::{DecoderConfig, SharedTransliteratorData, Transliterator};
 use khmerime_session::{
-    ImeSession, ImeSessionOptions, NativeKeyEvent, SegmentPreviewEntry, SegmentedPreviewMode, SessionResult,
-    SessionSnapshot,
+    ImeSession, ImeSessionOptions, NativeKeyEvent, PhraseCandidate, PhraseSegment, SegmentPreviewEntry,
+    SegmentedPreviewMode, SessionResult, SessionSnapshot,
 };
 
 uniffi::setup_scaffolding!("khmerime_ios_keyboard");
@@ -58,6 +58,33 @@ impl From<&SegmentPreviewEntry> for IosSegmentEntry {
     }
 }
 
+impl From<&PhraseSegment> for IosSegmentEntry {
+    fn from(s: &PhraseSegment) -> Self {
+        IosSegmentEntry {
+            output: s.output.clone(),
+            input: s.input.clone(),
+            focused: false,
+        }
+    }
+}
+
+/// One card of the Phrase Wheel (ADR-0014): a whole-composition Khmer hypothesis
+/// with its own segmentation.
+#[derive(Clone, Debug, Default, PartialEq, Eq, uniffi::Record)]
+pub struct IosPhraseCandidate {
+    pub text: String,
+    pub segments: Vec<IosSegmentEntry>,
+}
+
+impl From<&PhraseCandidate> for IosPhraseCandidate {
+    fn from(c: &PhraseCandidate) -> Self {
+        IosPhraseCandidate {
+            text: c.text.clone(),
+            segments: c.segments.iter().map(IosSegmentEntry::from).collect(),
+        }
+    }
+}
+
 /// Render state returned to Swift after every session call.
 #[derive(Clone, Debug, Default, PartialEq, Eq, uniffi::Record)]
 pub struct IosRenderState {
@@ -78,6 +105,9 @@ pub struct IosRenderState {
     pub segment_edit_active: bool,
     /// Which segment is currently being edited (when segment_edit_active).
     pub segment_edit_index: Option<u64>,
+    /// Ranked whole-composition hypotheses for the Phrase Wheel (ADR-0014); `[0]` is
+    /// the current best, the last entry is the raw roman fallback.
+    pub phrase_candidates: Vec<IosPhraseCandidate>,
 }
 
 fn render_state(snapshot: &SessionSnapshot, result: &SessionResult) -> IosRenderState {
@@ -90,6 +120,7 @@ fn render_state(snapshot: &SessionSnapshot, result: &SessionResult) -> IosRender
         commit_text: result.commit_text.clone(),
         segment_edit_active: snapshot.segment_edit_active,
         segment_edit_index: snapshot.segment_edit_index.map(|i| i as u64),
+        phrase_candidates: snapshot.phrase_candidates.iter().map(IosPhraseCandidate::from).collect(),
     }
 }
 
@@ -256,6 +287,30 @@ mod tests {
         assert!(state.segment_edit_index.is_none());
         assert!(state.focused_segment_index.is_none());
         assert!(state.selected_index.is_none());
+    }
+
+    // ── phrase wheel (ADR-0014) ───────────────────────────────────────────────
+
+    #[test]
+    fn render_state_exposes_phrase_candidates_for_the_wheel() {
+        let s = new_session();
+        s.focus_in();
+        let state = type_str(&s, "khnhomtov");
+        assert!(
+            !state.phrase_candidates.is_empty(),
+            "phrase candidates must cross the FFI so the Phrase Wheel can render"
+        );
+        let top = &state.phrase_candidates[0];
+        assert!(!top.text.is_empty(), "top wheel card must have Khmer text");
+        assert!(
+            !top.segments.is_empty(),
+            "top card must carry its segmentation for the Roman Row / Level-2 editing"
+        );
+        assert_eq!(
+            state.phrase_candidates.last().map(|entry| entry.text.as_str()),
+            Some("khnhomtov"),
+            "raw roman must be the last wheel card"
+        );
     }
 
     // ── basic composition ─────────────────────────────────────────────────────

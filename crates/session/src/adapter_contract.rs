@@ -129,7 +129,28 @@ pub struct SessionSnapshot {
     pub segment_edit_active: bool,
     pub segment_edit_index: Option<usize>,
     pub segment_preview: Vec<SegmentPreviewEntry>,
+    /// Ranked whole-composition Khmer hypotheses — the **Phrase Candidate** list the
+    /// mobile Phrase Wheel scrolls (ADR-0014). `[0]` is the current best and matches
+    /// the `segment_preview` concatenation.
+    pub phrase_candidates: Vec<PhraseCandidate>,
     pub cursor_location: CursorLocation,
+}
+
+/// One whole-composition Khmer hypothesis — a **Phrase Candidate** (ADR-0014).
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize)]
+pub struct PhraseCandidate {
+    /// The complete Khmer rendering of the entire composition.
+    pub text: String,
+    /// This hypothesis's own segmentation (one entry per word), for the wheel card's
+    /// Roman Row and for Level-2 editing. Its outputs concatenate to `text`.
+    pub segments: Vec<PhraseSegment>,
+}
+
+/// One word inside a **Phrase Candidate**: its roman slice and Khmer output.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize)]
+pub struct PhraseSegment {
+    pub input: String,
+    pub output: String,
 }
 
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize)]

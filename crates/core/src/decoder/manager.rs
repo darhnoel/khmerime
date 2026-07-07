@@ -4,8 +4,8 @@ use std::sync::Arc;
 use crate::composer::ComposerTable;
 
 use super::{
-    build_shadow_observation, DecodeFailure, DecodeRequest, DecodeResult, Decoder, DecoderConfig, DecoderMode,
-    LegacyDecoder, ShadowObservation, ShadowReport, WeightedSpanDecoder,
+    build_shadow_observation, DecodeCandidate, DecodeFailure, DecodeRequest, DecodeResult, Decoder, DecoderConfig,
+    DecoderMode, LegacyDecoder, ShadowObservation, ShadowReport, WeightedSpanDecoder,
 };
 
 pub(crate) struct DecoderManager {
@@ -82,6 +82,24 @@ impl DecoderManager {
         let legacy = self.legacy.decode(&request);
         let weighted_span = self.decode_weighted_span(&request);
         build_shadow_observation(self.config.mode, input, &composer, &legacy, weighted_span.as_ref())
+    }
+
+    /// The ranked whole-phrase hypotheses for the current input, each carrying its
+    /// own segmentation — the source for the mobile Phrase Wheel (ADR-0014). Uses the
+    /// same visible-result selection as `suggest`, but returns the structured
+    /// candidates instead of flattening them to display strings.
+    pub(crate) fn phrase_candidates(&self, input: &str, history: &HashMap<String, usize>) -> Vec<DecodeCandidate> {
+        let composer = self.composer.analyze(input);
+        let request = DecodeRequest {
+            input,
+            history,
+            composer: &composer,
+        };
+        let legacy = self.legacy.decode(&request);
+        let weighted_span = self.decode_weighted_span(&request);
+        let mut visible = self.choose_visible_result(&legacy, weighted_span.as_ref());
+        visible.candidates.truncate(self.config.max_candidates);
+        visible.candidates
     }
 
     fn decode_weighted_span(&self, request: &DecodeRequest<'_>) -> Option<DecodeResult> {

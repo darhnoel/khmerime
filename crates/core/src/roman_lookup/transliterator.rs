@@ -445,6 +445,12 @@ impl Transliterator {
         self.decoder.shadow_observation(input, history)
     }
 
+    /// Ranked whole-phrase hypotheses (each a Khmer output plus its segmentation)
+    /// for the current input — the source for the mobile Phrase Wheel (ADR-0014).
+    pub fn phrase_candidates(&self, input: &str, history: &HashMap<String, usize>) -> Vec<crate::DecodeCandidate> {
+        self.decoder.phrase_candidates(input, history)
+    }
+
     pub fn best_prefix_consumption(&self, input: &str, target: &str) -> Option<String> {
         self.legacy.best_prefix_consumption(input, target)
     }
