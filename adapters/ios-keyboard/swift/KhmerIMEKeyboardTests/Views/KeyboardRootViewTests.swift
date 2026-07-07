@@ -158,7 +158,8 @@ final class KeyboardRootViewTests: XCTestCase {
             focusedSegmentIndex: nil,
             commitText: nil,
             segmentEditActive: false,
-            segmentEditIndex: nil
+            segmentEditIndex: nil,
+            phraseCandidates: []
         )
     }
 }

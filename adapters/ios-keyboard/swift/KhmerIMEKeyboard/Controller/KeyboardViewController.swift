@@ -78,7 +78,7 @@ class KeyboardViewController: UIInputViewController {
     // MARK: - Views
 
     private var stripView: StripView!
-    private var candidateRowView: CandidateRowView!
+    private var candidateRowView: (UIView & KeyboardCandidateRowDisplaying)!
     private var qwertyView: UIView!
     private var numericView: UIView!
     private var symbolsView: UIView!

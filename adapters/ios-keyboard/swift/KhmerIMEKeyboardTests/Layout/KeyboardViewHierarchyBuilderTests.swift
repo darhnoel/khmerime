@@ -27,9 +27,10 @@ final class KeyboardViewHierarchyBuilderTests: XCTestCase {
         XCTAssertFalse(hierarchy.qwertyView.isHidden)
     }
 
-    func test_buildWiresCandidateRowSelectionHandler() {
+    func test_buildPlacesPhraseWheelInTheCandidateRowSlot() {
+        // ADR-0014: the Phrase Wheel is the default candidate surface; the word-level
+        // candidate row moves to Level-2 editing (a later slice).
         let target = ActionTarget()
-        var selectedIndex: Int?
 
         let hierarchy = KeyboardViewHierarchyBuilder(
             metrics: KeyboardLayoutMetrics(device: .phone),
@@ -38,13 +39,10 @@ final class KeyboardViewHierarchyBuilderTests: XCTestCase {
             globeKeyTag: 99,
             enKeyTag: 98,
             actions: ActionTarget.actions
-        ).build(
-            candidateRowSelection: { selectedIndex = $0 }
-        )
+        ).build()
 
-        hierarchy.candidateRowView.onCandidateSelected?(3)
-
-        XCTAssertEqual(selectedIndex, 3)
+        XCTAssertTrue(hierarchy.candidateRowView is PhraseWheelView,
+            "the Phrase Wheel should occupy the default candidate-row slot")
     }
 }
 

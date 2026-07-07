@@ -416,6 +416,7 @@ impl ImeSession {
                 self.set_cursor_location(location.x, location.y, location.width, location.height);
                 SessionResult::default()
             }
+            SessionCommand::SelectPhrase(index) => self.select_phrase(index),
         }
     }
 

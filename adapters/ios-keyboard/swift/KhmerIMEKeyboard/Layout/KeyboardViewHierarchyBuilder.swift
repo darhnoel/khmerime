@@ -2,7 +2,7 @@ import UIKit
 
 struct KeyboardViewHierarchy {
     let stripView: StripView
-    let candidateRowView: CandidateRowView
+    let candidateRowView: UIView & KeyboardCandidateRowDisplaying
     let qwertyView: UIView
     let numericView: UIView
     let symbolsView: UIView
@@ -23,8 +23,11 @@ struct KeyboardViewHierarchyBuilder {
         let stripView = StripView()
         stripView.translatesAutoresizingMaskIntoConstraints = false
 
-        let candidateRowView = CandidateRowView()
-        candidateRowView.onCandidateSelected = candidateRowSelection
+        // ADR-0014: the Phrase Wheel is the default candidate surface, occupying the
+        // candidate-row slot. `candidateRowSelection` (word-level tap) is unused here;
+        // wheel selection is driven by scroll snapping (wired in a later slice).
+        _ = candidateRowSelection
+        let candidateRowView = PhraseWheelView()
         candidateRowView.translatesAutoresizingMaskIntoConstraints = false
 
         let layerFactory = KeyboardLayerFactory(

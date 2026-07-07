@@ -143,6 +143,28 @@ mod tests {
     }
 
     #[test]
+    fn selecting_a_phrase_candidate_commits_that_one() {
+        // ADR-0014: scrolling the wheel to card i makes that Phrase Candidate the
+        // active Segmented Session, so Enter commits it (Visible Segmented Commit),
+        // not the top card.
+        use crate::adapter_contract::SessionCommand;
+        let mut session = session();
+        type_ascii(&mut session, "khnhomtov");
+        let candidates = session.snapshot().phrase_candidates;
+        assert!(candidates.len() >= 2, "need >= 2 candidates to select among");
+        let wanted = candidates[1].text.clone();
+
+        session.process_command(SessionCommand::SelectPhrase(1));
+        let result = session.process_key_event(0xFF0D, 0, 0); // KEY_RETURN
+
+        assert_eq!(
+            result.commit_text.as_deref(),
+            Some(wanted.as_str()),
+            "Enter must commit the selected phrase candidate, not the top one"
+        );
+    }
+
+    #[test]
     fn each_phrase_candidate_carries_its_own_segmentation() {
         // ADR-0014: a Phrase Candidate pairs Khmer with its segmentation so the wheel
         // card can show the roman row and Level-2 editing can target a word.

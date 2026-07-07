@@ -9,7 +9,7 @@ use std::sync::{Arc, Mutex, OnceLock};
 use khmerime_core::{DecoderConfig, SharedTransliteratorData, Transliterator};
 use khmerime_session::{
     ImeSession, ImeSessionOptions, NativeKeyEvent, PhraseCandidate, PhraseSegment, SegmentPreviewEntry,
-    SegmentedPreviewMode, SessionResult, SessionSnapshot,
+    SegmentedPreviewMode, SessionCommand, SessionResult, SessionSnapshot,
 };
 
 uniffi::setup_scaffolding!("khmerime_ios_keyboard");
@@ -169,6 +169,14 @@ impl KhmerIMESession {
         render_state(&s.snapshot(), &SessionResult::default())
     }
 
+    /// Scroll the Phrase Wheel to card `index` (ADR-0014): make that Phrase Candidate
+    /// the active selection so a following Space/Enter commits it.
+    pub fn select_phrase(&self, index: u64) -> IosRenderState {
+        let mut s = self.inner.lock().unwrap();
+        let result = s.process_command(SessionCommand::SelectPhrase(index as usize));
+        render_state(&s.snapshot(), &result)
+    }
+
     pub fn process_character(&self, ch: String) -> IosRenderState {
         let keyval = ch.chars().next().unwrap_or('?') as u32;
         let mut s = self.inner.lock().unwrap();
@@ -311,6 +319,18 @@ mod tests {
             Some("khnhomtov"),
             "raw roman must be the last wheel card"
         );
+    }
+
+    #[test]
+    fn select_phrase_makes_enter_commit_that_card() {
+        let s = new_session();
+        s.focus_in();
+        let state = type_str(&s, "khnhomtov");
+        assert!(state.phrase_candidates.len() >= 2, "need >= 2 wheel cards");
+        let wanted = state.phrase_candidates[1].text.clone();
+        s.select_phrase(1);
+        let committed = s.process_enter().commit_text.expect("enter must commit");
+        assert_eq!(committed, wanted, "wheel selection must drive the commit");
     }
 
     // ── basic composition ─────────────────────────────────────────────────────

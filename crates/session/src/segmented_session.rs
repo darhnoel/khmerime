@@ -16,7 +16,7 @@ use crate::adapter_contract::{PhraseCandidate, PhraseSegment, SegmentedPreviewMo
 use crate::ime_session::{exact_matches_first, offset_index, recompute_segment_ranges_and_raw, ImeSession};
 use crate::segment_model::{
     build_segmented_session, move_session_focus, normalize_visible_suggestions,
-    reflow_segmented_session_from_selection, SegmentedSession,
+    reflow_segmented_session_from_selection, SegmentedChoice, SegmentedSession,
 };
 
 /// A segmented refinement computed *off* the session lock (the model runs while producing
@@ -188,6 +188,52 @@ impl ImeSession {
             &|input, history| transliterator.shadow_observation(input, history),
         )
         .unwrap_or(session)
+    }
+
+    /// Make Phrase Candidate `index` the active **Segmented Session** so the next
+    /// commit takes that whole-phrase hypothesis (ADR-0014, Visible Segmented Commit).
+    /// `selection_touched` pins it against the next preview rebuild.
+    pub(crate) fn select_phrase(&mut self, index: usize) -> SessionResult {
+        let Some(phrase) = self.phrase_candidates.get(index).cloned() else {
+            return SessionResult::default();
+        };
+        let segments = if phrase.segments.is_empty() {
+            vec![SegmentedChoice {
+                input: self.composition_raw.clone(),
+                start: 0,
+                end: self.composition_raw.chars().count(),
+                candidates: vec![phrase.text.clone()],
+                selected: 0,
+            }]
+        } else {
+            let mut start = 0usize;
+            phrase
+                .segments
+                .iter()
+                .map(|segment| {
+                    let len = segment.input.chars().count();
+                    let choice = SegmentedChoice {
+                        input: segment.input.clone(),
+                        start,
+                        end: start + len,
+                        candidates: vec![segment.output.clone()],
+                        selected: 0,
+                    };
+                    start += len;
+                    choice
+                })
+                .collect()
+        };
+        self.segmented_session = Some(SegmentedSession {
+            raw_input: self.composition_raw.clone(),
+            segments,
+            focused: 0,
+        });
+        self.selection_touched = true;
+        SessionResult {
+            consumed: true,
+            ..SessionResult::default()
+        }
     }
 
     pub(crate) fn recompute_composition_state(&mut self) {

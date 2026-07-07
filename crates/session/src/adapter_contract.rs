@@ -97,6 +97,9 @@ pub enum SessionCommand {
     Enable,
     Disable,
     SetCursorLocation(CursorLocation),
+    /// Select Phrase Candidate `i` from the wheel as the active Segmented Session
+    /// (ADR-0014), so the next commit takes that whole-phrase hypothesis.
+    SelectPhrase(usize),
 }
 
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize)]
