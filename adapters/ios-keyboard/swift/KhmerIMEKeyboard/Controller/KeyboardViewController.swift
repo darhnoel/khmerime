@@ -302,7 +302,7 @@ class KeyboardViewController: UIInputViewController {
             actions: layerActions
         ).build(
             candidateRowSelection: { [weak self] index in
-                self?.handler?.selectCandidate(at: index)
+                self?.handler?.selectPhrase(at: index)
             }
         )
 

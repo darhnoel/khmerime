@@ -443,6 +443,16 @@ final class KeyboardInputHandler {
         }
     }
 
+    // Wheel scroll settled on Phrase Candidate `index` (ADR-0014): make it the active
+    // selection so Space/Enter commits it, then re-render.
+    func selectPhrase(at index: Int) {
+        dispatcher.onSession { [weak self] in
+            guard let self else { return }
+            let state = self.session.selectPhrase(at: index)
+            self.dispatcher.onMain { [weak self] in self?.render(state) }
+        }
+    }
+
     func selectCandidate(at index: Int) {
         if keyboardState == .charPick {
             if let candidate = lastState?.candidates[safe: index] {

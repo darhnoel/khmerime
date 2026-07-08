@@ -44,6 +44,27 @@ final class KeyboardViewHierarchyBuilderTests: XCTestCase {
         XCTAssertTrue(hierarchy.candidateRowView is PhraseWheelView,
             "the Phrase Wheel should occupy the default candidate-row slot")
     }
+
+    func test_buildWiresWheelSelectionThroughTheCallback() {
+        let target = ActionTarget()
+        var selected: Int?
+
+        let hierarchy = KeyboardViewHierarchyBuilder(
+            metrics: KeyboardLayoutMetrics(device: .phone),
+            isIPad: false,
+            target: target,
+            globeKeyTag: 99,
+            enKeyTag: 98,
+            actions: ActionTarget.actions
+        ).build(
+            candidateRowSelection: { selected = $0 }
+        )
+
+        (hierarchy.candidateRowView as? PhraseWheelView)?.onPhraseSelected?(3)
+
+        XCTAssertEqual(selected, 3,
+            "scrolling the wheel to a card must route through the build callback → selectPhrase")
+    }
 }
 
 private final class ActionTarget: NSObject {

@@ -24,10 +24,10 @@ struct KeyboardViewHierarchyBuilder {
         stripView.translatesAutoresizingMaskIntoConstraints = false
 
         // ADR-0014: the Phrase Wheel is the default candidate surface, occupying the
-        // candidate-row slot. `candidateRowSelection` (word-level tap) is unused here;
-        // wheel selection is driven by scroll snapping (wired in a later slice).
-        _ = candidateRowSelection
+        // candidate-row slot. Its selection callback fires when the user scrolls a card
+        // to center; the controller routes it to session.selectPhrase.
         let candidateRowView = PhraseWheelView()
+        candidateRowView.onPhraseSelected = candidateRowSelection
         candidateRowView.translatesAutoresizingMaskIntoConstraints = false
 
         let layerFactory = KeyboardLayerFactory(

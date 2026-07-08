@@ -28,6 +28,34 @@ final class PhraseWheelViewTests: XCTestCase {
         XCTAssertEqual(visibleLabelTexts(in: wheel), [], "clearing empties the wheel")
     }
 
+    func test_settlingWithACardCenteredReportsThatCardsIndex() throws {
+        let wheel = PhraseWheelView()
+        wheel.frame = CGRect(x: 0, y: 0, width: 220, height: 48)
+        var reported: Int?
+        wheel.onPhraseSelected = { reported = $0 }
+        wheel.render(makeState(phrases: ["ខ្ញុំទៅសាលារៀន", "ខ្ញុំទៅសាលា", "ខ្ញុំទៅ", "khnhom"]))
+        wheel.layoutIfNeeded()
+
+        let offset = try XCTUnwrap(wheel.centerOffset(forCardIndex: 2))
+        wheel.settleSelection(atContentOffsetX: offset)
+
+        XCTAssertEqual(reported, 2, "settling with card 2 centered must report index 2 (→ selectPhrase)")
+    }
+
+    func test_settlingHighlightsOnlyTheCenteredCard() throws {
+        let wheel = PhraseWheelView()
+        wheel.frame = CGRect(x: 0, y: 0, width: 220, height: 48)
+        wheel.render(makeState(phrases: ["ក", "ខ", "គ", "ឃ"]))
+        wheel.layoutIfNeeded()
+
+        let offset = try XCTUnwrap(wheel.centerOffset(forCardIndex: 1))
+        wheel.settleSelection(atContentOffsetX: offset)
+
+        XCTAssertEqual(visibleLabels(in: wheel).map { $0.textColor },
+                       [.secondaryLabel, .label, .secondaryLabel, .secondaryLabel],
+            "only the centered card is highlighted (.label); the rest dim to .secondaryLabel")
+    }
+
     // MARK: - Helpers
 
     private func makeState(phrases: [String]) -> IosRenderState {
@@ -45,10 +73,14 @@ final class PhraseWheelViewTests: XCTestCase {
     }
 
     private func visibleLabelTexts(in view: UIView) -> [String?] {
-        var result: [String?] = []
+        visibleLabels(in: view).map { $0.text }
+    }
+
+    private func visibleLabels(in view: UIView) -> [UILabel] {
+        var result: [UILabel] = []
         for sub in view.subviews {
-            if let label = sub as? UILabel, !label.isHidden { result.append(label.text) }
-            result += visibleLabelTexts(in: sub)
+            if let label = sub as? UILabel, !label.isHidden { result.append(label) }
+            result += visibleLabels(in: sub)
         }
         return result
     }
