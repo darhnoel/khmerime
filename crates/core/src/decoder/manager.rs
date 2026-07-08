@@ -85,9 +85,12 @@ impl DecoderManager {
     }
 
     /// The ranked whole-phrase hypotheses for the current input, each carrying its
-    /// own segmentation — the source for the mobile Phrase Wheel (ADR-0014). Uses the
-    /// same visible-result selection as `suggest`, but returns the structured
-    /// candidates instead of flattening them to display strings.
+    /// own segmentation — the source for the mobile Phrase Wheel (ADR-0015).
+    ///
+    /// Reads the weighted-span (WFST) decoder — the only one that produces whole-phrase
+    /// readings, and the same path that feeds the strip's segmented preview. Legacy is
+    /// a fallback only when WFST is empty/failed; sourcing this from `choose_visible_result`
+    /// (legacy under `Shadow` mode) made the wheel show the raw roman for long phrases.
     pub(crate) fn phrase_candidates(&self, input: &str, history: &HashMap<String, usize>) -> Vec<DecodeCandidate> {
         let composer = self.composer.analyze(input);
         let request = DecodeRequest {
@@ -95,11 +98,12 @@ impl DecoderManager {
             history,
             composer: &composer,
         };
-        let legacy = self.legacy.decode(&request);
-        let weighted_span = self.decode_weighted_span(&request);
-        let mut visible = self.choose_visible_result(&legacy, weighted_span.as_ref());
-        visible.candidates.truncate(self.config.max_candidates);
-        visible.candidates
+        let mut result = self
+            .decode_weighted_span(&request)
+            .filter(|result| result.failure.is_none() && !result.candidates.is_empty())
+            .unwrap_or_else(|| self.legacy.decode(&request));
+        result.candidates.truncate(self.config.max_candidates);
+        result.candidates
     }
 
     fn decode_weighted_span(&self, request: &DecodeRequest<'_>) -> Option<DecodeResult> {

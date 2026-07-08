@@ -45,7 +45,7 @@ One complete Khmer rendering of the *entire* **Composition** — a whole-phrase 
 _Avoid_: sentence candidate, sequence, full-composition candidate, phrase suggestion, n-best (implementation term)
 
 **Phrase Wheel**:
-The default mobile candidate surface (iOS + Android): a horizontal, snap-to-center carousel of **Phrase Candidate**s. Each card pairs the roman segmentation with the concatenated Khmer, scrolled together; the centered card is the selection, and Space/Enter commit it under the **Commit Rules**. It replaces the single-line Khmer preview and demotes the word-level candidate row to **Phrase Edit** only (see ADR-0014). Distinct from a **Candidate List**, which browses word choices for one segment.
+The default mobile candidate surface (iOS + Android): a horizontal row of the *alternative* **Phrase Candidate**s — the whole-phrase Khmer hypotheses **other than** the top-ranked one, which the **Strip**'s Khmer Row already shows. The cards are centered when they all fit the width and left-padded + horizontally scrollable when they overflow. Tapping a card commits that phrase immediately (**Commit Rules**); Space/Enter commit the top-ranked reading (the **Strip**'s preview). Shown only when at least one alternative exists; otherwise the **Strip** stands alone and the wheel is hidden. It demotes the word-level candidate row to **Phrase Edit** only (see ADR-0014). Distinct from a **Candidate List**, which browses word choices for one segment.
 _Avoid_: candidate carousel, suggestion strip, alarm-clock picker
 
 **Phrase Edit**:

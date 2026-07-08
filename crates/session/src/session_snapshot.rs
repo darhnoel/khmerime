@@ -111,24 +111,12 @@ mod tests {
     use crate::test_support::{session, type_ascii};
 
     #[test]
-    fn snapshot_surfaces_ranked_phrase_candidates_topping_the_best_preview() {
-        // ADR-0014: the decoder already ranks whole-sentence hypotheses; the
-        // snapshot must surface them (not just the single best) so the mobile
-        // Phrase Wheel can scroll them. Top entry must equal today's best
-        // segmented preview, so surfacing the list is not a regression.
+    fn top_phrase_candidate_matches_the_segmented_preview() {
+        // ADR-0015: the wheel reads the WFST decoder — the same source as the strip's
+        // segmented preview — so its top hypothesis equals the preview (no divergence).
         let mut session = session();
         type_ascii(&mut session, "khnhomtov");
         let snapshot = session.snapshot();
-
-        assert!(
-            snapshot.phrase_candidates.len() >= 2,
-            "expected multiple whole-phrase candidates, got {:?}",
-            snapshot
-                .phrase_candidates
-                .iter()
-                .map(|entry| entry.text.clone())
-                .collect::<Vec<_>>()
-        );
 
         let best_preview: String = snapshot
             .segment_preview
@@ -137,8 +125,9 @@ mod tests {
             .collect();
         assert!(!best_preview.is_empty(), "precondition: input should segment");
         assert_eq!(
-            snapshot.phrase_candidates[0].text, best_preview,
-            "top phrase candidate must equal the current best segmented preview"
+            snapshot.phrase_candidates.first().map(|entry| entry.text.clone()),
+            Some(best_preview),
+            "the wheel's top hypothesis must equal the strip's segmented preview (same WFST source)"
         );
     }
 
@@ -149,9 +138,14 @@ mod tests {
         // not the top card.
         use crate::adapter_contract::SessionCommand;
         let mut session = session();
-        type_ascii(&mut session, "khnhomtov");
+        // "khnhom" has two Khmer readings (ខ្ញុំ / ខ្ញំ) → >= 2 whole-phrase hypotheses.
+        type_ascii(&mut session, "khnhom");
         let candidates = session.snapshot().phrase_candidates;
-        assert!(candidates.len() >= 2, "need >= 2 candidates to select among");
+        assert!(
+            candidates.len() >= 2,
+            "need >= 2 whole-phrase candidates to select among, got {:?}",
+            candidates.iter().map(|entry| entry.text.clone()).collect::<Vec<_>>()
+        );
         let wanted = candidates[1].text.clone();
 
         session.process_command(SessionCommand::SelectPhrase(1));
@@ -185,25 +179,6 @@ mod tests {
         assert!(
             top.segments.iter().all(|seg| !seg.input.is_empty()),
             "each segment must carry its roman slice for the Roman Row"
-        );
-    }
-
-    #[test]
-    fn phrase_candidates_end_with_the_raw_roman_fallback() {
-        // ADR-0014 + ADR-0013: the raw roman string is the Commit Rules floor and
-        // must be the last, always-selectable card of the Phrase Wheel.
-        let mut session = session();
-        type_ascii(&mut session, "khnhomtov");
-        let snapshot = session.snapshot();
-        assert_eq!(
-            snapshot.phrase_candidates.last().map(|entry| entry.text.as_str()),
-            Some("khnhomtov"),
-            "raw roman must be the last phrase candidate, got {:?}",
-            snapshot
-                .phrase_candidates
-                .iter()
-                .map(|entry| entry.text.clone())
-                .collect::<Vec<_>>()
         );
     }
 

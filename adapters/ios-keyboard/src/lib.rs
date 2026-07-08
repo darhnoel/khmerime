@@ -314,10 +314,11 @@ mod tests {
             !top.segments.is_empty(),
             "top card must carry its segmentation for the Roman Row / Level-2 editing"
         );
-        assert_eq!(
-            state.phrase_candidates.last().map(|entry| entry.text.as_str()),
-            Some("khnhomtov"),
-            "raw roman must be the last wheel card"
+        // ADR-0015: WFST-sourced, so the cards are Khmer readings — not the raw roman.
+        assert!(
+            top.text.chars().all(|c| ('\u{1780}'..='\u{17FF}').contains(&c)),
+            "wheel cards are Khmer, not roman; got {:?}",
+            top.text
         );
     }
 
@@ -325,12 +326,34 @@ mod tests {
     fn select_phrase_makes_enter_commit_that_card() {
         let s = new_session();
         s.focus_in();
-        let state = type_str(&s, "khnhomtov");
-        assert!(state.phrase_candidates.len() >= 2, "need >= 2 wheel cards");
+        // "khnhom" has multiple Khmer readings → >= 2 whole-phrase hypotheses.
+        let state = type_str(&s, "khnhom");
+        assert!(
+            state.phrase_candidates.len() >= 2,
+            "need >= 2 wheel cards to select among, got {:?}",
+            state.phrase_candidates.iter().map(|c| c.text.clone()).collect::<Vec<_>>()
+        );
         let wanted = state.phrase_candidates[1].text.clone();
         s.select_phrase(1);
         let committed = s.process_enter().commit_text.expect("enter must commit");
         assert_eq!(committed, wanted, "wheel selection must drive the commit");
+    }
+
+    #[test]
+    fn phrase_candidates_are_khmer_for_a_long_phrase_not_raw_roman() {
+        // ADR-0015 regression: the wheel reads the WFST decoder, so a long multi-word
+        // phrase decodes to Khmer whole-phrase readings — not the raw roman fallback
+        // the old legacy source produced (the "derlengjeamouymitpheak" bug).
+        let s = new_session();
+        s.focus_in();
+        let state = type_str(&s, "komtovna");
+        let top = state.phrase_candidates.first().expect("expected a phrase candidate");
+        assert_ne!(top.text, "komtovna", "the wheel must not show the raw roman input");
+        assert!(
+            top.text.chars().all(|c| ('\u{1780}'..='\u{17FF}').contains(&c)),
+            "the top wheel hypothesis must be Khmer, not roman; got {:?}",
+            top.text
+        );
     }
 
     // ── basic composition ─────────────────────────────────────────────────────
