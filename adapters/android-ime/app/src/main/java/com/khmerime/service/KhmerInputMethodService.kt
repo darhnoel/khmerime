@@ -60,6 +60,8 @@ class KhmerInputMethodService : InputMethodService() {
     private val candidateChipPool = ViewPool<SuggestionChipView>(
         createChild = {
             SuggestionChipView(this).apply {
+                // WRAP_CONTENT width: the chip sizes to its text so a whole-phrase card
+                // shows the full phrase (SuggestionChipView.onMeasure); no fixed width.
                 layoutParams = LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.WRAP_CONTENT,
                     LinearLayout.LayoutParams.MATCH_PARENT,
@@ -68,7 +70,6 @@ class KhmerInputMethodService : InputMethodService() {
                     marginEnd = 4.dp()
                     topMargin = 4.dp()
                     bottomMargin = 4.dp()
-                    width = 80.dp()
                 }
             }
         },

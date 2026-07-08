@@ -20,8 +20,27 @@ class SuggestionChipView(context: Context) : View(context) {
         this.text = text
         this.isSelected = isSelected
         this.onClick = onClick
+        // New text may be wider/narrower — re-measure so the box fits the whole phrase.
+        requestLayout()
         invalidate()
     }
+
+    // Size the box to its text (+ breathing room), with a minimum so short word
+    // candidates stay uniformly tappable. A whole-phrase card therefore extends to
+    // cover the full phrase instead of clipping at a fixed width.
+    override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
+        val contentWidth = textPaint.measureText(text) + horizontalPadding * 2
+        val width = maxOf(minWidth.toFloat(), contentWidth).toInt()
+        setMeasuredDimension(
+            resolveSize(width, widthMeasureSpec),
+            MeasureSpec.getSize(heightMeasureSpec),
+        )
+    }
+
+    private val horizontalPadding: Float =
+        TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, 14f, resources.displayMetrics)
+    private val minWidth: Int =
+        TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, 56f, resources.displayMetrics).toInt()
 
     private val isDark: Boolean
         get() = (resources.configuration.uiMode and
