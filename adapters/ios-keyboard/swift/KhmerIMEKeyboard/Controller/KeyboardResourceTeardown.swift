@@ -39,7 +39,7 @@ enum KeyboardResourceTeardown {
         }
 
         if let wheel = view as? PhraseWheelView {
-            wheel.onPhraseCommitted = nil
+            wheel.onPhraseSelected = nil
         }
     }
 }

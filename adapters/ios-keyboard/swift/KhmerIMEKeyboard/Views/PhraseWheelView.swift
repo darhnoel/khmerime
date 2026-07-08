@@ -21,8 +21,9 @@ final class PhraseWheelView: UIView, KeyboardCandidateRowDisplaying {
     // Left/right breathing room so cards never touch the screen edge when they overflow.
     private static let edgeInset: CGFloat = 16
 
-    /// Tapping a card commits Phrase Candidate `index` (ADR-0015).
-    var onPhraseCommitted: ((Int) -> Void)?
+    /// Tapping a card selects Phrase Candidate `index` — it becomes the strip's
+    /// preview; Space/Enter then commit it. Tapping never commits (ADR-0015).
+    var onPhraseSelected: ((Int) -> Void)?
 
     /// Whether there is anything to show (≥1 alternative). The surface hides the row
     /// entirely when false, so the strip stands alone.
@@ -107,13 +108,13 @@ final class PhraseWheelView: UIView, KeyboardCandidateRowDisplaying {
         setNeedsLayout()
     }
 
-    // MARK: - Tap → commit
+    // MARK: - Tap → select
 
     @objc private func rowTapped(_ gr: UITapGestureRecognizer) {
         let point = gr.location(in: stack)
         let frames = tappableLabels.map { $0.frame }
         if let index = StripView.segmentIndex(at: point, labelFrames: frames) {
-            onPhraseCommitted?(index + Self.phraseIndexOffset)
+            onPhraseSelected?(index + Self.phraseIndexOffset)
         }
     }
 }

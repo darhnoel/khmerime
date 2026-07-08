@@ -13,9 +13,9 @@ final class CandidateSurfaceView: UIView, KeyboardCandidateRowDisplaying {
     let wheel = PhraseWheelView()
     let candidateRow = CandidateRowView()
 
-    var onPhraseCommitted: ((Int) -> Void)? {
-        get { wheel.onPhraseCommitted }
-        set { wheel.onPhraseCommitted = newValue }
+    var onPhraseSelected: ((Int) -> Void)? {
+        get { wheel.onPhraseSelected }
+        set { wheel.onPhraseSelected = newValue }
     }
 
     var onCandidateSelected: ((Int) -> Void)? {

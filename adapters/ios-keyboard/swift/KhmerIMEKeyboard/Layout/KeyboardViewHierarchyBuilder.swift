@@ -19,15 +19,15 @@ struct KeyboardViewHierarchyBuilder {
 
     func build(
         candidateSelection: ((Int) -> Void)? = nil,
-        phraseCommit: ((Int) -> Void)? = nil
+        phraseSelection: ((Int) -> Void)? = nil
     ) -> KeyboardViewHierarchy {
         let stripView = StripView()
         stripView.translatesAutoresizingMaskIntoConstraints = false
 
         // The candidate-row slot hosts the Phrase Wheel (composition) and the word
-        // candidate row (CharPick). Wheel tap → phraseCommit; CharPick tap → candidateSelection.
+        // candidate row (CharPick). Wheel tap → phraseSelection; CharPick tap → candidateSelection.
         let candidateRowView = CandidateSurfaceView()
-        candidateRowView.onPhraseCommitted = phraseCommit
+        candidateRowView.onPhraseSelected = phraseSelection
         candidateRowView.onCandidateSelected = candidateSelection
         candidateRowView.translatesAutoresizingMaskIntoConstraints = false
 
