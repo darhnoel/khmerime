@@ -40,6 +40,26 @@ _Avoid_: composition text (ambiguous with **Composition**), inline Khmer preview
 The visible Khmer choices for the active **Composition** or focused **Segmented Session** segment. In romanization mode, the Candidate List should remain visible even when there is only one obvious choice, because it tells the user what Enter will commit while the inline **Preedit** stays roman.
 _Avoid_: suggestions (too broad), inline candidates
 
+**Phrase Candidate**:
+One complete Khmer rendering of the *entire* **Composition** — a whole-phrase hypothesis carrying its own internal segmentation, not a single word. The decoder ranks several of these; the top-ranked one is the default **Strip** preview, and tapping another Phrase Candidate makes that selected phrase the **Strip** preview. Distinct from a **Candidate**, which is one Khmer choice for a *single* segment. Selecting a Phrase Candidate makes its segmentation the active **Segmented Session**.
+_Avoid_: sentence candidate, sequence, full-composition candidate, phrase suggestion, n-best (implementation term)
+
+**Phrase Wheel**:
+The default mobile candidate surface (iOS + Android): a horizontal row of the *alternative* **Phrase Candidate**s — the whole-phrase Khmer hypotheses **other than** the currently selected one, which the **Strip**'s Khmer Row already shows. The cards are centered when they all fit the width and left-padded + horizontally scrollable when they overflow. Tapping a card selects that phrase as the **Strip** preview; Space/Enter commit the selected reading. Shown only when at least one alternative exists; otherwise the **Strip** stands alone and the wheel is hidden. It demotes the word-level candidate row to **Phrase Edit** only (see ADR-0014). Distinct from a **Candidate List**, which browses word choices for one segment.
+_Avoid_: candidate carousel, suggestion strip, alarm-clock picker
+
+**Phrase Edit**:
+The mobile form of **Segment Edit Mode**, reached by a double-touch on the centered Khmer in the **Phrase Wheel**. The phrase expands into separated, tappable words with a word-level **Candidate List** for the focused segment; tapping a word moves focus, typing re-spells the focused word, and double-touch returns to the wheel. It is per-phrase and never sticky — any commit resets the **Composition** and the next one starts back at the **Phrase Wheel**.
+_Avoid_: expanded mode, level 2 (internal label), word edit mode
+
+**Key Preview Popup**:
+A transient visual above a pressed character-producing on-screen key that mirrors the key label so the user can confirm which key is being touched. In **CharPick Mode** it still mirrors the roman key label, not a Khmer candidate; it is visual feedback only and does not commit text, change input mode, select candidates, or interact with the **Phrase Wheel** or **Candidate Row**.
+_Avoid_: candidate popup, suggestion popup, key tap animation
+
+**Punctuation Suggestions**:
+The suggestion candidates produced when the user types the period key: `។`, `៕`, `.`, `?`, `!`, and `…`. On mobile these flow through **Phrase Candidate** data so the **Strip** shows the selected punctuation and the **Phrase Wheel** shows the alternatives. Distinct from the **Key Preview Popup**, which only mirrors the touched `.` key.
+_Avoid_: period popup, punctuation key preview
+
 **Coeng Form**:
 A Khmer subscript consonant used to type consonant clusters. A Coeng Form is the invisible coeng sign plus a base consonant, rendered together as a subscript shape (for example `្ក`). In **CharPick Mode**, Coeng Forms appear under the same roman letters as their base consonants so users can build clusters quickly.
 _Avoid_: bare coeng sign when you mean the full subscript consonant
@@ -142,6 +162,8 @@ _Avoid_: home screen, main menu, settings (the Dashboard is more than settings)
 - A **SharedTransliteratorData** contains exactly one **Search Index**
 - A **SharedTransliteratorData** is shared by the live engine, **Visible Refiner**, and **Commit Refiner** (three views, one underlying data)
 - A **Composition** may have zero or one **Segmented Session**
+- A **Composition** exposes a ranked list of **Phrase Candidate**s; the top-ranked one is the default preview, and the currently selected Phrase Candidate defines the current **Segmented Session**
+- Selecting a different **Phrase Candidate** swaps the active **Segmented Session**; the selection never persists past commit — committing resets the **Composition** and the next one starts from the top-ranked **Phrase Candidate** again
 - A **Segmented Session** may be in **Segment Edit Mode** for at most one of its segments at a time
 - A **Preedit** and **Commit Text** are derived from the same **Composition** but may diverge (see ADR-0001)
 - A **Visible Segmented Commit** makes the visible **Segmented Session** authoritative over hidden commit refinement

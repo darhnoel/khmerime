@@ -257,6 +257,12 @@ class KhmerInputHandler(
         render(session.processDigit(index + 1))
     }
 
+    // Tapping a Phrase Wheel card selects that whole-phrase reading (ADR-0015): it
+    // becomes the strip's preview; Space/Enter then commit it. Tapping never commits.
+    fun selectPhrase(index: Int) {
+        render(session.selectPhrase(index))
+    }
+
     // ── Private ───────────────────────────────────────────────────────────────
 
     private fun commitComposition() {

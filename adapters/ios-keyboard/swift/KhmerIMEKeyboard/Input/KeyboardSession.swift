@@ -79,6 +79,12 @@ final class KeyboardSession {
         return inner.processDigit(n: UInt8(index + 1))
     }
 
+    // Selects Phrase Candidate `index` from the wheel (ADR-0014) as the active
+    // Segmented Session, so a following Space/Enter commits it.
+    func selectPhrase(at index: Int) -> IosRenderState {
+        inner.selectPhrase(index: UInt64(index))
+    }
+
     // MARK: - CharPick mode
 
     // Enters CharPick mode. Clears any active composition.

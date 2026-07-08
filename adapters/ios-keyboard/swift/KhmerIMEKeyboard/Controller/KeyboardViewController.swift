@@ -78,7 +78,7 @@ class KeyboardViewController: UIInputViewController {
     // MARK: - Views
 
     private var stripView: StripView!
-    private var candidateRowView: CandidateRowView!
+    private var candidateRowView: (UIView & KeyboardCandidateRowDisplaying)!
     private var qwertyView: UIView!
     private var numericView: UIView!
     private var symbolsView: UIView!
@@ -135,6 +135,8 @@ class KeyboardViewController: UIInputViewController {
         switch rows {
         case .none:
             chromeHeight = 0
+        case .stripOnly:
+            chromeHeight = layoutMetrics.stripHeight
         case .candidateOnly:
             chromeHeight = layoutMetrics.candidateRowHeight
         case .stripAndCandidate:
@@ -301,8 +303,11 @@ class KeyboardViewController: UIInputViewController {
             enKeyTag: Self.enKeyTag,
             actions: layerActions
         ).build(
-            candidateRowSelection: { [weak self] index in
+            candidateSelection: { [weak self] index in
                 self?.handler?.selectCandidate(at: index)
+            },
+            phraseSelection: { [weak self] index in
+                self?.handler?.selectPhrase(at: index)
             }
         )
 

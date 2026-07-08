@@ -1196,9 +1196,9 @@ angkopheap,អង្គភាព,229,km
 angkor,អង្ក,22,km
 angkor,អង្ករ,325,km
 angkor,អង្គរ,458,km
+angkorak,អង្គរក្ស,31,km
 angkorjey,អង្គរជ័យ,4,km
 angkorochuum,អង្គរជុំ,1,km
-angkoroksar,អង្គរក្ស,31,km
 angkos,អង្កុស,1,km
 angkot,អង្កត់,21,km
 angkot,អង្គទ,1,km
@@ -1855,6 +1855,7 @@ arahatt,អរហត្ត,1,km
 arahatthajak,អរហទ្ធជ,1,km
 arahont,អរហន្ត,1,km
 arahonta,អរហន្តា,1,km
+arak,អារក្ស,9,km
 arakhatt,អរហត្ត,1,km
 arakkhakkam,អរក្ខកម្ម,1,km
 aranh,អរញ្ញ,1,km
@@ -1869,6 +1870,7 @@ are,អរេ,1,km
 areajakak,អរាជក,1,km
 areajeakak,អរាជក,1,km
 areak,អរាគ,1,km
+areak,អារក្ស,9,km
 areaka,អរាគ,1,km
 areakea,អរាគា,1,km
 areakni,អរណី,1,km
@@ -1904,8 +1906,6 @@ arok,អារក,6,km
 arokkhar,អារក្ខ,1,km
 arokkhor,អារក្ខ,1,km
 arokoud,អារកូដ,1,km
-aroksar,អារក្ស,9,km
-aroksor,អារក្ស,9,km
 arom,អារម្មណ៍,9576,km
 aromphor,អារម្ភ,1,km
 aronhnh,អារញ្ញ,1,km
@@ -3677,7 +3677,7 @@ bbarikkhar,បរិក្ខារ,99,km
 bbariman,បរិមាណ,359,km
 bbarineayuok,បរិនាយក,1,km
 bbarinhnhabat,បរិញ្ញាបត្រ,4,km
-bbariroksar,បរិរក្ស,1,km
+bbarirak,បរិរក្ស,1,km
 bbaristhan,បរិស្ថាន,1,km
 bbarithan,បរិស្ថាន,1,km
 bbaritt,បរិត្ត,1,km
@@ -3885,7 +3885,7 @@ bboreamukh,បរាមុខ,1,km
 bboreaphop,បរាភព,1,km
 bborikomm,បរិកម្ម,1,km
 bboriman,បរិមាណ,359,km
-bboriroksor,បរិរក្ស,1,km
+bborireak,បរិរក្ស,1,km
 bboriyay,បរិយាយ,23,km
 bboriyousan,បរិយោសាន,1,km
 bborng,ប៉ង,139,km
@@ -14795,8 +14795,8 @@ ksenksai,ក្សិណក្ស័យ,1,km
 kset,ក្សេត្រ,2,km
 ksetrachivkam,ក្សេត្រាជីវកម្ម,1,km
 ksetrachivkom,ក្សេត្រាជីវកម្ម,1,km
-ksetraroksar,ក្សេត្រារក្ស,1,km
-ksetraroksor,ក្សេត្រារក្ស,1,km
+ksetrarak,ក្សេត្រារក្ស,1,km
+ksetrarwak,ក្សេត្រារក្ស,1,km
 ksetrathikar,ក្សេត្រាធិការ,1,km
 ksonak,ក្សណៈ,1,km
 ksoung,ក្រសួង,3618,km
@@ -17008,10 +17008,10 @@ nakniponthor,អ្នកនិពន្ធ,11,km
 naknoam,អ្នកនាំ,17,km
 nakphlov,អ្នកផ្លូវ,1,km
 nakphum,អ្នកភូមិ,7,km
+nakraksa,អ្នករក្សា,7,km
 nakreaykar,អ្នករាយការណ៍,6,km
 nakriskon,អ្នករិះគន់,8,km
 nakrok,អ្នករក,69,km
-nakroksa,អ្នករក្សា,7,km
 nakselb,អ្នកសិល្ប៍,1,km
 naksrei,អ្នកស្រី,143,km
 nakta,អ្នកតា,6,km
@@ -18095,10 +18095,10 @@ ongkopheap,អង្គភាព,229,km
 ongkor,អង្ក,22,km
 ongkor,អង្ករ,325,km
 ongkor,អង្គរ,458,km
+ongkorak,អង្គរក្ស,31,km
 ongkorjey,អង្គរជ័យ,4,km
 ongkornn,អង្កន់,1,km
 ongkorochuum,អង្គរជុំ,1,km
-ongkoroksor,អង្គរក្ស,31,km
 ongkortt,អង្កត់,21,km
 ongkorttkhmaw,អង្កត់ខ្មៅ,1,km
 ongkos,អង្កុស,1,km
@@ -20065,11 +20065,11 @@ pongvouk,ពង្វក់,24,km
 pongvuek,ពង្វឹក,1,km
 ponha,ពញា,19,km
 ponhakraek,ពញាក្រែក,1,km
-ponharaksaphibal,ពញារក្សាភិបាល,1,km
 ponhea,ពញា,19,km
 ponhea,ពញាឮ,1,km
 ponheakraek,ពញាក្រែក,1,km
-ponhearksaphibal,ពញារក្សាភិបាល,1,km
+ponhearaksaphibal,ពញារក្សាភិបាល,1,km
+ponheareaksaphibal,ពញារក្សាភិបាល,1,km
 ponhnheak,ពញ្ញាក់,54,km
 ponita,ពនិតា,1,km
 ponlaus,ពន្លើស,1,km
@@ -20962,8 +20962,13 @@ raeng,រែង,1,km
 raeng,រ៉ែងៗ,1,km
 raet,រ៉ែត,4,km
 rai,រ៉ៃ,180,km
+raks,រក្ស,30,km
+raksa,រក្ស,30,km
 raksa,រក្សា,2214,km
 raksaphibal,រក្សាភិបាល,1,km
+raksapreahang,រក្សាព្រះអង្គ,1,km
+raksapreahong,រក្សាព្រះអង្គ,1,km
+raksasrok,រក្សាស្រុក,1,km
 raleak,រលាក,438,km
 ramrai,រ៉ាំរ៉ៃ,1,km
 rang,រ៉ាង,10,km
@@ -21077,6 +21082,7 @@ reak,រាក់,123,km
 reak,រាគ,33,km
 reakateak,រាក់ទាក់,1,km
 reakoteak,រាក់ទាក់,1,km
+reaksa,រក្សា,2214,km
 reaksasei,រាក្សសី,1,km
 reaksoas,រាក្ស័ស,1,km
 reaksosei,រាក្សសី,1,km
@@ -21159,7 +21165,6 @@ rehopol,រេហ៍ពល,1,km
 rei,រ៉ៃ,180,km
 rek,រយៈ,9250,km
 rekha,រេខា,1,km
-reksa,រក្សា,2214,km
 rel,រេល,1,km
 rengpeng,រឹងប៉ឹង,1,km
 rengrus,រឹងរូស,1,km
@@ -21662,11 +21667,6 @@ rokomukh,រកមុខ,2,km
 rokong,រគង,1,km
 rokot,រកូត,1,km
 rokout,រកូត,1,km
-roksapreahaangkor,រក្សាព្រះអង្គ,1,km
-roksapreahaongkor,រក្សាព្រះអង្គ,1,km
-roksar,រក្ស,30,km
-roksasrok,រក្សាស្រុក,1,km
-roksor,រក្ស,30,km
 roktae,រកតែ,1,km
 rol,រល,10,km
 rol,រល់,1,km

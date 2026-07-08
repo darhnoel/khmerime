@@ -97,6 +97,9 @@ pub enum SessionCommand {
     Enable,
     Disable,
     SetCursorLocation(CursorLocation),
+    /// Select Phrase Candidate `i` from the wheel as the active Segmented Session
+    /// (ADR-0014), so the next commit takes that whole-phrase hypothesis.
+    SelectPhrase(usize),
 }
 
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize)]
@@ -129,7 +132,31 @@ pub struct SessionSnapshot {
     pub segment_edit_active: bool,
     pub segment_edit_index: Option<usize>,
     pub segment_preview: Vec<SegmentPreviewEntry>,
+    /// Ranked whole-composition Khmer hypotheses — the **Phrase Candidate** list the
+    /// mobile Phrase Wheel scrolls (ADR-0014).
+    pub phrase_candidates: Vec<PhraseCandidate>,
+    /// Index into `phrase_candidates` whose phrase currently drives the strip preview.
+    /// Defaults to `0`; selecting another phrase updates this so renderers can show
+    /// every candidate except the one already previewed in the strip.
+    pub selected_phrase_index: usize,
     pub cursor_location: CursorLocation,
+}
+
+/// One whole-composition Khmer hypothesis — a **Phrase Candidate** (ADR-0014).
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize)]
+pub struct PhraseCandidate {
+    /// The complete Khmer rendering of the entire composition.
+    pub text: String,
+    /// This hypothesis's own segmentation (one entry per word), for the wheel card's
+    /// Roman Row and for Level-2 editing. Its outputs concatenate to `text`.
+    pub segments: Vec<PhraseSegment>,
+}
+
+/// One word inside a **Phrase Candidate**: its roman slice and Khmer output.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize)]
+pub struct PhraseSegment {
+    pub input: String,
+    pub output: String,
 }
 
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize)]

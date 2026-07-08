@@ -12,11 +12,11 @@ use std::sync::Arc;
 
 use khmerime_core::Transliterator;
 
-use crate::adapter_contract::{SegmentedPreviewMode, SessionResult};
+use crate::adapter_contract::{PhraseCandidate, PhraseSegment, SegmentedPreviewMode, SessionResult};
 use crate::ime_session::{exact_matches_first, offset_index, recompute_segment_ranges_and_raw, ImeSession};
 use crate::segment_model::{
     build_segmented_session, move_session_focus, normalize_visible_suggestions,
-    reflow_segmented_session_from_selection, SegmentedSession,
+    reflow_segmented_session_from_selection, SegmentedChoice, SegmentedSession,
 };
 
 /// A segmented refinement computed *off* the session lock (the model runs while producing
@@ -39,7 +39,11 @@ pub fn compute_segmented_refinement(
 ) -> SegmentedRefinement {
     let observation = refiner.shadow_observation(raw, history);
     let segmented_session = build_segmented_session(&observation, raw, history, &|input, hist| {
-        exact_matches_first(refiner, input, normalize_visible_suggestions(refiner.suggest(input, hist)))
+        exact_matches_first(
+            refiner,
+            input,
+            normalize_visible_suggestions(refiner.suggest(input, hist)),
+        )
     });
     let candidates = exact_matches_first(
         refiner,
@@ -190,9 +194,58 @@ impl ImeSession {
         .unwrap_or(session)
     }
 
+    /// Make Phrase Candidate `index` the active **Segmented Session** so the next
+    /// commit takes that whole-phrase hypothesis (ADR-0014, Visible Segmented Commit).
+    /// `selection_touched` pins it against the next preview rebuild.
+    pub(crate) fn select_phrase(&mut self, index: usize) -> SessionResult {
+        let Some(phrase) = self.phrase_candidates.get(index).cloned() else {
+            return SessionResult::default();
+        };
+        let segments = if phrase.segments.is_empty() {
+            vec![SegmentedChoice {
+                input: self.composition_raw.clone(),
+                start: 0,
+                end: self.composition_raw.chars().count(),
+                candidates: vec![phrase.text.clone()],
+                selected: 0,
+            }]
+        } else {
+            let mut start = 0usize;
+            phrase
+                .segments
+                .iter()
+                .map(|segment| {
+                    let len = segment.input.chars().count();
+                    let choice = SegmentedChoice {
+                        input: segment.input.clone(),
+                        start,
+                        end: start + len,
+                        candidates: vec![segment.output.clone()],
+                        selected: 0,
+                    };
+                    start += len;
+                    choice
+                })
+                .collect()
+        };
+        self.selected_phrase_index = index;
+        self.segmented_session = Some(SegmentedSession {
+            raw_input: self.composition_raw.clone(),
+            segments,
+            focused: 0,
+        });
+        self.selection_touched = true;
+        SessionResult {
+            consumed: true,
+            ..SessionResult::default()
+        }
+    }
+
     pub(crate) fn recompute_composition_state(&mut self) {
         if self.composition_raw.is_empty() {
             self.candidates.clear();
+            self.phrase_candidates.clear();
+            self.selected_phrase_index = 0;
             self.selected_index = 0;
             self.selection_touched = false;
             self.segmented_session = None;
@@ -206,6 +259,23 @@ impl ImeSession {
             &self.composition_raw,
             normalize_visible_suggestions(self.transliterator.suggest(&self.composition_raw, &self.history)),
         );
+        self.phrase_candidates = self
+            .transliterator
+            .phrase_candidates(&self.composition_raw, &self.history)
+            .into_iter()
+            .map(|candidate| PhraseCandidate {
+                text: candidate.text,
+                segments: candidate
+                    .segments
+                    .into_iter()
+                    .map(|segment| PhraseSegment {
+                        input: segment.input,
+                        output: segment.output,
+                    })
+                    .collect(),
+            })
+            .collect();
+        self.selected_phrase_index = 0;
         self.selected_index = 0;
         self.selection_touched = false;
         self.visible_refined_segments = None;

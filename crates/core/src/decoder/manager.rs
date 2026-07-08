@@ -4,8 +4,8 @@ use std::sync::Arc;
 use crate::composer::ComposerTable;
 
 use super::{
-    build_shadow_observation, DecodeFailure, DecodeRequest, DecodeResult, Decoder, DecoderConfig, DecoderMode,
-    LegacyDecoder, ShadowObservation, ShadowReport, WeightedSpanDecoder,
+    build_shadow_observation, DecodeCandidate, DecodeFailure, DecodeRequest, DecodeResult, Decoder, DecoderConfig,
+    DecodeSegment, DecoderMode, LegacyDecoder, ShadowObservation, ShadowReport, WeightedSpanDecoder,
 };
 
 pub(crate) struct DecoderManager {
@@ -82,6 +82,55 @@ impl DecoderManager {
         let legacy = self.legacy.decode(&request);
         let weighted_span = self.decode_weighted_span(&request);
         build_shadow_observation(self.config.mode, input, &composer, &legacy, weighted_span.as_ref())
+    }
+
+    /// The ranked whole-phrase hypotheses for the current input, each carrying its
+    /// own segmentation — the source for the mobile Phrase Wheel (ADR-0015).
+    ///
+    /// Reads the weighted-span (WFST) decoder — the only one that produces whole-phrase
+    /// readings, and the same path that feeds the strip's segmented preview. Legacy is
+    /// a fallback only when WFST is empty/failed; sourcing this from `choose_visible_result`
+    /// (legacy under `Shadow` mode) made the wheel show the raw roman for long phrases.
+    pub(crate) fn phrase_candidates(&self, input: &str, history: &HashMap<String, usize>) -> Vec<DecodeCandidate> {
+        let composer = self.composer.analyze(input);
+        let request = DecodeRequest {
+            input,
+            history,
+            composer: &composer,
+        };
+        let legacy = self.legacy.decode(&request);
+        let weighted_span = self.decode_weighted_span(&request);
+        let mut candidates = weighted_span
+            .as_ref()
+            .filter(|result| result.failure.is_none() && !result.candidates.is_empty())
+            .map(|result| result.candidates.clone())
+            .unwrap_or_default();
+
+        for candidate in legacy
+            .candidates
+            .iter()
+            .filter_map(|candidate| phrase_candidate_from_legacy(candidate, input))
+        {
+            if !candidates
+                .iter()
+                .any(|current| same_phrase_candidate(current, &candidate))
+            {
+                candidates.push(candidate);
+            }
+            if candidates.len() >= self.config.max_candidates {
+                break;
+            }
+        }
+
+        if candidates.is_empty() {
+            candidates = legacy
+                .candidates
+                .into_iter()
+                .filter_map(|candidate| phrase_candidate_from_legacy(&candidate, input))
+                .collect();
+        }
+        candidates.truncate(self.config.max_candidates);
+        candidates
     }
 
     fn decode_weighted_span(&self, request: &DecodeRequest<'_>) -> Option<DecodeResult> {
@@ -202,6 +251,45 @@ fn merge_results(legacy: &DecodeResult, weighted_span: Option<&DecodeResult>, li
     }
 
     merged
+}
+
+fn phrase_candidate_from_legacy(candidate: &DecodeCandidate, input: &str) -> Option<DecodeCandidate> {
+    if input == "." {
+        return matches!(candidate.text.as_str(), "។" | "៕" | "." | "?" | "!" | "…")
+            .then(|| one_segment_phrase_candidate(candidate, input));
+    }
+    if candidate.text == input || !candidate.text.chars().any(is_khmer_char) {
+        return None;
+    }
+    if candidate.segments.is_empty() {
+        Some(one_segment_phrase_candidate(candidate, input))
+    } else {
+        Some(candidate.clone())
+    }
+}
+
+fn one_segment_phrase_candidate(candidate: &DecodeCandidate, input: &str) -> DecodeCandidate {
+    let mut candidate = candidate.clone();
+    candidate.segments = vec![DecodeSegment {
+        input: input.to_owned(),
+        output: candidate.text.clone(),
+        weight_bps: 10_000,
+    }];
+    candidate
+}
+
+fn is_khmer_char(ch: char) -> bool {
+    ('\u{1780}'..='\u{17FF}').contains(&ch)
+}
+
+fn same_phrase_candidate(left: &DecodeCandidate, right: &DecodeCandidate) -> bool {
+    left.text == right.text
+        && left.segments.len() == right.segments.len()
+        && left
+            .segments
+            .iter()
+            .zip(right.segments.iter())
+            .all(|(left, right)| left.input == right.input && left.output == right.output)
 }
 
 fn stable_sample_bucket(input: &str) -> u64 {

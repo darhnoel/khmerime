@@ -8,8 +8,8 @@ use std::sync::{Arc, Mutex, OnceLock};
 
 use khmerime_core::{DecoderConfig, SharedTransliteratorData, Transliterator};
 use khmerime_session::{
-    ImeSession, ImeSessionOptions, NativeKeyEvent, SegmentPreviewEntry, SegmentedPreviewMode, SessionResult,
-    SessionSnapshot,
+    ImeSession, ImeSessionOptions, NativeKeyEvent, PhraseCandidate, PhraseSegment, SegmentPreviewEntry,
+    SegmentedPreviewMode, SessionCommand, SessionResult, SessionSnapshot,
 };
 
 uniffi::setup_scaffolding!("khmerime_ios_keyboard");
@@ -58,6 +58,33 @@ impl From<&SegmentPreviewEntry> for IosSegmentEntry {
     }
 }
 
+impl From<&PhraseSegment> for IosSegmentEntry {
+    fn from(s: &PhraseSegment) -> Self {
+        IosSegmentEntry {
+            output: s.output.clone(),
+            input: s.input.clone(),
+            focused: false,
+        }
+    }
+}
+
+/// One card of the Phrase Wheel (ADR-0014): a whole-composition Khmer hypothesis
+/// with its own segmentation.
+#[derive(Clone, Debug, Default, PartialEq, Eq, uniffi::Record)]
+pub struct IosPhraseCandidate {
+    pub text: String,
+    pub segments: Vec<IosSegmentEntry>,
+}
+
+impl From<&PhraseCandidate> for IosPhraseCandidate {
+    fn from(c: &PhraseCandidate) -> Self {
+        IosPhraseCandidate {
+            text: c.text.clone(),
+            segments: c.segments.iter().map(IosSegmentEntry::from).collect(),
+        }
+    }
+}
+
 /// Render state returned to Swift after every session call.
 #[derive(Clone, Debug, Default, PartialEq, Eq, uniffi::Record)]
 pub struct IosRenderState {
@@ -78,6 +105,11 @@ pub struct IosRenderState {
     pub segment_edit_active: bool,
     /// Which segment is currently being edited (when segment_edit_active).
     pub segment_edit_index: Option<u64>,
+    /// Ranked whole-composition hypotheses for the Phrase Wheel (ADR-0014); `[0]` is
+    /// the decoder's best-ranked phrase.
+    pub phrase_candidates: Vec<IosPhraseCandidate>,
+    /// Index into `phrase_candidates` currently previewed by the strip.
+    pub selected_phrase_index: u64,
 }
 
 fn render_state(snapshot: &SessionSnapshot, result: &SessionResult) -> IosRenderState {
@@ -90,6 +122,12 @@ fn render_state(snapshot: &SessionSnapshot, result: &SessionResult) -> IosRender
         commit_text: result.commit_text.clone(),
         segment_edit_active: snapshot.segment_edit_active,
         segment_edit_index: snapshot.segment_edit_index.map(|i| i as u64),
+        phrase_candidates: snapshot
+            .phrase_candidates
+            .iter()
+            .map(IosPhraseCandidate::from)
+            .collect(),
+        selected_phrase_index: snapshot.selected_phrase_index as u64,
     }
 }
 
@@ -136,6 +174,14 @@ impl KhmerIMESession {
         let mut s = self.inner.lock().unwrap();
         s.focus_out();
         render_state(&s.snapshot(), &SessionResult::default())
+    }
+
+    /// Scroll the Phrase Wheel to card `index` (ADR-0014): make that Phrase Candidate
+    /// the active selection so a following Space/Enter commits it.
+    pub fn select_phrase(&self, index: u64) -> IosRenderState {
+        let mut s = self.inner.lock().unwrap();
+        let result = s.process_command(SessionCommand::SelectPhrase(index as usize));
+        render_state(&s.snapshot(), &result)
     }
 
     pub fn process_character(&self, ch: String) -> IosRenderState {
@@ -256,6 +302,120 @@ mod tests {
         assert!(state.segment_edit_index.is_none());
         assert!(state.focused_segment_index.is_none());
         assert!(state.selected_index.is_none());
+        assert_eq!(state.selected_phrase_index, 0);
+    }
+
+    // ── phrase wheel (ADR-0014) ───────────────────────────────────────────────
+
+    #[test]
+    fn render_state_exposes_phrase_candidates_for_the_wheel() {
+        let s = new_session();
+        s.focus_in();
+        let state = type_str(&s, "khnhomtov");
+        assert!(
+            !state.phrase_candidates.is_empty(),
+            "phrase candidates must cross the FFI so the Phrase Wheel can render"
+        );
+        let top = &state.phrase_candidates[0];
+        assert!(!top.text.is_empty(), "top wheel card must have Khmer text");
+        assert!(
+            !top.segments.is_empty(),
+            "top card must carry its segmentation for the Roman Row / Level-2 editing"
+        );
+        // ADR-0015: WFST-sourced, so the cards are Khmer readings — not the raw roman.
+        assert!(
+            top.text.chars().all(|c| ('\u{1780}'..='\u{17FF}').contains(&c)),
+            "wheel cards are Khmer, not roman; got {:?}",
+            top.text
+        );
+    }
+
+    #[test]
+    fn select_phrase_makes_enter_commit_that_card() {
+        let s = new_session();
+        s.focus_in();
+        // "khnhom" has multiple Khmer readings → >= 2 whole-phrase hypotheses.
+        let state = type_str(&s, "khnhom");
+        assert!(
+            state.phrase_candidates.len() >= 2,
+            "need >= 2 wheel cards to select among, got {:?}",
+            state
+                .phrase_candidates
+                .iter()
+                .map(|c| c.text.clone())
+                .collect::<Vec<_>>()
+        );
+        let wanted = state.phrase_candidates[1].text.clone();
+        s.select_phrase(1);
+        let committed = s.process_enter().commit_text.expect("enter must commit");
+        assert_eq!(committed, wanted, "wheel selection must drive the commit");
+    }
+
+    #[test]
+    fn select_phrase_exposes_the_selected_phrase_index() {
+        let s = new_session();
+        s.focus_in();
+        let state = type_str(&s, "khnhom");
+        assert!(
+            state.phrase_candidates.len() >= 2,
+            "need >= 2 wheel cards to select among, got {:?}",
+            state
+                .phrase_candidates
+                .iter()
+                .map(|c| c.text.clone())
+                .collect::<Vec<_>>()
+        );
+
+        let selected = s.select_phrase(1);
+        assert_eq!(selected.selected_phrase_index, 1);
+        let restored = s.select_phrase(0);
+        assert_eq!(restored.selected_phrase_index, 0);
+    }
+
+    #[test]
+    fn phrase_candidates_are_khmer_for_a_long_phrase_not_raw_roman() {
+        // ADR-0015 regression: the wheel reads the WFST decoder, so a long multi-word
+        // phrase decodes to Khmer whole-phrase readings — not the raw roman fallback
+        // the old legacy source produced (the "derlengjeamouymitpheak" bug).
+        let s = new_session();
+        s.focus_in();
+        let state = type_str(&s, "komtovna");
+        let top = state.phrase_candidates.first().expect("expected a phrase candidate");
+        assert_ne!(top.text, "komtovna", "the wheel must not show the raw roman input");
+        assert!(
+            top.text.chars().all(|c| ('\u{1780}'..='\u{17FF}').contains(&c)),
+            "the top wheel hypothesis must be Khmer, not roman; got {:?}",
+            top.text
+        );
+    }
+
+    #[test]
+    fn segmented_phrase_exposes_whole_phrase_alternatives_for_the_wheel() {
+        let s = new_session();
+        s.focus_in();
+        let state = type_str(&s, "nhomttovsalarien");
+
+        assert!(
+            state.phrase_candidates.len() >= 2,
+            "the wheel needs whole-phrase alternatives, not just focused-word candidates; got {:?}",
+            state
+                .phrase_candidates
+                .iter()
+                .map(|candidate| candidate.text.clone())
+                .collect::<Vec<_>>()
+        );
+        assert!(
+            state
+                .phrase_candidates
+                .iter()
+                .all(|candidate| candidate.text.ends_with("សាលារៀន")),
+            "alternatives should remain whole-phrase readings; got {:?}",
+            state
+                .phrase_candidates
+                .iter()
+                .map(|candidate| candidate.text.clone())
+                .collect::<Vec<_>>()
+        );
     }
 
     // ── basic composition ─────────────────────────────────────────────────────
@@ -269,6 +429,33 @@ mod tests {
         assert_eq!(state.preedit, "nhom");
         assert!(!state.candidates.is_empty(), "nhom must produce at least one candidate");
         assert!(state.commit_text.is_none());
+    }
+
+    #[test]
+    fn period_input_exposes_khmer_and_latin_punctuation_suggestions() {
+        let s = new_session();
+        s.focus_in();
+
+        let state = s.process_character(".".to_string());
+
+        let expected = vec![
+            "។".to_owned(),
+            "៕".to_owned(),
+            ".".to_owned(),
+            "?".to_owned(),
+            "!".to_owned(),
+            "…".to_owned(),
+        ];
+        assert_eq!(state.candidates, expected);
+        assert_eq!(
+            state
+                .phrase_candidates
+                .iter()
+                .map(|candidate| candidate.text.clone())
+                .collect::<Vec<_>>(),
+            expected,
+            "mobile suggestion surface must receive all period alternatives through phrase_candidates"
+        );
     }
 
     #[test]

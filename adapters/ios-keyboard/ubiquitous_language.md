@@ -104,7 +104,7 @@ A tappable segment in the Strip representing one segment. Displays the segment's
 
 ## Candidate Row
 
-The persistent horizontally scrollable row between the Strip and key rows. It shows Khmer candidates for the active Composition or Focused Segment. Tapping a candidate selects it; it does not commit text by itself. The row is cleared when CharPick is active so CharPick's character candidates are the only visible candidates.
+The persistent horizontally scrollable row between the Strip and key rows. During normal roman composition it hosts the Phrase Wheel: whole-phrase alternatives other than the phrase currently previewed in the Strip. During Segment Edit it hosts Khmer candidates for the focused segment. During CharPick it hosts character candidates. Tapping a phrase card selects it for the Strip preview; Space/Enter commit the selected phrase.
 
 ---
 

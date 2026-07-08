@@ -90,7 +90,9 @@ final class StripPresentationSpecTests: XCTestCase {
             focusedSegmentIndex: segments.firstIndex(where: { $0.focused }).map { UInt64($0) },
             commitText: nil,
             segmentEditActive: segmentEditActive,
-            segmentEditIndex: segmentEditIndex.map { UInt64($0) }
+            segmentEditIndex: segmentEditIndex.map { UInt64($0) },
+            phraseCandidates: [],
+            selectedPhraseIndex: 0
         )
     }
 

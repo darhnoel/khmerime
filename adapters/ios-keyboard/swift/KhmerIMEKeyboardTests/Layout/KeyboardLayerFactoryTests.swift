@@ -80,6 +80,22 @@ final class KeyboardLayerFactoryTests: XCTestCase {
         XCTAssertEqual(symbol.titleLabel?.font.pointSize, 17)
     }
 
+    func test_characterProducingKeysGetPreviewLabelsButControlsDoNot() {
+        let letter = factory.makeLetterKey("k") as? GlassKeyButton
+        let symbol = factory.makeSymbolKey("?") as? GlassKeyButton
+        let bottomRow = factory.makeBottomRow(leftLabel: "123", leftAction: ActionTarget.actions.numeric, includePeriod: true)
+        let bottomKeys = bottomRow.arrangedSubviews.compactMap { $0 as? GlassKeyButton }
+
+        XCTAssertEqual(letter?.previewLabel, "K")
+        XCTAssertEqual(symbol?.previewLabel, "?")
+        XCTAssertNil(bottomKeys[0].previewLabel, "globe must not show a key preview popup")
+        XCTAssertNil(bottomKeys[1].previewLabel, "EN is a mode key, not a character key")
+        XCTAssertNil(bottomKeys[2].previewLabel, "123 is a mode key, not a character key")
+        XCTAssertNil(bottomKeys[3].previewLabel, "space is a control key")
+        XCTAssertEqual(bottomKeys[4].previewLabel, ".", "period is a small punctuation key")
+        XCTAssertNil(bottomKeys[5].previewLabel, "return is a control key")
+    }
+
     func test_keyCornerRadiusFollowsAndroidGlassProportionAfterLayout() {
         let letter = factory.makeLetterKey("k")
 

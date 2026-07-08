@@ -94,6 +94,8 @@ impl ImeSession {
             segment_edit_active: segment_edit_index.is_some(),
             segment_edit_index,
             segment_preview,
+            phrase_candidates: self.phrase_candidates.clone(),
+            selected_phrase_index: self.selected_phrase_index,
             cursor_location: self.cursor_location,
         }
     }
@@ -108,6 +110,118 @@ mod tests {
     use crate::adapter_contract::CursorLocation;
     use crate::ime_session::ImeSession;
     use crate::test_support::{session, type_ascii};
+
+    #[test]
+    fn top_phrase_candidate_matches_the_segmented_preview() {
+        // ADR-0015: the wheel reads the WFST decoder — the same source as the strip's
+        // segmented preview — so its top hypothesis equals the preview (no divergence).
+        let mut session = session();
+        type_ascii(&mut session, "khnhomtov");
+        let snapshot = session.snapshot();
+
+        let best_preview: String = snapshot
+            .segment_preview
+            .iter()
+            .map(|segment| segment.output.clone())
+            .collect();
+        assert!(!best_preview.is_empty(), "precondition: input should segment");
+        assert_eq!(
+            snapshot.phrase_candidates.first().map(|entry| entry.text.clone()),
+            Some(best_preview),
+            "the wheel's top hypothesis must equal the strip's segmented preview (same WFST source)"
+        );
+    }
+
+    #[test]
+    fn selecting_a_phrase_candidate_commits_that_one() {
+        // ADR-0014: scrolling the wheel to card i makes that Phrase Candidate the
+        // active Segmented Session, so Enter commits it (Visible Segmented Commit),
+        // not the top card.
+        use crate::adapter_contract::SessionCommand;
+        let mut session = session();
+        // "khnhom" has two Khmer readings (ខ្ញុំ / ខ្ញំ) → >= 2 whole-phrase hypotheses.
+        type_ascii(&mut session, "khnhom");
+        let candidates = session.snapshot().phrase_candidates;
+        assert!(
+            candidates.len() >= 2,
+            "need >= 2 whole-phrase candidates to select among, got {:?}",
+            candidates.iter().map(|entry| entry.text.clone()).collect::<Vec<_>>()
+        );
+        let wanted = candidates[1].text.clone();
+
+        session.process_command(SessionCommand::SelectPhrase(1));
+        let result = session.process_key_event(0xFF0D, 0, 0); // KEY_RETURN
+
+        assert_eq!(
+            result.commit_text.as_deref(),
+            Some(wanted.as_str()),
+            "Enter must commit the selected phrase candidate, not the top one"
+        );
+    }
+
+    #[test]
+    fn selecting_a_phrase_candidate_updates_the_preview_index_and_can_return_to_best() {
+        // Regression: after tapping an alternative, the wheel must be able to show
+        // the original best again, so the selected phrase index has to be explicit.
+        use crate::adapter_contract::SessionCommand;
+        let mut session = session();
+        type_ascii(&mut session, "khnhom");
+        let candidates = session.snapshot().phrase_candidates;
+        assert!(
+            candidates.len() >= 2,
+            "need >= 2 whole-phrase candidates to select among, got {:?}",
+            candidates.iter().map(|entry| entry.text.clone()).collect::<Vec<_>>()
+        );
+        let best = candidates[0].text.clone();
+        let alternative = candidates[1].text.clone();
+
+        session.process_command(SessionCommand::SelectPhrase(1));
+        let snapshot = session.snapshot();
+        assert_eq!(snapshot.selected_phrase_index, 1);
+        let preview: String = snapshot
+            .segment_preview
+            .iter()
+            .map(|segment| segment.output.clone())
+            .collect();
+        assert_eq!(preview, alternative, "strip preview should follow the selected phrase");
+
+        session.process_command(SessionCommand::SelectPhrase(0));
+        let snapshot = session.snapshot();
+        assert_eq!(snapshot.selected_phrase_index, 0);
+        let preview: String = snapshot
+            .segment_preview
+            .iter()
+            .map(|segment| segment.output.clone())
+            .collect();
+        assert_eq!(preview, best, "the original best should be selectable again");
+    }
+
+    #[test]
+    fn each_phrase_candidate_carries_its_own_segmentation() {
+        // ADR-0014: a Phrase Candidate pairs Khmer with its segmentation so the wheel
+        // card can show the roman row and Level-2 editing can target a word.
+        let mut session = session();
+        type_ascii(&mut session, "khnhomtov");
+        let snapshot = session.snapshot();
+        let top = snapshot
+            .phrase_candidates
+            .first()
+            .expect("expected at least one phrase candidate");
+        assert!(
+            top.segments.len() >= 2,
+            "khnhomtov should segment into >= 2 words, got {:?}",
+            top.segments.iter().map(|seg| seg.output.clone()).collect::<Vec<_>>()
+        );
+        let rebuilt: String = top.segments.iter().map(|seg| seg.output.clone()).collect();
+        assert_eq!(
+            rebuilt, top.text,
+            "a candidate's segment outputs must reconstruct its text"
+        );
+        assert!(
+            top.segments.iter().all(|seg| !seg.input.is_empty()),
+            "each segment must carry its roman slice for the Roman Row"
+        );
+    }
 
     #[test]
     fn snapshot_exposes_recommended_and_roman_hint_metadata() {

@@ -2,7 +2,7 @@ import UIKit
 
 struct KeyboardViewHierarchy {
     let stripView: StripView
-    let candidateRowView: CandidateRowView
+    let candidateRowView: UIView & KeyboardCandidateRowDisplaying
     let qwertyView: UIView
     let numericView: UIView
     let symbolsView: UIView
@@ -18,13 +18,17 @@ struct KeyboardViewHierarchyBuilder {
     let actions: KeyboardLayerActions
 
     func build(
-        candidateRowSelection: ((Int) -> Void)? = nil
+        candidateSelection: ((Int) -> Void)? = nil,
+        phraseSelection: ((Int) -> Void)? = nil
     ) -> KeyboardViewHierarchy {
         let stripView = StripView()
         stripView.translatesAutoresizingMaskIntoConstraints = false
 
-        let candidateRowView = CandidateRowView()
-        candidateRowView.onCandidateSelected = candidateRowSelection
+        // The candidate-row slot hosts the Phrase Wheel (composition) and the word
+        // candidate row (CharPick). Wheel tap → phraseSelection; CharPick tap → candidateSelection.
+        let candidateRowView = CandidateSurfaceView()
+        candidateRowView.onPhraseSelected = phraseSelection
+        candidateRowView.onCandidateSelected = candidateSelection
         candidateRowView.translatesAutoresizingMaskIntoConstraints = false
 
         let layerFactory = KeyboardLayerFactory(
@@ -48,6 +52,7 @@ struct KeyboardViewHierarchyBuilder {
             candidateRowView: candidateRowView
         )
         rootView.translatesAutoresizingMaskIntoConstraints = false
+        wireKeyPreviewCallbacks(rootView: rootView, keyLayers: [qwertyView, numericView, symbolsView])
 
         return KeyboardViewHierarchy(
             stripView: stripView,
@@ -57,5 +62,25 @@ struct KeyboardViewHierarchyBuilder {
             symbolsView: symbolsView,
             rootView: rootView
         )
+    }
+
+    private func wireKeyPreviewCallbacks(rootView: KeyboardRootView, keyLayers: [UIView]) {
+        for key in keyLayers.flatMap({ glassKeys(in: $0) }) {
+            key.onPreviewChanged = { [weak rootView] sourceKey, label in
+                guard let label else {
+                    rootView?.hideKeyPreview()
+                    return
+                }
+                rootView?.showKeyPreview(label: label, from: sourceKey)
+            }
+        }
+    }
+
+    private func glassKeys(in view: UIView) -> [GlassKeyButton] {
+        var result = view.subviews.compactMap { $0 as? GlassKeyButton }
+        for subview in view.subviews {
+            result += glassKeys(in: subview)
+        }
+        return result
     }
 }

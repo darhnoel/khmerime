@@ -14,8 +14,11 @@ class GlassKeyButton: UIButton {
     // Use this instead of addTarget(for: .touchDown) for keys that must register
     // every rapid tap even when two touches physically overlap.
     var onPress: (() -> Void)?
+    var previewLabel: String?
+    var onPreviewChanged: ((GlassKeyButton, String?) -> Void)?
 
     private var isPressed = false
+    private var isPreviewVisible = false
     private var pressAnimator: GlassKeyPressAnimator?
 
     private lazy var blurView: UIVisualEffectView = {
@@ -44,6 +47,7 @@ class GlassKeyButton: UIButton {
     }
 
     override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
+        showPreviewIfNeeded()
         onPress?()
         super.touchesBegan(touches, with: event)
         ensurePressAnimator().press()
@@ -56,6 +60,7 @@ class GlassKeyButton: UIButton {
         ensurePressAnimator().release()
         isPressed = false
         updateGlassAppearance()
+        hidePreviewIfNeeded()
     }
 
     override func touchesCancelled(_ touches: Set<UITouch>, with event: UIEvent?) {
@@ -63,6 +68,7 @@ class GlassKeyButton: UIButton {
         ensurePressAnimator().release()
         isPressed = false
         updateGlassAppearance()
+        hidePreviewIfNeeded()
     }
 
     // The press animation scales the button down to (1 - pressScaleDepth). UIKit
@@ -106,6 +112,18 @@ class GlassKeyButton: UIButton {
     private func applySquish(_ squish: CGFloat) {
         let scale = 1 - squish * Self.pressScaleDepth
         transform = CGAffineTransform(scaleX: scale, y: scale)
+    }
+
+    private func showPreviewIfNeeded() {
+        guard let previewLabel else { return }
+        isPreviewVisible = true
+        onPreviewChanged?(self, previewLabel)
+    }
+
+    private func hidePreviewIfNeeded() {
+        guard isPreviewVisible else { return }
+        isPreviewVisible = false
+        onPreviewChanged?(self, nil)
     }
 
     private func updateBlurViewLayout() {

@@ -35,8 +35,9 @@ mod test_support;
 
 pub use crate::adapter_contract::{
     should_persist_history_word, CandidateDisplayEntry, CursorLocation, HistoryStore, ImeSessionOptions,
-    ImeSessionSnapshot, ImeSessionUpdate, InputMode, NativeKeyEvent, SegmentPreviewEntry, SegmentedPreviewMode,
-    SessionCommand, SessionResult, SessionSnapshot, MAX_PERSISTED_HISTORY_WORD_CHARS,
+    ImeSessionSnapshot, ImeSessionUpdate, InputMode, NativeKeyEvent, PhraseCandidate, PhraseSegment,
+    SegmentPreviewEntry, SegmentedPreviewMode, SessionCommand, SessionResult, SessionSnapshot,
+    MAX_PERSISTED_HISTORY_WORD_CHARS,
 };
 pub use crate::ime_session::{ImeSession, ImeSessionBuilder};
 pub use crate::segmented_session::{compute_segmented_refinement, SegmentedRefinement};

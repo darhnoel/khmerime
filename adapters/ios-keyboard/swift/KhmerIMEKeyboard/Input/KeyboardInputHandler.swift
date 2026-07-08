@@ -443,6 +443,16 @@ final class KeyboardInputHandler {
         }
     }
 
+    // Tapping wheel Phrase Candidate `index` selects it (ADR-0015): make it the active
+    // phrase so the strip previews it; Space/Enter then commit it. Tapping never commits.
+    func selectPhrase(at index: Int) {
+        dispatcher.onSession { [weak self] in
+            guard let self else { return }
+            let state = self.session.selectPhrase(at: index)
+            self.dispatcher.onMain { [weak self] in self?.render(state) }
+        }
+    }
+
     func selectCandidate(at index: Int) {
         if keyboardState == .charPick {
             if let candidate = lastState?.candidates[safe: index] {

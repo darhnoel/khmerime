@@ -12,8 +12,8 @@ use jni::sys::{jint, jlong, jstring};
 use jni::JNIEnv;
 use khmerime_core::{DecoderConfig, Transliterator};
 use khmerime_session::{
-    ImeSession, ImeSessionOptions, InputMode, NativeKeyEvent, SegmentPreviewEntry, SegmentedPreviewMode,
-    SessionCommand, SessionResult, SessionSnapshot,
+    ImeSession, ImeSessionOptions, InputMode, NativeKeyEvent, PhraseCandidate, SegmentPreviewEntry,
+    SegmentedPreviewMode, SessionCommand, SessionResult, SessionSnapshot,
 };
 use serde::Serialize;
 
@@ -46,6 +46,33 @@ struct RenderState {
     commit_text: Option<String>,
     segment_edit_active: bool,
     segment_edit_index: Option<u64>,
+    // Ranked whole-phrase hypotheses for the Phrase Wheel (ADR-0015). The UI shows the
+    // ones other than `selected_phrase_index` (which the strip previews).
+    phrase_candidates: Vec<PhraseCandidateJson>,
+    selected_phrase_index: u64,
+}
+
+#[derive(Serialize)]
+struct PhraseCandidateJson {
+    text: String,
+    segments: Vec<SegmentEntry>,
+}
+
+impl From<&PhraseCandidate> for PhraseCandidateJson {
+    fn from(candidate: &PhraseCandidate) -> Self {
+        PhraseCandidateJson {
+            text: candidate.text.clone(),
+            segments: candidate
+                .segments
+                .iter()
+                .map(|segment| SegmentEntry {
+                    output: segment.output.clone(),
+                    input: segment.input.clone(),
+                    focused: false,
+                })
+                .collect(),
+        }
+    }
 }
 
 #[derive(Serialize)]
@@ -75,6 +102,8 @@ fn make_render_state(snapshot: &SessionSnapshot, result: &SessionResult) -> Rend
         commit_text: result.commit_text.clone(),
         segment_edit_active: snapshot.segment_edit_active,
         segment_edit_index: snapshot.segment_edit_index.map(|i| i as u64),
+        phrase_candidates: snapshot.phrase_candidates.iter().map(PhraseCandidateJson::from).collect(),
+        selected_phrase_index: snapshot.selected_phrase_index as u64,
     }
 }
 
@@ -230,6 +259,18 @@ pub extern "C" fn Java_com_khmerime_input_KhmerImeSession_nativeProcessDigit(
     let s = unsafe { session_mut(handle) };
     let digit = n.clamp(0, 9) as u32;
     let result = s.process_native_key_event(key_event(b'0' as u32 + digit));
+    render_json(&mut env, &s.snapshot(), &result)
+}
+
+#[no_mangle]
+pub extern "C" fn Java_com_khmerime_input_KhmerImeSession_nativeSelectPhrase(
+    mut env: JNIEnv,
+    _obj: JObject,
+    handle: jlong,
+    index: jint,
+) -> jstring {
+    let s = unsafe { session_mut(handle) };
+    let result = s.process_command(SessionCommand::SelectPhrase(index.max(0) as usize));
     render_json(&mut env, &s.snapshot(), &result)
 }
 

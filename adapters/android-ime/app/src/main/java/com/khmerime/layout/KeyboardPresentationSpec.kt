@@ -6,10 +6,28 @@ import com.khmerime.input.KeyboardState
 // Which input-chrome rows are worth their height (parity with iOS KeyboardChrome):
 // roman composition owns the preedit strip + candidate row; Suggest Character owns
 // only the candidate row, and only while candidates exist.
-enum class ChromeRows { None, CandidateOnly, StripAndCandidate }
+enum class ChromeRows { None, CandidateOnly, StripAndCandidate, StripOnly }
+
+// One selectable card in the Phrase Wheel: the phrase text plus its index into the
+// render state's phraseCandidates (so a tap maps to selectPhrase).
+data class PhraseAlternative(val index: Int, val text: String)
 
 object KeyboardPresentationSpec {
     fun suggestionCandidates(state: KhmerRenderState): List<String> = state.candidates
+
+    // The Phrase Wheel cards (ADR-0015): whole-phrase alternatives EXCLUDING the one the
+    // strip previews (selectedPhraseIndex). Empty → the strip stands alone.
+    fun phraseAlternatives(state: KhmerRenderState): List<PhraseAlternative> =
+        state.phraseCandidates.mapIndexedNotNull { index, candidate ->
+            if (index == state.selectedPhraseIndex) null else PhraseAlternative(index, candidate.text)
+        }
+
+    // Composition shows the Phrase Wheel in the chip row; CharPick and Segment Edit show
+    // word candidates instead.
+    fun showsPhraseWheel(keyboardState: KeyboardState?, state: KhmerRenderState): Boolean =
+        keyboardState != KeyboardState.SuggestCharacter &&
+            !state.segmentEditActive &&
+            phraseAlternatives(state).isNotEmpty()
 
     fun preeditText(keyboardState: KeyboardState?, state: KhmerRenderState): String =
         if (keyboardState == KeyboardState.SuggestCharacter ||
@@ -77,10 +95,16 @@ object KeyboardPresentationSpec {
         if (keyboardState == KeyboardState.SuggestCharacter) {
             return if (state.candidates.isEmpty()) ChromeRows.None else ChromeRows.CandidateOnly
         }
-        return if (romanHint.isNotEmpty() || state.candidates.isNotEmpty()) {
-            ChromeRows.StripAndCandidate
-        } else {
-            ChromeRows.None
+        // The candidate row is the Phrase Wheel (alternatives) during normal composition,
+        // or the word candidate row while editing a segment. When neither has anything to
+        // show, the strip stands alone (StripOnly) so the row collapses (ADR-0015).
+        val candidateRowVisible =
+            if (state.segmentEditActive) state.candidates.isNotEmpty()
+            else phraseAlternatives(state).isNotEmpty()
+        return when {
+            candidateRowVisible -> ChromeRows.StripAndCandidate
+            romanHint.isNotEmpty() -> ChromeRows.StripOnly
+            else -> ChromeRows.None
         }
     }
 }

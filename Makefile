@@ -58,6 +58,7 @@ MACOS_ENTITLEMENTS      := $(MACOS_ADAPTER_DIR)/swift/KhmerIMEMacOS/KhmerIMEMacO
 # MACOS_SIGNING_CONFIG=/path/to/config.mk for another config file.
 MACOS_SIGNING_CONFIG    ?= $(MACOS_ADAPTER_DIR)/macos-signing.local.mk
 MACOS_CODE_SIGN_IDENTITY ?=
+MACOS_INSTALLER_SIGN_IDENTITY ?=
 MACOS_TEAM_ID            ?=
 MACOS_NOTARY_PROFILE     ?= khmerime-notary
 -include $(MACOS_SIGNING_CONFIG)
@@ -465,6 +466,11 @@ linux-package:
 	bash scripts/platforms/linux/ibus/build_deb.sh
 
 macos-package:
+	MACOS_CODE_SIGN_IDENTITY='$(MACOS_CODE_SIGN_IDENTITY)' \
+	MACOS_INSTALLER_SIGN_IDENTITY='$(MACOS_INSTALLER_SIGN_IDENTITY)' \
+	MACOS_TEAM_ID='$(MACOS_TEAM_ID)' \
+	MACOS_NOTARY_PROFILE='$(MACOS_NOTARY_PROFILE)' \
+	MACOS_ENTITLEMENTS='$(MACOS_ENTITLEMENTS)' \
 	bash scripts/platforms/macos/imk/build_pkg.sh
 
 android-package:

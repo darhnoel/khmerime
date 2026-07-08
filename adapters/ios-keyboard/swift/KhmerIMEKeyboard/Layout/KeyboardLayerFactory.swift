@@ -121,7 +121,7 @@ struct KeyboardLayerFactory {
         row.addArrangedSubview(leftBtn)
         row.addArrangedSubview(spaceBtn)
         if includePeriod {
-            let periodBtn = makeSpecialKey(".", action: actions.period)
+            let periodBtn = makeSpecialKey(".", action: actions.period, previewLabel: ".")
             periodBtn.widthAnchor.constraint(equalToConstant: specialKeyW).isActive = true
             row.addArrangedSubview(periodBtn)
         }
@@ -203,6 +203,7 @@ struct KeyboardLayerFactory {
     func makeLetterKey(_ letter: String) -> UIButton {
         let btn = GlassKeyButton(frame: .zero)
         btn.setTitle(letter.uppercased(), for: .normal)
+        btn.previewLabel = letter.uppercased()
         KeyStyle.applyLetter(btn, isIPad: isIPad)
         btn.onPress = { [weak target, weak btn] in
             _ = target?.perform(actions.letter, with: btn)
@@ -213,6 +214,7 @@ struct KeyboardLayerFactory {
     func makeSymbolKey(_ symbol: String) -> UIButton {
         let btn = GlassKeyButton(frame: .zero)
         btn.setTitle(symbol, for: .normal)
+        btn.previewLabel = symbol
         KeyStyle.applySymbol(btn, isIPad: isIPad)
         btn.onPress = { [weak target, weak btn] in
             _ = target?.perform(actions.symbol, with: btn)
@@ -220,9 +222,10 @@ struct KeyboardLayerFactory {
         return btn
     }
 
-    func makeSpecialKey(_ title: String, action: Selector) -> UIButton {
+    func makeSpecialKey(_ title: String, action: Selector, previewLabel: String? = nil) -> UIButton {
         let btn = GlassKeyButton(frame: .zero)
         btn.setTitle(title, for: .normal)
+        btn.previewLabel = previewLabel
         KeyStyle.applySpecial(btn, isIPad: isIPad)
         btn.addTarget(target, action: action, for: .touchUpInside)
         return btn

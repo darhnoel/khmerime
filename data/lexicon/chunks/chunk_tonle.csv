@@ -1649,8 +1649,8 @@ likhhet,លិខិត,282,km,generated,draft,tonle:s1; reverse=2en; weak_cover
 lykhet,លិខិត,282,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.2806
 bandaoh,បណ្ដោះ,281,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=2; rank=2; beams=10; score=-0.2997
 bondoh,បណ្ដោះ,281,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=2; rank=3; beams=10; score=-0.3385; collision=1; existing_targets=បណ្ដុះ
-aphirok,អភិរក្ស,281,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=1; beams=10; score=-0.2708
-aphiroksar,អភិរក្ស,281,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.3422
+aphirak,អភិរក្ស,281,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=1; beams=10; score=-0.2708
+aphiraks,អភិរក្ស,281,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.3422
 aur,អូរ,281,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.5784
 oour,អូរ,281,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.6782
 they,ថី,280,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.4169
@@ -5512,9 +5512,9 @@ sloi,ស្លុយ,10,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=
 saob,ស្អាប់,10,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=2; rank=3; beams=10; score=-0.4036; collision=1; existing_targets=ស្អប់
 hary,ហារី,10,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.3192
 hori,ហារី,10,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.4069; collision=1; existing_targets=ហរិ
-anuraksor,អនុរក្ស,10,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.2958
-anuroksar,អនុរក្ស,10,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.2862
-anuroksor,អនុរក្ស,10,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=1; beams=10; score=-0.2605
+anurak,អនុរក្ស,10,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.2958
+anuraks,អនុរក្ស,10,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.2862
+anureak,អនុរក្ស,10,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=1; beams=10; score=-0.2605
 anuseniy,អនុសេនីយ៍,10,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=1; beams=10; score=-0.1224
 anusenyy,អនុសេនីយ៍,10,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.2287
 onuseniy,អនុសេនីយ៍,10,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.2354
@@ -11950,7 +11950,7 @@ taakyak,តោកយ៉ាក,1,km,generated,draft,tonle:s1; reverse=2en; weak_c
 taokyak,តោកយ៉ាក,1,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=1; beams=10; score=-0.1898
 taakrokhaok,តោករខោក,1,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.1863
 tookrokhaok,តោករខោក,1,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.1817
-taokoaroksor,តោកអារក្ស,1,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=2; rank=3; beams=10; score=-0.2419
+taokoarak,តោកអារក្ស,1,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=2; rank=3; beams=10; score=-0.2419
 taongkar,តោងការ,1,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.1991
 taongokor,តោងការ,1,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.2684
 taongteam,តោងទាម,1,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.1695
@@ -14467,9 +14467,9 @@ borintor,បុរិន្ទ,1,km,generated,draft,tonle:s1; reverse=2en; weak_
 borisak,បុរិសៈ,1,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=1; beams=10; score=-0.1372
 borisok,បុរិសៈ,1,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.3505
 borysak,បុរិសៈ,1,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.2845
-boreuoksar,បុរីរក្ស,1,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=1; beams=10; score=-0.2592
-boreuoksor,បុរីរក្ស,1,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.2624
-boriroksor,បុរីរក្ស,1,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.3104
+boreyrak,បុរីរក្ស,1,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=1; beams=10; score=-0.2592
+boreirak,បុរីរក្ស,1,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.2624
+borirak,បុរីរក្ស,1,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.3104
 boreuom,បុរីរម្យ,1,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=1; beams=10; score=-0.2064
 boryrom,បុរីរម្យ,1,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.3368
 borouheth,បុរោហិត,1,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.2424
@@ -17251,8 +17251,8 @@ roketh,រកេត,1,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1;
 rokhet,រកេត,1,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.3068; collision=1; existing_targets=រខិត
 rak,រក៍,1,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.4505
 rokh,រក៍,1,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.3135
-roksaphibal,រក្សាភិបាល,1,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=1; beams=10; score=-0.0873
-roksaphybal,រក្សាភិបាល,1,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.1994
+raksaphibal,រក្សាភិបាល,1,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=1; beams=10; score=-0.0873
+raksaphybal,រក្សាភិបាល,1,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.1994
 raksasrok,រក្សាស្រុក,1,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.1964
 roksasrak,រក្សាស្រុក,1,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.1717
 rokhens,រខិញ,1,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.2629
