@@ -1,5 +1,6 @@
 package com.khmerime
 
+import com.khmerime.input.KhmerPhraseCandidate
 import com.khmerime.input.KhmerRenderState
 import com.khmerime.input.KhmerSegmentEntry
 import com.khmerime.input.KeyboardState
@@ -288,22 +289,13 @@ class KeyboardPresentationSpecTest {
     }
 
     @Test
-    fun chromeRowsQwertyWithRomanHintShowsStripAndCandidate() {
+    fun chromeRowsQwertyWithRomanHintButNoAlternativesShowsStripOnly() {
+        // ADR-0015: composing with a single reading (no phrase alternatives) collapses
+        // the candidate row so the strip stands alone.
         val state = KhmerRenderState(candidates = emptyList())
         assertEquals(
-            "a non-empty roman hint keeps the full roman composition chrome",
-            ChromeRows.StripAndCandidate,
+            ChromeRows.StripOnly,
             KeyboardPresentationSpec.chromeRows(KeyboardState.Qwerty, "khn", state),
-        )
-    }
-
-    @Test
-    fun chromeRowsQwertyEmptyHintButCandidatesShowsStripAndCandidate() {
-        val state = KhmerRenderState(candidates = listOf("ក", "ខ"))
-        assertEquals(
-            "non-Suggest-Character candidate browsing reserves the full chrome",
-            ChromeRows.StripAndCandidate,
-            KeyboardPresentationSpec.chromeRows(KeyboardState.Qwerty, "", state),
         )
     }
 
@@ -324,6 +316,54 @@ class KeyboardPresentationSpecTest {
             "Suggest Character candidates need the candidate row, not the roman strip",
             ChromeRows.CandidateOnly,
             KeyboardPresentationSpec.chromeRows(KeyboardState.SuggestCharacter, "", state),
+        )
+    }
+
+    // ── Phrase Wheel (ADR-0015) ──────────────────────────────────────────────
+
+    @Test
+    fun phraseAlternativesExcludeTheSelectedPhrase() {
+        val state = KhmerRenderState(
+            phraseCandidates = listOf(
+                KhmerPhraseCandidate("ខ្ញុំទៅសាលា"),
+                KhmerPhraseCandidate("ខ្ញុំទៅសាលារៀន"),
+                KhmerPhraseCandidate("ខ្ញុំទៅ"),
+            ),
+            selectedPhraseIndex = 1,
+        )
+
+        val alternatives = KeyboardPresentationSpec.phraseAlternatives(state)
+
+        assertEquals("keeps original indices for tap → selectPhrase", listOf(0, 2), alternatives.map { it.index })
+        assertEquals(listOf("ខ្ញុំទៅសាលា", "ខ្ញុំទៅ"), alternatives.map { it.text })
+    }
+
+    @Test
+    fun oneReadingCollapsesTheCandidateRowToStripOnly() {
+        val state = KhmerRenderState(
+            phraseCandidates = listOf(KhmerPhraseCandidate("ខ្ញុំ")),
+            preedit = "khnhom",
+        )
+
+        assertTrue("one reading → no alternatives", KeyboardPresentationSpec.phraseAlternatives(state).isEmpty())
+        assertEquals(
+            "no alternatives → strip stands alone, candidate row collapses",
+            ChromeRows.StripOnly,
+            KeyboardPresentationSpec.chromeRows(KeyboardState.Qwerty, "khnhom", state),
+        )
+    }
+
+    @Test
+    fun multipleReadingsReserveTheStripAndCandidateRow() {
+        val state = KhmerRenderState(
+            phraseCandidates = listOf(KhmerPhraseCandidate("ខ្ញុំ"), KhmerPhraseCandidate("ខ្ញំ")),
+            preedit = "khnhom",
+        )
+
+        assertEquals(
+            "alternatives present → the Phrase Wheel row is reserved",
+            ChromeRows.StripAndCandidate,
+            KeyboardPresentationSpec.chromeRows(KeyboardState.Qwerty, "khnhom", state),
         )
     }
 }

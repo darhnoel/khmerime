@@ -228,8 +228,10 @@ class KhmerInputMethodService : InputMethodService() {
     // Three-state input chrome (parity with iOS): collapse the rows a mode is not
     // using so the keyboard reclaims their height. See KeyboardPresentationSpec.chromeRows.
     private fun applyChrome(rows: ChromeRows) {
-        preeditStrip?.visibility = if (rows == ChromeRows.StripAndCandidate) View.VISIBLE else View.GONE
-        candidateScroll?.visibility = if (rows == ChromeRows.None) View.GONE else View.VISIBLE
+        preeditStrip?.visibility =
+            if (rows == ChromeRows.StripAndCandidate || rows == ChromeRows.StripOnly) View.VISIBLE else View.GONE
+        candidateScroll?.visibility =
+            if (rows == ChromeRows.CandidateOnly || rows == ChromeRows.StripAndCandidate) View.VISIBLE else View.GONE
     }
 
     private fun resetSuggestCharacterSuggestions() {
@@ -248,15 +250,29 @@ class KhmerInputMethodService : InputMethodService() {
         applyChrome(KeyboardPresentationSpec.chromeRows(keyboardState, romanHint, state))
 
         if (candidateStrip == null) return
-        val selectedIndex = KeyboardPresentationSpec.selectedCandidateIndex(keyboardState, state)
-        val candidates = KeyboardPresentationSpec.suggestionCandidates(state)
-        val chips = candidateChipPool.sync(candidates.size)
-        candidates.forEachIndexed { index, candidate ->
-            chips[index].update(
-                text = KeyboardPresentationSpec.candidateDisplayLabel(candidate),
-                isSelected = index == selectedIndex,
-                onClick = { handler?.selectCandidate(index) },
-            )
+        if (KeyboardPresentationSpec.showsPhraseWheel(keyboardState, state)) {
+            // Phrase Wheel: whole-phrase alternatives; a tap selects (previews in strip).
+            val alternatives = KeyboardPresentationSpec.phraseAlternatives(state)
+            val chips = candidateChipPool.sync(alternatives.size)
+            alternatives.forEachIndexed { chipIndex, alternative ->
+                chips[chipIndex].update(
+                    text = KeyboardPresentationSpec.candidateDisplayLabel(alternative.text),
+                    isSelected = false,
+                    onClick = { handler?.selectPhrase(alternative.index) },
+                )
+            }
+        } else {
+            // Word candidates (CharPick / Segment Edit): a tap selects that candidate.
+            val selectedIndex = KeyboardPresentationSpec.selectedCandidateIndex(keyboardState, state)
+            val candidates = KeyboardPresentationSpec.suggestionCandidates(state)
+            val chips = candidateChipPool.sync(candidates.size)
+            candidates.forEachIndexed { index, candidate ->
+                chips[index].update(
+                    text = KeyboardPresentationSpec.candidateDisplayLabel(candidate),
+                    isSelected = index == selectedIndex,
+                    onClick = { handler?.selectCandidate(index) },
+                )
+            }
         }
     }
 }
