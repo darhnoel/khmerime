@@ -28,10 +28,23 @@ final class CandidateSurfaceViewTests: XCTestCase {
         XCTAssertFalse(surface.candidateRow.isHidden, "CharPick character candidates use the candidate row")
     }
 
-    private func makeState(phrases: [String], candidates: [String]) -> IosRenderState {
+    func test_segmentEditActiveShowsWordCandidatesNotWheel() {
+        // ADR-0014 Level 2: double-touch a card → edit one word. While editing, the
+        // focused segment's word candidates show (in the candidate row), not the wheel.
+        let surface = CandidateSurfaceView()
+
+        surface.render(
+            makeState(phrases: ["ខ្ញុំទៅ"], candidates: ["ខ្ញុំ", "ញ៉ម"], segmentEditActive: true),
+            presentation: .composition)
+
+        XCTAssertTrue(surface.wheel.isHidden, "the wheel is hidden while editing a word (Level 2)")
+        XCTAssertFalse(surface.candidateRow.isHidden, "the focused segment's word candidates show during edit")
+    }
+
+    private func makeState(phrases: [String], candidates: [String], segmentEditActive: Bool = false) -> IosRenderState {
         IosRenderState(
             candidates: candidates, selectedIndex: nil, preedit: "", segments: [],
-            focusedSegmentIndex: nil, commitText: nil, segmentEditActive: false, segmentEditIndex: nil,
+            focusedSegmentIndex: nil, commitText: nil, segmentEditActive: segmentEditActive, segmentEditIndex: nil,
             phraseCandidates: phrases.map { IosPhraseCandidate(text: $0, segments: []) }
         )
     }

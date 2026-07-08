@@ -42,6 +42,11 @@ final class CandidateSurfaceView: UIView, KeyboardCandidateRowDisplaying {
 
     func render(_ state: IosRenderState, presentation: CandidateRowPresentation = .composition) {
         switch presentation {
+        case .composition where state.segmentEditActive:
+            // Level 2: editing one word — the focused segment's candidates take over.
+            wheel.isHidden = true
+            candidateRow.isHidden = false
+            candidateRow.render(state, presentation: .composition)
         case .composition:
             wheel.isHidden = false
             candidateRow.isHidden = true
