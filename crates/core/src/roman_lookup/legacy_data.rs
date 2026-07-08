@@ -423,7 +423,14 @@ impl LegacyData {
     pub(crate) fn suggest_with_limit(&self, input: &str, history: &HashMap<String, usize>, limit: usize) -> Vec<String> {
         let query = input.strip_suffix(' ').unwrap_or(input);
         if query == "." {
-            return vec!["។".to_owned(), "៕".to_owned(), ".".to_owned()];
+            return vec![
+                "។".to_owned(),
+                "៕".to_owned(),
+                ".".to_owned(),
+                "?".to_owned(),
+                "!".to_owned(),
+                "…".to_owned(),
+            ];
         }
         if query.chars().all(|ch| ch.is_ascii_digit()) && !query.is_empty() {
             let mapped = query.chars().filter_map(khmer_digit).collect::<String>();

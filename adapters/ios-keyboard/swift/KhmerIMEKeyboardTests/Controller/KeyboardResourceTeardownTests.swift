@@ -11,6 +11,7 @@ final class KeyboardResourceTeardownTests: XCTestCase {
 
         let key = GlassKeyButton()
         key.onPress = {}
+        key.onPreviewChanged = { _, _ in }
         key.addTarget(target, action: #selector(TeardownTarget.action), for: .touchUpInside)
         nested.addSubview(key)
 
@@ -42,6 +43,7 @@ final class KeyboardResourceTeardownTests: XCTestCase {
         KeyboardResourceTeardown.releaseInteractions(in: root)
 
         XCTAssertNil(key.onPress)
+        XCTAssertNil(key.onPreviewChanged)
         XCTAssertNil(key.actions(forTarget: target, forControlEvent: .touchUpInside))
         XCTAssertNil(backspace.onTap)
         XCTAssertNil(backspace.onHoldFire)

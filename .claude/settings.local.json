@@ -1,0 +1,31 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(cargo test *)",
+      "Bash(export JAVA_HOME=\"/Applications/Android Studio.app/Contents/jbr/Contents/Home\")",
+      "Bash(./gradlew :app:testDebugUnitTest --tests \"com.khmerime.KeyViewStyleTest\")",
+      "Bash(./gradlew :app:testDebugUnitTest)",
+      "Bash(xcodebuild test *)",
+      "Bash(xcodebuild clean *)",
+      "Read(//tmp/**)",
+      "Bash(find /Users/rathnak/Library/Developer/Xcode/DerivedData/KhmerIME-aomdxnibdtyxfhdhxephtxrbbfhd/Build/Products/Debug-iphonesimulator -maxdepth 2 2>&1)",
+      "Read(//Users/rathnak/Library/Developer/Xcode/DerivedData/KhmerIME-aomdxnibdtyxfhdhxephtxrbbfhd/Build/Products/Debug-iphonesimulator/**)",
+      "Bash(find /Users/rathnak/Library/Developer/Xcode/DerivedData/KhmerIME-aomdxnibdtyxfhdhxephtxrbbfhd/Build/Intermediates.noindex/KhmerIME.build/Debug-iphonesimulator/KhmerIMEKeyboard.build/Objects-normal/arm64 -iname \"*.swiftmodule\" 2>&1)",
+      "Read(//Users/rathnak/Library/Developer/Xcode/DerivedData/KhmerIME-aomdxnibdtyxfhdhxephtxrbbfhd/Build/Intermediates.noindex/KhmerIME.build/Debug-iphonesimulator/KhmerIMEKeyboard.build/Objects-normal/arm64/**)",
+      "Bash(xcodebuild build *)",
+      "Bash(xcodegen generate *)",
+      "Bash(awk '/\\\\.editor-card *\\\\{/,/^\\\\}/' assets/css/30-editor.css)",
+      "Bash(awk '/\\\\.editor-card[ ,{]/{flag=1} flag{print} /^\\\\}/{if\\(flag\\)exit}' assets/css/10-layout.css)",
+      "Bash(.venv/bin/python -m pytest tests/test_theme.py -q)",
+      "Bash(cd /Users/rathnak/Developments/khmerime *)",
+      "Bash(cd /Users/rathnak/Developments/khmerime; echo \"=== root docs/adr numbering \\(committed + untracked\\) ===\"; ls -1 docs/adr/ 2>/dev/null | tail -8; echo; echo \"=== multiple-context map? ===\"; ls CONTEXT-MAP.md 2>/dev/null || echo \"\\(no CONTEXT-MAP.md — single root context\\)\"; echo; echo \"=== skill ADR format ===\"; cat /Users/rathnak/.claude/skills/grill-with-docs/ADR-FORMAT.md 2>/dev/null | head -60)",
+      "Read(//Users/rathnak/.agents/skills/grill-with-docs/**)",
+      "Bash(JAVA_HOME='/Applications/Android Studio.app/Contents/jbr/Contents/Home' PATH='/Applications/Android Studio.app/Contents/jbr/Contents/Home/bin:__TRACKED_VAR__' ./gradlew :app:testDebugUnitTest --tests com.khmerime.KhmerInputHandlerBehaviorTest)",
+      "Bash(cargo build *)"
+    ],
+    "additionalDirectories": [
+      "/tmp",
+      "/Users/rathnak/Developments/khmerime/assets/css"
+    ]
+  }
+}

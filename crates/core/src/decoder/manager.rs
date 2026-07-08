@@ -5,7 +5,7 @@ use crate::composer::ComposerTable;
 
 use super::{
     build_shadow_observation, DecodeCandidate, DecodeFailure, DecodeRequest, DecodeResult, Decoder, DecoderConfig,
-    DecoderMode, LegacyDecoder, ShadowObservation, ShadowReport, WeightedSpanDecoder,
+    DecodeSegment, DecoderMode, LegacyDecoder, ShadowObservation, ShadowReport, WeightedSpanDecoder,
 };
 
 pub(crate) struct DecoderManager {
@@ -109,13 +109,13 @@ impl DecoderManager {
         for candidate in legacy
             .candidates
             .iter()
-            .filter(|candidate| useful_phrase_candidate(candidate, input))
+            .filter_map(|candidate| phrase_candidate_from_legacy(candidate, input))
         {
             if !candidates
                 .iter()
-                .any(|current| same_phrase_candidate(current, candidate))
+                .any(|current| same_phrase_candidate(current, &candidate))
             {
-                candidates.push(candidate.clone());
+                candidates.push(candidate);
             }
             if candidates.len() >= self.config.max_candidates {
                 break;
@@ -126,7 +126,7 @@ impl DecoderManager {
             candidates = legacy
                 .candidates
                 .into_iter()
-                .filter(|candidate| useful_phrase_candidate(candidate, input))
+                .filter_map(|candidate| phrase_candidate_from_legacy(&candidate, input))
                 .collect();
         }
         candidates.truncate(self.config.max_candidates);
@@ -253,8 +253,29 @@ fn merge_results(legacy: &DecodeResult, weighted_span: Option<&DecodeResult>, li
     merged
 }
 
-fn useful_phrase_candidate(candidate: &DecodeCandidate, input: &str) -> bool {
-    !candidate.segments.is_empty() && candidate.text != input && candidate.text.chars().any(is_khmer_char)
+fn phrase_candidate_from_legacy(candidate: &DecodeCandidate, input: &str) -> Option<DecodeCandidate> {
+    if input == "." {
+        return matches!(candidate.text.as_str(), "។" | "៕" | "." | "?" | "!" | "…")
+            .then(|| one_segment_phrase_candidate(candidate, input));
+    }
+    if candidate.text == input || !candidate.text.chars().any(is_khmer_char) {
+        return None;
+    }
+    if candidate.segments.is_empty() {
+        Some(one_segment_phrase_candidate(candidate, input))
+    } else {
+        Some(candidate.clone())
+    }
+}
+
+fn one_segment_phrase_candidate(candidate: &DecodeCandidate, input: &str) -> DecodeCandidate {
+    let mut candidate = candidate.clone();
+    candidate.segments = vec![DecodeSegment {
+        input: input.to_owned(),
+        output: candidate.text.clone(),
+        weight_bps: 10_000,
+    }];
+    candidate
 }
 
 fn is_khmer_char(ch: char) -> bool {

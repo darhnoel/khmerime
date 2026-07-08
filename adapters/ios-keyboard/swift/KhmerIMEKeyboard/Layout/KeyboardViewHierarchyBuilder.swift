@@ -52,6 +52,7 @@ struct KeyboardViewHierarchyBuilder {
             candidateRowView: candidateRowView
         )
         rootView.translatesAutoresizingMaskIntoConstraints = false
+        wireKeyPreviewCallbacks(rootView: rootView, keyLayers: [qwertyView, numericView, symbolsView])
 
         return KeyboardViewHierarchy(
             stripView: stripView,
@@ -61,5 +62,25 @@ struct KeyboardViewHierarchyBuilder {
             symbolsView: symbolsView,
             rootView: rootView
         )
+    }
+
+    private func wireKeyPreviewCallbacks(rootView: KeyboardRootView, keyLayers: [UIView]) {
+        for key in keyLayers.flatMap({ glassKeys(in: $0) }) {
+            key.onPreviewChanged = { [weak rootView] sourceKey, label in
+                guard let label else {
+                    rootView?.hideKeyPreview()
+                    return
+                }
+                rootView?.showKeyPreview(label: label, from: sourceKey)
+            }
+        }
+    }
+
+    private func glassKeys(in view: UIView) -> [GlassKeyButton] {
+        var result = view.subviews.compactMap { $0 as? GlassKeyButton }
+        for subview in view.subviews {
+            result += glassKeys(in: subview)
+        }
+        return result
     }
 }

@@ -596,11 +596,18 @@ mod tests {
     }
 
     #[test]
-    fn period_suggestions_include_literal_period() {
+    fn period_suggestions_include_khmer_and_latin_punctuation_alternatives() {
         let transliterator = Transliterator::from_default_data().unwrap();
         assert_eq!(
             transliterator.suggest(".", &HashMap::new()),
-            vec!["។".to_owned(), "៕".to_owned(), ".".to_owned()]
+            vec![
+                "។".to_owned(),
+                "៕".to_owned(),
+                ".".to_owned(),
+                "?".to_owned(),
+                "!".to_owned(),
+                "…".to_owned(),
+            ]
         );
     }
 

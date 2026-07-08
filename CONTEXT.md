@@ -52,6 +52,14 @@ _Avoid_: candidate carousel, suggestion strip, alarm-clock picker
 The mobile form of **Segment Edit Mode**, reached by a double-touch on the centered Khmer in the **Phrase Wheel**. The phrase expands into separated, tappable words with a word-level **Candidate List** for the focused segment; tapping a word moves focus, typing re-spells the focused word, and double-touch returns to the wheel. It is per-phrase and never sticky — any commit resets the **Composition** and the next one starts back at the **Phrase Wheel**.
 _Avoid_: expanded mode, level 2 (internal label), word edit mode
 
+**Key Preview Popup**:
+A transient visual above a pressed character-producing on-screen key that mirrors the key label so the user can confirm which key is being touched. In **CharPick Mode** it still mirrors the roman key label, not a Khmer candidate; it is visual feedback only and does not commit text, change input mode, select candidates, or interact with the **Phrase Wheel** or **Candidate Row**.
+_Avoid_: candidate popup, suggestion popup, key tap animation
+
+**Punctuation Suggestions**:
+The suggestion candidates produced when the user types the period key: `។`, `៕`, `.`, `?`, `!`, and `…`. On mobile these flow through **Phrase Candidate** data so the **Strip** shows the selected punctuation and the **Phrase Wheel** shows the alternatives. Distinct from the **Key Preview Popup**, which only mirrors the touched `.` key.
+_Avoid_: period popup, punctuation key preview
+
 **Coeng Form**:
 A Khmer subscript consonant used to type consonant clusters. A Coeng Form is the invisible coeng sign plus a base consonant, rendered together as a subscript shape (for example `្ក`). In **CharPick Mode**, Coeng Forms appear under the same roman letters as their base consonants so users can build clusters quickly.
 _Avoid_: bare coeng sign when you mean the full subscript consonant

@@ -64,6 +64,54 @@ final class GlassKeyButtonTests: XCTestCase {
             "full press must shrink button to 92% (1 - 0.08)")
     }
 
+    // MARK: - key preview popup events
+
+    func test_previewableKey_showsPreviewOnTouchBeganAndHidesOnTouchEnded() {
+        let btn = GlassKeyButton()
+        btn.configureForTesting(runner: synchronousRunner)
+        btn.previewLabel = "A"
+        var events: [(keyIsSource: Bool, label: String?)] = []
+        btn.onPreviewChanged = { key, label in
+            events.append((key === btn, label))
+        }
+
+        btn.touchesBegan(Set(), with: nil)
+        btn.touchesEnded(Set(), with: nil)
+
+        XCTAssertEqual(events.count, 2)
+        XCTAssertTrue(events[0].keyIsSource)
+        XCTAssertEqual(events[0].label, "A")
+        XCTAssertTrue(events[1].keyIsSource)
+        XCTAssertNil(events[1].label)
+    }
+
+    func test_previewableKey_hidesPreviewOnTouchCancelled() {
+        let btn = GlassKeyButton()
+        btn.configureForTesting(runner: synchronousRunner)
+        btn.previewLabel = "A"
+        var labels: [String?] = []
+        btn.onPreviewChanged = { _, label in labels.append(label) }
+
+        btn.touchesBegan(Set(), with: nil)
+        btn.touchesCancelled(Set(), with: nil)
+
+        XCTAssertEqual(labels.count, 2)
+        XCTAssertEqual(labels[0], "A")
+        XCTAssertNil(labels[1])
+    }
+
+    func test_nonPreviewableKeyDoesNotEmitPreviewEvents() {
+        let btn = GlassKeyButton()
+        btn.configureForTesting(runner: synchronousRunner)
+        var labels: [String?] = []
+        btn.onPreviewChanged = { _, label in labels.append(label) }
+
+        btn.touchesBegan(Set(), with: nil)
+        btn.touchesEnded(Set(), with: nil)
+
+        XCTAssertTrue(labels.isEmpty)
+    }
+
     // MARK: - release restore
 
     func test_touchesEnded_restoresTransformToIdentity() {

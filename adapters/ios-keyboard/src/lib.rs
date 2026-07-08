@@ -432,6 +432,33 @@ mod tests {
     }
 
     #[test]
+    fn period_input_exposes_khmer_and_latin_punctuation_suggestions() {
+        let s = new_session();
+        s.focus_in();
+
+        let state = s.process_character(".".to_string());
+
+        let expected = vec![
+            "។".to_owned(),
+            "៕".to_owned(),
+            ".".to_owned(),
+            "?".to_owned(),
+            "!".to_owned(),
+            "…".to_owned(),
+        ];
+        assert_eq!(state.candidates, expected);
+        assert_eq!(
+            state
+                .phrase_candidates
+                .iter()
+                .map(|candidate| candidate.text.clone())
+                .collect::<Vec<_>>(),
+            expected,
+            "mobile suggestion surface must receive all period alternatives through phrase_candidates"
+        );
+    }
+
+    #[test]
     fn backspace_removes_last_raw_preedit_char() {
         let s = new_session();
         s.focus_in();

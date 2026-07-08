@@ -12,6 +12,7 @@ final class KeyboardRootView: UIView {
     private let numericView: UIView
     private let symbolsView: UIView
     private let candidateRowView: UIView
+    private var keyPreviewPopup: KeyPreviewPopupView?
 
     // Height constraints for the two chrome rows. Driven by KeyboardChrome.Rows
     // so roman composition can reserve both rows while CharPick reserves only
@@ -125,5 +126,82 @@ final class KeyboardRootView: UIView {
     func clearStrip() {
         stripDisplay.clear()
         candidateRowDisplay.clear()
+    }
+
+    func showKeyPreview(label: String, from sourceKey: UIView) {
+        keyPreviewPopup?.removeFromSuperview()
+        let popup = KeyPreviewPopupView(label: label)
+        popup.frame = KeyPreviewPopupView.frame(sourceFrame: sourceKey.convert(sourceKey.bounds, to: self), in: bounds)
+        addSubview(popup)
+        keyPreviewPopup = popup
+    }
+
+    func hideKeyPreview() {
+        keyPreviewPopup?.removeFromSuperview()
+        keyPreviewPopup = nil
+    }
+}
+
+final class KeyPreviewPopupView: UIView {
+    static let edgeInset: CGFloat = 4
+    static let verticalGap: CGFloat = 6
+
+    let previewLabel: String
+
+    private let blurView = UIVisualEffectView(effect: UIBlurEffect(style: .systemUltraThinMaterial))
+    private let labelView = UILabel()
+
+    init(label: String) {
+        self.previewLabel = label
+        super.init(frame: .zero)
+
+        isUserInteractionEnabled = false
+        addSubview(blurView)
+        addSubview(labelView)
+
+        labelView.text = label
+        labelView.textAlignment = .center
+        labelView.font = .systemFont(ofSize: 28, weight: .medium)
+        updateAppearance()
+    }
+
+    required init?(coder: NSCoder) { fatalError("use init(label:)") }
+
+    static func frame(sourceFrame: CGRect, in bounds: CGRect) -> CGRect {
+        let width = max(sourceFrame.width * 1.55, 48)
+        let height = max(sourceFrame.height * 1.35, 56)
+        let unclampedX = sourceFrame.midX - width / 2
+        let minX = bounds.minX + edgeInset
+        let maxX = bounds.maxX - edgeInset - width
+        let x = min(max(unclampedX, minX), maxX)
+        let y = max(bounds.minY + edgeInset, sourceFrame.minY - height - verticalGap)
+        return CGRect(x: x, y: y, width: width, height: height)
+    }
+
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        blurView.frame = bounds
+        labelView.frame = bounds
+        let radius = GlassColorSpec.keyCornerRadius(height: bounds.height)
+        blurView.layer.cornerRadius = radius
+        blurView.clipsToBounds = true
+        layer.cornerRadius = radius
+    }
+
+    override func traitCollectionDidChange(_ previousTraitCollection: UITraitCollection?) {
+        super.traitCollectionDidChange(previousTraitCollection)
+        updateAppearance()
+    }
+
+    private func updateAppearance() {
+        let isDark = traitCollection.userInterfaceStyle == .dark
+        backgroundColor = GlassColorSpec.pressedBackground(isDark: isDark)
+        labelView.textColor = .label
+        layer.borderWidth = 1
+        layer.borderColor = GlassColorSpec.borderColor(isDark: isDark).cgColor
+        layer.shadowColor = UIColor.black.cgColor
+        layer.shadowOpacity = isDark ? 0.24 : 0.14
+        layer.shadowRadius = 4
+        layer.shadowOffset = CGSize(width: 0, height: 2)
     }
 }

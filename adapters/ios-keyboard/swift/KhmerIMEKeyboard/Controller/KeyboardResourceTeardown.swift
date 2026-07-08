@@ -15,6 +15,7 @@ enum KeyboardResourceTeardown {
 
         if let key = view as? GlassKeyButton {
             key.onPress = nil
+            key.onPreviewChanged = nil
         }
 
         if let backspace = view as? BackspaceButton {
