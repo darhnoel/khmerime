@@ -13,9 +13,9 @@ final class CandidateSurfaceView: UIView, KeyboardCandidateRowDisplaying {
     let wheel = PhraseWheelView()
     let candidateRow = CandidateRowView()
 
-    var onPhraseSelected: ((Int) -> Void)? {
-        get { wheel.onPhraseSelected }
-        set { wheel.onPhraseSelected = newValue }
+    var onPhraseCommitted: ((Int) -> Void)? {
+        get { wheel.onPhraseCommitted }
+        set { wheel.onPhraseCommitted = newValue }
     }
 
     var onCandidateSelected: ((Int) -> Void)? {
@@ -48,9 +48,11 @@ final class CandidateSurfaceView: UIView, KeyboardCandidateRowDisplaying {
             candidateRow.isHidden = false
             candidateRow.render(state, presentation: .composition)
         case .composition:
-            wheel.isHidden = false
             candidateRow.isHidden = true
             wheel.render(state, presentation: presentation)
+            // Hide the row entirely when there are no alternatives — the strip's
+            // preview already shows the top reading, so it stands alone (ADR-0015).
+            wheel.isHidden = !wheel.hasAlternatives
         case .charPick:
             wheel.isHidden = true
             candidateRow.isHidden = false

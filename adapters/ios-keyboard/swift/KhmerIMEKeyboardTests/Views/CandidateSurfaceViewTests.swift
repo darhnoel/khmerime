@@ -19,6 +19,16 @@ final class CandidateSurfaceViewTests: XCTestCase {
         XCTAssertTrue(surface.candidateRow.isHidden, "the word candidate row is hidden during composition")
     }
 
+    func test_compositionWithNoAlternativesHidesTheWheel() {
+        // ADR-0015: one hypothesis → the strip already shows it → the wheel hides so the
+        // strip stands alone (no redundant single card).
+        let surface = CandidateSurfaceView()
+
+        surface.render(makeState(phrases: ["ខ្ញុំ"], candidates: ["ក"]), presentation: .composition)
+
+        XCTAssertTrue(surface.wheel.isHidden, "with no alternatives the wheel is hidden")
+    }
+
     func test_charPickShowsCandidateRowAndHidesWheel() {
         let surface = CandidateSurfaceView()
 

@@ -45,9 +45,9 @@ final class KeyboardViewHierarchyBuilderTests: XCTestCase {
             "the candidate-surface host should occupy the candidate-row slot")
     }
 
-    func test_buildWiresWheelSelectionThroughTheCallback() {
+    func test_buildWiresWheelCommitThroughTheCallback() {
         let target = ActionTarget()
-        var selected: Int?
+        var committed: Int?
 
         let hierarchy = KeyboardViewHierarchyBuilder(
             metrics: KeyboardLayoutMetrics(device: .phone),
@@ -57,13 +57,13 @@ final class KeyboardViewHierarchyBuilderTests: XCTestCase {
             enKeyTag: 98,
             actions: ActionTarget.actions
         ).build(
-            phraseSelection: { selected = $0 }
+            phraseCommit: { committed = $0 }
         )
 
-        (hierarchy.candidateRowView as? CandidateSurfaceView)?.onPhraseSelected?(3)
+        (hierarchy.candidateRowView as? CandidateSurfaceView)?.onPhraseCommitted?(3)
 
-        XCTAssertEqual(selected, 3,
-            "scrolling the wheel to a card must route through the build callback → selectPhrase")
+        XCTAssertEqual(committed, 3,
+            "tapping a wheel card must route through the build callback → commitPhrase")
     }
 
     func test_buildWiresCharPickSelectionThroughTheCallback() {

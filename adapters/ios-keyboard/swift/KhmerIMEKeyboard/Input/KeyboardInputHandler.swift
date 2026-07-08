@@ -443,13 +443,28 @@ final class KeyboardInputHandler {
         }
     }
 
-    // Wheel scroll settled on Phrase Candidate `index` (ADR-0014): make it the active
-    // selection so Space/Enter commits it, then re-render.
-    func selectPhrase(at index: Int) {
+    // Tapping wheel Phrase Candidate `index` commits it (ADR-0015): select it as the
+    // active phrase, then commit — mirrors commitComposition.
+    func commitPhrase(at index: Int) {
+        guard keyboardState != .charPick else { return }
+        let hadRomanBuffer = !romanBuffer.isEmpty
+        for _ in romanBuffer { proxy.deleteBackward() }
+        romanBuffer = ""
         dispatcher.onSession { [weak self] in
             guard let self else { return }
-            let state = self.session.selectPhrase(at: index)
-            self.dispatcher.onMain { [weak self] in self?.render(state) }
+            _ = self.session.selectPhrase(at: index)
+            let state = self.session.sendReturn()
+            self.dispatcher.onMain { [weak self] in
+                guard let self else { return }
+                let khmerText = state.segments.isEmpty
+                    ? (state.commitText ?? "")
+                    : state.segments.map { $0.output }.joined()
+                if !khmerText.isEmpty {
+                    self.proxy.insertText(khmerText)
+                    if hadRomanBuffer { self.pendingAutoSpaceCheck = true }
+                }
+                self.onStripClear?()
+            }
         }
     }
 

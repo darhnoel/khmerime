@@ -1,12 +1,11 @@
 import UIKit
 
-// PhraseWheelView
-// ===============
-// The default mobile candidate surface (ADR-0014): a horizontal, center-snapped
-// carousel of whole-phrase hypotheses. One card per Phrase Candidate, in rank
-// order (raw roman last). The card nearest the view's horizontal center is the
-// selection; settling reports it via `onPhraseSelected` (→ session.selectPhrase)
-// and highlights it. Snapping builds on the pure `PhraseWheelLayout` math.
+// PhraseWheelView (ADR-0015)
+// ==========================
+// A horizontal row of the *alternative* Phrase Candidates — the whole-phrase Khmer
+// hypotheses other than the top-ranked one, which the strip already shows. Centered
+// when the cards fit, left-padded + horizontally scrollable when they overflow
+// (reusing CandidateRowLayout). Tapping a card commits that phrase.
 // Conforms to KeyboardCandidateRowDisplaying so it occupies the candidate-row slot.
 
 final class PhraseWheelView: UIView, KeyboardCandidateRowDisplaying {
@@ -14,12 +13,20 @@ final class PhraseWheelView: UIView, KeyboardCandidateRowDisplaying {
     private let scrollView = UIScrollView()
     private let stack = UIStackView()
     private let pool = StripLabelPool()
-    private var cards: [UILabel] = []
-    private var selectedIndex = 0
+    private var tappableLabels: [UILabel] = []
 
-    /// Called when the centered card changes as the user scrolls — the index of the
-    /// now-selected Phrase Candidate. The controller forwards it to `selectPhrase`.
-    var onPhraseSelected: ((Int) -> Void)?
+    // The wheel drops the top hypothesis (index 0 — shown by the strip), so displayed
+    // card j maps to Phrase Candidate index j + 1.
+    private static let phraseIndexOffset = 1
+    // Left/right breathing room so cards never touch the screen edge when they overflow.
+    private static let edgeInset: CGFloat = 16
+
+    /// Tapping a card commits Phrase Candidate `index` (ADR-0015).
+    var onPhraseCommitted: ((Int) -> Void)?
+
+    /// Whether there is anything to show (≥1 alternative). The surface hides the row
+    /// entirely when false, so the strip stands alone.
+    var hasAlternatives: Bool { !tappableLabels.isEmpty }
 
     override init(frame: CGRect) {
         super.init(frame: frame)
@@ -31,7 +38,8 @@ final class PhraseWheelView: UIView, KeyboardCandidateRowDisplaying {
     // MARK: - Public API
 
     func render(_ state: IosRenderState, presentation: CandidateRowPresentation = .composition) {
-        rebuild(texts: state.phraseCandidates.map { $0.text })
+        // Alternatives only — the strip owns the top hypothesis.
+        rebuild(texts: state.phraseCandidates.dropFirst().map { $0.text })
     }
 
     func clear() {
@@ -45,7 +53,6 @@ final class PhraseWheelView: UIView, KeyboardCandidateRowDisplaying {
 
         scrollView.showsHorizontalScrollIndicator = false
         scrollView.showsVerticalScrollIndicator = false
-        scrollView.delegate = self
         scrollView.translatesAutoresizingMaskIntoConstraints = false
         addSubview(scrollView)
 
@@ -67,67 +74,46 @@ final class PhraseWheelView: UIView, KeyboardCandidateRowDisplaying {
             stack.bottomAnchor.constraint(equalTo: scrollView.contentLayoutGuide.bottomAnchor),
             stack.heightAnchor.constraint(equalTo: scrollView.frameLayoutGuide.heightAnchor),
         ])
+
+        let tap = UITapGestureRecognizer(target: self, action: #selector(rowTapped(_:)))
+        stack.addGestureRecognizer(tap)
+    }
+
+    // Center the cards while they all fit; once they overflow, fall back to the edge
+    // inset so the row left-aligns (with left breathing room) and scrolls. Same math
+    // as the candidate row.
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        let contentWidth = stack.systemLayoutSizeFitting(UIView.layoutFittingCompressedSize).width
+        let inset = CandidateRowLayout.centeringInset(
+            contentWidth: contentWidth,
+            availableWidth: bounds.width,
+            edgeInset: Self.edgeInset
+        )
+        if scrollView.contentInset.left != inset {
+            scrollView.contentInset = UIEdgeInsets(top: 0, left: inset, bottom: 0, right: inset)
+        }
     }
 
     // MARK: - Cards
 
     private func rebuild(texts: [String]) {
-        cards = pool.sync(count: texts.count, in: stack)
-        for (index, label) in cards.enumerated() {
+        tappableLabels = pool.sync(count: texts.count, in: stack)
+        for (index, label) in tappableLabels.enumerated() {
             label.text = texts[index]
+            label.font = .systemFont(ofSize: 20, weight: .regular)
+            label.textColor = .label
         }
-        selectedIndex = 0
-        applyHighlight()
+        setNeedsLayout()
     }
 
-    private func applyHighlight() {
-        for (index, label) in cards.enumerated() {
-            let selected = index == selectedIndex
-            label.font = .systemFont(ofSize: 20, weight: selected ? .semibold : .regular)
-            label.textColor = selected ? .label : .secondaryLabel
+    // MARK: - Tap → commit
+
+    @objc private func rowTapped(_ gr: UITapGestureRecognizer) {
+        let point = gr.location(in: stack)
+        let frames = tappableLabels.map { $0.frame }
+        if let index = StripView.segmentIndex(at: point, labelFrames: frames) {
+            onPhraseCommitted?(index + Self.phraseIndexOffset)
         }
-    }
-
-    // MARK: - Snap + selection
-
-    private func cardCenters() -> [CGFloat] {
-        cards.map { label in
-            scrollView.convert(label.frame, from: label.superview).midX
-        }
-    }
-
-    /// The content offset that centers card `index`. Exposed for the scroll wiring
-    /// and for tests.
-    func centerOffset(forCardIndex index: Int) -> CGFloat? {
-        PhraseWheelLayout.centerOffset(forCardIndex: index, cardCenters: cardCenters(), viewWidth: bounds.width)
-    }
-
-    /// Given a resting horizontal scroll offset, snap to the nearest card, highlight
-    /// it, and report the selection if it changed.
-    func settleSelection(atContentOffsetX offsetX: CGFloat) {
-        let centers = cardCenters()
-        guard let index = PhraseWheelLayout.nearestCardIndex(toCenterX: offsetX + bounds.width / 2,
-                                                             cardCenters: centers) else { return }
-        if let target = PhraseWheelLayout.centerOffset(forCardIndex: index, cardCenters: centers,
-                                                       viewWidth: bounds.width) {
-            let clamped = max(0, target)
-            if abs(scrollView.contentOffset.x - clamped) > 0.5 {
-                scrollView.setContentOffset(CGPoint(x: clamped, y: 0), animated: true)
-            }
-        }
-        guard index != selectedIndex else { return }
-        selectedIndex = index
-        applyHighlight()
-        onPhraseSelected?(index)
-    }
-}
-
-extension PhraseWheelView: UIScrollViewDelegate {
-    func scrollViewDidEndDecelerating(_ scrollView: UIScrollView) {
-        settleSelection(atContentOffsetX: scrollView.contentOffset.x)
-    }
-
-    func scrollViewDidEndDragging(_ scrollView: UIScrollView, willDecelerate decelerate: Bool) {
-        if !decelerate { settleSelection(atContentOffsetX: scrollView.contentOffset.x) }
     }
 }

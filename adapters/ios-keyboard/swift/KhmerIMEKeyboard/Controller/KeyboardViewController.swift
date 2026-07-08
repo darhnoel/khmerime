@@ -304,8 +304,8 @@ class KeyboardViewController: UIInputViewController {
             candidateSelection: { [weak self] index in
                 self?.handler?.selectCandidate(at: index)
             },
-            phraseSelection: { [weak self] index in
-                self?.handler?.selectPhrase(at: index)
+            phraseCommit: { [weak self] index in
+                self?.handler?.commitPhrase(at: index)
             }
         )
 
