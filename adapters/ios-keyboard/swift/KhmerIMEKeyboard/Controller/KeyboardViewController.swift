@@ -301,7 +301,10 @@ class KeyboardViewController: UIInputViewController {
             enKeyTag: Self.enKeyTag,
             actions: layerActions
         ).build(
-            candidateRowSelection: { [weak self] index in
+            candidateSelection: { [weak self] index in
+                self?.handler?.selectCandidate(at: index)
+            },
+            phraseSelection: { [weak self] index in
                 self?.handler?.selectPhrase(at: index)
             }
         )

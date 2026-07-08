@@ -37,5 +37,9 @@ enum KeyboardResourceTeardown {
         if let candidateRow = view as? CandidateRowView {
             candidateRow.onCandidateSelected = nil
         }
+
+        if let wheel = view as? PhraseWheelView {
+            wheel.onPhraseSelected = nil
+        }
     }
 }

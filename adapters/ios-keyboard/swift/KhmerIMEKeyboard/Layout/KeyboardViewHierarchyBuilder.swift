@@ -18,16 +18,18 @@ struct KeyboardViewHierarchyBuilder {
     let actions: KeyboardLayerActions
 
     func build(
-        candidateRowSelection: ((Int) -> Void)? = nil
+        candidateSelection: ((Int) -> Void)? = nil,
+        phraseSelection: ((Int) -> Void)? = nil
     ) -> KeyboardViewHierarchy {
         let stripView = StripView()
         stripView.translatesAutoresizingMaskIntoConstraints = false
 
-        // ADR-0014: the Phrase Wheel is the default candidate surface, occupying the
-        // candidate-row slot. Its selection callback fires when the user scrolls a card
-        // to center; the controller routes it to session.selectPhrase.
-        let candidateRowView = PhraseWheelView()
-        candidateRowView.onPhraseSelected = candidateRowSelection
+        // ADR-0014: the candidate-row slot hosts the Phrase Wheel (composition) and the
+        // word candidate row (CharPick). Wheel scroll → phraseSelection; CharPick tap →
+        // candidateSelection.
+        let candidateRowView = CandidateSurfaceView()
+        candidateRowView.onPhraseSelected = phraseSelection
+        candidateRowView.onCandidateSelected = candidateSelection
         candidateRowView.translatesAutoresizingMaskIntoConstraints = false
 
         let layerFactory = KeyboardLayerFactory(

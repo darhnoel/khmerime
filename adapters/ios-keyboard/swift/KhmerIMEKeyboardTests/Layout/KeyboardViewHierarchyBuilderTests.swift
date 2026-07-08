@@ -27,9 +27,9 @@ final class KeyboardViewHierarchyBuilderTests: XCTestCase {
         XCTAssertFalse(hierarchy.qwertyView.isHidden)
     }
 
-    func test_buildPlacesPhraseWheelInTheCandidateRowSlot() {
-        // ADR-0014: the Phrase Wheel is the default candidate surface; the word-level
-        // candidate row moves to Level-2 editing (a later slice).
+    func test_buildPlacesCandidateSurfaceInTheCandidateRowSlot() {
+        // ADR-0014: the slot hosts the Phrase Wheel (composition) + the word candidate
+        // row (CharPick), inside a CandidateSurfaceView.
         let target = ActionTarget()
 
         let hierarchy = KeyboardViewHierarchyBuilder(
@@ -41,8 +41,8 @@ final class KeyboardViewHierarchyBuilderTests: XCTestCase {
             actions: ActionTarget.actions
         ).build()
 
-        XCTAssertTrue(hierarchy.candidateRowView is PhraseWheelView,
-            "the Phrase Wheel should occupy the default candidate-row slot")
+        XCTAssertTrue(hierarchy.candidateRowView is CandidateSurfaceView,
+            "the candidate-surface host should occupy the candidate-row slot")
     }
 
     func test_buildWiresWheelSelectionThroughTheCallback() {
@@ -57,13 +57,34 @@ final class KeyboardViewHierarchyBuilderTests: XCTestCase {
             enKeyTag: 98,
             actions: ActionTarget.actions
         ).build(
-            candidateRowSelection: { selected = $0 }
+            phraseSelection: { selected = $0 }
         )
 
-        (hierarchy.candidateRowView as? PhraseWheelView)?.onPhraseSelected?(3)
+        (hierarchy.candidateRowView as? CandidateSurfaceView)?.onPhraseSelected?(3)
 
         XCTAssertEqual(selected, 3,
             "scrolling the wheel to a card must route through the build callback → selectPhrase")
+    }
+
+    func test_buildWiresCharPickSelectionThroughTheCallback() {
+        let target = ActionTarget()
+        var selected: Int?
+
+        let hierarchy = KeyboardViewHierarchyBuilder(
+            metrics: KeyboardLayoutMetrics(device: .phone),
+            isIPad: false,
+            target: target,
+            globeKeyTag: 99,
+            enKeyTag: 98,
+            actions: ActionTarget.actions
+        ).build(
+            candidateSelection: { selected = $0 }
+        )
+
+        (hierarchy.candidateRowView as? CandidateSurfaceView)?.onCandidateSelected?(2)
+
+        XCTAssertEqual(selected, 2,
+            "tapping a CharPick character candidate must route through the build callback")
     }
 }
 
