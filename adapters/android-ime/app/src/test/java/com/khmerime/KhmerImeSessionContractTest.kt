@@ -2,6 +2,7 @@ package com.khmerime
 
 import com.khmerime.input.KhmerImeSession
 import com.khmerime.input.KhmerRenderState
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -64,5 +65,43 @@ class KhmerImeSessionContractTest {
             "exiting CharPick must leave a clean roman render state",
             romanState.candidates.isEmpty() && romanState.preedit.isEmpty(),
         )
+    }
+
+    @Test
+    fun phraseCandidatesExposeKhmerWholePhraseAlternatives() {
+        val session = KhmerImeSession()
+        session.focusIn()
+
+        var state = KhmerRenderState()
+        // "khnhom" has multiple Khmer readings (ខ្ញុំ / ខ្ញំ) → >= 2 phrase candidates.
+        for (ch in "khnhom") {
+            state = session.processCharacter(ch.toString())
+        }
+
+        assertTrue(
+            "khnhom must expose >= 2 phrase candidates for the wheel; got ${state.phraseCandidates}",
+            state.phraseCandidates.size >= 2,
+        )
+        assertTrue(
+            "the top phrase candidate carries its segmentation",
+            state.phraseCandidates.firstOrNull()?.segments?.isNotEmpty() == true,
+        )
+    }
+
+    @Test
+    fun selectPhraseMakesEnterCommitThatReading() {
+        val session = KhmerImeSession()
+        session.focusIn()
+
+        var state = KhmerRenderState()
+        for (ch in "khnhom") {
+            state = session.processCharacter(ch.toString())
+        }
+        val wanted = state.phraseCandidates[1].text
+
+        session.selectPhrase(1)
+        val committed = session.processEnter().commitText
+
+        assertEquals("selecting phrase 1 then Enter commits that reading", wanted, committed)
     }
 }
