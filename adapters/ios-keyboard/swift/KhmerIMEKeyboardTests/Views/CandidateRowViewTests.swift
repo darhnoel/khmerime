@@ -143,7 +143,8 @@ final class CandidateRowViewTests: XCTestCase {
             commitText: nil,
             segmentEditActive: false,
             segmentEditIndex: nil,
-            phraseCandidates: []
+            phraseCandidates: [],
+            selectedPhraseIndex: 0
         )
     }
 }

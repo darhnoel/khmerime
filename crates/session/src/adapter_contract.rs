@@ -133,9 +133,12 @@ pub struct SessionSnapshot {
     pub segment_edit_index: Option<usize>,
     pub segment_preview: Vec<SegmentPreviewEntry>,
     /// Ranked whole-composition Khmer hypotheses — the **Phrase Candidate** list the
-    /// mobile Phrase Wheel scrolls (ADR-0014). `[0]` is the current best and matches
-    /// the `segment_preview` concatenation.
+    /// mobile Phrase Wheel scrolls (ADR-0014).
     pub phrase_candidates: Vec<PhraseCandidate>,
+    /// Index into `phrase_candidates` whose phrase currently drives the strip preview.
+    /// Defaults to `0`; selecting another phrase updates this so renderers can show
+    /// every candidate except the one already previewed in the strip.
+    pub selected_phrase_index: usize,
     pub cursor_location: CursorLocation,
 }
 

@@ -84,6 +84,17 @@ final class KeyboardRootViewTests: XCTestCase {
             "collapsed chrome must drop the candidate row height to zero")
     }
 
+    func test_setChromeRowsStripOnly_collapsesCandidateRowButKeepsStrip() {
+        let fixture = makeRootView()
+
+        fixture.rootView.setChromeRows(.stripOnly)
+
+        XCTAssertEqual(fixture.rootView.stripHeightConstraint.constant, 44,
+            "strip height should remain reserved for the selected phrase preview")
+        XCTAssertEqual(fixture.rootView.candidateRowHeightConstraint.constant, 0,
+            "candidate row height should collapse when there are no phrase alternatives")
+    }
+
     func test_setChromeRowsStripAndCandidate_restoresReservedRowHeights() {
         let fixture = makeRootView()
         fixture.rootView.setChromeRows(.none)
@@ -159,7 +170,8 @@ final class KeyboardRootViewTests: XCTestCase {
             commitText: nil,
             segmentEditActive: false,
             segmentEditIndex: nil,
-            phraseCandidates: []
+            phraseCandidates: [],
+            selectedPhraseIndex: 0
         )
     }
 }

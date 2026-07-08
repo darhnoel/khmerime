@@ -41,11 +41,11 @@ The visible Khmer choices for the active **Composition** or focused **Segmented 
 _Avoid_: suggestions (too broad), inline candidates
 
 **Phrase Candidate**:
-One complete Khmer rendering of the *entire* **Composition** — a whole-phrase hypothesis carrying its own internal segmentation, not a single word. The decoder ranks several of these; the top-ranked one is what the **Strip**'s Khmer Row previews today. Distinct from a **Candidate**, which is one Khmer choice for a *single* segment. Selecting a Phrase Candidate makes its segmentation the active **Segmented Session**.
+One complete Khmer rendering of the *entire* **Composition** — a whole-phrase hypothesis carrying its own internal segmentation, not a single word. The decoder ranks several of these; the top-ranked one is the default **Strip** preview, and tapping another Phrase Candidate makes that selected phrase the **Strip** preview. Distinct from a **Candidate**, which is one Khmer choice for a *single* segment. Selecting a Phrase Candidate makes its segmentation the active **Segmented Session**.
 _Avoid_: sentence candidate, sequence, full-composition candidate, phrase suggestion, n-best (implementation term)
 
 **Phrase Wheel**:
-The default mobile candidate surface (iOS + Android): a horizontal row of the *alternative* **Phrase Candidate**s — the whole-phrase Khmer hypotheses **other than** the top-ranked one, which the **Strip**'s Khmer Row already shows. The cards are centered when they all fit the width and left-padded + horizontally scrollable when they overflow. Tapping a card commits that phrase immediately (**Commit Rules**); Space/Enter commit the top-ranked reading (the **Strip**'s preview). Shown only when at least one alternative exists; otherwise the **Strip** stands alone and the wheel is hidden. It demotes the word-level candidate row to **Phrase Edit** only (see ADR-0014). Distinct from a **Candidate List**, which browses word choices for one segment.
+The default mobile candidate surface (iOS + Android): a horizontal row of the *alternative* **Phrase Candidate**s — the whole-phrase Khmer hypotheses **other than** the currently selected one, which the **Strip**'s Khmer Row already shows. The cards are centered when they all fit the width and left-padded + horizontally scrollable when they overflow. Tapping a card selects that phrase as the **Strip** preview; Space/Enter commit the selected reading. Shown only when at least one alternative exists; otherwise the **Strip** stands alone and the wheel is hidden. It demotes the word-level candidate row to **Phrase Edit** only (see ADR-0014). Distinct from a **Candidate List**, which browses word choices for one segment.
 _Avoid_: candidate carousel, suggestion strip, alarm-clock picker
 
 **Phrase Edit**:
@@ -154,7 +154,7 @@ _Avoid_: home screen, main menu, settings (the Dashboard is more than settings)
 - A **SharedTransliteratorData** contains exactly one **Search Index**
 - A **SharedTransliteratorData** is shared by the live engine, **Visible Refiner**, and **Commit Refiner** (three views, one underlying data)
 - A **Composition** may have zero or one **Segmented Session**
-- A **Composition** exposes a ranked list of **Phrase Candidate**s; the top-ranked one is the default preview and defines the current **Segmented Session**
+- A **Composition** exposes a ranked list of **Phrase Candidate**s; the top-ranked one is the default preview, and the currently selected Phrase Candidate defines the current **Segmented Session**
 - Selecting a different **Phrase Candidate** swaps the active **Segmented Session**; the selection never persists past commit — committing resets the **Composition** and the next one starts from the top-ranked **Phrase Candidate** again
 - A **Segmented Session** may be in **Segment Edit Mode** for at most one of its segments at a time
 - A **Preedit** and **Commit Text** are derived from the same **Composition** but may diverge (see ADR-0001)

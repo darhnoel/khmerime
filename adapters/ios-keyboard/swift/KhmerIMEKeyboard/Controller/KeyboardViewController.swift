@@ -135,6 +135,8 @@ class KeyboardViewController: UIInputViewController {
         switch rows {
         case .none:
             chromeHeight = 0
+        case .stripOnly:
+            chromeHeight = layoutMetrics.stripHeight
         case .candidateOnly:
             chromeHeight = layoutMetrics.candidateRowHeight
         case .stripAndCandidate:

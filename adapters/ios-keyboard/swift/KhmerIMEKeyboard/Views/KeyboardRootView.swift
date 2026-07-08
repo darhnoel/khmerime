@@ -96,6 +96,9 @@ final class KeyboardRootView: UIView {
         case .none:
             stripHeightConstraint.constant = 0
             candidateRowHeightConstraint.constant = 0
+        case .stripOnly:
+            stripHeightConstraint.constant = stripReservedHeight
+            candidateRowHeightConstraint.constant = 0
         case .candidateOnly:
             stripHeightConstraint.constant = 0
             candidateRowHeightConstraint.constant = candidateRowReservedHeight

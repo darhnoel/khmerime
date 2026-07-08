@@ -19,33 +19,43 @@ correctly. The two surfaces were reading different decoders.
 
 Refine the Phrase Wheel (both platforms):
 
-- **Source.** `phrase_candidates` reads the **weighted-span (WFST)** result — the
-  same decoder that feeds the strip — falling back to legacy only when WFST is
-  empty/failed. This is the bug fix: the wheel now shows Khmer whole-phrase
-  hypotheses, and its ranking matches the strip's best.
+- **Source.** `phrase_candidates` reads the **weighted-span (WFST)** result as
+  the primary source — the same decoder that feeds the strip — then appends
+  segmented legacy/composer phrase combinations that are useful Khmer
+  whole-phrase candidates. This keeps WFST ranking as the anchor while restoring
+  alternatives such as `ខ្ញុំទៅសាលារៀន`, `ខ្ញុំទៅ៏សាលារៀន`, ... for multi-word
+  inputs like `nhomttovsalarien`. Legacy raw-roman fallback remains excluded
+  from the wheel.
 - **Contents — alternatives only.** The wheel shows the hypotheses *other than* the
-  top-ranked one; the **Strip**'s Khmer Row already shows the best. No raw-roman
-  card. (The raw string remains the **Commit Rules** floor, just not a wheel card.)
-- **Visibility.** Shown only when at least one alternative exists; otherwise the
-  strip stands alone and the wheel is hidden.
+  currently selected one; the **Strip**'s Khmer Row already shows that selected
+  phrase. No raw-roman card. (The raw string remains the **Commit Rules** floor,
+  just not a wheel card.)
+- **Visibility.** Shown only when at least one visible alternative exists after
+  excluding `selected_phrase_index`; otherwise the strip stands alone and the
+  candidate-row height collapses.
 - **Layout — balanced.** Cards are centered when they all fit the width, and
   left-padded + horizontally scrollable when they overflow — reusing
   `CandidateRowLayout.centeringInset`.
-- **Selection — tap commits.** Tapping a card commits that phrase immediately
-  (matching ADR-0012 and the strip's tap-to-commit); Space/Enter commit the
-  top-ranked reading (the strip's preview). The center-snap "alarm-clock" selection
-  from ADR-0014 is retired.
+- **Selection — tap selects.** Tapping a card makes that Phrase Candidate the
+  strip preview by calling `select_phrase(index)` and setting
+  `selected_phrase_index`. It does not commit. Space/Enter commit the selected
+  reading (the strip's preview). The center-snap "alarm-clock" selection from
+  ADR-0014 is retired.
 
 ## Consequences
 
 - Reverses ADR-0014's snap-to-center selection, "show all hypotheses (+ raw, roman
   pairing)" contents, and always-on visibility.
 - The engine keeps exposing the **full** ranked list (`phrase_candidates` =
-  `finals[0..N]`); "alternatives only" is a UI projection (drop index 0), so the
-  data model stays general.
-- Simplifies the iOS view: the snap/scroll-settle/`selectPhrase`-then-Enter
-  machinery is deleted in favour of a tap-to-commit centered/scrollable row.
+  `finals[0..N]` plus useful segmented phrase combinations); "alternatives only"
+  is a UI projection that excludes `selected_phrase_index`, so the data model
+  stays general and selection is reversible.
+- Simplifies the iOS view: the snap/scroll-settle machinery is deleted in favour
+  of a tap-select centered/scrollable row.
 - The wheel's word-level editing entry is unchanged (strip chips → Segment Edit).
+- iOS chrome has a `stripOnly` state: normal composition keeps the strip visible
+  but reserves the candidate-row height only when the wheel has visible
+  alternatives.
 
 ## When to revisit
 

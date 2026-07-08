@@ -106,8 +106,10 @@ pub struct IosRenderState {
     /// Which segment is currently being edited (when segment_edit_active).
     pub segment_edit_index: Option<u64>,
     /// Ranked whole-composition hypotheses for the Phrase Wheel (ADR-0014); `[0]` is
-    /// the current best, the last entry is the raw roman fallback.
+    /// the decoder's best-ranked phrase.
     pub phrase_candidates: Vec<IosPhraseCandidate>,
+    /// Index into `phrase_candidates` currently previewed by the strip.
+    pub selected_phrase_index: u64,
 }
 
 fn render_state(snapshot: &SessionSnapshot, result: &SessionResult) -> IosRenderState {
@@ -120,7 +122,12 @@ fn render_state(snapshot: &SessionSnapshot, result: &SessionResult) -> IosRender
         commit_text: result.commit_text.clone(),
         segment_edit_active: snapshot.segment_edit_active,
         segment_edit_index: snapshot.segment_edit_index.map(|i| i as u64),
-        phrase_candidates: snapshot.phrase_candidates.iter().map(IosPhraseCandidate::from).collect(),
+        phrase_candidates: snapshot
+            .phrase_candidates
+            .iter()
+            .map(IosPhraseCandidate::from)
+            .collect(),
+        selected_phrase_index: snapshot.selected_phrase_index as u64,
     }
 }
 
@@ -295,6 +302,7 @@ mod tests {
         assert!(state.segment_edit_index.is_none());
         assert!(state.focused_segment_index.is_none());
         assert!(state.selected_index.is_none());
+        assert_eq!(state.selected_phrase_index, 0);
     }
 
     // ── phrase wheel (ADR-0014) ───────────────────────────────────────────────
@@ -331,12 +339,37 @@ mod tests {
         assert!(
             state.phrase_candidates.len() >= 2,
             "need >= 2 wheel cards to select among, got {:?}",
-            state.phrase_candidates.iter().map(|c| c.text.clone()).collect::<Vec<_>>()
+            state
+                .phrase_candidates
+                .iter()
+                .map(|c| c.text.clone())
+                .collect::<Vec<_>>()
         );
         let wanted = state.phrase_candidates[1].text.clone();
         s.select_phrase(1);
         let committed = s.process_enter().commit_text.expect("enter must commit");
         assert_eq!(committed, wanted, "wheel selection must drive the commit");
+    }
+
+    #[test]
+    fn select_phrase_exposes_the_selected_phrase_index() {
+        let s = new_session();
+        s.focus_in();
+        let state = type_str(&s, "khnhom");
+        assert!(
+            state.phrase_candidates.len() >= 2,
+            "need >= 2 wheel cards to select among, got {:?}",
+            state
+                .phrase_candidates
+                .iter()
+                .map(|c| c.text.clone())
+                .collect::<Vec<_>>()
+        );
+
+        let selected = s.select_phrase(1);
+        assert_eq!(selected.selected_phrase_index, 1);
+        let restored = s.select_phrase(0);
+        assert_eq!(restored.selected_phrase_index, 0);
     }
 
     #[test]
@@ -353,6 +386,35 @@ mod tests {
             top.text.chars().all(|c| ('\u{1780}'..='\u{17FF}').contains(&c)),
             "the top wheel hypothesis must be Khmer, not roman; got {:?}",
             top.text
+        );
+    }
+
+    #[test]
+    fn segmented_phrase_exposes_whole_phrase_alternatives_for_the_wheel() {
+        let s = new_session();
+        s.focus_in();
+        let state = type_str(&s, "nhomttovsalarien");
+
+        assert!(
+            state.phrase_candidates.len() >= 2,
+            "the wheel needs whole-phrase alternatives, not just focused-word candidates; got {:?}",
+            state
+                .phrase_candidates
+                .iter()
+                .map(|candidate| candidate.text.clone())
+                .collect::<Vec<_>>()
+        );
+        assert!(
+            state
+                .phrase_candidates
+                .iter()
+                .all(|candidate| candidate.text.ends_with("សាលារៀន")),
+            "alternatives should remain whole-phrase readings; got {:?}",
+            state
+                .phrase_candidates
+                .iter()
+                .map(|candidate| candidate.text.clone())
+                .collect::<Vec<_>>()
         );
     }
 

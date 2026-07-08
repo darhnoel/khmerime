@@ -91,7 +91,8 @@ final class StripPresentationSpecTests: XCTestCase {
             commitText: nil,
             segmentEditActive: segmentEditActive,
             segmentEditIndex: segmentEditIndex.map { UInt64($0) },
-            phraseCandidates: []
+            phraseCandidates: [],
+            selectedPhraseIndex: 0
         )
     }
 

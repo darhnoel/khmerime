@@ -54,6 +54,7 @@ pub struct ImeSession {
     pub(crate) composition_raw: String,
     pub(crate) candidates: Vec<String>,
     pub(crate) phrase_candidates: Vec<PhraseCandidate>,
+    pub(crate) selected_phrase_index: usize,
     pub(crate) selected_index: usize,
     pub(crate) selection_touched: bool,
     pub(crate) segmented_session: Option<SegmentedSession>,
@@ -226,6 +227,7 @@ impl ImeSession {
             composition_raw: String::new(),
             candidates: Vec::new(),
             phrase_candidates: Vec::new(),
+            selected_phrase_index: 0,
             selected_index: 0,
             selection_touched: false,
             segmented_session: None,
@@ -337,6 +339,7 @@ impl ImeSession {
         self.composition_raw.clear();
         self.candidates.clear();
         self.phrase_candidates.clear();
+        self.selected_phrase_index = 0;
         self.selected_index = 0;
         self.selection_touched = false;
         self.segmented_session = None;

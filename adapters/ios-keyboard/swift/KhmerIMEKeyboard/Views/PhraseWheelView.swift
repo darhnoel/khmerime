@@ -3,9 +3,9 @@ import UIKit
 // PhraseWheelView (ADR-0015)
 // ==========================
 // A horizontal row of the *alternative* Phrase Candidates — the whole-phrase Khmer
-// hypotheses other than the top-ranked one, which the strip already shows. Centered
+// hypotheses other than the selected one, which the strip already shows. Centered
 // when the cards fit, left-padded + horizontally scrollable when they overflow
-// (reusing CandidateRowLayout). Tapping a card commits that phrase.
+// (reusing CandidateRowLayout). Tapping a card selects that phrase for preview.
 // Conforms to KeyboardCandidateRowDisplaying so it occupies the candidate-row slot.
 
 final class PhraseWheelView: UIView, KeyboardCandidateRowDisplaying {
@@ -15,9 +15,6 @@ final class PhraseWheelView: UIView, KeyboardCandidateRowDisplaying {
     private let pool = StripLabelPool()
     private var tappableLabels: [UILabel] = []
 
-    // The wheel drops the top hypothesis (index 0 — shown by the strip), so displayed
-    // card j maps to Phrase Candidate index j + 1.
-    private static let phraseIndexOffset = 1
     // Left/right breathing room so cards never touch the screen edge when they overflow.
     private static let edgeInset: CGFloat = 16
 
@@ -39,12 +36,16 @@ final class PhraseWheelView: UIView, KeyboardCandidateRowDisplaying {
     // MARK: - Public API
 
     func render(_ state: IosRenderState, presentation: CandidateRowPresentation = .composition) {
-        // Alternatives only — the strip owns the top hypothesis.
-        rebuild(texts: state.phraseCandidates.dropFirst().map { $0.text })
+        // Alternatives only — the strip owns the selected hypothesis.
+        let selectedIndex = Int(state.selectedPhraseIndex)
+        let alternatives = state.phraseCandidates.enumerated()
+            .filter { index, _ in index != selectedIndex }
+            .map { index, phrase in (index: index, text: phrase.text) }
+        rebuild(alternatives: alternatives)
     }
 
     func clear() {
-        rebuild(texts: [])
+        rebuild(alternatives: [])
     }
 
     // MARK: - Setup
@@ -98,10 +99,11 @@ final class PhraseWheelView: UIView, KeyboardCandidateRowDisplaying {
 
     // MARK: - Cards
 
-    private func rebuild(texts: [String]) {
-        tappableLabels = pool.sync(count: texts.count, in: stack)
+    private func rebuild(alternatives: [(index: Int, text: String)]) {
+        tappableLabels = pool.sync(count: alternatives.count, in: stack)
         for (index, label) in tappableLabels.enumerated() {
-            label.text = texts[index]
+            label.text = alternatives[index].text
+            label.tag = alternatives[index].index
             label.font = .systemFont(ofSize: 20, weight: .regular)
             label.textColor = .label
         }
@@ -114,7 +116,7 @@ final class PhraseWheelView: UIView, KeyboardCandidateRowDisplaying {
         let point = gr.location(in: stack)
         let frames = tappableLabels.map { $0.frame }
         if let index = StripView.segmentIndex(at: point, labelFrames: frames) {
-            onPhraseSelected?(index + Self.phraseIndexOffset)
+            onPhraseSelected?(tappableLabels[index].tag)
         }
     }
 }

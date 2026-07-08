@@ -95,6 +95,7 @@ impl ImeSession {
             segment_edit_index,
             segment_preview,
             phrase_candidates: self.phrase_candidates.clone(),
+            selected_phrase_index: self.selected_phrase_index,
             cursor_location: self.cursor_location,
         }
     }
@@ -159,6 +160,43 @@ mod tests {
     }
 
     #[test]
+    fn selecting_a_phrase_candidate_updates_the_preview_index_and_can_return_to_best() {
+        // Regression: after tapping an alternative, the wheel must be able to show
+        // the original best again, so the selected phrase index has to be explicit.
+        use crate::adapter_contract::SessionCommand;
+        let mut session = session();
+        type_ascii(&mut session, "khnhom");
+        let candidates = session.snapshot().phrase_candidates;
+        assert!(
+            candidates.len() >= 2,
+            "need >= 2 whole-phrase candidates to select among, got {:?}",
+            candidates.iter().map(|entry| entry.text.clone()).collect::<Vec<_>>()
+        );
+        let best = candidates[0].text.clone();
+        let alternative = candidates[1].text.clone();
+
+        session.process_command(SessionCommand::SelectPhrase(1));
+        let snapshot = session.snapshot();
+        assert_eq!(snapshot.selected_phrase_index, 1);
+        let preview: String = snapshot
+            .segment_preview
+            .iter()
+            .map(|segment| segment.output.clone())
+            .collect();
+        assert_eq!(preview, alternative, "strip preview should follow the selected phrase");
+
+        session.process_command(SessionCommand::SelectPhrase(0));
+        let snapshot = session.snapshot();
+        assert_eq!(snapshot.selected_phrase_index, 0);
+        let preview: String = snapshot
+            .segment_preview
+            .iter()
+            .map(|segment| segment.output.clone())
+            .collect();
+        assert_eq!(preview, best, "the original best should be selectable again");
+    }
+
+    #[test]
     fn each_phrase_candidate_carries_its_own_segmentation() {
         // ADR-0014: a Phrase Candidate pairs Khmer with its segmentation so the wheel
         // card can show the roman row and Level-2 editing can target a word.
@@ -175,7 +213,10 @@ mod tests {
             top.segments.iter().map(|seg| seg.output.clone()).collect::<Vec<_>>()
         );
         let rebuilt: String = top.segments.iter().map(|seg| seg.output.clone()).collect();
-        assert_eq!(rebuilt, top.text, "a candidate's segment outputs must reconstruct its text");
+        assert_eq!(
+            rebuilt, top.text,
+            "a candidate's segment outputs must reconstruct its text"
+        );
         assert!(
             top.segments.iter().all(|seg| !seg.input.is_empty()),
             "each segment must carry its roman slice for the Roman Row"

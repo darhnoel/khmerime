@@ -39,7 +39,11 @@ pub fn compute_segmented_refinement(
 ) -> SegmentedRefinement {
     let observation = refiner.shadow_observation(raw, history);
     let segmented_session = build_segmented_session(&observation, raw, history, &|input, hist| {
-        exact_matches_first(refiner, input, normalize_visible_suggestions(refiner.suggest(input, hist)))
+        exact_matches_first(
+            refiner,
+            input,
+            normalize_visible_suggestions(refiner.suggest(input, hist)),
+        )
     });
     let candidates = exact_matches_first(
         refiner,
@@ -224,6 +228,7 @@ impl ImeSession {
                 })
                 .collect()
         };
+        self.selected_phrase_index = index;
         self.segmented_session = Some(SegmentedSession {
             raw_input: self.composition_raw.clone(),
             segments,
@@ -240,6 +245,7 @@ impl ImeSession {
         if self.composition_raw.is_empty() {
             self.candidates.clear();
             self.phrase_candidates.clear();
+            self.selected_phrase_index = 0;
             self.selected_index = 0;
             self.selection_touched = false;
             self.segmented_session = None;
@@ -269,6 +275,7 @@ impl ImeSession {
                     .collect(),
             })
             .collect();
+        self.selected_phrase_index = 0;
         self.selected_index = 0;
         self.selection_touched = false;
         self.visible_refined_segments = None;

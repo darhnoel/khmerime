@@ -98,12 +98,39 @@ impl DecoderManager {
             history,
             composer: &composer,
         };
-        let mut result = self
-            .decode_weighted_span(&request)
+        let legacy = self.legacy.decode(&request);
+        let weighted_span = self.decode_weighted_span(&request);
+        let mut candidates = weighted_span
+            .as_ref()
             .filter(|result| result.failure.is_none() && !result.candidates.is_empty())
-            .unwrap_or_else(|| self.legacy.decode(&request));
-        result.candidates.truncate(self.config.max_candidates);
-        result.candidates
+            .map(|result| result.candidates.clone())
+            .unwrap_or_default();
+
+        for candidate in legacy
+            .candidates
+            .iter()
+            .filter(|candidate| useful_phrase_candidate(candidate, input))
+        {
+            if !candidates
+                .iter()
+                .any(|current| same_phrase_candidate(current, candidate))
+            {
+                candidates.push(candidate.clone());
+            }
+            if candidates.len() >= self.config.max_candidates {
+                break;
+            }
+        }
+
+        if candidates.is_empty() {
+            candidates = legacy
+                .candidates
+                .into_iter()
+                .filter(|candidate| useful_phrase_candidate(candidate, input))
+                .collect();
+        }
+        candidates.truncate(self.config.max_candidates);
+        candidates
     }
 
     fn decode_weighted_span(&self, request: &DecodeRequest<'_>) -> Option<DecodeResult> {
@@ -224,6 +251,24 @@ fn merge_results(legacy: &DecodeResult, weighted_span: Option<&DecodeResult>, li
     }
 
     merged
+}
+
+fn useful_phrase_candidate(candidate: &DecodeCandidate, input: &str) -> bool {
+    !candidate.segments.is_empty() && candidate.text != input && candidate.text.chars().any(is_khmer_char)
+}
+
+fn is_khmer_char(ch: char) -> bool {
+    ('\u{1780}'..='\u{17FF}').contains(&ch)
+}
+
+fn same_phrase_candidate(left: &DecodeCandidate, right: &DecodeCandidate) -> bool {
+    left.text == right.text
+        && left.segments.len() == right.segments.len()
+        && left
+            .segments
+            .iter()
+            .zip(right.segments.iter())
+            .all(|(left, right)| left.input == right.input && left.output == right.output)
 }
 
 fn stable_sample_bucket(input: &str) -> u64 {
