@@ -60,7 +60,7 @@ struct KeyboardLayerFactory {
     func buildQwertyView() -> UIView {
         buildStandardView(rows: [
             makeLetterRow(["q", "w", "e", "r", "t", "y", "u", "i", "o", "p"]),
-            makeLetterRow(["a", "s", "d", "f", "g", "h", "j", "k", "l"]),
+            makeQwertyRow2(),
             makeQwertyRow3(),
             makeBottomRow(leftLabel: "✦", leftAction: actions.togglePanel, includePeriod: true),
         ])
@@ -70,8 +70,8 @@ struct KeyboardLayerFactory {
         buildStandardView(rows: [
             makeSymbolRow(["1", "2", "3", "4", "5", "6", "7", "8", "9", "0"]),
             makeSymbolRow(["-", "/", ":", ";", "(", ")", "¥", "&", "@", "\""]),
-            makeSpecialSideRow(leftLabel: "#+=", leftAction: actions.symbols, leftWidth: wideSpecialKeyW),
-            makeBottomRow(leftLabel: "ABC", leftAction: actions.abc, includePeriod: false),
+            makeSpecialSideRow(leftLabel: "ABC", leftAction: actions.abc, leftWidth: wideSpecialKeyW),
+            makeBottomRow(leftLabel: "#+=", leftAction: actions.symbols, includePeriod: false),
         ])
     }
 
@@ -131,25 +131,24 @@ struct KeyboardLayerFactory {
 
     // MARK: - Row Builders
 
+    private func makeQwertyRow2() -> UIStackView {
+        QwertyCharacterGridRowView.centeredLetterRow(
+            ["a", "s", "d", "f", "g", "h", "j", "k", "l"].map { makeLetterKey($0) },
+            spacing: 6
+        )
+    }
+
     private func makeQwertyRow3() -> UIView {
-        let row = UIStackView()
-        row.axis = .horizontal
-        row.spacing = 6
-        row.distribution = .fill
-
         let toggleBtn = makeSpecialKey("123", action: actions.numeric)
-        toggleBtn.widthAnchor.constraint(equalToConstant: specialKeyW).isActive = true
-
-        let mid = makeLetterRow(["z", "x", "c", "v", "b", "n", "m"])
-        mid.setContentHuggingPriority(.init(rawValue: 1), for: .horizontal)
-
+        let letters = ["z", "x", "c", "v", "b", "n", "m"].map { makeLetterKey($0) }
         let backBtn = makeBackspaceButton()
-        backBtn.widthAnchor.constraint(equalToConstant: specialKeyW).isActive = true
 
-        row.addArrangedSubview(toggleBtn)
-        row.addArrangedSubview(mid)
-        row.addArrangedSubview(backBtn)
-        return row
+        return QwertyCharacterGridRowView.edgeControlRow(
+            leadingControl: toggleBtn,
+            letters: letters,
+            trailingControl: backBtn,
+            spacing: 6
+        )
     }
 
     // Row 3 of 123 and #+=: [leftSpecial | . , ? ! ' | ⌫]
