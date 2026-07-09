@@ -50,10 +50,7 @@ final class StripView: UIView, KeyboardStripDisplaying {
 
         khmerRow.axis = .horizontal
         khmerRow.spacing = 8
-        // Top-align so the strip's spare height falls BELOW the Khmer, where its
-        // below-base marks (coeng subscripts + vowels, e.g. ្ញុ in ខ្ញុំ) need room —
-        // rather than wasting it as a gap above.
-        khmerRow.alignment = .top
+        khmerRow.alignment = .center
         khmerRow.distribution = .equalSpacing
         khmerRow.translatesAutoresizingMaskIntoConstraints = false
         addSubview(khmerRow)
@@ -64,18 +61,18 @@ final class StripView: UIView, KeyboardStripDisplaying {
         addSubview(separator)
 
         NSLayoutConstraint.activate([
-            romanRow.topAnchor.constraint(equalTo: topAnchor, constant: 1),
+            // Flush to the strip's top edge; content is top-anchored so the strip's
+            // spare height is clear space at the BOTTOM (below the Khmer).
+            romanRow.topAnchor.constraint(equalTo: topAnchor, constant: 2),
             romanRow.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 8),
             romanRow.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -8),
-            romanRow.heightAnchor.constraint(equalToConstant: 18),
+            romanRow.heightAnchor.constraint(equalToConstant: 14),
 
-            // Pull up under the roman row with a negative offset to eat the Khmer font's
-            // ascent padding (empty space above the glyph), so the visible Khmer sits
-            // snug under the roman and the spare height falls to the bottom, where the
-            // below-base marks (្ញុ) need it.
-            khmerRow.topAnchor.constraint(equalTo: romanRow.bottomAnchor, constant: -6),
+            // A proper gap under the roman row. The Khmer row sizes to its own content
+            // and is NOT stretched to the separator, so the strip's spare height falls
+            // BELOW it (clearance for the below-base marks ្ញុ) instead of floating it.
+            khmerRow.topAnchor.constraint(equalTo: romanRow.bottomAnchor, constant: 4),
             khmerRow.centerXAnchor.constraint(equalTo: centerXAnchor),
-            khmerRow.bottomAnchor.constraint(equalTo: separator.topAnchor, constant: -2),
 
             separator.leadingAnchor.constraint(equalTo: leadingAnchor),
             separator.trailingAnchor.constraint(equalTo: trailingAnchor),

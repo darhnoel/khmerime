@@ -20,20 +20,20 @@ struct KeyboardLayoutMetrics {
     init(device: Device) {
         switch device {
         case .phone:
-            // +6 over the key area to fund the taller strip below (keeps keys the same size).
-            baseKeyboardHeight = 310
+            // +12 over the key area funds the taller strip (keeps keys the same size).
+            baseKeyboardHeight = 316
             specialKeyWidth = 42
             returnKeyWidth = 82
             wideSpecialKeyWidth = 48
         case .pad:
-            baseKeyboardHeight = 370
+            baseKeyboardHeight = 376
             specialKeyWidth = 56
             returnKeyWidth = 112
             wideSpecialKeyWidth = 72
         }
-        // Taller than the candidate row so the Khmer row's stacked glyphs (coeng
-        // subscripts + below-base vowels) aren't clipped at the bottom.
-        stripHeight = 50
+        // Roomy enough that the top-anchored roman + Khmer rows leave clear space at
+        // the bottom for the Khmer below-base marks (coeng subscripts + vowels).
+        stripHeight = 56
         candidateRowHeight = 44
         rowSpacing = 8
         keyHorizontalInset = 3
