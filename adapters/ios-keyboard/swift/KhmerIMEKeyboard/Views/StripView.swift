@@ -64,12 +64,16 @@ final class StripView: UIView, KeyboardStripDisplaying {
         addSubview(separator)
 
         NSLayoutConstraint.activate([
-            romanRow.topAnchor.constraint(equalTo: topAnchor, constant: 2),
+            romanRow.topAnchor.constraint(equalTo: topAnchor, constant: 1),
             romanRow.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 8),
             romanRow.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -8),
             romanRow.heightAnchor.constraint(equalToConstant: 18),
 
-            khmerRow.topAnchor.constraint(equalTo: romanRow.bottomAnchor, constant: 2),
+            // Pull up under the roman row with a negative offset to eat the Khmer font's
+            // ascent padding (empty space above the glyph), so the visible Khmer sits
+            // snug under the roman and the spare height falls to the bottom, where the
+            // below-base marks (្ញុ) need it.
+            khmerRow.topAnchor.constraint(equalTo: romanRow.bottomAnchor, constant: -6),
             khmerRow.centerXAnchor.constraint(equalTo: centerXAnchor),
             khmerRow.bottomAnchor.constraint(equalTo: separator.topAnchor, constant: -2),
 

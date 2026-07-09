@@ -89,7 +89,7 @@ final class KeyboardRootViewTests: XCTestCase {
 
         fixture.rootView.setChromeRows(.stripOnly)
 
-        XCTAssertEqual(fixture.rootView.stripHeightConstraint.constant, 52,
+        XCTAssertEqual(fixture.rootView.stripHeightConstraint.constant, 50,
             "strip height should remain reserved for the selected phrase preview")
         XCTAssertEqual(fixture.rootView.candidateRowHeightConstraint.constant, 0,
             "candidate row height should collapse when there are no phrase alternatives")
@@ -101,7 +101,7 @@ final class KeyboardRootViewTests: XCTestCase {
 
         fixture.rootView.setChromeRows(.stripAndCandidate)
 
-        XCTAssertEqual(fixture.rootView.stripHeightConstraint.constant, 52,
+        XCTAssertEqual(fixture.rootView.stripHeightConstraint.constant, 50,
             "expanded chrome must restore the strip to its reserved height")
         XCTAssertEqual(fixture.rootView.candidateRowHeightConstraint.constant, 44,
             "expanded chrome must restore the candidate row to its reserved height")

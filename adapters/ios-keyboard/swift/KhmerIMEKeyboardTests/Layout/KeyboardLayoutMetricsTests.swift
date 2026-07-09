@@ -12,8 +12,8 @@ final class KeyboardLayoutMetricsTests: XCTestCase {
         let phone = KeyboardLayoutMetrics(device: .phone)
         let pad = KeyboardLayoutMetrics(device: .pad)
 
-        XCTAssertEqual(phone.baseKeyboardHeight, 312)
-        XCTAssertEqual(phone.stripHeight, 52)
+        XCTAssertEqual(phone.baseKeyboardHeight, 310)
+        XCTAssertEqual(phone.stripHeight, 50)
         XCTAssertEqual(phone.specialKeyWidth, 42)
         XCTAssertEqual(phone.returnKeyWidth, 82)
         XCTAssertEqual(phone.wideSpecialKeyWidth, 48)
@@ -22,8 +22,8 @@ final class KeyboardLayoutMetricsTests: XCTestCase {
         XCTAssertEqual(phone.keyTopInset, 8)
         XCTAssertEqual(phone.keyBottomInset, 4)
 
-        XCTAssertEqual(pad.baseKeyboardHeight, 372)
-        XCTAssertEqual(pad.stripHeight, 52)
+        XCTAssertEqual(pad.baseKeyboardHeight, 370)
+        XCTAssertEqual(pad.stripHeight, 50)
         XCTAssertEqual(pad.specialKeyWidth, 56)
         XCTAssertEqual(pad.returnKeyWidth, 112)
         XCTAssertEqual(pad.wideSpecialKeyWidth, 72)
