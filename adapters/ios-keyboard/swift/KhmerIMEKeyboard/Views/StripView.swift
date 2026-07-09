@@ -50,7 +50,10 @@ final class StripView: UIView, KeyboardStripDisplaying {
 
         khmerRow.axis = .horizontal
         khmerRow.spacing = 8
-        khmerRow.alignment = .center
+        // Top-align so the strip's spare height falls BELOW the Khmer, where its
+        // below-base marks (coeng subscripts + vowels, e.g. ្ញុ in ខ្ញុំ) need room —
+        // rather than wasting it as a gap above.
+        khmerRow.alignment = .top
         khmerRow.distribution = .equalSpacing
         khmerRow.translatesAutoresizingMaskIntoConstraints = false
         addSubview(khmerRow)
