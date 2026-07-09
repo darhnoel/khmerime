@@ -95,6 +95,35 @@ final class KeyboardRootViewTests: XCTestCase {
             "candidate row height should collapse when there are no phrase alternatives")
     }
 
+    func test_keyPreviewReanchorsWhenChromeExpansionResizesTheKeyboard() {
+        // The first keystroke of a composition expands the chrome: the host grows,
+        // the bottom-anchored keys shift down within rootView, and a statically
+        // framed popup would ride up over the strip. The popup must re-anchor to
+        // its source key on layout.
+        let fixture = makeRootView()
+        fixture.rootView.frame = CGRect(x: 0, y: 0, width: 390, height: 216) // idle: chrome collapsed
+        fixture.rootView.layoutIfNeeded()
+        let key = UIView(frame: CGRect(x: 178, y: 60, width: 34, height: 44))
+        fixture.qwertyView.addSubview(key)
+
+        fixture.rootView.showKeyPreview(label: "J", from: key)
+        let popup = fixture.rootView.subviews.compactMap { $0 as? KeyPreviewPopupView }.first
+        let frameWhileCollapsed = popup?.frame ?? .zero
+
+        // Composing: host grows by strip + candidate row; keys move down 100pt.
+        fixture.rootView.frame = CGRect(x: 0, y: 0, width: 390, height: 316)
+        fixture.rootView.layoutIfNeeded()
+
+        let expected = KeyPreviewPopupView.frame(
+            sourceFrame: key.convert(key.bounds, to: fixture.rootView),
+            in: fixture.rootView.bounds
+        )
+        XCTAssertEqual(popup?.frame, expected,
+            "popup must re-anchor to its key after the keyboard resizes")
+        XCTAssertNotEqual(popup?.frame, frameWhileCollapsed,
+            "keys moved down 100pt, so a correctly anchored popup cannot keep its old frame")
+    }
+
     func test_setChromeRowsStripAndCandidate_restoresReservedRowHeights() {
         let fixture = makeRootView()
         fixture.rootView.setChromeRows(.none)
