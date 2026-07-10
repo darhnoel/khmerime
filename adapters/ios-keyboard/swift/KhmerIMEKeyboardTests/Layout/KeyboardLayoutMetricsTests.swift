@@ -40,7 +40,7 @@ final class KeyboardLayoutMetricsTests: XCTestCase {
             XCTAssertEqual(
                 metrics.idleKeyboardHeight,
                 metrics.baseKeyboardHeight - metrics.stripHeight - metrics.candidateRowHeight,
-                "idle height must drop exactly the strip + candidate row (88pt), keeping the key area unchanged"
+                "idle height must drop exactly the strip + candidate row, keeping the key area unchanged"
             )
         }
     }

@@ -119,7 +119,11 @@ final class KeyboardRootView: UIView {
     }
 
     func render(_ state: IosRenderState, romanHint: String, keyboardState: KeyboardState) {
-        stripDisplay.render(state, romanBuffer: romanHint)
+        if keyboardState == .charPick {
+            stripDisplay.clear()
+        } else {
+            stripDisplay.render(state, romanBuffer: romanHint)
+        }
         let presentation: CandidateRowPresentation = keyboardState == .charPick ? .charPick : .composition
         candidateRowDisplay.render(state, presentation: presentation)
     }

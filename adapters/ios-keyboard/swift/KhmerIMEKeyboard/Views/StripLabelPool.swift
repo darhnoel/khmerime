@@ -1,5 +1,20 @@
 import UIKit
 
+// Khmer glyphs can extend beyond the system font's nominal line box, especially
+// Coeng Forms and below-base vowels. A plain UILabel sizes itself to that line
+// box and clips those marks even when its parent row has spare height.
+private final class KhmerGlyphLabel: UILabel {
+    private static let verticalGlyphClearance: CGFloat = 12
+
+    override var intrinsicContentSize: CGSize {
+        var size = super.intrinsicContentSize
+        if size.height != UIView.noIntrinsicMetric {
+            size.height += Self.verticalGlyphClearance
+        }
+        return size
+    }
+}
+
 // StripLabelPool
 // ==============
 // Manages a reusable pool of UILabels inside a UIStackView.
@@ -18,7 +33,7 @@ final class StripLabelPool {
     @discardableResult
     func sync(count: Int, in stackView: UIStackView) -> [UILabel] {
         while labels.count < count {
-            let label = UILabel()
+            let label = KhmerGlyphLabel()
             label.isUserInteractionEnabled = true
             stackView.addArrangedSubview(label)
             labels.append(label)
