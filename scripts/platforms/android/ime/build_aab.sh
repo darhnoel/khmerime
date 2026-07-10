@@ -15,6 +15,10 @@ DIST_DIR="${ROOT_DIR}/dist/android"
 
 command -v cargo-ndk >/dev/null 2>&1 || { echo "cargo-ndk required: cargo install cargo-ndk" >&2; exit 2; }
 
+# Gradle reads the Product Version from this env (versionName inside the .aab);
+# export the resolved value so the bundle internals always agree with the filename.
+export KHMERIME_PACKAGE_VERSION="${VERSION}"
+
 # 1. logo assets + native lib (release)
 make -C "${ROOT_DIR}" platform-android-assets
 cargo ndk -t "${ABI}" -o "${ADAPTER}/app/src/main/jniLibs" build -p khmerime_android_ime --release
