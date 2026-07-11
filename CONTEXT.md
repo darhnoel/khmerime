@@ -72,6 +72,14 @@ _Avoid_: bare coeng sign when you mean the full subscript consonant
 The exact romanized key or keys displayed beside a Khmer candidate to show why that candidate is available. Roman Hints are display metadata for the **Candidate List**; they do not replace the raw roman **Preedit** and do not change the **Commit Text**. If no exact Roman Hint exists for a candidate, the UI must not invent one; it should show a derived marker instead.
 _Avoid_: invented hint, transliteration label, candidate subtitle
 
+**Pronunciation Variant**:
+One alternative spoken form of a Khmer headword. Dictionary pronunciations joined by `ឬ` are separate Pronunciation Variants even when they share one written word; dictionary senses that share both the written word and pronunciation are not separate variants. Each Pronunciation Variant may produce its own candidate **Roman Alias** for Lexicon review.
+_Avoid_: duplicate word, pronunciation sense
+
+**Roman Alias**:
+A reviewed roman spelling that maps to one Khmer **Lexicon** target. One target may have multiple Roman Aliases, including aliases derived from distinct **Pronunciation Variant**s.
+_Avoid_: pronunciation, Roman Hint
+
 **Commit Text**:
 The confirmed text sent to the host application when the user confirms. In romanization mode, Enter is the normal confirmation key; Space and digit keys select candidates or segments during an active **Composition**. Commit text is normally Khmer, selected from candidates, a **Segmented Session**, or the **Commit Refiner**; it may fall back to roman text when no Khmer output is available.
 _Avoid_: output text, submission
