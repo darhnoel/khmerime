@@ -34,10 +34,21 @@ final class KeyboardLayerFactoryTests: XCTestCase {
         let numericRows = standardRows(in: factory.buildNumericView())
         let symbolsRows = standardRows(in: factory.buildSymbolsView())
 
-        XCTAssertEqual(buttonTitles(in: numericRows[2]), ["#+=", ".", ",", "?", "!", "'", "⌫"])
-        XCTAssertEqual(buttonTitles(in: numericRows[3]), ["", "EN", "ABC", "space", "⏎"])
+        XCTAssertEqual(buttonTitles(in: numericRows[2]), ["ABC", ".", ",", "?", "!", "'", "⌫"])
+        XCTAssertEqual(buttonTitles(in: numericRows[3]), ["", "EN", "#+=", "space", "⏎"])
         XCTAssertEqual(buttonTitles(in: symbolsRows[2]), ["123", ".", ",", "?", "!", "'", "⌫"])
         XCTAssertEqual(buttonTitles(in: symbolsRows[3]), ["", "EN", "ABC", "space", "⏎"])
+    }
+
+    func test_numericLayerSwappedModeButtonsKeepTheirActions() {
+        let rows = standardRows(in: factory.buildNumericView())
+        let row3Buttons = (rows[2] as? UIStackView)?.arrangedSubviews.compactMap { $0 as? UIButton } ?? []
+        let bottomButtons = (rows[3] as? UIStackView)?.arrangedSubviews.compactMap { $0 as? UIButton } ?? []
+
+        XCTAssertEqual(row3Buttons.first?.title(for: .normal), "ABC")
+        XCTAssertEqual(row3Buttons.first.map(actionNames(on:)), ["abcTapped"])
+        XCTAssertEqual(bottomButtons[2].title(for: .normal), "#+=")
+        XCTAssertEqual(actionNames(on: bottomButtons[2]), ["symbolsTapped"])
     }
 
     func test_bottomRowTagsGlobeAndEnAndWiresActionsToTarget() {
@@ -96,6 +107,33 @@ final class KeyboardLayerFactoryTests: XCTestCase {
         XCTAssertNil(bottomKeys[5].previewLabel, "return is a control key")
     }
 
+    func test_qwertyCharacterGridKeepsLettersUniformAndWidensEdgeControls() {
+        let layout = QwertyCharacterGridLayout(availableWidth: 390, spacing: 6)
+
+        XCTAssertGreaterThan(layout.row2LeadingSideInset, 0)
+        XCTAssertEqual(layout.row2LeadingSideInset, layout.row2TrailingSideInset, accuracy: 0.001)
+        XCTAssertEqual(layout.row3LeadingControlWidth, layout.row3TrailingControlWidth, accuracy: 0.001)
+        XCTAssertGreaterThan(layout.row3LeadingControlWidth, layout.characterKeyWidth)
+
+        XCTAssertEqual(layout.row1ConsumedWidth, 390, accuracy: 0.001)
+        XCTAssertEqual(layout.row2ConsumedWidth, 390, accuracy: 0.001)
+        XCTAssertEqual(layout.row3ConsumedWidth, 390, accuracy: 0.001)
+    }
+
+    func test_qwertyLayerAppliesCharacterGridAtLayoutTime() {
+        let layer = factory.buildQwertyView()
+        layer.frame = CGRect(x: 0, y: 0, width: 390, height: 216)
+        layer.layoutIfNeeded()
+
+        let buttons = buttonsByTitle(in: layer)
+
+        XCTAssertEqual(buttons["A"]?.bounds.width ?? 0, buttons["Q"]?.bounds.width ?? 0, accuracy: 0.001)
+        XCTAssertEqual(buttons["Z"]?.bounds.width ?? 0, buttons["Q"]?.bounds.width ?? 0, accuracy: 0.001)
+        XCTAssertEqual(buttons["123"]?.bounds.width ?? 0, buttons["⌫"]?.bounds.width ?? 0, accuracy: 0.5)
+        XCTAssertGreaterThan(buttons["⌫"]?.bounds.width ?? 0, buttons["Q"]?.bounds.width ?? 0)
+        XCTAssertGreaterThan(buttons["A"]?.frame.minX ?? 0, buttons["Q"]?.frame.minX ?? 0)
+    }
+
     func test_keyCornerRadiusFollowsAndroidGlassProportionAfterLayout() {
         let letter = factory.makeLetterKey("k")
 
@@ -117,6 +155,17 @@ final class KeyboardLayerFactoryTests: XCTestCase {
         if let button = view as? UIButton { return [button.title(for: .normal) ?? ""] }
         guard let stack = view as? UIStackView else { return [] }
         return stack.arrangedSubviews.flatMap(buttonTitles)
+    }
+
+    private func buttonsByTitle(in view: UIView) -> [String: UIButton] {
+        var result: [String: UIButton] = [:]
+        if let button = view as? UIButton, let title = button.title(for: .normal), !title.isEmpty {
+            result[title] = button
+        }
+        for subview in view.subviews {
+            result.merge(buttonsByTitle(in: subview)) { current, _ in current }
+        }
+        return result
     }
 
     private func actionNames(on button: UIButton) -> [String] {

@@ -60,6 +60,10 @@ _Avoid_: candidate popup, suggestion popup, key tap animation
 The suggestion candidates produced when the user types the period key: `។`, `៕`, `.`, `?`, `!`, and `…`. On mobile these flow through **Phrase Candidate** data so the **Strip** shows the selected punctuation and the **Phrase Wheel** shows the alternatives. Distinct from the **Key Preview Popup**, which only mirrors the touched `.` key.
 _Avoid_: period popup, punctuation key preview
 
+**QWERTY Character Grid**:
+The visual grid used by the mobile QWERTY layer where roman letter keys keep one consistent character-key width across rows, while edge controls may be wider for reachability. It is a keyboard-layout concept, not an input mode or candidate surface.
+_Avoid_: packed row, stretched letters, English layout clone
+
 **Coeng Form**:
 A Khmer subscript consonant used to type consonant clusters. A Coeng Form is the invisible coeng sign plus a base consonant, rendered together as a subscript shape (for example `្ក`). In **CharPick Mode**, Coeng Forms appear under the same roman letters as their base consonants so users can build clusters quickly.
 _Avoid_: bare coeng sign when you mean the full subscript consonant

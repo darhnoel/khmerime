@@ -44,6 +44,20 @@ final class CandidateRowViewTests: XCTestCase {
             "CharPick candidates should not imply a default candidate with semibold text")
     }
 
+    func test_render_reservesVerticalGlyphClearanceForCoengCandidates() {
+        let row = CandidateRowView()
+        row.frame = CGRect(x: 0, y: 0, width: 300, height: 44)
+
+        row.render(makeState(candidates: ["្ង"], selectedIndex: 0), presentation: .charPick)
+        row.layoutIfNeeded()
+
+        let label = visibleLabels(in: row)[0]
+        XCTAssertGreaterThanOrEqual(label.bounds.height, label.font.lineHeight + 12,
+            "Khmer labels need clearance beyond the nominal font line box for below-base marks")
+        XCTAssertGreaterThanOrEqual(label.frame.minY, row.bounds.minY)
+        XCTAssertLessThanOrEqual(label.frame.maxY, row.bounds.maxY)
+    }
+
     func test_tapAtPoint_onACandidateLabel_invokesOnCandidateSelected() {
         let row = CandidateRowView()
         row.frame = CGRect(x: 0, y: 0, width: 300, height: 44)

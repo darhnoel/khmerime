@@ -12,8 +12,8 @@ final class KeyboardLayoutMetricsTests: XCTestCase {
         let phone = KeyboardLayoutMetrics(device: .phone)
         let pad = KeyboardLayoutMetrics(device: .pad)
 
-        XCTAssertEqual(phone.baseKeyboardHeight, 304)
-        XCTAssertEqual(phone.stripHeight, 44)
+        XCTAssertEqual(phone.baseKeyboardHeight, 316)
+        XCTAssertEqual(phone.stripHeight, 56)
         XCTAssertEqual(phone.specialKeyWidth, 42)
         XCTAssertEqual(phone.returnKeyWidth, 82)
         XCTAssertEqual(phone.wideSpecialKeyWidth, 48)
@@ -22,8 +22,8 @@ final class KeyboardLayoutMetricsTests: XCTestCase {
         XCTAssertEqual(phone.keyTopInset, 8)
         XCTAssertEqual(phone.keyBottomInset, 4)
 
-        XCTAssertEqual(pad.baseKeyboardHeight, 364)
-        XCTAssertEqual(pad.stripHeight, 44)
+        XCTAssertEqual(pad.baseKeyboardHeight, 376)
+        XCTAssertEqual(pad.stripHeight, 56)
         XCTAssertEqual(pad.specialKeyWidth, 56)
         XCTAssertEqual(pad.returnKeyWidth, 112)
         XCTAssertEqual(pad.wideSpecialKeyWidth, 72)
@@ -40,7 +40,7 @@ final class KeyboardLayoutMetricsTests: XCTestCase {
             XCTAssertEqual(
                 metrics.idleKeyboardHeight,
                 metrics.baseKeyboardHeight - metrics.stripHeight - metrics.candidateRowHeight,
-                "idle height must drop exactly the strip + candidate row (88pt), keeping the key area unchanged"
+                "idle height must drop exactly the strip + candidate row, keeping the key area unchanged"
             )
         }
     }

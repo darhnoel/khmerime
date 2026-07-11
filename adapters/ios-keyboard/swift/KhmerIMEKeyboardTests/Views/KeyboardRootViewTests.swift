@@ -62,6 +62,18 @@ final class KeyboardRootViewTests: XCTestCase {
         XCTAssertEqual(fixture.candidateRowView.renderedPresentation, .charPick)
     }
 
+    func test_renderInCharPickClearsStripInsteadOfRenderingFirstCandidate() {
+        let fixture = makeRootView()
+        let state = makeRenderState(candidates: ["ង", "្ង", "ញ"])
+
+        fixture.rootView.render(state, romanHint: "", keyboardState: .charPick)
+
+        XCTAssertNil(fixture.stripView.renderedState,
+            "CharPick candidates belong only in the Candidate List, never in the collapsed Strip")
+        XCTAssertEqual(fixture.stripView.clearCount, 1,
+            "CharPick rendering must clear any previously rendered Strip preview")
+    }
+
     func test_clearStrip_alsoClearsCandidateRow() {
         let fixture = makeRootView()
         fixture.rootView.clearStrip()
@@ -89,10 +101,44 @@ final class KeyboardRootViewTests: XCTestCase {
 
         fixture.rootView.setChromeRows(.stripOnly)
 
-        XCTAssertEqual(fixture.rootView.stripHeightConstraint.constant, 44,
+        XCTAssertEqual(fixture.rootView.stripHeightConstraint.constant, 56,
             "strip height should remain reserved for the selected phrase preview")
         XCTAssertEqual(fixture.rootView.candidateRowHeightConstraint.constant, 0,
             "candidate row height should collapse when there are no phrase alternatives")
+    }
+
+    func test_keyPreviewReanchorsWhenChromeExpansionResizesTheKeyboard() {
+        // The first keystroke of a composition expands the chrome: the host grows,
+        // the bottom-anchored keys shift down within rootView, and a statically
+        // framed popup would ride up over the strip. The popup must re-anchor to
+        // its source key on layout.
+        let fixture = makeRootView()
+        let metrics = KeyboardLayoutMetrics(device: .phone)
+        fixture.rootView.frame = CGRect(x: 0, y: 0, width: 390, height: metrics.idleKeyboardHeight)
+        fixture.rootView.layoutIfNeeded()
+        let key = UIView(frame: CGRect(x: 178, y: 60, width: 34, height: 44))
+        fixture.qwertyView.addSubview(key)
+
+        fixture.rootView.showKeyPreview(label: "J", from: key)
+        let popup = fixture.rootView.subviews.compactMap { $0 as? KeyPreviewPopupView }.first
+        let frameWhileCollapsed = popup?.frame ?? .zero
+
+        // Composing: host grows by the strip + candidate row.
+        fixture.rootView.frame = CGRect(x: 0, y: 0, width: 390, height: metrics.baseKeyboardHeight)
+        fixture.rootView.layoutIfNeeded()
+
+        let expected = KeyPreviewPopupView.frame(
+            sourceFrame: key.convert(key.bounds, to: fixture.rootView),
+            in: fixture.rootView.bounds
+        )
+        guard let popup else { return XCTFail("expected a key preview popup") }
+        XCTAssertEqual(popup.frame.minX, expected.minX, accuracy: 0.001)
+        XCTAssertEqual(popup.frame.minY, expected.minY, accuracy: 0.001)
+        XCTAssertEqual(popup.frame.width, expected.width, accuracy: 0.001)
+        XCTAssertEqual(popup.frame.height, expected.height, accuracy: 0.001,
+            "popup must re-anchor to its key after the keyboard resizes")
+        XCTAssertNotEqual(popup.frame, frameWhileCollapsed,
+            "keys moved down with the expanded chrome, so a correctly anchored popup cannot keep its old frame")
     }
 
     func test_setChromeRowsStripAndCandidate_restoresReservedRowHeights() {
@@ -101,7 +147,7 @@ final class KeyboardRootViewTests: XCTestCase {
 
         fixture.rootView.setChromeRows(.stripAndCandidate)
 
-        XCTAssertEqual(fixture.rootView.stripHeightConstraint.constant, 44,
+        XCTAssertEqual(fixture.rootView.stripHeightConstraint.constant, 56,
             "expanded chrome must restore the strip to its reserved height")
         XCTAssertEqual(fixture.rootView.candidateRowHeightConstraint.constant, 44,
             "expanded chrome must restore the candidate row to its reserved height")

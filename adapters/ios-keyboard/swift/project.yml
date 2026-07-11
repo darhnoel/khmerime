@@ -90,6 +90,7 @@ targets:
       - path: KhmerIMEKeyboard/Layout/KeyboardLayerVisibility.swift
       - path: KhmerIMEKeyboard/Layout/KeyboardLayoutMetrics.swift
       - path: KhmerIMEKeyboard/Layout/KeyboardViewHierarchyBuilder.swift
+      - path: KhmerIMEKeyboard/Layout/QwertyCharacterGridLayout.swift
       - path: KhmerIMEKeyboard/Views/CandidateRowLayout.swift
       - path: KhmerIMEKeyboard/Views/CandidateRowView.swift
       - path: KhmerIMEKeyboard/Views/CandidateSurfaceView.swift

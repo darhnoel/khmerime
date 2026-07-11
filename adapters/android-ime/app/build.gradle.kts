@@ -16,8 +16,11 @@ android {
         applicationId = "com.khmerime"
         minSdk = 24
         targetSdk = 36
-        versionCode = 1
-        versionName = "1.0"
+        // Play reads these, not the artifact filename. versionName is the Product
+        // Version (tag-derived, e.g. 1.0.0-rc.2 — see docs/release_automation.md);
+        // versionCode is the monotonic Build Number and must increase per upload.
+        versionCode = System.getenv("KHMERIME_ANDROID_VERSION_CODE")?.toIntOrNull() ?: 1
+        versionName = System.getenv("KHMERIME_PACKAGE_VERSION") ?: "0.0.0-dev"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }

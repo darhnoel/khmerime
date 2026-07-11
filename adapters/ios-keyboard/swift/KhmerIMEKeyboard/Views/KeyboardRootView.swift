@@ -13,6 +13,7 @@ final class KeyboardRootView: UIView {
     private let symbolsView: UIView
     private let candidateRowView: UIView
     private var keyPreviewPopup: KeyPreviewPopupView?
+    private weak var keyPreviewSourceKey: UIView?
 
     // Height constraints for the two chrome rows. Driven by KeyboardChrome.Rows
     // so roman composition can reserve both rows while CharPick reserves only
@@ -118,7 +119,11 @@ final class KeyboardRootView: UIView {
     }
 
     func render(_ state: IosRenderState, romanHint: String, keyboardState: KeyboardState) {
-        stripDisplay.render(state, romanBuffer: romanHint)
+        if keyboardState == .charPick {
+            stripDisplay.clear()
+        } else {
+            stripDisplay.render(state, romanBuffer: romanHint)
+        }
         let presentation: CandidateRowPresentation = keyboardState == .charPick ? .charPick : .composition
         candidateRowDisplay.render(state, presentation: presentation)
     }
@@ -131,6 +136,7 @@ final class KeyboardRootView: UIView {
     func showKeyPreview(label: String, from sourceKey: UIView) {
         keyPreviewPopup?.removeFromSuperview()
         let popup = KeyPreviewPopupView(label: label)
+        keyPreviewSourceKey = sourceKey
         popup.frame = KeyPreviewPopupView.frame(sourceFrame: sourceKey.convert(sourceKey.bounds, to: self), in: bounds)
         addSubview(popup)
         keyPreviewPopup = popup
@@ -139,6 +145,22 @@ final class KeyboardRootView: UIView {
     func hideKeyPreview() {
         keyPreviewPopup?.removeFromSuperview()
         keyPreviewPopup = nil
+        keyPreviewSourceKey = nil
+    }
+
+    // The popup frame is computed at touch time, but the first keystroke of a
+    // composition expands the chrome: the keyboard grows while the keys stay
+    // bottom-anchored, so a static frame would ride up over the strip. Re-anchor
+    // to the source key on every layout pass — this also makes the popup animate
+    // along with the chrome expansion.
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        guard let popup = keyPreviewPopup else { return }
+        guard let key = keyPreviewSourceKey, key.superview != nil else {
+            hideKeyPreview()
+            return
+        }
+        popup.frame = KeyPreviewPopupView.frame(sourceFrame: key.convert(key.bounds, to: self), in: bounds)
     }
 }
 
