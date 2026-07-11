@@ -8,54 +8,89 @@
     <link rel="stylesheet" href="/style.css">
   </head>
   <body>
-    <header class="app-header">
-      <div>
-        <h1>KhmerIME Lexicon Editor</h1>
-        <p id="status-line">Loading...</p>
+    <header class="app-header" aria-label="Filters and actions">
+      <div class="toolbar">
+        <input id="query-input" type="search" placeholder="Search roman, target, notes…" autocomplete="off" aria-label="Search">
+        <label>Chunk <select id="chunk-filter"></select></label>
+        <label>Status <select id="status-filter"></select></label>
+        <label>Category <select id="category-filter"></select></label>
+        <label>Rows <select id="page-size"><option>50</option><option selected>100</option><option>250</option></select></label>
       </div>
       <div class="primary-actions">
-        <button id="reload-button" type="button">Reload</button>
-        <button id="save-button" type="button" class="primary">Save Build Check</button>
+        <button id="review-open-button" type="button" class="btn">
+          <svg viewBox="0 0 24 24" class="icon" aria-hidden="true"><path d="M12 9v4M12 17h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"/></svg>
+          Review
+          <span id="review-badge" class="badge" hidden>0</span>
+        </button>
+        <button id="diff-open-button" type="button" class="btn">
+          <svg viewBox="0 0 24 24" class="icon" aria-hidden="true"><path d="M12 3v18M6 8l-3 4 3 4M18 8l3 4-3 4"/></svg>
+          Diff
+        </button>
+        <button id="reload-button" type="button" class="btn">Reload</button>
+        <button id="save-button" type="button" class="btn primary" title="Save Build Check">
+          Save Build Check
+          <span id="save-dirty-dot" class="save-dot" hidden aria-label="unsaved changes"></span>
+        </button>
       </div>
     </header>
 
-    <section class="toolbar" aria-label="Filters">
-      <label>Search <input id="query-input" type="search" autocomplete="off"></label>
-      <label>Chunk <select id="chunk-filter"></select></label>
-      <label>Status <select id="status-filter"></select></label>
-      <label>Category <select id="category-filter"></select></label>
-      <label>Rows <select id="page-size"><option>50</option><option selected>100</option><option>250</option></select></label>
-    </section>
-
-    <nav class="tabs" aria-label="Views">
-      <button class="tab active" data-tab="grid-panel" type="button">Editor</button>
-      <button class="tab" data-tab="problems-panel" type="button">Problem Queue</button>
-      <button class="tab" data-tab="dirty-panel" type="button">Dirty Changes</button>
-      <button class="tab" data-tab="diff-panel" type="button">Diff</button>
-    </nav>
-
     <main>
-      <section id="grid-panel" class="panel active">
+      <section id="grid-panel">
         <div class="grid-actions">
-          <button id="add-row-button" type="button">Add Row</button>
-          <button id="duplicate-row-button" type="button">Duplicate Row</button>
-          <button id="revert-row-button" type="button">Revert Row</button>
-          <button id="soft-remove-button" type="button">Soft Remove</button>
-          <button id="move-up-button" type="button">Move Up</button>
-          <button id="move-down-button" type="button">Move Down</button>
-          <button id="move-top-button" type="button">Move Top</button>
-          <button id="move-bottom-button" type="button">Move Bottom</button>
-          <span class="bulk-group">
-            <select id="bulk-column">
-              <option value="category">category</option>
-              <option value="status">status</option>
-              <option value="freq_lang">freq_lang</option>
-            </select>
-            <select id="bulk-value"></select>
-            <button id="bulk-apply-button" type="button">Apply to Selected/Active</button>
-          </span>
-          <button id="undo-button" type="button">Undo</button>
-          <button id="redo-button" type="button">Redo</button>
+          <div class="action-core">
+            <button id="add-row-button" type="button" class="btn">
+              <svg viewBox="0 0 24 24" class="icon" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+              Add
+            </button>
+            <span class="action-sep" aria-hidden="true"></span>
+            <button id="undo-button" type="button" class="btn icon-only" aria-label="Undo" title="Undo (Ctrl+Z)">
+              <svg viewBox="0 0 24 24" class="icon" aria-hidden="true"><path d="M9 14 4 9l5-5"/><path d="M4 9h11a5 5 0 0 1 0 10h-1"/></svg>
+            </button>
+            <button id="redo-button" type="button" class="btn icon-only" aria-label="Redo" title="Redo (Ctrl+Y)">
+              <svg viewBox="0 0 24 24" class="icon" aria-hidden="true"><path d="m15 14 5-5-5-5"/><path d="M20 9H9a5 5 0 0 0 0 10h1"/></svg>
+            </button>
+          </div>
+
+          <div id="selection-bar" class="selection-bar" role="toolbar" aria-label="Selected row actions" hidden>
+            <span id="selection-count" class="selection-count"></span>
+            <button id="delete-row-button" type="button" class="btn btn-danger">
+              <svg viewBox="0 0 24 24" class="icon" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/></svg>
+              Delete
+            </button>
+            <button id="soft-remove-button" type="button" class="btn">Disable</button>
+            <button id="regex-open-button" type="button" class="btn">
+              <svg viewBox="0 0 24 24" class="icon" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+              Find / Replace…
+            </button>
+            <div class="menu-wrap">
+              <button id="set-open-button" type="button" class="btn" aria-haspopup="true" aria-expanded="false">Set…</button>
+              <div id="set-popover" class="popover" hidden>
+                <label>Field
+                  <select id="bulk-column">
+                    <option value="category">category</option>
+                    <option value="status">status</option>
+                    <option value="freq_lang">freq_lang</option>
+                  </select>
+                </label>
+                <label>Value <select id="bulk-value"></select></label>
+                <button id="bulk-apply-button" type="button" class="btn primary">Apply</button>
+              </div>
+            </div>
+            <div class="menu-wrap">
+              <button id="overflow-open-button" type="button" class="btn icon-only" aria-haspopup="true" aria-expanded="false" aria-label="More actions" title="More">
+                <svg viewBox="0 0 24 24" class="icon" aria-hidden="true"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></svg>
+              </button>
+              <div id="overflow-popover" class="popover popover-menu" hidden>
+                <button id="duplicate-row-button" type="button" class="menu-item">Duplicate</button>
+                <button id="revert-row-button" type="button" class="menu-item">Revert</button>
+                <hr>
+                <button id="move-up-button" type="button" class="menu-item">Move Up</button>
+                <button id="move-down-button" type="button" class="menu-item">Move Down</button>
+                <button id="move-top-button" type="button" class="menu-item">Move to Top</button>
+                <button id="move-bottom-button" type="button" class="menu-item">Move to Bottom</button>
+              </div>
+            </div>
+          </div>
         </div>
         <div id="grid"></div>
         <div class="pager">
@@ -65,29 +100,86 @@
           <span id="total-label"></span>
         </div>
       </section>
+    </main>
 
-      <section id="problems-panel" class="panel">
-        <div class="panel-actions">
-          <button id="refresh-problems-button" type="button">Refresh Problems</button>
-          <span id="problems-count"></span>
-        </div>
-        <div id="problems-list" class="list"></div>
-      </section>
+    <div id="review-scrim" class="scrim" hidden></div>
+    <aside id="review-drawer" class="drawer" role="dialog" aria-modal="true" aria-label="Review" hidden>
+      <div class="drawer-head">
+        <h2>Review</h2>
+        <button id="review-close-button" type="button" class="btn icon-only" aria-label="Close">
+          <svg viewBox="0 0 24 24" class="icon" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>
+        </button>
+      </div>
 
-      <section id="dirty-panel" class="panel">
-        <div class="panel-actions">
-          <button id="discard-button" type="button">Discard Draft</button>
+      <section class="drawer-section">
+        <div class="section-head">
+          <h3>Draft state</h3>
+          <button id="discard-button" type="button" class="btn">Discard Draft</button>
         </div>
         <pre id="dirty-output"></pre>
       </section>
 
-      <section id="diff-panel" class="panel">
+      <section class="drawer-section drawer-grow">
+        <div class="section-head">
+          <h3>Problems</h3>
+          <button id="refresh-problems-button" type="button" class="btn">Refresh</button>
+        </div>
         <div class="panel-actions">
-          <button id="refresh-diff-button" type="button">Refresh Diff</button>
+          <label>Type
+            <select id="problem-type-filter">
+              <option value="duplicate approved runtime key" selected>duplicate approved runtime key</option>
+              <option value="invalid row">invalid row</option>
+              <option value="inconsistent target frequency">inconsistent target frequency</option>
+              <option value="status is disabled">status is disabled</option>
+              <option value="status is rejected">status is rejected</option>
+              <option value="">all</option>
+            </select>
+          </label>
+          <span id="problems-count"></span>
+        </div>
+        <div id="problems-list" class="list"></div>
+      </section>
+    </aside>
+
+    <div id="diff-modal" class="modal" role="dialog" aria-modal="true" aria-label="Diff">
+      <div class="modal-card modal-wide">
+        <div class="section-head">
+          <h2>Diff</h2>
+          <span>
+            <button id="refresh-diff-button" type="button" class="btn">Refresh</button>
+            <button id="diff-close-button" type="button" class="btn">Close</button>
+          </span>
         </div>
         <pre id="diff-output"></pre>
-      </section>
-    </main>
+      </div>
+    </div>
+
+    <div id="regex-modal" class="modal" role="dialog" aria-modal="true" aria-label="Find and replace">
+      <div class="modal-card">
+        <h2>Find / Replace (regex)</h2>
+        <p class="modal-hint">Applied to selected/active rows only. Preview before applying; the change is undoable.</p>
+        <div class="regex-fields">
+          <label>Column
+            <select id="regex-column">
+              <option value="roman" selected>roman</option>
+              <option value="target">target</option>
+              <option value="notes">notes</option>
+            </select>
+          </label>
+          <label>Pattern <input id="regex-pattern" type="text" placeholder="^a" autocomplete="off"></label>
+          <label>Replacement <input id="regex-replacement" type="text" placeholder="" autocomplete="off"></label>
+        </div>
+        <div class="modal-actions">
+          <button id="regex-preview-button" type="button">Preview</button>
+          <span id="regex-count" class="muted"></span>
+        </div>
+        <div id="regex-preview-list" class="regex-preview"></div>
+        <div class="modal-footer">
+          <button id="regex-cancel-button" type="button">Cancel</button>
+          <button id="regex-apply-button" type="button" class="primary" disabled>Apply</button>
+        </div>
+      </div>
+    </div>
 
     <div id="message" role="status" aria-live="polite"></div>
 

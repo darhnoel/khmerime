@@ -7,10 +7,10 @@ const state = {
   total: 0,
   searchTimer: null,
   activeRowId: null,
-  activeTab: "grid-panel",
   gridScrollTop: 0,
   gridScrollLeft: 0,
   selectedRowIds: new Set(),
+  problems: null,
 };
 
 const $ = (id) => document.getElementById(id);
@@ -33,7 +33,6 @@ function writeSavedView() {
     page: state.page,
     pageSize: state.pageSize,
     activeRowId: state.activeRowId,
-    activeTab: state.activeTab,
     gridScrollTop: state.gridScrollTop,
     gridScrollLeft: state.gridScrollLeft,
   };
@@ -62,7 +61,6 @@ function restoreSavedViewControls() {
     state.page = Number(saved.page);
   }
   if (typeof saved.activeRowId === "string") state.activeRowId = saved.activeRowId;
-  if (typeof saved.activeTab === "string") state.activeTab = saved.activeTab;
   state.gridScrollTop = Number(saved.gridScrollTop) || 0;
   state.gridScrollLeft = Number(saved.gridScrollLeft) || 0;
 }
@@ -131,6 +129,46 @@ function selectedOrActiveIds() {
   return state.activeRowId ? [state.activeRowId] : [];
 }
 
+function refreshSelectionUI() {
+  const count = selectedOrActiveIds().length;
+  const bar = $("selection-bar");
+  bar.hidden = count === 0;
+  if (count) {
+    const selected = selectedIds().length;
+    $("selection-count").textContent = selected ? `${selected} selected` : "1 active";
+  }
+}
+
+function closePopovers(except) {
+  for (const id of ["set-popover", "overflow-popover"]) {
+    if (id === except) continue;
+    $(id).hidden = true;
+    const trigger = id === "set-popover" ? "set-open-button" : "overflow-open-button";
+    $(trigger).setAttribute("aria-expanded", "false");
+  }
+}
+
+function togglePopover(popoverId, triggerId) {
+  const popover = $(popoverId);
+  const willOpen = popover.hidden;
+  closePopovers(willOpen ? popoverId : null);
+  popover.hidden = !willOpen;
+  $(triggerId).setAttribute("aria-expanded", String(willOpen));
+}
+
+function openContextMenu(pageX, pageY) {
+  // Reuse the overflow menu at the cursor — same items, same handlers.
+  closePopovers("overflow-popover");
+  const menu = $("overflow-popover");
+  menu.classList.add("context-menu");
+  menu.hidden = false;
+  const rect = menu.getBoundingClientRect();
+  const x = Math.min(pageX, window.innerWidth - rect.width - 8);
+  const y = Math.min(pageY, window.innerHeight - rect.height - 8);
+  menu.style.left = `${Math.max(8, x)}px`;
+  menu.style.top = `${Math.max(8, y)}px`;
+}
+
 function filters() {
   return {
     query: $("query-input").value.trim(),
@@ -155,15 +193,14 @@ async function loadMeta() {
   renderDirty();
 }
 
-function statusText() {
-  if (!state.meta) return "Loading...";
-  const dirty = state.meta.dirty_chunks.length ? `Dirty: ${state.meta.dirty_chunks.join(", ")}` : "No dirty chunks";
-  const external = state.meta.external_changes.length ? ` External changes: ${state.meta.external_changes.join(", ")}` : "";
-  return `${dirty}.${external}`;
-}
-
 function renderDirty() {
-  $("status-line").textContent = statusText();
+  const dirtyCount = state.meta.dirty_chunks.length;
+  const dot = $("save-dirty-dot");
+  dot.hidden = dirtyCount === 0;
+  dot.textContent = dirtyCount > 1 ? String(dirtyCount) : "";
+  $("save-button").title = dirtyCount
+    ? `Save Build Check — ${state.meta.dirty_chunks.join(", ")}`
+    : "Save Build Check";
   $("undo-button").disabled = !state.meta.can_undo;
   $("redo-button").disabled = !state.meta.can_redo;
   const lines = [
@@ -210,6 +247,7 @@ async function loadRows() {
   $("total-label").textContent = `${state.total} rows`;
   $("prev-page").disabled = state.page <= 1;
   $("next-page").disabled = state.page >= state.lastPage;
+  refreshSelectionUI();
   writeSavedView();
 }
 
@@ -248,8 +286,8 @@ function issueFormatter(cell) {
 
 function makeTable() {
   state.table = new Tabulator("#grid", {
-    height: "62vh",
-    layout: "fitDataStretch",
+    height: "100%",
+    layout: "fitColumns",
     index: "id",
     selectableRows: "highlight",
     editTriggerEvent: "click",
@@ -282,21 +320,22 @@ function makeTable() {
           }
           state.activeRowId = id;
           row.reformat();
+          refreshSelectionUI();
         },
       },
-      { title: "chunk", field: "chunk", width: 128, headerSort: false },
-      { title: "row", field: "row", width: 70, headerSort: false },
-      { title: "orig", field: "orig_line", width: 70, headerSort: false },
-      { title: "runtime", field: "runtime", width: 92, formatter: runtimeFormatter, headerSort: false },
-      { title: "roman", field: "roman", editor: "input", width: 170, headerSort: false },
-      { title: "target", field: "target", editor: "input", width: 190, headerSort: false },
-      { title: "freq", field: "freq", editor: "number", width: 82, headerSort: false, editorParams: { min: 1, step: 1 } },
-      { title: "lang", field: "freq_lang", editor: "list", width: 90, headerSort: false, editorParams: () => ({ values: state.meta.freq_langs }) },
-      { title: "category", field: "category", editor: "list", width: 128, headerSort: false, editorParams: () => ({ values: state.meta.categories }) },
-      { title: "status", field: "status", editor: "list", width: 118, headerSort: false, editorParams: () => ({ values: state.meta.statuses }) },
-      { title: "notes", field: "notes", editor: "input", minWidth: 220, headerSort: false },
-      { title: "errors", field: "errors", formatter: issueFormatter, width: 190, headerSort: false },
-      { title: "warnings", field: "warnings", formatter: issueFormatter, width: 230, headerSort: false },
+      { title: "chunk", field: "chunk", width: 120, headerSort: false },
+      { title: "row", field: "row", width: 62, headerSort: false },
+      { title: "orig", field: "orig_line", width: 62, headerSort: false },
+      { title: "runtime", field: "runtime", width: 84, formatter: runtimeFormatter, headerSort: false },
+      { title: "roman", field: "roman", editor: "input", widthGrow: 2, minWidth: 150, headerSort: false },
+      { title: "target", field: "target", editor: "input", widthGrow: 2, minWidth: 150, headerSort: false },
+      { title: "freq", field: "freq", editor: "number", width: 72, headerSort: false, editorParams: { min: 1, step: 1 } },
+      { title: "lang", field: "freq_lang", editor: "list", width: 78, headerSort: false, editorParams: () => ({ values: state.meta.freq_langs }) },
+      { title: "category", field: "category", editor: "list", width: 116, headerSort: false, editorParams: () => ({ values: state.meta.categories }) },
+      { title: "status", field: "status", editor: "list", width: 100, headerSort: false, editorParams: () => ({ values: state.meta.statuses }) },
+      { title: "notes", field: "notes", editor: "input", widthGrow: 3, minWidth: 200, headerSort: false },
+      { title: "errors", field: "errors", formatter: issueFormatter, widthGrow: 1, minWidth: 120, headerSort: false },
+      { title: "warnings", field: "warnings", formatter: issueFormatter, widthGrow: 1, minWidth: 140, headerSort: false },
     ],
   });
 
@@ -311,10 +350,11 @@ function makeTable() {
       if (payload.meta) {
         state.meta = payload.meta;
         renderDirty();
-      } else {
-        await loadMeta();
       }
-      await loadRows();
+      // Update only the edited row in place — no full-page reload/repaint.
+      // Cross-row warnings stay lazy: they refresh on save, filter change, or
+      // reload, not on every keystroke.
+      if (payload.row) cell.getRow().update(payload.row);
     } catch (error) {
       showMessage(error.message, 8000);
       await loadRows();
@@ -324,7 +364,16 @@ function makeTable() {
     state.activeRowId = row.getData().id;
     document.querySelectorAll(".tabulator-row.row-active").forEach((node) => node.classList.remove("row-active"));
     row.getElement().classList.add("row-active");
+    refreshSelectionUI();
     writeSavedView();
+  });
+  state.table.on("rowContext", (event, row) => {
+    event.preventDefault();
+    const id = row.getData().id;
+    if (!state.selectedRowIds.has(id)) state.activeRowId = id;
+    row.getElement().classList.add("row-active");
+    refreshSelectionUI();
+    openContextMenu(event.pageX, event.pageY);
   });
   state.table.on("tableBuilt", () => {
     const holder = tableHolder();
@@ -338,6 +387,7 @@ function makeTable() {
 
 async function postAction(path, body = {}, reload = true) {
   const payload = await api(path, { method: "POST", body });
+  closePopovers(null);
   if (payload.meta) {
     state.meta = payload.meta;
     renderDirty();
@@ -345,6 +395,7 @@ async function postAction(path, body = {}, reload = true) {
     await loadMeta();
   }
   if (reload) await loadRows();
+  refreshSelectionUI();
   return payload;
 }
 
@@ -430,6 +481,72 @@ async function softRemove() {
   await postAction("/api/soft-remove", { row_ids: ids });
 }
 
+async function deleteRows() {
+  const ids = selectedOrActiveIds();
+  if (!ids.length) return showMessage("Select rows or click a row first.");
+  await postAction("/api/delete-rows", { row_ids: ids });
+  state.selectedRowIds.clear();
+  state.activeRowId = null;
+  showMessage(`Deleted ${ids.length} row(s). Undo (Ctrl+Z) or Save-time backup restores them.`);
+}
+
+function regexBody() {
+  return {
+    row_ids: selectedOrActiveIds(),
+    column: $("regex-column").value,
+    pattern: $("regex-pattern").value,
+    replacement: $("regex-replacement").value,
+  };
+}
+
+async function regexPreview() {
+  const body = regexBody();
+  if (!body.row_ids.length) return showMessage("Select rows or click a row first.");
+  try {
+    const payload = await api("/api/bulk-regex-preview", { method: "POST", body });
+    const list = $("regex-preview-list");
+    list.replaceChildren();
+    if (!payload.count) {
+      list.textContent = "No rows match — nothing would change.";
+    } else {
+      for (const change of payload.changes) {
+        const item = document.createElement("div");
+        item.className = "regex-change";
+        item.innerHTML = `<code>${change.old}</code> → <code>${change.new}</code>`;
+        list.appendChild(item);
+      }
+    }
+    $("regex-count").textContent = `${payload.count} row(s) would change`;
+    $("regex-apply-button").disabled = !payload.count;
+  } catch (error) {
+    showMessage(error.message, 8000);
+  }
+}
+
+async function regexApply() {
+  const body = regexBody();
+  try {
+    const payload = await postAction("/api/bulk-regex-apply", body);
+    closeRegexModal();
+    showMessage(`Applied pattern to ${payload.updated} row(s).`);
+  } catch (error) {
+    showMessage(error.message, 8000);
+  }
+}
+
+function openRegexModal() {
+  if (!selectedOrActiveIds().length) return showMessage("Select rows or click a row first.");
+  $("regex-preview-list").replaceChildren();
+  $("regex-count").textContent = "";
+  $("regex-apply-button").disabled = true;
+  $("regex-modal").classList.add("visible");
+  $("regex-pattern").focus();
+}
+
+function closeRegexModal() {
+  $("regex-modal").classList.remove("visible");
+}
+
 async function moveRows(direction) {
   const ids = selectedIds();
   if (!ids.length) return showMessage("Select rows first.");
@@ -453,9 +570,10 @@ async function saveBuildCheck() {
     const payload = await postAction("/api/save-build-check", {}, false);
     if (payload.diff !== undefined) {
       $("diff-output").textContent = payload.diff || "(no diff)";
-      switchTab("diff-panel");
+      $("diff-modal").classList.add("visible");
     }
     await loadRows();
+    await loadProblems();
     showMessage(`${payload.message}${payload.backup_dir ? `\nBackup: ${payload.backup_dir}` : ""}`, 7000);
   } catch (error) {
     showMessage(error.message, 12000);
@@ -468,11 +586,19 @@ async function loadDiff() {
 }
 
 async function loadProblems() {
-  const payload = await api("/api/problems");
-  $("problems-count").textContent = `${payload.total} problem entries`;
+  state.problems = await api("/api/problems");
+  renderProblems();
+}
+
+function renderProblems() {
+  const payload = state.problems;
+  if (!payload) return;
+  const typeFilter = $("problem-type-filter").value;
+  const shown = typeFilter ? payload.problems.filter((item) => item.type === typeFilter) : payload.problems;
+  $("problems-count").textContent = `${shown.length} shown / ${payload.total} total`;
   const list = $("problems-list");
   list.replaceChildren();
-  for (const item of payload.problems) {
+  for (const item of shown) {
     const row = item.row;
     const element = document.createElement("div");
     element.className = "problem-item";
@@ -492,23 +618,48 @@ async function loadProblems() {
       state.activeRowId = row.id;
       state.page = Math.max(1, Math.ceil(Number(row.row || 1) / state.pageSize));
       state.gridScrollTop = 0;
-      switchTab("grid-panel");
+      closeReview();
       await loadRows();
     });
     element.append(type, detail, open);
     list.appendChild(element);
   }
+  updateReviewBadge();
 }
 
-function switchTab(panelId) {
-  state.activeTab = panelId;
-  document.querySelectorAll(".tab").forEach((node) => node.classList.toggle("active", node.dataset.tab === panelId));
-  document.querySelectorAll(".panel").forEach((node) => node.classList.toggle("active", node.id === panelId));
-  writeSavedView();
+async function openReview() {
+  $("review-drawer").hidden = false;
+  $("review-scrim").hidden = false;
+  await loadProblems();
+}
+
+function closeReview() {
+  $("review-drawer").hidden = true;
+  $("review-scrim").hidden = true;
+}
+
+async function openDiff() {
+  await loadDiff();
+  $("diff-modal").classList.add("visible");
+}
+
+function closeDiff() {
+  $("diff-modal").classList.remove("visible");
+}
+
+function updateReviewBadge() {
+  const badge = $("review-badge");
+  const total = state.problems ? state.problems.total : 0;
+  badge.textContent = String(total);
+  badge.hidden = total === 0;
 }
 
 function wireEvents() {
-  document.querySelectorAll(".tab").forEach((node) => node.addEventListener("click", () => switchTab(node.dataset.tab)));
+  $("review-open-button").addEventListener("click", () => openReview().catch((error) => showMessage(error.message)));
+  $("review-close-button").addEventListener("click", closeReview);
+  $("review-scrim").addEventListener("click", closeReview);
+  $("diff-open-button").addEventListener("click", () => openDiff().catch((error) => showMessage(error.message)));
+  $("diff-close-button").addEventListener("click", closeDiff);
   $("query-input").addEventListener("input", () => {
     window.clearTimeout(state.searchTimer);
     state.searchTimer = window.setTimeout(() => {
@@ -550,11 +701,37 @@ function wireEvents() {
   $("move-bottom-button").addEventListener("click", () => moveRows("bottom").catch((error) => showMessage(error.message)));
   $("bulk-column").addEventListener("change", updateBulkValues);
   $("bulk-apply-button").addEventListener("click", () => bulkEdit().catch((error) => showMessage(error.message)));
+  $("set-open-button").addEventListener("click", (event) => {
+    event.stopPropagation();
+    togglePopover("set-popover", "set-open-button");
+  });
+  $("overflow-open-button").addEventListener("click", (event) => {
+    event.stopPropagation();
+    $("overflow-popover").classList.remove("context-menu");
+    $("overflow-popover").style.left = "";
+    $("overflow-popover").style.top = "";
+    togglePopover("overflow-popover", "overflow-open-button");
+  });
+  document.addEventListener("click", () => closePopovers(null));
+  ["set-popover", "overflow-popover"].forEach((id) =>
+    $(id).addEventListener("click", (event) => event.stopPropagation()),
+  );
+  $("delete-row-button").addEventListener("click", () => deleteRows().catch((error) => showMessage(error.message)));
+  $("regex-open-button").addEventListener("click", openRegexModal);
+  $("regex-preview-button").addEventListener("click", () => regexPreview().catch((error) => showMessage(error.message)));
+  $("regex-apply-button").addEventListener("click", () => regexApply().catch((error) => showMessage(error.message)));
+  $("regex-cancel-button").addEventListener("click", closeRegexModal);
+  ["regex-pattern", "regex-replacement", "regex-column"].forEach((id) =>
+    $(id).addEventListener("input", () => {
+      $("regex-apply-button").disabled = true;
+    }),
+  );
   $("undo-button").addEventListener("click", () => postAction("/api/undo").catch((error) => showMessage(error.message)));
   $("redo-button").addEventListener("click", () => postAction("/api/redo").catch((error) => showMessage(error.message)));
   $("save-button").addEventListener("click", saveBuildCheck);
   $("refresh-diff-button").addEventListener("click", () => loadDiff().catch((error) => showMessage(error.message)));
   $("refresh-problems-button").addEventListener("click", () => loadProblems().catch((error) => showMessage(error.message)));
+  $("problem-type-filter").addEventListener("change", renderProblems);
   $("discard-button").addEventListener("click", async () => {
     if (!window.confirm("Discard all unsaved draft changes?")) return;
     await postAction("/api/discard-draft");
@@ -576,19 +753,35 @@ function wireEvents() {
 
   window.addEventListener("beforeunload", writeSavedView);
 
+  function typingTarget(event) {
+    const node = event.target;
+    if (!node) return false;
+    if (node.isContentEditable) return true;
+    const tag = node.tagName;
+    return tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT";
+  }
+
+  const fail = (error) => showMessage(error.message);
+
   document.addEventListener("keydown", (event) => {
     if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "s") {
       event.preventDefault();
       saveBuildCheck();
     } else if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "z") {
       event.preventDefault();
-      postAction("/api/undo").catch((error) => showMessage(error.message));
+      postAction("/api/undo").catch(fail);
     } else if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "y") {
       event.preventDefault();
-      postAction("/api/redo").catch((error) => showMessage(error.message));
-    } else if (event.key === "Delete" && selectedIds().length) {
+      postAction("/api/redo").catch(fail);
+    } else if (event.key === "Escape" && $("regex-modal").classList.contains("visible")) {
+      closeRegexModal();
+    } else if (event.key === "Escape" && $("diff-modal").classList.contains("visible")) {
+      closeDiff();
+    } else if (event.key === "Escape" && !$("review-drawer").hidden) {
+      closeReview();
+    } else if (event.key === "Delete" && !typingTarget(event) && selectedOrActiveIds().length) {
       event.preventDefault();
-      softRemove().catch((error) => showMessage(error.message));
+      deleteRows().catch(fail);
     }
   });
 }
@@ -597,7 +790,6 @@ async function init() {
   wireEvents();
   await loadMeta();
   makeTable();
-  switchTab(state.activeTab || "grid-panel");
   await loadRows();
   await loadProblems();
 }
