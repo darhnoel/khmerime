@@ -264,6 +264,19 @@ class EditorState:
             output.append(row)
         return output, problem_map
 
+    def edited_row_count(self) -> int:
+        total = 0
+        for name in self.dirty_chunks:
+            draft = self.drafts[name]
+            live_ids = set()
+            for row in draft.rows:
+                live_ids.add(row["_id"])
+                original = draft.originals.get(row["_id"])
+                if original is None or any(row.get(c, "") != original.get(c, "") for c in chunks.CHUNK_COLUMNS):
+                    total += 1
+            total += sum(1 for row_id in draft.originals if row_id not in live_ids)
+        return total
+
     def api_meta(self) -> dict[str, object]:
         external_changes = []
         for name in self.dirty_chunks:
@@ -272,6 +285,7 @@ class EditorState:
                 external_changes.append(name)
         return {
             "chunks": self.chunk_names(),
+            "edited_rows": self.edited_row_count(),
             "columns": chunks.CHUNK_COLUMNS,
             "freq_langs": sorted(chunks.VALID_FREQ_LANGS),
             "categories": sorted(chunks.VALID_CATEGORIES),

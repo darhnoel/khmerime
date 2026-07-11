@@ -178,25 +178,8 @@ button:disabled {
   max-width: 420px;
 }
 
-.save-dot {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 8px;
-  height: 8px;
-  margin-left: 2px;
-  padding: 0;
-  border-radius: 999px;
-  background: #fff;
-}
-
-.save-dot:not(:empty) {
-  min-width: 16px;
-  height: 16px;
-  padding: 0 5px;
-  font-size: 11px;
-  font-weight: 700;
-  color: var(--primary);
+#save-button.has-edits {
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 35%, transparent);
 }
 
 main {

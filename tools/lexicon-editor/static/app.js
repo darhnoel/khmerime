@@ -194,12 +194,11 @@ async function loadMeta() {
 }
 
 function renderDirty() {
-  const dirtyCount = state.meta.dirty_chunks.length;
-  const dot = $("save-dirty-dot");
-  dot.hidden = dirtyCount === 0;
-  dot.textContent = dirtyCount > 1 ? String(dirtyCount) : "";
-  $("save-button").title = dirtyCount
-    ? `Save Build Check — ${state.meta.dirty_chunks.join(", ")}`
+  const edited = state.meta.edited_rows || 0;
+  $("save-label").textContent = edited ? `Build (${edited})` : "Build";
+  $("save-button").classList.toggle("has-edits", edited > 0);
+  $("save-button").title = edited
+    ? `Save Build Check — ${edited} edited row(s) in ${state.meta.dirty_chunks.join(", ")}`
     : "Save Build Check";
   $("undo-button").disabled = !state.meta.can_undo;
   $("redo-button").disabled = !state.meta.can_redo;
@@ -479,6 +478,9 @@ async function softRemove() {
   if (!ids.length) return showMessage("Select rows first.");
   if (!window.confirm(`Soft remove ${ids.length} selected row(s)?`)) return;
   await postAction("/api/soft-remove", { row_ids: ids });
+  state.selectedRowIds.clear();
+  state.activeRowId = null;
+  refreshSelectionUI();
 }
 
 async function deleteRows() {
@@ -527,6 +529,9 @@ async function regexApply() {
   const body = regexBody();
   try {
     const payload = await postAction("/api/bulk-regex-apply", body);
+    state.selectedRowIds.clear();
+    state.activeRowId = null;
+    refreshSelectionUI();
     closeRegexModal();
     showMessage(`Applied pattern to ${payload.updated} row(s).`);
   } catch (error) {
@@ -557,12 +562,13 @@ async function moveRows(direction) {
 async function bulkEdit() {
   const ids = selectedOrActiveIds();
   if (!ids.length) return showMessage("Select rows or click a row first.");
-  await postAction("/api/bulk-edit", {
-    row_ids: ids,
-    column: $("bulk-column").value,
-    value: $("bulk-value").value,
-  });
-  showMessage(`Applied ${$("bulk-column").value}=${$("bulk-value").value} to ${ids.length} row(s).`);
+  const column = $("bulk-column").value;
+  const value = $("bulk-value").value;
+  await postAction("/api/bulk-edit", { row_ids: ids, column, value });
+  state.selectedRowIds.clear();
+  state.activeRowId = null;
+  refreshSelectionUI();
+  showMessage(`Applied ${column}=${value} to ${ids.length} row(s).`);
 }
 
 async function saveBuildCheck() {

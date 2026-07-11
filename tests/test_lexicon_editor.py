@@ -60,6 +60,20 @@ class LexiconEditorStateTests(unittest.TestCase):
     def tearDown(self) -> None:
         self.temporary_directory.cleanup()
 
+    def test_edited_row_count_tracks_edits_adds_and_deletes(self) -> None:
+        state = make_state(self.tmp_path)
+        self.assertEqual(state.api_meta()["edited_rows"], 0)
+
+        row_id = state.current_rows()[0]["_id"]
+        state.api_edit_cell({"row_id": row_id, "column": "roman", "value": "sraap"})
+        self.assertEqual(state.api_meta()["edited_rows"], 1)
+
+        state.api_add_row({"after_row_id": row_id})
+        self.assertEqual(state.api_meta()["edited_rows"], 2)
+
+        state.api_delete_rows({"row_ids": [row_id]})
+        self.assertEqual(state.api_meta()["edited_rows"], 2)
+
     def test_edit_cell_marks_chunk_dirty(self) -> None:
         state = make_state(self.tmp_path)
         row_id = state.current_rows()[0]["_id"]
