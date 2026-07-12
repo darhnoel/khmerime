@@ -399,9 +399,11 @@ pre {
 
 #message {
   position: fixed;
-  right: 18px;
+  left: 50%;
+  transform: translateX(-50%);
   bottom: 18px;
   max-width: min(560px, calc(100vw - 36px));
+  text-align: center;
   background: #111827;
   color: #fff;
   border-radius: 8px;
@@ -437,7 +439,7 @@ pre {
   background: rgba(15, 23, 42, 0.45);
   align-items: flex-start;
   justify-content: center;
-  padding: 8vh 16px;
+  padding: 5vh 16px;
   z-index: 50;
 }
 
@@ -451,6 +453,8 @@ pre {
   border-radius: 10px;
   padding: 20px;
   width: min(560px, 100%);
+  max-height: 90vh;
+  overflow-y: auto;
   box-shadow: 0 12px 40px rgba(15, 23, 42, 0.25);
 }
 
@@ -483,6 +487,21 @@ pre {
   padding: 7px 8px;
 }
 
+.regex-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+}
+
+.regex-row label {
+  flex: 1;
+  min-width: 0;
+}
+
+.regex-row button {
+  flex: 0 0 auto;
+}
+
 .modal-actions {
   display: flex;
   align-items: center;
@@ -490,9 +509,44 @@ pre {
   margin: 14px 0 8px;
 }
 
+/* Regex modal: fixed-height flex card so only the split region scrolls. */
+#regex-modal .modal-card {
+  display: flex;
+  flex-direction: column;
+  width: min(max(50vw, 560px), 100%);
+  max-width: none;
+  height: 90vh;
+  overflow: hidden;
+}
+
+#regex-modal .modal-footer {
+  position: static;
+  margin-top: 12px;
+}
+
+.regex-split {
+  display: grid;
+  /* minmax(0,1fr) locks each track to its share so a wide table scrolls
+     inside its column instead of blowing the column out. */
+  grid-template-columns: minmax(0, 35%) minmax(0, 1fr);
+  gap: 16px;
+  align-items: stretch;
+  flex: 1;
+  min-height: 0;
+}
+
+.regex-rules-col,
+.regex-preview-col {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  min-width: 0;
+}
+
 .regex-preview {
-  max-height: 32vh;
-  overflow-y: auto;
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
   border: 1px solid var(--line);
   border-radius: 6px;
   padding: 8px;
@@ -500,15 +554,35 @@ pre {
   color: var(--muted);
 }
 
-.regex-change {
-  padding: 2px 0;
+.preview-table {
+  width: max-content;
+  min-width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
 }
 
-.regex-change code {
+.preview-table th {
+  text-align: left;
+  color: var(--muted);
+  font-weight: 500;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 2px 8px 4px 0;
+  position: sticky;
+  top: -8px;
+  background: var(--panel);
+}
+
+.preview-table td {
+  padding: 2px 8px 2px 0;
   color: var(--text);
-  background: var(--bg);
-  padding: 1px 4px;
-  border-radius: 4px;
+  vertical-align: top;
+  white-space: nowrap;
+}
+
+.preview-table .preview-target {
+  color: var(--muted);
 }
 
 .modal-footer {
@@ -516,6 +590,11 @@ pre {
   justify-content: flex-end;
   gap: 8px;
   margin-top: 16px;
+  position: sticky;
+  bottom: -20px;
+  background: var(--panel);
+  padding: 12px 0 0;
+  border-top: 1px solid var(--line);
 }
 
 /* --- Decluttered grid action bar --- */
@@ -703,4 +782,118 @@ pre {
   border-radius: 6px;
   background: var(--surface);
   padding: 5px 8px;
+}
+
+/* --- Multi-chunk filter dropdown --- */
+#chunk-filter-popover {
+  max-height: 50vh;
+  overflow-y: auto;
+  min-width: 220px;
+}
+
+.chunk-filter-popover {
+  min-width: 240px;
+  padding: 6px;
+}
+
+.chunk-filter-head {
+  padding: 2px 2px 6px;
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 4px;
+}
+
+.chunk-filter-list {
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+/* Override .popover label (column layout) for the filter rows. */
+.chunk-filter-row,
+.popover label.chunk-filter-row {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  white-space: nowrap;
+  color: var(--text);
+  font-size: 13px;
+}
+
+.chunk-filter-row input {
+  margin: 0;
+  flex: none;
+}
+
+.chunk-filter-row > span:first-of-type {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.chunk-filter-row:hover {
+  background: var(--surface-2);
+}
+
+.chunk-filter-row.is-head {
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.chunk-filter-count {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 400;
+}
+
+/* --- Predefined regex rules checklist --- */
+.regex-rules-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin: 12px 0 6px;
+}
+
+.regex-rules-head h3 {
+  margin: 0;
+  font-size: 13px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.regex-rules-list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 4px;
+}
+
+.regex-rules-list code {
+  color: var(--text);
+  background: var(--bg);
+  padding: 1px 4px;
+  border-radius: 4px;
+}
+
+.regex-rule-row {
+  cursor: grab;
+}
+
+.regex-rule-row.dragging {
+  opacity: 0.5;
+  background: var(--surface-2);
+}
+
+.drag-handle {
+  color: var(--muted);
+  cursor: grab;
+  user-select: none;
+  font-size: 14px;
+  line-height: 1;
 }

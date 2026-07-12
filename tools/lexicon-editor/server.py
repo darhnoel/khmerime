@@ -96,6 +96,8 @@ class Handler(BaseHTTPRequestHandler):
                     "/api/delete-rows": STATE.api_delete_rows,
                     "/api/bulk-regex-preview": STATE.api_bulk_regex_preview,
                     "/api/bulk-regex-apply": STATE.api_bulk_regex_apply,
+                    "/api/bulk-regex-rules-preview": STATE.api_bulk_regex_rules_preview,
+                    "/api/bulk-regex-rules-apply": STATE.api_bulk_regex_rules_apply,
                     "/api/move-rows": STATE.api_move_rows,
                     "/api/bulk-edit": STATE.api_bulk_edit,
                     "/api/revert-row": STATE.api_revert_row,

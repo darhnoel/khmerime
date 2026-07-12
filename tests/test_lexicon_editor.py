@@ -115,6 +115,229 @@ class LexiconEditorFrequencyConflictTests(unittest.TestCase):
             state.api_bulk_edit({"row_ids": ids, "column": "freq", "value": "0"})
 
 
+def make_duplicate_key_state(tmp_path: Path) -> "server.EditorState":
+    chunks_dir = tmp_path / "chunks"
+    write_chunk(
+        chunks_dir / "chunk_0001.csv",
+        [["amara", "អមរ", "5", "km", "words", "approved", ""]],
+    )
+    write_chunk(
+        chunks_dir / "chunk_tonle_more.csv",
+        [["amara", "អមរ", "1", "km", "words", "approved", ""]],
+    )
+    return server.EditorState(
+        root=tmp_path,
+        chunks_dir=chunks_dir,
+        runtime_path=tmp_path / "roman_lookup.csv",
+    )
+
+
+class LexiconEditorDuplicateKeyTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.temporary_directory = tempfile.TemporaryDirectory()
+        self.tmp_path = Path(self.temporary_directory.name)
+
+    def tearDown(self) -> None:
+        self.temporary_directory.cleanup()
+
+    def test_duplicate_key_conflicts_groups_approved_rows_across_chunks(self) -> None:
+        state = make_duplicate_key_state(self.tmp_path)
+
+        conflicts = state.duplicate_key_conflicts()
+
+        self.assertEqual(len(conflicts), 1)
+        conflict = conflicts[0]
+        self.assertEqual((conflict["roman"], conflict["target"], conflict["freq_lang"]), ("amara", "អមរ", "km"))
+        self.assertEqual({r["chunk"] for r in conflict["rows"]}, {"chunk_0001.csv", "chunk_tonle_more.csv"})
+        for row in conflict["rows"]:
+            self.assertIn("id", row)
+
+    def test_duplicate_key_conflicts_empty_when_unique(self) -> None:
+        state = make_state(self.tmp_path)
+        self.assertEqual(state.duplicate_key_conflicts(), [])
+
+    def test_save_build_check_raises_with_duplicate_detail(self) -> None:
+        state = make_duplicate_key_state(self.tmp_path)
+        row_id = state.current_rows()[0]["_id"]
+        state.api_edit_cell({"row_id": row_id, "column": "notes", "value": "x"})
+
+        with self.assertRaises(server.EditorError) as ctx:
+            state.api_save_build_check()
+
+        detail = getattr(ctx.exception, "detail", None)
+        self.assertIsNotNone(detail)
+        self.assertEqual(len(detail["duplicate_keys"]), 1)
+        self.assertEqual(detail["duplicate_keys"][0]["roman"], "amara")
+
+    def test_disabling_one_row_resolves_the_duplicate(self) -> None:
+        state = make_duplicate_key_state(self.tmp_path)
+        rac_row = next(r for r in state.duplicate_key_conflicts()[0]["rows"] if r["chunk"] == "chunk_tonle_more.csv")
+
+        state.api_bulk_edit({"row_ids": [rac_row["id"]], "column": "status", "value": "disabled"})
+
+        self.assertEqual(state.duplicate_key_conflicts(), [])
+
+
+def make_three_chunk_state(tmp_path: Path) -> "server.EditorState":
+    chunks_dir = tmp_path / "chunks"
+    write_chunk(chunks_dir / "chunk_0001.csv", [["a", "ក", "1", "km", "words", "approved", ""]])
+    write_chunk(chunks_dir / "chunk_0002.csv", [["b", "ខ", "1", "km", "words", "approved", ""]])
+    write_chunk(chunks_dir / "chunk_0003.csv", [["c", "គ", "1", "km", "words", "approved", ""]])
+    return server.EditorState(
+        root=tmp_path,
+        chunks_dir=chunks_dir,
+        runtime_path=tmp_path / "roman_lookup.csv",
+    )
+
+
+class LexiconEditorMultiChunkFilterTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.temporary_directory = tempfile.TemporaryDirectory()
+        self.tmp_path = Path(self.temporary_directory.name)
+
+    def tearDown(self) -> None:
+        self.temporary_directory.cleanup()
+
+    def test_api_rows_filters_to_selected_chunk_set(self) -> None:
+        state = make_three_chunk_state(self.tmp_path)
+
+        result = state.api_rows({"chunk": ["chunk_0001.csv", "chunk_0003.csv"]})
+
+        chunks_shown = {row["chunk"] for row in result["data"]}
+        self.assertEqual(chunks_shown, {"chunk_0001.csv", "chunk_0003.csv"})
+        self.assertEqual(result["total"], 2)
+
+    def test_api_rows_no_chunk_shows_all(self) -> None:
+        state = make_three_chunk_state(self.tmp_path)
+        result = state.api_rows({})
+        self.assertEqual(result["total"], 3)
+
+    def test_api_rows_filters_by_multiple_statuses(self) -> None:
+        chunks_dir = self.tmp_path / "chunks"
+        write_chunk(
+            chunks_dir / "chunk_0001.csv",
+            [
+                ["a", "ក", "1", "km", "words", "approved", ""],
+                ["b", "ខ", "1", "km", "words", "draft", ""],
+                ["c", "គ", "1", "km", "words", "disabled", ""],
+            ],
+        )
+        state = server.EditorState(
+            root=self.tmp_path, chunks_dir=chunks_dir, runtime_path=self.tmp_path / "roman_lookup.csv"
+        )
+
+        result = state.api_rows({"status": ["approved", "draft"]})
+
+        self.assertEqual({row["status"] for row in result["data"]}, {"approved", "draft"})
+        self.assertEqual(result["total"], 2)
+
+
+class LexiconEditorTargetRegexFilterTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.temporary_directory = tempfile.TemporaryDirectory()
+        self.tmp_path = Path(self.temporary_directory.name)
+
+    def tearDown(self) -> None:
+        self.temporary_directory.cleanup()
+
+    def _state(self) -> "server.EditorState":
+        chunks_dir = self.tmp_path / "chunks"
+        write_chunk(
+            chunks_dir / "chunk_0001.csv",
+            [
+                ["srau", "ស្រៅ", "1", "km", "words", "approved", ""],
+                ["srav", "ស្រៈ", "1", "km", "words", "approved", ""],
+                ["thmei", "ថ្មី", "1", "km", "words", "approved", ""],
+            ],
+        )
+        return server.EditorState(
+            root=self.tmp_path, chunks_dir=chunks_dir, runtime_path=self.tmp_path / "roman_lookup.csv"
+        )
+
+    def test_filters_targets_by_regex_suffix(self) -> None:
+        result = self._state().api_rows({"target": ["ៅ$"]})
+        self.assertEqual({row["roman"] for row in result["data"]}, {"srau"})
+
+    def test_regex_matches_only_target_not_roman(self) -> None:
+        # 'srau' is roman-only; a target regex must not match roman text.
+        result = self._state().api_rows({"target": ["srau"]})
+        self.assertEqual(result["total"], 0)
+
+    def test_ands_with_search_query(self) -> None:
+        result = self._state().api_rows({"target": ["ស"], "query": ["thmei"]})
+        self.assertEqual(result["total"], 0)
+
+    def test_invalid_regex_shows_all(self) -> None:
+        result = self._state().api_rows({"target": ["["]})
+        self.assertEqual(result["total"], 3)
+
+    def test_empty_target_shows_all(self) -> None:
+        result = self._state().api_rows({"target": [""]})
+        self.assertEqual(result["total"], 3)
+
+
+class LexiconEditorRuntimeFilterTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.temporary_directory = tempfile.TemporaryDirectory()
+        self.tmp_path = Path(self.temporary_directory.name)
+
+    def tearDown(self) -> None:
+        self.temporary_directory.cleanup()
+
+    def _state(self) -> "server.EditorState":
+        chunks_dir = self.tmp_path / "chunks"
+        write_chunk(
+            chunks_dir / "chunk_0001.csv",
+            [
+                ["a", "ក", "1", "km", "words", "approved", ""],
+                ["b", "ខ", "1", "km", "words", "draft", ""],
+                ["c", "គ", "1", "km", "words", "disabled", ""],
+            ],
+        )
+        return server.EditorState(
+            root=self.tmp_path, chunks_dir=chunks_dir, runtime_path=self.tmp_path / "roman_lookup.csv"
+        )
+
+    def test_included_shows_only_approved(self) -> None:
+        result = self._state().api_rows({"runtime": ["included"]})
+        self.assertEqual({row["roman"] for row in result["data"]}, {"a"})
+
+    def test_excluded_shows_non_approved(self) -> None:
+        result = self._state().api_rows({"runtime": ["excluded"]})
+        self.assertEqual({row["roman"] for row in result["data"]}, {"b", "c"})
+
+    def test_all_or_empty_shows_everything(self) -> None:
+        self.assertEqual(self._state().api_rows({"runtime": ["all"]})["total"], 3)
+        self.assertEqual(self._state().api_rows({"runtime": [""]})["total"], 3)
+
+
+class LexiconEditorReviewBadgeTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.temporary_directory = tempfile.TemporaryDirectory()
+        self.tmp_path = Path(self.temporary_directory.name)
+
+    def tearDown(self) -> None:
+        self.temporary_directory.cleanup()
+
+    def test_disabled_rows_count_in_total_but_not_actionable(self) -> None:
+        chunks_dir = self.tmp_path / "chunks"
+        write_chunk(
+            chunks_dir / "chunk_0001.csv",
+            [
+                ["a", "ក", "1", "km", "words", "approved", ""],
+                ["b", "ខ", "1", "km", "words", "disabled", ""],
+            ],
+        )
+        state = server.EditorState(
+            root=self.tmp_path, chunks_dir=chunks_dir, runtime_path=self.tmp_path / "roman_lookup.csv"
+        )
+
+        result = state.api_problems()
+
+        self.assertEqual(result["total"], 1)  # the disabled row is listed
+        self.assertEqual(result["actionable"], 0)  # but not counted as actionable
+
+
 class LexiconEditorBootstrapTests(unittest.TestCase):
     def test_root_resolves_to_repo_and_manager_is_importable(self) -> None:
         # Guards against the file-depth regression: state.py must resolve ROOT
@@ -284,6 +507,109 @@ class LexiconEditorBulkRegexTests(unittest.TestCase):
             state.api_bulk_regex_apply(
                 {"row_ids": ids, "column": "roman", "pattern": "(", "replacement": ""}
             )
+        self.assertEqual(state.dirty_chunks, set())
+
+    def test_no_row_ids_applies_to_filtered_set(self) -> None:
+        # No explicit selection: regex should act on every row matching the filter.
+        state = make_multi_row_state(self.tmp_path)
+
+        result = state.api_bulk_regex_preview(
+            {"filter": {"query": "aax"}, "column": "roman", "pattern": "^a", "replacement": ""}
+        )
+
+        changes = {change["old"]: change["new"] for change in result["changes"]}
+        self.assertEqual(changes, {"aaxxxx": "axxxx"})
+
+    def test_no_row_ids_no_filter_applies_to_all_rows(self) -> None:
+        state = make_multi_row_state(self.tmp_path)
+
+        result = state.api_bulk_regex_preview(
+            {"filter": {}, "column": "roman", "pattern": "^a", "replacement": ""}
+        )
+
+        changes = {change["old"]: change["new"] for change in result["changes"]}
+        self.assertEqual(changes, {"aaxxxx": "axxxx", "aayyyy": "ayyyy"})
+
+    def test_row_ids_win_over_filter(self) -> None:
+        state = make_multi_row_state(self.tmp_path)
+        first_id = state.current_rows()[0]["_id"]  # aaxxxx
+
+        result = state.api_bulk_regex_preview(
+            {"row_ids": [first_id], "filter": {}, "column": "roman", "pattern": "^a", "replacement": ""}
+        )
+
+        changes = {change["old"]: change["new"] for change in result["changes"]}
+        self.assertEqual(changes, {"aaxxxx": "axxxx"})
+
+
+def make_rules_state(tmp_path: Path) -> "server.EditorState":
+    chunks_dir = tmp_path / "chunks"
+    write_chunk(
+        chunks_dir / "chunk_0001.csv",
+        [
+            ["tteak", "ក", "1", "km", "words", "approved", ""],  # overlap: tteak vs teak
+            ["veak", "ខ", "1", "km", "words", "approved", ""],
+            ["domros", "គ", "1", "km", "words", "approved", ""],  # ros$ -> ruos
+            ["plain", "ឃ", "1", "km", "words", "approved", ""],   # untouched
+        ],
+    )
+    return server.EditorState(
+        root=tmp_path,
+        chunks_dir=chunks_dir,
+        runtime_path=tmp_path / "roman_lookup.csv",
+    )
+
+
+class LexiconEditorRegexRulesTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.temporary_directory = tempfile.TemporaryDirectory()
+        self.tmp_path = Path(self.temporary_directory.name)
+
+    def tearDown(self) -> None:
+        self.temporary_directory.cleanup()
+
+    RULES = [
+        {"pattern": "tteak", "replacement": "tta"},
+        {"pattern": "veak", "replacement": "va"},
+        {"pattern": "teak", "replacement": "ta"},
+        {"pattern": "ros$", "replacement": "ruos"},
+    ]
+
+    def test_apply_ordered_rules_resolves_overlap_and_chains(self) -> None:
+        state = make_rules_state(self.tmp_path)
+        ids = [row["_id"] for row in state.current_rows()]
+
+        result = state.api_bulk_regex_rules_apply(
+            {"row_ids": ids, "column": "roman", "rules": self.RULES}
+        )
+
+        romans = [row["roman"] for row in state.current_rows()]
+        # tteak -> tta (rule 1 wins because it's ordered before teak)
+        # veak -> va, domros -> domruos, plain untouched
+        self.assertEqual(romans, ["tta", "va", "domruos", "plain"])
+        self.assertEqual(result["updated"], 3)
+
+    def test_rules_apply_is_one_undo_step(self) -> None:
+        state = make_rules_state(self.tmp_path)
+        ids = [row["_id"] for row in state.current_rows()]
+        state.api_bulk_regex_rules_apply({"row_ids": ids, "column": "roman", "rules": self.RULES})
+
+        state.api_undo()
+
+        self.assertEqual(
+            [row["roman"] for row in state.current_rows()], ["tteak", "veak", "domros", "plain"]
+        )
+
+    def test_rules_preview_shows_final_without_mutating(self) -> None:
+        state = make_rules_state(self.tmp_path)
+        ids = [row["_id"] for row in state.current_rows()]
+
+        result = state.api_bulk_regex_rules_preview(
+            {"row_ids": ids, "column": "roman", "rules": self.RULES}
+        )
+
+        changes = {c["old"]: c["new"] for c in result["changes"]}
+        self.assertEqual(changes, {"tteak": "tta", "veak": "va", "domros": "domruos"})
         self.assertEqual(state.dirty_chunks, set())
 
 

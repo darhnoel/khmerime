@@ -1,1127 +1,302 @@
 roman,target,freq,freq_lang,category,status,notes
 mearn,មាន,107477,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.9851
 meon,មាន,107477,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.2357
-nyng,និង,81464,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=2; rank=2; beams=10; score=-0.2621
-khnong,ក្នុង,71969,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=2; rank=2; beams=10; score=-0.2185
-knang,ក្នុង,71969,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=2; rank=3; beams=10; score=-0.2611
-bbi,ពី,70847,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.4041
 py,ពី,70847,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.5883
-thha,ថា,70631,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=2; rank=2; beams=10; score=-0.4236
-tho,ថា,70631,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=2; rank=3; beams=10; score=-0.4902
-khar,ការ,62277,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=2; rank=2; beams=10; score=-0.3314; collision=1; existing_targets=ខរ|ខារ
-kor,ការ,62277,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=2; rank=3; beams=10; score=-0.4484; collision=1; existing_targets=ក|ករ|ក៏
-thae,តែ,59574,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=2; rank=3; beams=10; score=-0.3684; collision=1; existing_targets=ថែ
-ttae,តែ,59574,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=2; rank=2; beams=10; score=-0.3120; collision=1; existing_targets=ទេ
-nok,អ្នក,52630,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=2; rank=2; beams=10; score=-0.2867; collision=1; existing_targets=នក
-nokh,អ្នក,52630,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=2; rank=3; beams=10; score=-0.4606
-myn,មិន,50167,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=2; rank=2; beams=10; score=-0.2865
 lauk,លោក,40623,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.3782
 louk,លោក,40623,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.2050; collision=1; existing_targets=លក់
-loukh,លោក,40623,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=1; rank=1; beams=10; score=-0.1958
-bbel,ពេល,40030,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.3121; collision=1; existing_targets=ប៉ិល
-phel,ពេល,40030,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.3606; collision=1; existing_targets=ភេល
-nuah,នោះ,38345,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.4083
 nuoh,នោះ,38345,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=1; beams=10; score=-0.1541
-nuos,នោះ,38345,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.3682
-ai,ឲ្យ,37705,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.5628; collision=1; existing_targets=អៃ|ឰ
-rob,រូប,34206,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.8684; collision=1; existing_targets=រប|របប
 rup,រូប,34206,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.2722
-neong,នាង,29843,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.1867
-nieng,នាង,29843,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.8389
-gneo,គ្នា,27555,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=2; rank=2; beams=10; score=-0.2463
-khnea,គ្នា,27555,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=2; rank=3; beams=10; score=-0.7264
 aach,អាច,26432,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=2; rank=1; beams=10; score=-0.3546
-aoch,អាច,26432,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=2; rank=2; beams=10; score=-0.5286; collision=1; existing_targets=ឱជ
-thti,ទី,25512,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=2; rank=2; beams=10; score=-0.3519
-tthi,ទី,25512,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=2; rank=3; beams=10; score=-0.4357
-khrom,ក្រុម,25176,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=2; rank=2; beams=10; score=-0.2107
-kram,ក្រុម,25176,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=2; rank=3; beams=10; score=-0.3597; collision=1; existing_targets=ក្រម|ក្រាម|ក្រំ
-bbheap,ភាព,23278,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.3210
 pheab,ភាព,23278,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.3185
 chraeun,ច្រើន,22203,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=2; rank=1; beams=10; score=-0.1386
 jraeun,ច្រើន,22203,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=2; rank=3; beams=10; score=-0.3016
 daer,ដែរ,21786,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=2; rank=3; beams=10; score=-0.4593
-doe,ដែរ,21786,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=2; rank=2; beams=10; score=-0.3889
-docs,ដូច,18465,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.3784
 douch,ដូច,18465,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.4214
-tha,តា,17669,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.4489; collision=1; existing_targets=ថា
-tta,តា,17669,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.5936
-da,ដ៏,17604,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.5546; collision=1; existing_targets=ដា
-dar,ដ៏,17604,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.3339; collision=1; existing_targets=ដរ|ដារ
-no,ណា,16543,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.3572
-nor,ណា,16543,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-1.0686; collision=1; existing_targets=ហ្ន
-kraay,ក្រោយ,16383,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.3203
 kraoy,ក្រោយ,16383,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=1; beams=10; score=-0.1854
-krooy,ក្រោយ,16383,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.3765
-nai,នៃ,15822,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=2; rank=3; beams=10; score=-1.1209
 baeu,បើ,15685,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=1; beams=10; score=-0.3197
-boeu,បើ,15685,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.5243
 ruam,រួម,15666,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=2; rank=3; beams=10; score=-0.3673
-bbuok,ពួក,15575,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=2; rank=1; beams=10; score=-0.3582
-phuok,ពួក,15575,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=2; rank=2; beams=10; score=-0.3639
 puok,ពួក,15575,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=2; rank=3; beams=10; score=-0.3674
-khhang,ខាង,14807,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.2558
-khong,ខាង,14807,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.3145; collision=1; existing_targets=ខុងៗ
-vins,វិញ,14764,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.2774
 vynh,វិញ,14764,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.3349
 jeate,ជាតិ,14579,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=2; rank=1; beams=10; score=-0.2573
-jeathe,ជាតិ,14579,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=2; rank=3; beams=10; score=-0.3502
-khan,កាន់,14435,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.2581; collision=1; existing_targets=ខណ្ឌ|ខន|ខន់|ខាន|ខាន់
-kon,កាន់,14435,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.4266; collision=1; existing_targets=កន|កុន|កូន
 samrab,សម្រាប់,14398,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.2318
-somrob,សម្រាប់,14398,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.2930; collision=1; existing_targets=សម្រប
 chap,ចាប់,13986,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=2; rank=2; beams=10; score=-0.3182
-chob,ចាប់,13986,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=2; rank=3; beams=10; score=-0.4539; collision=1; existing_targets=ចប|ចប់
-khoun,កូន,13044,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.3774
 koun,កូន,13044,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.4087
-ah,អស់,12988,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.9636; collision=1; existing_targets=អា|អ្ហ
-as,អស់,12988,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=1; rank=1; beams=10; score=-0.2807; collision=1; existing_targets=អាស
-mneakh,ម្នាក់,12923,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=2; rank=2; beams=10; score=-0.1814
-mneok,ម្នាក់,12923,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=2; rank=3; beams=10; score=-0.3053
-neo,នា,12841,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.2361
-nie,នា,12841,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-1.3371
-man,មុន,12760,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=2; rank=3; beams=10; score=-0.9116; collision=1; existing_targets=មែន
-laar,ល្អ,12166,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.2772
 loor,ល្អ,12166,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.3273
-neakh,នាក់,12112,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=2; rank=2; beams=10; score=-0.2895
-neok,នាក់,12112,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=2; rank=3; beams=10; score=-0.3340
-sor,សារ,11998,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=2; rank=2; beams=10; score=-0.3321; collision=1; existing_targets=សរ|សុរ
-veo,វា,11971,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.2189
-vvea,វា,11971,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-1.3361
-cheang,ជាង,11950,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=2; rank=2; beams=10; score=-0.2621
-jeong,ជាង,11950,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=2; rank=3; beams=10; score=-0.2866
-thara,តារា,11153,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=2; rank=2; beams=10; score=-0.3309
-tora,តារា,11153,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=2; rank=3; beams=10; score=-0.4243
-khal,កាល,10282,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.3006; collision=1; existing_targets=ខាល|ខាល់
-kol,កាល,10282,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.3939; collision=1; existing_targets=កល|កល់|កុរ
-manuss,មនុស្ស,10225,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=2; rank=2; beams=10; score=-0.2912
-monuss,មនុស្ស,10225,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=2; rank=1; beams=10; score=-0.1374
-lea,រា,9881,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-1.4310; collision=1; existing_targets=លា
-reo,រា,9881,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.2644
-laeng,លេង,9857,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=2; rank=2; beams=10; score=-0.5368; collision=1; existing_targets=លែង
-loeng,លេង,9857,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=2; rank=3; beams=10; score=-0.6677
-aram,អារម្មណ៍,9576,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=2; rank=2; beams=10; score=-0.3663
-orom,អារម្មណ៍,9576,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=2; rank=3; beams=10; score=-0.4228
 chuoy,ជួយ,9482,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=2; rank=2; beams=10; score=-0.3396
 juoi,ជួយ,9482,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=2; rank=3; beams=10; score=-0.4435
 juoy,ជួយ,9482,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=2; rank=1; beams=10; score=-0.1917
-khhsae,ខ្សែ,9264,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=2; rank=2; beams=10; score=-0.2331
-khsoe,ខ្សែ,9264,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=2; rank=3; beams=10; score=-0.3540
 noam,នាំ,8898,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=1; beams=10; score=-0.2076; collision=1; existing_targets=នាំពា
-noom,នាំ,8898,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.3386
-chaung,ជើង,8820,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=2; rank=3; beams=10; score=-0.3130
-jaung,ជើង,8820,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=2; rank=1; beams=10; score=-0.1805
 saat,ស្អាត,8820,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=2; rank=1; beams=10; score=-0.3495
-saot,ស្អាត,8820,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=2; rank=2; beams=10; score=-0.4294; collision=1; existing_targets=សោត
-bbises,ពិសេស,8558,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.3394
-bises,ពិសេស,8558,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.3325
-goamr,គាំទ្រ,8522,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=2; rank=1; beams=10; score=-0.2798; collision=1; existing_targets=គាំពារ
-goamror,គាំទ្រ,8522,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=2; rank=3; beams=10; score=-0.3204
 bhlouv,ផ្លូវ,8233,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=2; rank=1; beams=10; score=-0.2866
 phlouv,ផ្លូវ,8233,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=2; rank=3; beams=10; score=-0.3113
-dakh,ដាក់,8027,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.2928
 dakk,ដាក់,8027,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.4883
-day,ដៃ,7842,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.3876; collision=1; existing_targets=ថ្ងៃ
-doi,ដៃ,7842,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.4349
-nos,ណាស់,7518,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=2; rank=3; beams=10; score=-0.4120
-keilakar,កីឡាករ,7501,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.1764
 keylakor,កីឡាករ,7501,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.2597
-grarb,គ្រាប់,7483,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=2; rank=3; beams=10; score=-0.3923
-leanean,លាន,7332,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-1.1662
 leon,លាន,7332,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.2272
-bat,បទ,7271,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.5159; collision=1; existing_targets=បត់|បាត|បាត់|បាត្រ|បាទ|+2
-both,បទ,7271,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.4823
-thtus,ទោះ,6984,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=2; rank=2; beams=10; score=-0.4529
-tthus,ទោះ,6984,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=2; rank=3; beams=10; score=-0.4779
 ttuoh,ទោះ,6984,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=2; rank=1; beams=10; score=-0.3491
-sras,ស្រស់,6855,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.2585; collision=1; existing_targets=ស្រស|ស្រាស់
-sroh,ស្រស់,6855,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.4151; collision=1; existing_targets=ស្រុះ
 bambhot,បំផុត,6790,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.2540
 bamphot,បំផុត,6790,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=1; beams=10; score=-0.1384; collision=1; existing_targets=បំផត
 bomphot,បំផុត,6790,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.2550
-bbhol,ផល,6692,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=2; rank=3; beams=10; score=-0.3765
-bhal,ផល,6692,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=2; rank=2; beams=10; score=-0.3667; collision=1; existing_targets=ផាល
-bbue,ពីរ,6671,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.5839
 pir,ពីរ,6671,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=1; beams=10; score=-0.5398
-pyr,ពីរ,6671,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.6430
 kamm,កម្ម,6605,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.3144
-khomm,កម្ម,6605,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.4006
-komm,កម្ម,6605,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=1; rank=1; beams=10; score=-0.2597
 riep,រៀប,6420,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=2; rank=3; beams=10; score=-0.3534
-ryeb,រៀប,6420,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=2; rank=2; beams=10; score=-0.2913
-ruocs,រួច,6417,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=2; rank=2; beams=10; score=-0.3150
-haetho,ហេតុ,6408,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=2; rank=3; beams=10; score=-0.4394
-haeto,ហេតុ,6408,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=2; rank=1; beams=10; score=-0.4070
-hetho,ហេតុ,6408,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=2; rank=2; beams=10; score=-0.4074
 gou,គូ,6085,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.9166
 guu,គូ,6085,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.4206
-chomryeng,ចម្រៀង,5794,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=2; rank=3; beams=10; score=-0.2265
-that,ថត,5780,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=2; rank=1; beams=10; score=-0.3717
-thhot,ថត,5780,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=2; rank=3; beams=10; score=-0.4238
-thtaub,ទើប,5735,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=2; rank=3; beams=10; score=-0.4128
-ttaub,ទើប,5735,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=2; rank=1; beams=10; score=-0.2439
 lekh,លេខ,5636,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=1; beams=10; score=-0.2295
-lekhh,លេខ,5636,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.2690
 jeachraeun,ជាច្រើន,5552,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=1; beams=10; score=-0.1782
 jeachrern,ជាច្រើន,5552,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.1994
 jeajraeun,ជាច្រើន,5552,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.2638
-rang,រង,5546,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=2; rank=2; beams=10; score=-0.2838; collision=1; existing_targets=រ៉ាង
-traem,ត្រឹម,5467,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=2; rank=2; beams=10; score=-0.3358
 trirm,ត្រឹម,5467,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=2; rank=3; beams=10; score=-0.3431
 troem,ត្រឹម,5467,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=2; rank=1; beams=10; score=-0.2457
 bal,បាល់,5432,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=1; beams=10; score=-0.2109
-bol,បាល់,5432,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.4051; collision=1; existing_targets=បុល
-pal,បាល់,5432,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.3551
-brakh,ប្រាក់,5387,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=2; rank=3; beams=10; score=-0.3294
 kaeut,កើត,5286,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=1; beams=10; score=-0.3526
-khaeut,កើត,5286,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.4207
-komvithy,កម្មវិធី,5269,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=2; rank=3; beams=10; score=-0.2364
 sokh,សុខ,5224,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=1; beams=10; score=-0.2578
-sokhh,សុខ,5224,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.3850
 katt,កាត់,5064,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=1; beams=10; score=-0.3572
-khat,កាត់,5064,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.4260; collision=1; existing_targets=ខាត|ខាត់
-thteak,ទាក់,5025,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.3644
-tteakh,ទាក់,5025,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.3618
-dollear,ដុល្លារ,5014,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=1; rank=1; beams=10; score=-0.1258
-dolleor,ដុល្លារ,5014,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.2466
-saum,សូម,4984,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=2; rank=2; beams=10; score=-0.2963
 soum,សូម,4984,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=2; rank=1; beams=10; score=-0.1178
 daeum,ដើម,4965,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=1; beams=10; score=-0.2115
-doeum,ដើម,4965,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.3372
 mei,មី,4963,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.9625; collision=1; existing_targets=ម៉ៃ
-my,មី,4963,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.3511
-bbenh,ពេញ,4945,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.3139
-phenh,ពេញ,4945,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.3400
 karngea,ការងារ,4926,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.3095
 karngear,ការងារ,4926,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=1; beams=10; score=-0.2448
-karongear,ការងារ,4926,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.2539
-chun,ជូន,4883,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.2660; collision=1; existing_targets=ជន
 joun,ជូន,4883,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.9415
-bbet,ពេទ្យ,4828,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.3643; collision=1; existing_targets=ប៉ិត
-phet,ពេទ្យ,4828,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.4027; collision=1; existing_targets=ផិត|ភេទ
-aiu,អាយុ,4750,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=2; rank=3; beams=10; score=-0.5214
 ayu,អាយុ,4750,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=2; rank=1; beams=10; score=-0.2488
 baeuk,បើក,4742,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=1; beams=10; score=-0.2628
-baeukh,បើក,4742,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.3666
-bhttarl,ផ្ទាល់,4686,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=2; rank=1; beams=10; score=-0.2663
-phttarl,ផ្ទាល់,4686,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=2; rank=3; beams=10; score=-0.3845
-bbrom,ព្រម,4681,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.2452
-phrom,ព្រម,4681,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.3694
-lok,លក់,4666,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.4284; collision=1; existing_targets=លក|លូក|លោក|ឡក
-loukh,លក់,4666,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.4239
 banghoh,បង្ហោះ,4652,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.3076
-banghuoh,បង្ហោះ,4652,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.3495
 gruah,គ្រោះ,4634,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=2; rank=2; beams=10; score=-0.3528
 gruoh,គ្រោះ,4634,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=2; rank=1; beams=10; score=-0.1649; collision=1; existing_targets=គ្រោះជា
 gruos,គ្រោះ,4634,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=2; rank=3; beams=10; score=-0.3761
-trar,ត្រ,4629,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.3204
-ttror,ត្រ,4629,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.3287; collision=1; existing_targets=ទ្រ
-thang,តាំង,4621,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=2; rank=2; beams=10; score=-0.2807; collision=1; existing_targets=ថង|ថង់|ថាំង
-tong,តាំង,4621,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=2; rank=3; beams=10; score=-0.3651; collision=1; existing_targets=តុង
-biphop,ពិភព,4520,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.2912
-piphap,ពិភព,4520,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.3070
-rongvarn,រង្វាន់,4462,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.2592
 rongvoan,រង្វាន់,4462,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=1; beams=10; score=-0.1694
-thhae,ថែ,4459,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.3521
-thoe,ថែ,4459,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.4198
-samrech,សម្រេច,4356,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.1936; collision=1; existing_targets=សំរេច
-somrech,សម្រេច,4356,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=1; rank=1; beams=10; score=-0.1760
-somrecs,សម្រេច,4356,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.2496
-mchah,ម្ចាស់,4337,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=2; rank=3; beams=10; score=-0.3549
 krau,ក្រៅ,4292,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=1; beams=10; score=-0.2764; collision=1; existing_targets=ក្រឳ
 krov,ក្រៅ,4292,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.4036
-deei,ដី,4266,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=2; rank=3; beams=10; score=-1.5237
-kha,កា,4238,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.3839
-ko,កា,4238,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.5514
 chi,ជី,4230,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.4005
 jy,ជី,4230,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.5054
-thtinh,ទិញ,4228,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.2953
-tthinh,ទិញ,4228,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.2916
-brah,ប្រាស់,4210,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=2; rank=3; beams=10; score=-0.4095; collision=1; existing_targets=ប្រះ
 slap,ស្លាប់,4201,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.2863
-slob,ស្លាប់,4201,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.3173; collision=1; existing_targets=សន្លប់|ស្លប|ស្លុប
-boras,បុរស,4170,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.3448
-poros,បុរស,4170,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.3706
-ghmean,គ្មាន,4157,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.7410
 gmeon,គ្មាន,4157,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.2193
-dang,ដង,4135,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=2; rank=2; beams=10; score=-0.2447; collision=1; existing_targets=ដាង|ដាំង
-darng,ដង,4135,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=2; rank=3; beams=10; score=-0.2731
 samros,សម្រស់,4135,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=2; rank=2; beams=10; score=-0.2255
-somras,សម្រស់,4135,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=2; rank=3; beams=10; score=-0.3116
-chbah,ច្បាស់,4113,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.3679
-chbos,ច្បាស់,4113,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.3751
-karapear,ការពារ,3914,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.2952
-karopear,ការពារ,3914,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=1; rank=1; beams=10; score=-0.2637
 karpear,ការពារ,3914,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.3405
 juob,ជួប,3911,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=1; beams=10; score=-0.2080
-thtes,ទេស,3876,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=2; rank=2; beams=10; score=-0.3298
-tthes,ទេស,3876,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=2; rank=3; beams=10; score=-0.3588
-bbean,ពាន,3872,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.2945
-phean,ពាន,3872,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.3610; collision=1; existing_targets=ភាណ|ភាន
-beak,ពាក់,3820,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.3568; collision=1; existing_targets=ប្រកែក
-peok,ពាក់,3820,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.4054
-khbbous,ខ្ពស់,3793,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=2; rank=2; beams=10; score=-0.2873
-khbous,ខ្ពស់,3793,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=2; rank=3; beams=10; score=-0.3258
-ioung,យោង,3790,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.3425
 yaung,យោង,3790,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.3411
 young,យោង,3790,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=1; beams=10; score=-0.1399
 e,ឯ,3769,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=1; beams=10; score=-0.3173
-ore,ឯ,3769,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.7331
-sacs,សាច់,3759,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.3242
-soch,សាច់,3759,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.4020; collision=1; existing_targets=សុច
-bath,បាត់,3729,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.4119; collision=1; existing_targets=បាឋ
-pat,បាត់,3729,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.3972
 kanhnha,កញ្ញា,3727,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.2927
-khanhnha,កញ្ញា,3727,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.3271
-konhnha,កញ្ញា,3727,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=1; rank=1; beams=10; score=-0.2923
 brap,ប្រាប់,3715,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=2; rank=3; beams=10; score=-0.3683
 samdaeng,សម្ដែង,3668,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=1; beams=10; score=-0.1274; collision=1; existing_targets=សំដែង
-samdoeng,សម្ដែង,3668,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.2261; collision=1; existing_targets=សំដឹង
-kbol,ក្បាល,3667,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.3466
-kpal,ក្បាល,3667,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.3626
-roieakpel,រយៈពេល,3640,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.2330
-royeokpel,រយៈពេល,3640,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.2422
 daeur,ដើរ,3589,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=1; beams=10; score=-0.2183
-derr,ដើរ,3589,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.3535
-doeur,ដើរ,3589,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.3612
-thtuu,ទូ,3583,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.3769
-tthuu,ទូ,3583,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.3775
-chuum,ជុំ,3545,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=2; rank=2; beams=10; score=-0.2819
-juum,ជុំ,3545,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=2; rank=1; beams=10; score=-0.1215
-iontor,យន្ត,3522,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.3566
-yantor,យន្ត,3522,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.3368
-yontor,យន្ត,3522,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=1; rank=1; beams=10; score=-0.2180
 vythi,វិធី,3518,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=2; rank=3; beams=10; score=-0.3448
-chit,ជិត,3514,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.4015; collision=1; existing_targets=ចិត្ត
-jith,ជិត,3514,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.4413
 tbaung,ត្បូង,3474,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.3004
 tboung,ត្បូង,3474,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=1; beams=10; score=-0.1762
-tpoung,ត្បូង,3474,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.2879
-por,បរ,3461,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.4913; collision=1; existing_targets=ពណ៌|ពរ|ព័រ
-so,សា,3427,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=2; rank=2; beams=10; score=-0.4366; collision=1; existing_targets=សម្បូរ
 thhaem,ថែម,3417,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.3130
-thoem,ថែម,3417,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.3202
 kechch,កិច្ច,3398,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=2; rank=2; beams=10; score=-0.3140
-kechcs,កិច្ច,3398,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=2; rank=3; beams=10; score=-0.4248
-chorb,ជាប់,3396,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.4002
 joab,ជាប់,3396,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.4555
 khmae,ខ្មែរ,3386,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=1; beams=10; score=-0.2863
-khmaer,ខ្មែរ,3386,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.3233
-khmoe,ខ្មែរ,3386,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.3956
-dah,ដោះ,3380,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=2; rank=1; beams=10; score=-0.3306
-daoh,ដោះ,3380,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=2; rank=3; beams=10; score=-0.4977
-vitiea,វិទ្យា,3375,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.2891
 vytyea,វិទ្យា,3375,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.3067
-yabb,យប់,3374,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.5137; collision=1; existing_targets=យ៉ាប់
 yob,យប់,3374,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.5026
 yobb,យប់,3374,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=1; beams=10; score=-0.3431
-bbhnek,ភ្នែក,3332,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=2; rank=2; beams=10; score=-0.2986
 phnaek,ភ្នែក,3332,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=2; rank=3; beams=10; score=-0.3738
-khrong,ក្រុង,3320,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.1774
-krang,ក្រុង,3320,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.2965; collision=1; existing_targets=ក្រង|ក្រង់|ក្រាំង
 roab,រាប់,3318,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.3732
 rorp,រាប់,3318,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.4599
 grou,គ្រូ,3300,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=2; rank=2; beams=10; score=-0.9061
-khru,គ្រូ,3300,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=2; rank=3; beams=10; score=-0.9653
-mol,មូល,3264,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.5536
 moul,មូល,3264,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.7517; collision=1; existing_targets=មួល
-braphop,ប្រភព,3252,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=2; rank=2; beams=10; score=-0.2563
-brobhop,ប្រភព,3252,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=2; rank=3; beams=10; score=-0.2905
-thtikrong,ទីក្រុង,3245,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.2357
 ttykrong,ទីក្រុង,3245,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.2406
 bhaaeul,ផ្អើល,3231,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=2; rank=1; beams=10; score=-0.2338
 phaaeul,ផ្អើល,3231,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=2; rank=2; beams=10; score=-0.2466
-phaairl,ផ្អើល,3231,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=2; rank=3; beams=10; score=-0.3575
-khhos,ខុស,3212,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.3622
-khoh,ខុស,3212,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.4688
-ambi,អំពី,3207,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=2; rank=2; beams=10; score=-0.3777
 ampy,អំពី,3207,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=2; rank=3; beams=10; score=-0.3973
-khror,ក្រ,3187,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.2539
-krar,ក្រ,3187,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.2813
-bbor,ពណ៌,3180,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.4368
-bor,ពណ៌,3180,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.4251; collision=1; existing_targets=បង្ក|បន្ត|បរ
-chaekh,ចែក,3137,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=2; rank=2; beams=10; score=-0.2720
-choek,ចែក,3137,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=2; rank=3; beams=10; score=-0.3239; collision=1; existing_targets=ចឹក
-chhut,ឈុត,3115,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.3413
-jhuth,ឈុត,3115,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.3022
 samkhan,សំខាន់,2998,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=1; beams=10; score=-0.1202
-samkhon,សំខាន់,2998,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.2463
-satthor,សុទ្ធ,2963,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.3243
-sotthar,សុទ្ធ,2963,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.2599
-sotthor,សុទ្ធ,2963,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=1; rank=1; beams=10; score=-0.1453
-vaelea,វេលា,2949,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.8533
-veleo,វេលា,2949,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.1810
-braman,ប្រមាណ,2941,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=2; rank=2; beams=10; score=-0.2986
 broman,ប្រមាណ,2941,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=2; rank=1; beams=10; score=-0.2579
 proman,ប្រមាណ,2941,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=2; rank=3; beams=10; score=-0.3638
-daek,ដឹក,2895,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=2; rank=3; beams=10; score=-0.3691; collision=1; existing_targets=ដែក
 doek,ដឹក,2895,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=2; rank=1; beams=10; score=-0.2558
-doekh,ដឹក,2895,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=2; rank=2; beams=10; score=-0.3439
-peakya,ពាក្យ,2865,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.4128
-peok,ពាក្យ,2865,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.3969
-kam,កុំ,2848,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=2; rank=3; beams=10; score=-0.4407; collision=1; existing_targets=កម|កម្ម|កាម|កាំ
-khom,កុំ,2848,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=2; rank=2; beams=10; score=-0.3338; collision=1; existing_targets=ខម|ខំ
-kai,កាយ,2833,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.4310; collision=1; existing_targets=កៃ
-koy,កាយ,2833,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.4455; collision=1; existing_targets=កុយ
 sakammopheap,សកម្មភាព,2821,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=1; beams=10; score=-0.1465
-sakommopheap,សកម្មភាព,2821,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.1741
-sokammopheap,សកម្មភាព,2821,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.1765
-reai,រាយ,2803,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.3342
-reoy,រាយ,2803,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.2977
-aei,អី,2789,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.6788
 ei,អី,2789,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=1; beams=10; score=-0.2114; collision=1; existing_targets=អ៊ី
-bambeak,បំពាក់,2783,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=2; rank=3; beams=10; score=-0.2825
 bampeak,បំពាក់,2783,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=2; rank=1; beams=10; score=-0.1303
-sath,សត្វ,2774,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.4815
-sathvor,សត្វ,2774,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.4565
-satt,សត្វ,2774,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=1; rank=1; beams=10; score=-0.4532; collision=1; existing_targets=សត្ត|សទ្ទ
-iur,យូរ,2760,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.4405
-yur,យូរ,2760,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=1; beams=10; score=-0.1730; collision=1; existing_targets=យុរ
-choea,ជឿ,2736,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.4948
-jira,ជឿ,2736,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.5513
-joea,ជឿ,2736,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=1; rank=1; beams=10; score=-0.3658
-thtol,ទល់,2733,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.2711
-tthol,ទល់,2733,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.3144
-khandar,ខណ្ឌ,2727,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=1; rank=1; beams=10; score=-0.2209
-khandor,ខណ្ឌ,2727,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.2282
-khondar,ខណ្ឌ,2727,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.2663
-thteanh,ទាញ,2721,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.2706
-ttheanh,ទាញ,2721,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.2735
-bbhleam,ភ្លាម,2716,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=2; rank=2; beams=10; score=-0.2290
-bhleam,ភ្លាម,2716,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=2; rank=3; beams=10; score=-0.2834
-rodthar,រដ្ឋ,2712,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=2; rank=2; beams=10; score=-0.3724
-rodthhor,រដ្ឋ,2712,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=2; rank=3; beams=10; score=-0.4303
-rodthor,រដ្ឋ,2712,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=2; rank=1; beams=10; score=-0.3562
 ry,រី,2691,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.3714
-dacs,ដាច់,2674,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=2; rank=2; beams=10; score=-0.3321
-doch,ដាច់,2674,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=2; rank=3; beams=10; score=-0.4262; collision=1; existing_targets=ដូច
-chath,ចាត់,2662,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=2; rank=3; beams=10; score=-0.3167
-monthi,មន្ទីរ,2658,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=2; rank=2; beams=10; score=-0.4008
 monty,មន្ទីរ,2658,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=2; rank=3; beams=10; score=-0.4014
 reaykar,រាយការណ៍,2603,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=1; beams=10; score=-0.1644
-reaykor,រាយការណ៍,2603,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.3180
-chumneanh,ជំនាញ,2600,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=2; rank=2; beams=10; score=-0.2079
-jumneans,ជំនាញ,2600,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=2; rank=3; beams=10; score=-0.2411
-sam,សម,2597,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.1841; collision=1; existing_targets=សាំ|ស៊ាំ
 sorm,សម,2597,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.7502; collision=1; existing_targets=ស្អំ
 svaa,ស្វា,2596,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=2; rank=3; beams=10; score=-1.2655
-svo,ស្វា,2596,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=2; rank=2; beams=10; score=-0.3086
-bbhumi,ភូមិ,2595,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=2; rank=2; beams=10; score=-0.2853
 phhumi,ភូមិ,2595,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=2; rank=1; beams=10; score=-0.2562
-taeu,តើ,2572,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=1; rank=1; beams=10; score=-0.2324
-toeu,តើ,2572,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.4423
 gaul,គោល,2564,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.2958
 goul,គោល,2564,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=1; beams=10; score=-0.1019
-nhaam,ញ៉ាំ,2562,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.3568
-nhoam,ញ៉ាំ,2562,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=1; rank=1; beams=10; score=-0.2332; collision=1; existing_targets=ញាំ|ញាំញី
 bangkert,បង្កើត,2554,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=2; rank=3; beams=10; score=-0.2336
-bongkaut,បង្កើត,2554,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=2; rank=2; beams=10; score=-0.2310
-stan,ស្ថាន,2542,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.3426; collision=1; existing_targets=ស្ទន់
-sthon,ស្ថាន,2542,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.3044
-kang,កុង,2522,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.3568; collision=1; existing_targets=កាង
-khong,កុង,2522,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.2682; collision=1; existing_targets=ខុងៗ
-hakhk,ហាក់,2498,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.3532
-hakkh,ហាក់,2498,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.4387
 kamlang,កម្លាំង,2487,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.2073
-khomlang,កម្លាំង,2487,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.2224
-soth,ស៊ុត,2479,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=2; rank=3; beams=10; score=-0.3680
-sott,ស៊ុត,2479,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=2; rank=2; beams=10; score=-0.3281
-thouch,តូច,2459,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=2; rank=3; beams=10; score=-0.4027
 kaeun,កើន,2451,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.3183
-khern,កើន,2451,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.3359
-thtong,ទង,2449,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.3197
-tthong,ទង,2449,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.3065
 ttong,ទង,2449,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=1; beams=10; score=-0.2400; collision=1; existing_targets=ទង់|ទោង
-thtuol,ទួល,2413,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=2; rank=2; beams=10; score=-0.2537
-tthuol,ទួល,2413,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=2; rank=3; beams=10; score=-0.3469
-chans,ចាញ់,2409,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.3211
-chonh,ចាញ់,2409,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.3432
-srai,ស្រាយ,2398,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.2862; collision=1; existing_targets=ស្រ័យ
-sroy,ស្រាយ,2398,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.3351
-grang,គ្រង,2391,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.2204
 grorng,គ្រង,2391,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.5814
 loy,លុយ,2378,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-1.0892; collision=1; existing_targets=លយ|ឡូយ
 lui,លុយ,2378,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.2970
-ththorm,ធម្ម,2370,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.4013
-tthomm,ធម្ម,2370,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.2986
-sakh,សក់,2370,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.3851
 sok,សក់,2370,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.3901; collision=1; existing_targets=សក|សុក|សុក្រ|សុខ|សោក|+1
-sokh,សក់,2370,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=1; rank=1; beams=10; score=-0.3302
-iol,យល់,2368,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=2; rank=3; beams=10; score=-0.4188
-yal,យល់,2368,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=2; rank=2; beams=10; score=-0.3865
 thlay,ថ្លៃ,2358,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.3317
-thloi,ថ្លៃ,2358,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.3564
-veai,វាយ,2313,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=2; rank=3; beams=10; score=-0.3765
-veoy,វាយ,2313,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=2; rank=2; beams=10; score=-0.2565
-bandanh,បណ្ដាញ,2312,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.2144
-pandanh,បណ្ដាញ,2312,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.2881
-lecs,លេច,2294,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.2670
-bbuoh,ពោះ,2283,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=2; rank=2; beams=10; score=-0.3852
-buoh,ពោះ,2283,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=2; rank=3; beams=10; score=-0.4445
-thra,ត្រា,2274,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.3538
-ttra,ត្រា,2274,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.4114
-ram,រំ,2263,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=2; rank=3; beams=10; score=-0.5820
 harng,ហាង,2247,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.6473
-hong,ហាង,2247,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.2268; collision=1; existing_targets=ហង|ហង្ស|ហុង
-gamroung,គម្រោង,2227,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=2; rank=3; beams=10; score=-0.2019
 gomraung,គម្រោង,2227,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=2; rank=2; beams=10; score=-0.1943
 gomroung,គម្រោង,2227,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=2; rank=1; beams=10; score=-0.0737
-bang,បង់,2221,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.3156; collision=1; existing_targets=បាង
-pong,បង់,2221,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.3739; collision=1; existing_targets=ផង|ពង|ពង្ស
-sakh,សាក,2217,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=2; rank=2; beams=10; score=-0.2777
-sokh,សាក,2217,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=2; rank=3; beams=10; score=-0.4707
-srap,ស្រាប់,2214,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.2652; collision=1; existing_targets=ស្រព
-srob,ស្រាប់,2214,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.3360; collision=1; existing_targets=ស្រប|ស្រប់|ស្រ៊ុប
-chheam,ឈាម,2205,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.2581
-jheom,ឈាម,2205,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.2600
-sam,សុំ,2199,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=2; rank=3; beams=10; score=-0.4122; collision=1; existing_targets=សាំ|ស៊ាំ
-soam,សុំ,2199,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=2; rank=1; beams=10; score=-0.2550; collision=1; existing_targets=ស៊ាំ
-chhor,ឈរ,2174,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=2; rank=2; beams=10; score=-0.3053; collision=1; existing_targets=ឆរ
-jhar,ឈរ,2174,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=2; rank=3; beams=10; score=-0.3146
-sevea,សេវា,2174,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=1; beams=10; score=-0.1011
-seveo,សេវា,2174,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.2253
+srap,ស្រាប់,2214,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.2652; collision=1; existing_targets=ស្រព
 kdau,ក្ដៅ,2157,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=1; beams=10; score=-0.2258
-kdou,ក្ដៅ,2157,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.3784
-khdau,ក្ដៅ,2157,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.3971
-bbhlerng,ភ្លើង,2119,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=2; rank=3; beams=10; score=-0.2374
-bhlerng,ភ្លើង,2119,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=2; rank=2; beams=10; score=-0.2311
-vakk,វគ្គ,2117,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.4438
-vokk,វគ្គ,2117,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=1; beams=10; score=-0.3010
-vokkh,វគ្គ,2117,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.4031
-dau,ដៅ,2098,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=1; beams=10; score=-0.3353
 dov,ដៅ,2098,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.3670
 hat,ហាត់,2095,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.3841; collision=1; existing_targets=ហត្ថ
 sangsai,សង្ស័យ,2091,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=1; beams=10; score=-0.1856
 sangsay,សង្ស័យ,2091,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.2620
 kamsan,កម្សាន្ត,2086,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.2505
-komsantor,កម្សាន្ត,2086,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.2978
-chakh,ចាក,2086,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.3208
-chok,ចាក,2086,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.4708; collision=1; existing_targets=ចុក
-aschar,អស្ចារ្យ,2077,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=2; rank=1; beams=10; score=-0.1626
-asjar,អស្ចារ្យ,2077,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=2; rank=3; beams=10; score=-0.3373
 oschar,អស្ចារ្យ,2077,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=2; rank=2; beams=10; score=-0.3308
-srar,ស្រ,2067,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.1757
-stror,ស្រ,2067,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-1.1093
 dar,ដា,2064,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.8304; collision=1; existing_targets=ដរ|ដារ
-do,ដា,2064,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.4382; collision=1; existing_targets=ដូរ
-ryen,រៀន,2032,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=2; rank=2; beams=10; score=-0.2441
-syn,សិន,2025,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=2; rank=3; beams=10; score=-1.0655
-thriem,ត្រៀម,2019,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.2476
-triem,ត្រៀម,2019,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=1; beams=10; score=-0.1480
-tryem,ត្រៀម,2019,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.3187
-bhdal,ផ្ដល់,2016,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=2; rank=3; beams=10; score=-0.3017
+triem,ត្រៀម,2019,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=1; beams=10; score=-0.1480
 phdol,ផ្ដល់,2016,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=2; rank=2; beams=10; score=-0.2754
 daung,ដូង,2004,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.3066
 doung,ដូង,2004,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=1; beams=10; score=-0.1287; collision=1; existing_targets=ដួង
 sangha,សង្ហា,1998,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.2248
-songhea,សង្ហា,1998,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.2580
-aubbuk,ឪពុក,1998,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.3905
-auphuk,ឪពុក,1998,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=1; beams=10; score=-0.3106
-aupuk,ឪពុក,1998,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.3154
-soen,សែន,1995,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=2; rank=2; beams=10; score=-0.1951
-ngeai,ងាយ,1971,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.2836
-ngeoy,ងាយ,1971,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.2347
 har,ហា,1971,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.6135; collision=1; existing_targets=ហរ|ហារ
-ho,ហា,1971,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.4553; collision=1; existing_targets=ហូរ|ហ៊|ហ៊ូ|ហ៊ោ
-song,សាង,1967,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.2298; collision=1; existing_targets=សង|សង់|សុង|ស៊ង
-peh,បេះ,1954,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=2; rank=2; beams=10; score=-0.3431
-rikh,រីក,1936,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.3377
 ryk,រីក,1936,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.3422; collision=1; existing_targets=ឫក|ឫក្ស
-neori,នារី,1930,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=2; rank=3; beams=10; score=-0.2875
-chaal,ចោល,1928,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.3527
 chaol,ចោល,1928,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=1; beams=10; score=-0.1670
-chool,ចោល,1928,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.3066
 bhaaem,ផ្អែម,1926,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=2; rank=1; beams=10; score=-0.2853
 phaaem,ផ្អែម,1926,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=2; rank=2; beams=10; score=-0.2853
-koe,កែ,1917,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.3977
-meah,មាស,1908,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.3813
-meos,មាស,1908,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.2857
-samnakh,សំណាក់,1895,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=1; beams=10; score=-0.2007
-somnakh,សំណាក់,1895,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.2522
-phek,ពេក,1885,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.3813
-atethechon,អតិថិជន,1876,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=2; rank=1; beams=10; score=-0.1680
-atethechun,អតិថិជន,1876,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=2; rank=3; beams=10; score=-0.2705
-laus,លើស,1870,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.2836
-lerh,លើស,1870,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.4258
 sdeng,ស្ដែង,1860,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.8522
-sdoeng,ស្ដែង,1860,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.1647; collision=1; existing_targets=ស្ដឹង
 ngear,ងារ,1856,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=1; beams=10; score=-0.1776
-ngeor,ងារ,1856,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.2712
-keilo,កីឡា,1846,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.3159
 keyla,កីឡា,1846,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.2843
 chhab,ឆាប់,1844,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=1; beams=10; score=-0.1794; collision=1; existing_targets=ឆាប
 chhap,ឆាប់,1844,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.3037
-srab,ស្រប,1831,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.2501; collision=1; existing_targets=ស្រប់|ស្រាប់
-srop,ស្រប,1831,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.3593; collision=1; existing_targets=ស្រព
 sovatthepheap,សុវត្ថិភាព,1830,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=2; rank=2; beams=10; score=-0.1916
-sovotthepheap,សុវត្ថិភាព,1830,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=2; rank=1; beams=10; score=-0.1586
-sovtthepheap,សុវត្ថិភាព,1830,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=2; rank=3; beams=10; score=-0.1917
 chhean,ឈាន,1829,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.2540
-jheon,ឈាន,1829,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.2870
 vatt,វត្ត,1826,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=2; rank=2; beams=10; score=-0.3930
-votht,វត្ត,1826,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=2; rank=3; beams=10; score=-0.4515
 vott,វត្ត,1826,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=2; rank=1; beams=10; score=-0.2039
-hau,ហៅ,1822,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=1; beams=10; score=-0.3456; collision=1; existing_targets=ហ៊ោ|ហ៊ៅ
 chak,ចាក់,1805,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=1; beams=10; score=-0.2281; collision=1; existing_targets=ចក្រ|ចាក
-chakh,ចាក់,1805,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.3310
-chakhk,ចាក់,1805,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.4278
-rubbheap,រូបភាព,1803,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.1862
-rubpheop,រូបភាព,1803,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.2737
 sanhnha,សញ្ញា,1784,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=1; beams=10; score=-0.2151
-sonhnha,សញ្ញា,1784,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.2208
-sonhnhea,សញ្ញា,1784,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.3076
 sanhnhabat,សញ្ញាបត្រ,1784,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.2662
-sonhabat,សញ្ញាបត្រ,1784,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.2668
 sanhnhabat,សញ្ញាប័ត្រ,1784,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.2796
-sonhabat,សញ្ញាប័ត្រ,1784,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.3049
-bakh,បាក់,1780,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.3960
-pak,បាក់,1780,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.4239; collision=1; existing_targets=បក្ស
 bon,បុណ្យ,1768,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=1; beams=10; score=-0.2841; collision=1; existing_targets=បន|បន់|ប៉ន់
-pon,បុណ្យ,1768,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.5271; collision=1; existing_targets=ប៉ុន|ពន|ពន់
-samotthokechch,សមត្ថកិច្ច,1759,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.2384
-somotthakechch,សមត្ថកិច្ច,1759,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.2440
-somotthokechch,សមត្ថកិច្ច,1759,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=1; beams=10; score=-0.2307
 darn,ដាន,1756,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.9301
-don,ដាន,1756,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.3126; collision=1; existing_targets=ដុន
-leaeng,លែង,1749,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=2; rank=1; beams=10; score=-0.1701
-leoeng,លែង,1749,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=2; rank=2; beams=10; score=-0.2326
-saah,សោះ,1741,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.4616
-saoh,សោះ,1741,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=1; beams=10; score=-0.2725; collision=1; existing_targets=សោះសា|ស្អុះ
-saos,សោះ,1741,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.5056
-damnaeng,ដំណឹង,1740,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.2130; collision=1; existing_targets=ដំណែង|តំណែង
-damnoeng,ដំណឹង,1740,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=1; beams=10; score=-0.1330
-domnoeng,ដំណឹង,1740,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.1808
-thtey,ទៃ,1737,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.3644
 ttei,ទៃ,1737,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.3095
 chey,ជ័យ,1736,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.3739; collision=1; existing_targets=ចំណី
 jei,ជ័យ,1736,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.3459
-thnom,ថ្នាំ,1736,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.3315; collision=1; existing_targets=ថ្នម
 tnam,ថ្នាំ,1736,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.3336
-bbrey,ព្រៃ,1731,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=2; rank=2; beams=10; score=-0.3474
-brey,ព្រៃ,1731,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=2; rank=3; beams=10; score=-0.3561; collision=1; existing_targets=ប្រី
-chbap,ច្បាប់,1724,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.3744
-chbob,ច្បាប់,1724,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.3601
-brocheabreyopheap,ប្រជាប្រិយភាព,1720,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=2; rank=3; beams=10; score=-0.1779
 brocheabreypheap,ប្រជាប្រិយភាព,1720,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=2; rank=1; beams=10; score=-0.1287
 brojeabreypheap,ប្រជាប្រិយភាព,1720,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=2; rank=2; beams=10; score=-0.1616
-khun,គុណ,1711,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.9652
 kun,គុណ,1711,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.9344
-bbhot,ផុត,1693,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=2; rank=3; beams=10; score=-0.4513
 phot,ផុត,1693,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=2; rank=2; beams=10; score=-0.3582; collision=1; existing_targets=ផត
-phariyea,ភរិយា,1691,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=2; rank=2; beams=10; score=-0.3014
-phoriiea,ភរិយា,1691,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=2; rank=3; beams=10; score=-0.3051
-phoriyea,ភរិយា,1691,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=2; rank=1; beams=10; score=-0.1760
-veong,វាង,1680,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.1710
-vveang,វាង,1680,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.8788
-han,ហ៊ុន,1678,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.5349; collision=1; existing_targets=ហាន|ហ័ន
 hon,ហ៊ុន,1678,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.3265
-saeng,សឹង,1668,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.2856; collision=1; existing_targets=សែង
 sirng,សឹង,1668,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.3081
 soeng,សឹង,1668,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=1; beams=10; score=-0.1528; collision=1; existing_targets=ស៊ឹង
 reach,រាជ,1667,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=1; beams=10; score=-0.1899; collision=1; existing_targets=រាច
-reoch,រាជ,1667,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.3446
-brachhang,ប្រឆាំង,1663,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=2; rank=2; beams=10; score=-0.1820
-dou,ដូរ,1660,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.4958
-dour,ដូរ,1660,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=1; beams=10; score=-0.3072
-suar,សួរ,1657,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=2; rank=3; beams=10; score=-0.3633
 suor,សួរ,1657,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=2; rank=1; beams=10; score=-0.1895
-thuo,តួ,1646,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=2; rank=2; beams=10; score=-0.3587; collision=1; existing_targets=ថួ
-ttuo,តួ,1646,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=2; rank=3; beams=10; score=-0.4321
 tuo,តួ,1646,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=2; rank=1; beams=10; score=-0.3177
 bet,បិទ,1639,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=1; beams=10; score=-0.3112; collision=1; existing_targets=បិត|ប៉ិត
-beth,បិទ,1639,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.3288
-pet,បិទ,1639,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.3461; collision=1; existing_targets=ពិត|ពេទ្យ
-thok,តុ,1616,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=2; rank=2; beams=10; score=-0.4842
-ttok,តុ,1616,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=2; rank=3; beams=10; score=-0.5473; collision=1; existing_targets=ទុក|ទុក្ខ
-nyy,ន័យ,1612,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=2; rank=3; beams=10; score=-1.0209
 smaeu,ស្មើ,1612,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=1; beams=10; score=-0.2145
-smoeu,ស្មើ,1612,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.3280
-thtomrong,ទម្រង់,1598,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=2; rank=2; beams=10; score=-0.2133
-tthomrong,ទម្រង់,1598,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=2; rank=3; beams=10; score=-0.2215
-bacs,បាច់,1583,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.3887
-pach,បាច់,1583,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.4643
-bboal,ពាល់,1582,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.4288
-bborl,ពាល់,1582,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=1; beams=10; score=-0.4128
 poal,ពាល់,1582,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.4477
-thtob,ទប់,1579,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.4276
 ttob,ទប់,1579,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=1; beams=10; score=-0.2246
 ttop,ទប់,1579,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.4022
-mae,មេ,1572,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-1.0435; collision=1; existing_targets=មែ|ម៉ែ|ហ្មេ
-moe,មេ,1572,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-1.2260
-chhau,ឈើ,1570,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.3788; collision=1; existing_targets=ឆៅ
-jhau,ឈើ,1570,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=1; beams=10; score=-0.2201
 aav,អាវ,1557,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.8154
-ov,អាវ,1557,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.4790; collision=1; existing_targets=ឳ
-rearl,រាល,1556,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-1.1802
-reol,រាល,1556,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.2381
 darl,ដាល,1555,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-1.0033
-dol,ដាល,1555,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.2758; collision=1; existing_targets=ដល់|ដុល
-sliekh,ស្លៀក,1551,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=2; rank=1; beams=10; score=-0.1511
-slyek,ស្លៀក,1551,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=2; rank=3; beams=10; score=-0.3447
-bbhet,ភេទ,1547,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=1; beams=10; score=-0.2521
-phhet,ភេទ,1547,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.2629
-luach,លួច,1546,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.3569
 luoch,លួច,1546,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=1; beams=10; score=-0.1695
-luocs,លួច,1546,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.3149
 rot,រត់,1535,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.3372; collision=1; existing_targets=រត
-roth,រត់,1535,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.3212; collision=1; existing_targets=រដ្ឋ|រថ
-rott,រត់,1535,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=1; beams=10; score=-0.3068; collision=1; existing_targets=រត្ត
-bboul,ពោល,1533,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=1; beams=10; score=-0.2509
-boul,ពោល,1533,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.3824; collision=1; existing_targets=បូល
 poul,ពោល,1533,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.2674
-chomraus,ជម្រើស,1525,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.3144
-jomraus,ជម្រើស,1525,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=1; beams=10; score=-0.1856
 jomrers,ជម្រើស,1525,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.2504
-leo,លា,1524,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.2323
-lie,លា,1524,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-1.3163
-amlang,អំឡុង,1507,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=2; rank=3; beams=10; score=-0.2731
-neom,នាម,1496,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.2156
-niem,នាម,1496,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-1.1093
-mmirn,ម៉ឺន,1487,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.2611
-mmirun,ម៉ឺន,1487,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=1; beams=10; score=-0.2479
-mmueun,ម៉ឺន,1487,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.2882
 msyl,ម្សិល,1486,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=2; rank=2; beams=10; score=-0.2372
-bandet,បណ្ឌិត,1485,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=2; rank=2; beams=10; score=-0.3103; collision=1; existing_targets=បណ្ឌិត្យ
-bondeth,បណ្ឌិត,1485,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=2; rank=3; beams=10; score=-0.3225
-kaoh,កោះ,1460,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=2; rank=2; beams=10; score=-0.4854
-khaoh,កោះ,1460,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=2; rank=3; beams=10; score=-0.5078
-dam,ដុំ,1451,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=2; rank=3; beams=10; score=-0.3930; collision=1; existing_targets=ដម|ដាម|ដាំ|ដំ
-doam,ដុំ,1451,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=2; rank=1; beams=10; score=-0.2795
-keiladthan,កីឡដ្ឋាន,1442,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.2612
-keilodthan,កីឡដ្ឋាន,1442,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.1895
-chhak,ឆាក,1431,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=1; beams=10; score=-0.2046; collision=1; existing_targets=ឆក
-chhakh,ឆាក,1431,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.2522
-chhok,ឆាក,1431,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.3963; collision=1; existing_targets=ឆក|ឆក់|ឆុក
-chreav,ជ្រាវ,1430,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.2551
-jreov,ជ្រាវ,1430,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.2746
-ghhuum,ឃុំ,1429,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.7648
-ghuum,ឃុំ,1429,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=1; beams=10; score=-0.0812
-threi,ត្រី,1429,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=2; rank=3; beams=10; score=-0.3205
-thtitang,ទីតាំង,1425,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.2493
-ttytang,ទីតាំង,1425,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.2638
-bandal,បណ្ដាល,1412,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.2133
-pandal,បណ្ដាល,1412,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.2999
-sonhcheat,សញ្ជាតិ,1412,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=2; rank=2; beams=10; score=-0.2008; collision=1; existing_targets=សញ្ជាត
-throng,ត្រង់,1387,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.2578
-trang,ត្រង់,1387,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.2557; collision=1; existing_targets=ត្រង|ត្រាង
-raveang,រវាង,1380,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.2080
-roveong,រវាង,1380,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.1804
-thtror,ទ្រ,1379,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.2647
-tthror,ទ្រ,1379,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.2607
-chhob,ឈប់,1375,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=2; rank=2; beams=10; score=-0.3215; collision=1; existing_targets=ឆប|ឆុប
-jhop,ឈប់,1375,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=2; rank=3; beams=10; score=-0.4378
 saharoth,សហរដ្ឋ,1366,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=1; beams=10; score=-0.2850
-sahoroth,សហរដ្ឋ,1366,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.3206
-soharoth,សហរដ្ឋ,1366,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.3234
-lbeanh,ល្បាញ,1363,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=1; beams=10; score=-0.2436
-lpeanh,ល្បាញ,1363,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.3422
-sangkhet,សង្កេត,1363,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.2133
-songkhet,សង្កេត,1363,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=1; beams=10; score=-0.2087
-vechch,វេជ្ជ,1362,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=2; rank=1; beams=10; score=-0.3544; collision=1; existing_targets=វេច្ច
-vechcha,វេជ្ជ,1362,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=2; rank=2; beams=10; score=-0.3761
-vechcs,វេជ្ជ,1362,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=2; rank=3; beams=10; score=-0.3799
-sang,សង់,1352,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=2; rank=2; beams=10; score=-0.2134; collision=1; existing_targets=សាង|សាំង|ស៊ង
 songg,សង់,1352,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=2; rank=3; beams=10; score=-0.3547
-phchoab,ភ្ជាប់,1351,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=2; rank=3; beams=10; score=-0.3593
-phchorb,ភ្ជាប់,1351,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=2; rank=1; beams=10; score=-0.2964
-samlab,សម្លាប់,1349,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.2488
-somlob,សម្លាប់,1349,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.2826; collision=1; existing_targets=សម្លប
-bangkern,បង្កើន,1345,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.2120
-bongkaun,បង្កើន,1345,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.2315
-men,មីន,1332,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.9918; collision=1; existing_targets=មិន|មេន|មែន
-myn,មីន,1332,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.2800
-khaev,កែវ,1330,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=2; rank=2; beams=10; score=-0.2484
-koev,កែវ,1330,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=2; rank=3; beams=10; score=-0.3223
-khhan,ខាន,1323,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.3192
-khon,ខាន,1323,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.3786; collision=1; existing_targets=ខន|ខន់|ខុន
-chis,ជិះ,1316,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.4136
 jih,ជិះ,1316,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.4456
-khath,ខាត,1310,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.4454
-khhat,ខាត,1310,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.4116
 snarm,ស្នាម,1310,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.7751
-snom,ស្នាម,1310,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.2564
-lam,លំ,1300,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=2; rank=3; beams=10; score=-0.3938; collision=1; existing_targets=ឡាំ
-thhlaeng,ថ្លែង,1298,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.2599
-thloeng,ថ្លែង,1298,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.2254; collision=1; existing_targets=ថ្លឹង
-ar,អរ,1298,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=1; beams=10; score=-0.2252; collision=1; existing_targets=អថ៌|អារ
-arak,អរ,1298,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-1.0742
-thhmor,ថ្ម,1296,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.4267
-thmar,ថ្ម,1296,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.2951; collision=1; existing_targets=ថ្មារ
-neayok,នាយក,1289,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=2; rank=2; beams=10; score=-0.2821
 chrieng,ច្រៀង,1288,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=1; beams=10; score=-0.0923
-chryeng,ច្រៀង,1288,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.2339
 jrieng,ច្រៀង,1288,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.2853; collision=1; existing_targets=ជ្រៀង
 pisaot,ពិសោធន៍,1281,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.2631
-pisaoth,ពិសោធន៍,1281,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=1; beams=10; score=-0.2543; collision=1; existing_targets=ពិសោធ
-pisooth,ពិសោធន៍,1281,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.3677
-bborn,ពាន់,1279,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=2; rank=2; beams=10; score=-0.3508
 poan,ពាន់,1279,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=2; rank=3; beams=10; score=-0.4521; collision=1; existing_targets=ព័ន្ធ
-neai,នាយ,1274,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.3526
-neoy,នាយ,1274,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.2712
-srar,ស្រា,1265,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-1.2625
-sro,ស្រា,1265,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.3030
-baer,បែរ,1250,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=1; beams=10; score=-0.3626
-boer,បែរ,1250,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.5251
-baah,បោះ,1236,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.5350
-baoh,បោះ,1236,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=1; beams=10; score=-0.3406
-srov,ស្រាវ,1230,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.2530
-srrav,ស្រាវ,1230,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-1.2255
-kham,ខំ,1226,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=2; rank=1; beams=10; score=-0.3029; collision=1; existing_targets=ខម|ខាម|ខាំ
-khham,ខំ,1226,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=2; rank=3; beams=10; score=-0.3740
-seei,សី,1211,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=2; rank=3; beams=10; score=-1.1425
-lauklaeung,លើកឡើង,1206,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=1; beams=10; score=-0.2137
 lerklaeung,លើកឡើង,1206,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.2218
 samgoal,សម្គាល់,1204,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.3344
 somgoal,សម្គាល់,1204,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=1; beams=10; score=-0.3296
 ghortt,ឃាត់,1198,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=2; rank=3; beams=10; score=-0.3539
-khomar,កុមារ,1197,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.3118
+khomar,កុមារ,1197,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.3118
 komar,កុមារ,1197,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=1; beams=10; score=-0.2048
-komor,កុមារ,1197,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.3451
-komarea,កុមារា,1197,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.3208
-komora,កុមារា,1197,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.3482
-ses,សិស្ស,1191,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=2; rank=2; beams=10; score=-0.4886; collision=1; existing_targets=សេស|សេះ
-sess,សិស្ស,1191,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=2; rank=1; beams=10; score=-0.2396
-sessar,សិស្ស,1191,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=2; rank=3; beams=10; score=-0.5064
-sar,សរ,1189,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.2207; collision=1; existing_targets=សា|សារ
-sara,សរ,1189,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-1.0199; collision=1; existing_targets=សរៈ|សារា|សារៈ
 smarn,ស្មាន,1184,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.5300
-smon,ស្មាន,1184,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.2458; collision=1; existing_targets=ស្មន់|ស្មន្ធ
-maam,មាំ,1182,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.3794
-moom,មាំ,1182,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.3393
-rouk,រោគ,1178,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=1; beams=10; score=-0.1871; collision=1; existing_targets=រោក
-roukh,រោគ,1178,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.2582
-ththlou,ធ្លោ,1177,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.3120
-tthhlou,ធ្លោ,1177,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.3331
-tthlou,ធ្លោ,1177,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=1; beams=10; score=-0.2206
+rouk,រោគ,1178,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=1; beams=10; score=-0.1871; collision=1; existing_targets=រោក
+tthlou,ធ្លោ,1177,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=1; beams=10; score=-0.2206
 gau,គោ,1173,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.3944
 gou,គោ,1173,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=1; beams=10; score=-0.1855
 raung,រោង,1162,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.3582; collision=1; existing_targets=រ៉ើងៗ
 roung,រោង,1162,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=1; beams=10; score=-0.1402
-tamnang,តំណាង,1156,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=1; beams=10; score=-0.2203; collision=1; existing_targets=តំណាំង
-thamnang,តំណាង,1156,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.2447
-tomnang,តំណាង,1156,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.2618
+tamnang,តំណាង,1156,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=1; beams=10; score=-0.2203; collision=1; existing_targets=តំណាំង
+tomnang,តំណាង,1156,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.2618
 vaeng,វែង,1150,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=1; beams=10; score=-0.1708
-veaeng,វែង,1150,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.2626
-veoeng,វែង,1150,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.3106
-mdeay,ម្ដាយ,1147,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=1; beams=10; score=-0.2177
-mdeoy,ម្ដាយ,1147,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.3602
-dark,ដក,1143,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.3560
-dorkh,ដក,1143,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.3713
-bech,ពេជ្រ,1139,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=2; rank=3; beams=10; score=-0.4254; collision=1; existing_targets=ប៉ិច
 graung,គ្រោង,1134,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.1992
 groung,គ្រោង,1134,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=1; beams=10; score=-0.0743
-broe,ប្រែ,1131,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.3557
 prae,ប្រែ,1131,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.3034
-noe,ណែ,1127,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=2; rank=2; beams=10; score=-0.3038
-tamruv,តម្រូវ,1126,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=2; rank=2; beams=10; score=-0.2842
-thomruv,តម្រូវ,1126,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=2; rank=3; beams=10; score=-0.2941
-tomruv,តម្រូវ,1126,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=2; rank=1; beams=10; score=-0.2558
-thtean,ទាន,1125,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.2576
-tthean,ទាន,1125,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.2359; collision=1; existing_targets=ធាន
-khanglau,ខាងលើ,1123,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.1909
-khongler,ខាងលើ,1123,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.2663
+tomruv,តម្រូវ,1126,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=2; rank=1; beams=10; score=-0.2558
 sanya,សន្យា,1121,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=2; rank=3; beams=10; score=-0.3424
-sanyea,សន្យា,1121,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=2; rank=2; beams=10; score=-0.3300
-sonyea,សន្យា,1121,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=2; rank=1; beams=10; score=-0.3230
-thtur,ទូរ,1110,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=1; beams=10; score=-0.3025
-ttur,ទូរ,1110,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.3039
-bamrer,បម្រើ,1109,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.2586
-bomrau,បម្រើ,1109,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.2782
-hoth,ហូត,1108,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.3889; collision=1; existing_targets=ហត្ថ
-hott,ហូត,1108,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.4043
-lon,ឡាន,1107,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=2; rank=2; beams=10; score=-0.2703; collision=1; existing_targets=លន|លន់
+bamrer,បម្រើ,1109,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.2586
 sbaeuy,ស្បើយ,1105,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=1; beams=10; score=-0.2303
-sbairy,ស្បើយ,1105,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.3290
-khorkk,កក់,1104,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=2; rank=2; beams=10; score=-0.4389
-korkkh,កក់,1104,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=2; rank=3; beams=10; score=-0.4683
 lob,លប់,1099,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=2; rank=1; beams=10; score=-0.3076; collision=1; existing_targets=លប|លុប|ឡប់|ឡប់ៗ|ឡុបៗ
 lop,លប់,1099,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=2; rank=2; beams=10; score=-0.3807; collision=1; existing_targets=ឡប់|ឡប់ៗ
 chnay,ច្នៃ,1098,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.3261
-chnoi,ច្នៃ,1098,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.3270
-nokarbal,នគរបាល,1098,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.2416
 nokorbol,នគរបាល,1098,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.2416
-aeurob,អឺរ៉ុប,1094,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.3939
 eurob,អឺរ៉ុប,1094,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=1; beams=10; score=-0.3353
-oeurob,អឺរ៉ុប,1094,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.4412
-sedkechch,សេដ្ឋកិច្ច,1084,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=2; rank=1; beams=10; score=-0.2089
-sedkecs,សេដ្ឋកិច្ច,1084,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=2; rank=3; beams=10; score=-0.2977
-neaneo,នានា,1074,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.2253
-neonea,នានា,1074,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.2122
-chuor,ជួរ,1072,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.3127
 juor,ជួរ,1072,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=1; beams=10; score=-0.1757
-asya,អាស៊ី,1062,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.4686
-osia,អាស៊ី,1062,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.4646
 loas,លាស់,1060,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.3390
-loos,លាស់,1060,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.5097
-gunopheap,គុណភាព,1056,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=2; rank=3; beams=10; score=-0.2372
-khrob,ក្រប,1054,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=2; rank=3; beams=10; score=-0.4298
-krab,ក្រប,1054,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=2; rank=2; beams=10; score=-0.2827; collision=1; existing_targets=ក្រាប|ក្រាប់|ក្រាប់ៗ
-khlans,ខ្លាញ់,1054,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=2; rank=2; beams=10; score=-0.3045
-khlonh,ខ្លាញ់,1054,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=2; rank=3; beams=10; score=-0.3075
 reap,រាប,1053,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.2789
-reob,រាប,1053,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.3494
-khot,កត់,1036,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.4540
-koth,កត់,1036,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=1; beams=10; score=-0.4292
-inda,ឥណ្ឌា,1033,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=1; beams=10; score=-0.2417
 indea,ឥណ្ឌា,1033,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.3007
-indo,ឥណ្ឌា,1033,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.4194
 chumnuoy,ជំនួយ,1020,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=2; rank=2; beams=10; score=-0.2273
 jumnuoi,ជំនួយ,1020,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=2; rank=3; beams=10; score=-0.2849
 jumnuoy,ជំនួយ,1020,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=2; rank=1; beams=10; score=-0.1139
 sah,សះ,1018,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=1; beams=10; score=-0.2571; collision=1; existing_targets=សហ
-soh,សះ,1018,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.4661; collision=1; existing_targets=សហ
-ray,រយ,1017,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.4050
 roi,រយ,1017,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.4343
 bampenh,បំពេញ,1014,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=1; beams=10; score=-0.1678
-pampenh,បំពេញ,1014,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.3059
-peanechchkamm,ពាណិជ្ជកម្ម,1007,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.1752
-peanechjkamm,ពាណិជ្ជកម្ម,1007,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.1894
-peanejchkamm,ពាណិជ្ជកម្ម,1007,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=1; beams=10; score=-0.1698
 lhem,ល្ហែម,1007,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=1; beams=10; score=-0.1348
-lhoem,ល្ហែម,1007,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.3266
 aan,អាន,1001,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=1; beams=10; score=-0.2744
-aon,អាន,1001,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.4720; collision=1; existing_targets=ឱន
-oan,អាន,1001,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.5040
 chreab,ជ្រាប,999,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.2989
 jreap,ជ្រាប,999,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.2848
 chumrunh,ជំរុញ,997,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.2030
-jumruns,ជំរុញ,997,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.1975
-naum,នោម,992,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.3170
 noum,នោម,992,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=1; beams=10; score=-0.1482
 kbaer,ក្បែរ,991,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.3400
-kboe,ក្បែរ,991,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.4379
-om,អម,975,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.3531; collision=1; existing_targets=អុំ|អ៊ំ
-orm,អម,975,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.6872
-ththnu,ធ្នូ,972,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.2723
-tthhnu,ធ្នូ,972,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.2479
-pheakoroy,ភាគរយ,972,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=2; rank=2; beams=10; score=-0.2309
-bbum,ពុំ,971,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=2; rank=1; beams=10; score=-0.3591
-phum,ពុំ,971,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=2; rank=3; beams=10; score=-0.3809; collision=1; existing_targets=ភូម|ភូមិ
-sahokar,សហការ,970,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=2; rank=3; beams=10; score=-0.2518
-sohakar,សហការ,970,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=2; rank=2; beams=10; score=-0.2201
-syem,សៀម,966,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=2; rank=2; beams=10; score=-0.2436
-thtous,ទោស,965,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.2743
-tthous,ទោស,965,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.2890
-ttous,ទោស,965,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=1; beams=10; score=-0.2132; collision=1; existing_targets=ទោះ
-bdour,ប្ដូរ,963,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=2; rank=1; beams=10; score=-0.3378
-pdour,ប្ដូរ,963,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=2; rank=2; beams=10; score=-0.4410
-lumdob,លំដាប់,956,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=2; rank=2; beams=10; score=-0.2622
 gilou,គីឡូ,953,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=1; beams=10; score=-0.2446
 gylou,គីឡូ,953,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.3788
-sau,ស៊ូ,951,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.6747; collision=1; existing_targets=សៅ
 sou,ស៊ូ,951,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.4539; collision=1; existing_targets=សូ
-bai,បាយ,946,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=2; rank=3; beams=10; score=-0.4802
-pay,បាយ,946,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=2; rank=2; beams=10; score=-0.4684
-raus,រើស,946,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.2731
-rerh,រើស,946,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.4413
-sal,សល់,944,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.2130; collision=1; existing_targets=សាល|សាល់
 sorl,សល់,944,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-1.0758
-sobbheak,សុភ,943,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=2; rank=1; beams=10; score=-0.2839
-sobbhek,សុភ,943,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=2; rank=3; beams=10; score=-0.3572
-khram,ក្រាម,939,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=2; rank=2; beams=10; score=-0.2310
-krom,ក្រាម,939,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=2; rank=3; beams=10; score=-0.3386; collision=1; existing_targets=ក្រម|ក្រុម|ក្រោម
 sejkdei,សេចក្ដី,932,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=2; rank=3; beams=10; score=-0.2577
 saok,សោក,926,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=2; rank=1; beams=10; score=-0.1902; collision=1; existing_targets=ស្អក
-saokh,សោក,926,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=2; rank=2; beams=10; score=-0.3058
-sook,សោក,926,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=2; rank=3; beams=10; score=-0.3911
-hang,ហុង,926,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.3019; collision=1; existing_targets=ហង្ស|ហាង
 hung,ហុង,926,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.2804
-bboste,ប៉ុស្តិ៍,922,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=2; rank=2; beams=10; score=-0.4079
-bpost,ប៉ុស្តិ៍,922,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=2; rank=3; beams=10; score=-0.4890
-leong,លាង,919,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.2026
-lieng,លាង,919,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.9741; collision=1; existing_targets=លៀង
 tterkchet,ទឹកចិត្ត,912,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.2602
-tterkchett,ទឹកចិត្ត,912,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.1926
 tteukchett,ទឹកចិត្ត,912,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=1; beams=10; score=-0.1904
-bbhnum,ភ្នំ,904,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=2; rank=1; beams=10; score=-0.2641
-pauropenh,ពោរពេញ,903,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.2560
-pourapenh,ពោរពេញ,903,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.2682
-pouropenh,ពោរពេញ,903,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=1; beams=10; score=-0.1442
-tamnaeng,តំណែង,902,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=2; rank=1; beams=10; score=-0.1643
-thamnaeng,តំណែង,902,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=2; rank=3; beams=10; score=-0.2586
-tomnaeng,តំណែង,902,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=2; rank=2; beams=10; score=-0.2158
-borkh,បក,898,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.4560
-pork,បក,898,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.4872
-mesea,មេសា,898,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.6909
-meso,មេសា,898,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.2567
-rumbbueng,រំពឹង,895,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=2; rank=2; beams=10; score=-0.2043
-rumphueng,រំពឹង,895,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=2; rank=3; beams=10; score=-0.2543
-thtaen,ទែន,888,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.3069
-ttaen,ទែន,888,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=1; beams=10; score=-0.2123
-ttoen,ទែន,888,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.3610
-baramphor,បារម្ភ,888,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.3077
-baromphor,បារម្ភ,888,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=1; beams=10; score=-0.2700
-tab,តប,886,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.4816; collision=1; existing_targets=តប់|តាប|តាប់
-tob,តប,886,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.4664; collision=1; existing_targets=តប់|តុបៗ
-brasas,ប្រសាសន៍,885,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=2; rank=1; beams=10; score=-0.2275
+tomnaeng,តំណែង,902,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=2; rank=2; beams=10; score=-0.2158
 dap,ដាប់,882,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.3231
-dob,ដាប់,882,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.4281; collision=1; existing_targets=ដប|ដប់|ដុប|ដុបៗ
-han,ហ៊ាន,880,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=1; beams=10; score=-0.1865; collision=1; existing_targets=ហាន|ហ័ន
-hon,ហ៊ាន,880,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.3734
-samaat,សម្អាត,873,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.3403; collision=1; existing_targets=សំអាត
+samaat,សម្អាត,873,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.3403; collision=1; existing_targets=សំអាត
 somaat,សម្អាត,873,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=1; beams=10; score=-0.3272
-somaath,សម្អាត,873,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.4207
-sngath,ស្ងាត់,870,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=2; rank=1; beams=10; score=-0.2019
-sngatt,ស្ងាត់,870,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=2; rank=2; beams=10; score=-0.2200
-svai,ស្វាយ,864,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.3347
-svoy,ស្វាយ,864,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.3213
+sngatt,ស្ងាត់,870,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=2; rank=2; beams=10; score=-0.2200
 chumnoan,ជំនាន់,863,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.2795
 jumnoan,ជំនាន់,863,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=1; beams=10; score=-0.1619
-bonh,បាញ់,862,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.4045
-panh,បាញ់,862,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.3439
-danghaum,ដង្ហើម,855,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=1; beams=10; score=-0.1436
 dangherm,ដង្ហើម,855,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.1974
 donghaum,ដង្ហើម,855,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.1582
-skath,ស្កាត់,853,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.3142
-skatt,ស្កាត់,853,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.3421
-daekh,ដេក,848,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.6589
-dekh,ដេក,848,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.1865
-kar,ករ,847,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.3115; collision=1; existing_targets=ការ|ការណ៍
-khor,ករ,847,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.3404; collision=1; existing_targets=ខ|ខរ|ខុរៗ|ខោ
-khuab,ខួប,842,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.4241
 khuob,ខួប,842,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=1; beams=10; score=-0.2391
-kuob,ខួប,842,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.4144
 chau,ចៅ,842,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=2; rank=1; beams=10; score=-0.1920
-chou,ចៅ,842,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=2; rank=2; beams=10; score=-0.4491
-jau,ចៅ,842,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=2; rank=3; beams=10; score=-0.4905; collision=1; existing_targets=ជើ
-khhuor,ខួរ,841,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=2; rank=3; beams=10; score=-0.3523
 khuor,ខួរ,841,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=2; rank=1; beams=10; score=-0.2318
-bbhleang,ភ្លៀង,841,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=2; rank=2; beams=10; score=-0.2846
-bbhlieng,ភ្លៀង,841,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=2; rank=3; beams=10; score=-0.2933
-phlieng,ភ្លៀង,841,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=2; rank=1; beams=10; score=-0.2209
-charng,ចង,825,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=2; rank=2; beams=10; score=-0.2237
-iean,យាន,823,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.3560
-yeon,យាន,823,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.3223
-bhdacs,ផ្ដាច់,822,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=2; rank=3; beams=10; score=-0.3419
+phlieng,ភ្លៀង,841,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=2; rank=1; beams=10; score=-0.2209
 phdach,ផ្ដាច់,822,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=2; rank=2; beams=10; score=-0.2674
-bokh,បុក,815,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.3480
-pok,បុក,815,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.4415; collision=1; existing_targets=ពក|ពុក
-thtvear,ទ្វារ,814,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.2445
-ttvear,ទ្វារ,814,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=1; beams=10; score=-0.1513
+ttvear,ទ្វារ,814,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=1; beams=10; score=-0.1513
 ttveor,ទ្វារ,814,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.2729
-vitheon,វិធាន,809,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.2595
-vythean,វិធាន,809,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.2433
-ththieb,ធៀប,801,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.2811
 tthieb,ធៀប,801,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=1; beams=10; score=-0.1956
 tthiep,ធៀប,801,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.3666
-daekh,ដែក,799,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.2524
-doek,ដែក,799,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.3051
-chonhchun,ជញ្ជូន,798,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=2; rank=3; beams=10; score=-0.2396
-jonhchun,ជញ្ជូន,798,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=2; rank=1; beams=10; score=-0.1179
 bangvuek,បង្វឹក,796,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.2701
 bongvirk,បង្វឹក,796,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.2500
 bongvuek,បង្វឹក,796,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=1; beams=10; score=-0.2397
-boron,បុរាណ,795,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.3335
-poran,បុរាណ,795,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.3467
 chheh,ឆេះ,794,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=1; beams=10; score=-0.1054
 jheh,ឆេះ,794,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.3162
-snetthar,ស្និទ្ធ,790,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.2690
-snetthor,ស្និទ្ធ,790,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=1; beams=10; score=-0.1932
-snitthor,ស្និទ្ធ,790,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.3127
-leai,លាយ,781,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.3635
-leoy,លាយ,781,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.2743
-karngg,កង់,777,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=2; rank=3; beams=10; score=-0.3027
-khorngg,កង់,777,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=2; rank=2; beams=10; score=-0.2705
-sang,សង,763,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=2; rank=2; beams=10; score=-0.2126; collision=1; existing_targets=សាង|សាំង|ស៊ង
-asan,អាសន្ន,763,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=2; rank=1; beams=10; score=-0.2333; collision=1; existing_targets=អាសន
-asonn,អាសន្ន,763,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=2; rank=3; beams=10; score=-0.4263
-phreng,ប្រេង,761,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=2; rank=3; beams=10; score=-0.4446
-samnaeu,សំណើ,761,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=2; rank=1; beams=10; score=-0.1963
-somnaeu,សំណើ,761,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=2; rank=2; beams=10; score=-0.2302
-khork,កក,756,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=2; rank=3; beams=10; score=-0.4610; collision=1; existing_targets=ខក
-korkh,កក,756,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=2; rank=2; beams=10; score=-0.4580
 snaeu,ស្នើ,749,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=1; beams=10; score=-0.2132
-snoeu,ស្នើ,749,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.3383
 borei,បុរី,747,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=1; beams=10; score=-0.2067
-porei,បុរី,747,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.4020
 aang,អាង,739,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=2; rank=1; beams=10; score=-0.3099
-aong,អាង,739,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=2; rank=3; beams=10; score=-0.3828
 masin,ម៉ាស៊ីន,735,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=2; rank=1; beams=10; score=-0.3561
-masyn,ម៉ាស៊ីន,735,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=2; rank=3; beams=10; score=-0.5069
-mosin,ម៉ាស៊ីន,735,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=2; rank=2; beams=10; score=-0.4183
 proat,ព្រ័ត្រ,734,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=1; beams=10; score=-0.2501
-proatrar,ព្រ័ត្រ,734,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.3736
-proatror,ព្រ័ត្រ,734,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.3267
-broeng,ប្រែង,732,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.2515
-praeng,ប្រែង,732,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.2337
-sau,សេរ,726,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.5646; collision=1; existing_targets=សៅ
-ser,សេរ,726,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.2652; collision=1; existing_targets=សរសើរ|សិរស៍
-skar,ស្ករ,724,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=1; beams=10; score=-0.2282; collision=1; existing_targets=ស្ការ|ស្គរ|ស្គារ
-skhar,ស្ករ,724,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.2912
 taon,តោន,723,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=1; beams=10; score=-0.2505
-thaon,តោន,723,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.3733
-toon,តោន,723,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.3596
-mantor,មន្ត,723,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.3174
-montar,មន្ត,723,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.2713
-montor,មន្ត,723,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=1; beams=10; score=-0.1684
-thtumninh,ទំនិញ,722,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.2285
-tthumninh,ទំនិញ,722,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.2489
-riebcham,រៀបចំ,710,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=2; rank=2; beams=10; score=-0.1964
 riebchom,រៀបចំ,710,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=2; rank=1; beams=10; score=-0.1907
-ryebchom,រៀបចំ,710,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=2; rank=3; beams=10; score=-0.2733
-buoh,បួស,704,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.4346
 buos,បួស,704,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=1; beams=10; score=-0.2299
-puos,បួស,704,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.4182
-khhork,ខក,702,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=2; rank=3; beams=10; score=-0.4408
-biau,បៀរ,702,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=2; rank=3; beams=10; score=-0.4791
 bier,បៀរ,702,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=2; rank=1; beams=10; score=-0.2712
-byer,បៀរ,702,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=2; rank=2; beams=10; score=-0.4399
-snea,ស្នា,694,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-1.1395
-sno,ស្នា,694,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.3019
-gan,គន់,692,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.4184
 gon,គន់,692,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=1; beams=10; score=-0.1605; collision=1; existing_targets=គណ|គន
-ngeakh,ងាក,692,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.2209
-ngeok,ងាក,692,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.2429
-chaat,ចោទ,691,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.3831
 chaot,ចោទ,691,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=1; beams=10; score=-0.1884; collision=1; existing_targets=ចោត
-choot,ចោទ,691,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.3554
-kab,កប់,688,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=2; rank=2; beams=10; score=-0.4200; collision=1; existing_targets=កប|កាប|កាប់|កាបៗ
-char,ចរ,688,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.2233; collision=1; existing_targets=ចារ
 jor,ចរ,688,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.4976; collision=1; existing_targets=ចោរ|ជរ
-khaetala,ខែតុលា,677,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.2836
-khoetola,ខែតុលា,677,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.2365
-banhchuh,បញ្ចុះ,676,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.2321
-bonhchuh,បញ្ចុះ,676,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=1; beams=10; score=-0.2195
-bonhchus,បញ្ចុះ,676,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.2683
-sap,សព,673,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.3958
-chuol,ជួល,669,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.3101
 juol,ជួល,669,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=1; beams=10; score=-0.1646
-bongrueng,ពង្រឹង,668,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.2022
 pongrirng,ពង្រឹង,668,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.2183
 pongrueng,ពង្រឹង,668,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=1; beams=10; score=-0.1288
-gang,គង់,667,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=2; rank=2; beams=10; score=-0.3396; collision=1; existing_targets=គាង
 gongg,គង់,667,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=2; rank=3; beams=10; score=-0.5081
-bbonthor,ពន្ធ,661,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.3030
-bonthor,ពន្ធ,661,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.2637
-ponthor,ពន្ធ,661,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=1; beams=10; score=-0.2312
 leak,លាក់,661,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=1; beams=10; score=-0.2221; collision=1; existing_targets=លក្ខ|លាក
-leakh,លាក់,661,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.2531
-leok,លាក់,661,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.3806
-sau,សៅរ៍,661,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=2; rank=1; beams=10; score=-0.3677; collision=1; existing_targets=សៅ
-saur,សៅរ៍,661,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=2; rank=2; beams=10; score=-0.3731
-sour,សៅរ៍,661,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=2; rank=3; beams=10; score=-0.4626; collision=1; existing_targets=សូរ|សួរ
-nharb,ញាប់,655,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.3824
+sau,សៅរ៍,661,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=2; rank=1; beams=10; score=-0.3677; collision=1; existing_targets=សៅ
 nhoab,ញាប់,655,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.2887
 tteap,ទាប,655,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.3375
-tteob,ទាប,655,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.3505
-snang,ស្នង,655,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.1900; collision=1; existing_targets=សំណាង
 snong,ស្នង,655,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=1; beams=10; score=-0.1677; collision=1; existing_targets=សំណង់
-bambaek,បំបែក,652,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=2; rank=1; beams=10; score=-0.1607
-bampaek,បំបែក,652,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=2; rank=3; beams=10; score=-0.2720
-mmeae,ម៉ែ,651,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=2; rank=3; beams=10; score=-0.3564
-mmoe,ម៉ែ,651,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=2; rank=2; beams=10; score=-0.3318
-sam,សំ,648,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=1; beams=10; score=-0.1501; collision=1; existing_targets=សាំ|ស៊ាំ
-sorm,សំ,648,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-1.0402; collision=1; existing_targets=ស្អំ
 banhchhob,បញ្ឈប់,643,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.1737
 bonhchhob,បញ្ឈប់,643,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=1; beams=10; score=-0.1606
 bonhjhob,បញ្ឈប់,643,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.2889
 nhien,ញៀន,639,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=1; beams=10; score=-0.1101
-nhyen,ញៀន,639,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.2802
-heav,ហាវ,636,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-1.1704; collision=1; existing_targets=ហៀវ
-srorl,ស្រាល,631,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.7311
 leas,លះ,630,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.2790; collision=1; existing_targets=លាស
-leoh,លះ,630,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.3327
-khaeknha,ខែកញ្ញា,628,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=1; beams=10; score=-0.1452
 khaeknho,ខែកញ្ញា,628,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.2618
 khoeknha,ខែកញ្ញា,628,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.2604
 niyom,និយម,626,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=1; beams=10; score=-0.2376
@@ -1237,7 +412,7 @@ chocs,ចុច,549,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=2; r
 joch,ចុច,549,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=2; rank=3; beams=10; score=-0.4051; collision=1; existing_targets=ជច់
 aachnha,អាជ្ញា,549,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=2; rank=2; beams=10; score=-0.2839
 aajnha,អាជ្ញា,549,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=2; rank=1; beams=10; score=-0.2351
-aajnhea,អាជ្ញា,549,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=2; rank=3; beams=10; score=-0.3575
+aajnha,អាជ្ញា,549,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=2; rank=3; beams=10; score=-0.3575
 saeuch,សើច,547,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=2; rank=1; beams=10; score=-0.2246
 saeucs,សើច,547,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=2; rank=3; beams=10; score=-0.3379
 thtrong,ទ្រង់,545,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=2; rank=2; beams=10; score=-0.2153
@@ -1857,7 +1032,7 @@ stokh,ស្តុក,229,km,generated,draft,tonle:s1; reverse=2en; weak_coverag
 srakh,ស្រក់,227,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.2787
 srokh,ស្រក់,227,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=1; beams=10; score=-0.2425
 aothr,អាថ៌,227,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.3748
-oathr,អាថ៌,227,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.3954
+athr,អាថ៌,227,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.3954
 kariol,ការយល់,225,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.2970
 koryol,ការយល់,225,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.3041
 tthoneakear,ធនាគារ,225,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=1; beams=10; score=-0.0763
@@ -2566,7 +1741,7 @@ thray,ត្រាយ,117,km,generated,draft,tonle:s1; reverse=2en; weak_coverag
 trai,ត្រាយ,117,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.3662; collision=1; existing_targets=ត្រៃ|ត្រ័យ
 botrey,បុត្រី,117,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.2699
 potrei,បុត្រី,117,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.3128
-boatthor,ព័ទ្ធ,117,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.2441
+poatt,ព័ទ្ធ,117,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.2441
 paatthor,ព័ទ្ធ,117,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.2925
 saae,ស៊ែ,117,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-1.0375
 soe,ស៊ែ,117,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.3064
@@ -3175,7 +2350,7 @@ vodthonapheap,វឌ្ឍនភាព,72,km,generated,draft,tonle:s1; reverse=2
 samrecs,សំរេច,72,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.2140
 somrech,សំរេច,72,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.2564
 samaot,សំអាត,72,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.3064
-samoat,សំអាត,72,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.3339
+samaat,សំអាត,72,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.3339
 sroth,ស្រុត,72,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=1; beams=10; score=-0.2570
 srott,ស្រុត,72,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.2603
 aapheos,អាភាស,72,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.2766
@@ -4342,7 +3517,7 @@ heronhvotthok,ហិរញ្ញវត្ថុ,26,km,generated,draft,tonle:s1; 
 anamyk,អនាមិក,26,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.3148
 onamik,អនាមិក,26,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.2767
 aothoam,អាធ័ម,26,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.2899
-oathoam,អាធ័ម,26,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.2957
+athoam,អាធ័ម,26,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.2957
 nggaeth,ង៉ែត,25,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=2; rank=1; beams=10; score=-0.2022
 nggaett,ង៉ែត,25,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=2; rank=3; beams=10; score=-0.2450
 cheth,ចិត,25,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.2962
@@ -4432,7 +3607,6 @@ sroam,ស្រាំ,24,km,generated,draft,tonle:s1; reverse=2en; weak_coverage
 avoyoveak,អវយវៈ,24,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.1823
 ovayoveak,អវយវៈ,24,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.2623
 aatmo,អាត្មា,24,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.3540
-oatma,អាត្មា,24,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.3436
 khanada,កាណាដា,23,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=2; rank=2; beams=10; score=-0.2951
 konada,កាណាដា,23,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=2; rank=3; beams=10; score=-0.3070
 karpisooth,ការពិសោធន៍,23,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.2131
@@ -18789,7 +17963,7 @@ loukesvoreok,លោកេស្វរៈ,1,km,generated,draft,tonle:s1; reverse=
 launmpil,លោណម្ពិល,1,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.2415
 lounmpyl,លោណម្ពិល,1,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.1914
 loutoongreae,លោតអង្រែ,1,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=2; rank=3; beams=10; score=-0.1841
-loutoanteak,លោតអន្ទាក់,1,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=2; rank=3; beams=10; score=-0.1822
+loutoanteak,លោតអន្ទាក់,1,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=2; rank=3; beams=10; score=-0.1822
 louthae,លោតែ,1,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.2556
 loutoe,លោតែ,1,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.2604
 louth,លោទ,1,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.2382
@@ -20561,7 +19735,6 @@ sasana,សាសន,1,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=2;
 sasanikh,សាសនិក,1,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.3048
 sasonik,សាសនិក,1,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.2346
 sasaptor,សាសព្ទ,1,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=1; beams=10; score=-0.2006
-sasoptor,សាសព្ទ,1,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.2593
 sasptor,សាសព្ទ,1,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.3446
 sasaroukh,សាសរោគ,1,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=2; rank=3; beams=10; score=-0.2618
 sasdo,សាស្ដា,1,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.2668
@@ -22628,9 +21801,9 @@ anteveasekh,អន្តេវាសិក,1,km,generated,draft,tonle:s1; revers
 anteveosen,អន្តេវាសិន,1,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=2; rank=3; beams=10; score=-0.2040
 anteaengantei,អន្តែងអន្តៃ,1,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=2; rank=3; beams=10; score=-0.1836
 onteaengantey,អន្តែងអន្តៃ,1,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=2; rank=2; beams=10; score=-0.1789
-anteak,អន្តៈ,1,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=2; rank=1; beams=10; score=-0.2743; collision=1; existing_targets=អន្ទាក់
+anteak,អន្តៈ,1,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=2; rank=1; beams=10; score=-0.2743; collision=1; existing_targets=អន្ទាក់
 anteakh,អន្តៈ,1,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=2; rank=2; beams=10; score=-0.3102
-onteak,អន្តៈ,1,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=2; rank=3; beams=10; score=-0.3330; collision=1; existing_targets=អន្ទាក់
+onteak,អន្តៈ,1,km,generated,rejected,tonle:s1; reverse=2en; weak_coverage=2; rank=3; beams=10; score=-0.3330; collision=1; existing_targets=អន្ទាក់
 antham,អន្ថម,1,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=2; rank=3; beams=10; score=-0.3318
 anthirm,អន្ថឺម,1,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=2; rank=3; beams=10; score=-0.2801
 anthauch,អន្ថោចៗ,1,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=2; rank=3; beams=10; score=-0.2752
@@ -22750,7 +21923,6 @@ aphithamm,អភិធម្ម,1,km,generated,draft,tonle:s1; reverse=2en; weak
 aphitthomm,អភិធម្ម,1,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=2; rank=2; beams=10; score=-0.1992
 aphythean,អភិធាន,1,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.2078
 ophithean,អភិធាន,1,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.2312
-aphitheansoptor,អភិធានសព្ទ,1,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=2; rank=2; beams=10; score=-0.1443
 aphittheansaptor,អភិធានសព្ទ,1,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=2; rank=3; beams=10; score=-0.1732
 aphinyves,អភិនិវេស,1,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.2310
 aphynives,អភិនិវេស,1,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.2159
@@ -23414,13 +22586,13 @@ aabayiksatt,អាបាយិកសត្ត,1,km,generated,draft,tonle:s1; rev
 aabayiksott,អាបាយិកសត្ត,1,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.2234
 aabayyksatt,អាបាយិកសត្ត,1,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.2337
 aobochchha,អាបុច្ឆា,1,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.2305
-oabochchha,អាបុច្ឆា,1,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.2139
+abbochchha,អាបុច្ឆា,1,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.2139
 aaboo,អាបោ,1,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.3848
 aobao,អាបោ,1,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.3826
 aabaong,អាប៉ោង,1,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.2611
 aapaang,អាប៉ោង,1,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.3187
 aabaat,អាប័ទ,1,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.2488
-oaboat,អាប័ទ,1,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.4056
+abat,អាប័ទ,1,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.4056
 aapeoth,អាពាធ,1,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.2938
 aopeath,អាពាធ,1,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.3106
 aapeathyk,អាពាធិក,1,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.2298

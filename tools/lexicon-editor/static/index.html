@@ -11,10 +11,54 @@
     <header class="app-header" aria-label="Filters and actions">
       <div class="toolbar">
         <input id="query-input" type="search" placeholder="Search roman, target, notes…" autocomplete="off" aria-label="Search">
-        <label>Chunk <select id="chunk-filter"></select></label>
-        <label>Status <select id="status-filter"></select></label>
-        <label>Category <select id="category-filter"></select></label>
-        <label>Rows <select id="page-size"><option>50</option><option selected>100</option><option>250</option></select></label>
+        <input id="target-input" type="search" placeholder="Khmer target /regex/…" autocomplete="off" aria-label="Filter Khmer target by regex">
+        <div class="menu-wrap">
+          <button id="chunk-filter-button" type="button" class="btn" aria-haspopup="true" aria-expanded="false">All chunks</button>
+          <div id="chunk-filter-popover" class="popover chunk-filter-popover" hidden>
+            <div class="chunk-filter-head">
+              <label class="chunk-filter-row is-head">
+                <input id="chunk-filter-all" type="checkbox">
+                <span>Select all</span>
+                <span id="chunk-filter-count" class="chunk-filter-count"></span>
+              </label>
+            </div>
+            <div id="chunk-filter-list" class="chunk-filter-list"></div>
+          </div>
+        </div>
+        <div class="menu-wrap">
+          <button id="status-filter-button" type="button" class="btn" aria-haspopup="true" aria-expanded="false">All status</button>
+          <div id="status-filter-popover" class="popover chunk-filter-popover" hidden>
+            <div class="chunk-filter-head">
+              <label class="chunk-filter-row is-head">
+                <input id="status-filter-all" type="checkbox">
+                <span>Select all</span>
+                <span id="status-filter-count" class="chunk-filter-count"></span>
+              </label>
+            </div>
+            <div id="status-filter-list" class="chunk-filter-list"></div>
+          </div>
+        </div>
+        <div class="menu-wrap">
+          <button id="category-filter-button" type="button" class="btn" aria-haspopup="true" aria-expanded="false">All categories</button>
+          <div id="category-filter-popover" class="popover chunk-filter-popover" hidden>
+            <div class="chunk-filter-head">
+              <label class="chunk-filter-row is-head">
+                <input id="category-filter-all" type="checkbox">
+                <span>Select all</span>
+                <span id="category-filter-count" class="chunk-filter-count"></span>
+              </label>
+            </div>
+            <div id="category-filter-list" class="chunk-filter-list"></div>
+          </div>
+        </div>
+        <label>Runtime
+          <select id="runtime-filter">
+            <option value="" selected>all</option>
+            <option value="included">included</option>
+            <option value="excluded">excluded</option>
+          </select>
+        </label>
+        <label>Rows <select id="page-size"><option>50</option><option selected>100</option><option>250</option><option>500</option><option>1000</option><option>1500</option><option>2000</option></select></label>
       </div>
       <div class="primary-actions">
         <button id="review-open-button" type="button" class="btn">
@@ -50,7 +94,7 @@
             </button>
           </div>
 
-          <div id="selection-bar" class="selection-bar" role="toolbar" aria-label="Selected row actions" hidden>
+          <div id="selection-bar" class="selection-bar" role="toolbar" aria-label="Selected row actions">
             <span id="selection-count" class="selection-count"></span>
             <button id="delete-row-button" type="button" class="btn btn-danger">
               <svg viewBox="0 0 24 24" class="icon" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/></svg>
@@ -66,8 +110,8 @@
               <div id="set-popover" class="popover" hidden>
                 <label>Field
                   <select id="bulk-column">
-                    <option value="category">category</option>
                     <option value="status">status</option>
+                    <option value="category">category</option>
                     <option value="freq_lang">freq_lang</option>
                   </select>
                 </label>
@@ -170,23 +214,42 @@
     <div id="regex-modal" class="modal" role="dialog" aria-modal="true" aria-label="Find and replace">
       <div class="modal-card">
         <h2>Find / Replace (regex)</h2>
-        <p class="modal-hint">Applied to selected/active rows only. Preview before applying; the change is undoable.</p>
+        <p class="modal-hint"><span id="regex-scope"></span> Preview before applying; the change is undoable.</p>
         <div class="regex-fields">
-          <label>Column
+          <label class="regex-col">Column
             <select id="regex-column">
               <option value="roman" selected>roman</option>
               <option value="target">target</option>
               <option value="notes">notes</option>
             </select>
           </label>
-          <label>Pattern <input id="regex-pattern" type="text" placeholder="^a" autocomplete="off"></label>
-          <label>Replacement <input id="regex-replacement" type="text" placeholder="" autocomplete="off"></label>
-        </div>
-        <div class="modal-actions">
-          <button id="regex-preview-button" type="button">Preview</button>
+          <div class="regex-row">
+            <label>Pattern <input id="regex-pattern" type="text" placeholder="^a" autocomplete="off"></label>
+            <label>Replacement <input id="regex-replacement" type="text" placeholder="" autocomplete="off"></label>
+            <button id="regex-preview-button" type="button">Preview</button>
+          </div>
           <span id="regex-count" class="muted"></span>
         </div>
-        <div id="regex-preview-list" class="regex-preview"></div>
+
+        <div class="regex-split">
+          <div class="regex-rules-col">
+            <div class="regex-rules-head">
+              <h3>Predefined rules (roman)</h3>
+              <label class="chunk-filter-row is-head">
+                <input id="regex-rules-all" type="checkbox">
+                <span>Select all</span>
+              </label>
+            </div>
+            <div id="regex-rules-list" class="regex-rules-list"></div>
+            <div class="modal-actions">
+              <button id="regex-rules-preview-button" type="button">Preview rules</button>
+            </div>
+          </div>
+          <div class="regex-preview-col">
+            <div class="regex-rules-head"><h3>Preview</h3></div>
+            <div id="regex-preview-list" class="regex-preview"></div>
+          </div>
+        </div>
         <div class="modal-footer">
           <button id="regex-cancel-button" type="button">Cancel</button>
           <button id="regex-apply-button" type="button" class="primary" disabled>Apply</button>

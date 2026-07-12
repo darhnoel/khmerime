@@ -264,24 +264,61 @@ class EditorState:
         conflicts.sort(key=lambda c: (str(c["target"]), str(c["freq_lang"])))
         return conflicts
 
-    def filtered_rows(self, params: dict[str, str]) -> tuple[list[Row], dict[str, list[str]]]:
+    def duplicate_key_conflicts(self) -> list[dict[str, object]]:
+        runtime_keys: dict[tuple[str, str, str], list[Row]] = {}
+        for row in self.current_rows():
+            if row.get("status") == "approved":
+                key = (row.get("roman", ""), row.get("target", ""), row.get("freq_lang", ""))
+                runtime_keys.setdefault(key, []).append(row)
+        conflicts: list[dict[str, object]] = []
+        for (roman, target, freq_lang), group in runtime_keys.items():
+            if len(group) > 1:
+                conflicts.append(
+                    {
+                        "roman": roman,
+                        "target": target,
+                        "freq_lang": freq_lang,
+                        "rows": [{"id": row["_id"], "chunk": row["_chunk"], "freq": row.get("freq", "")} for row in group],
+                    }
+                )
+        conflicts.sort(key=lambda c: (str(c["roman"]), str(c["target"])))
+        return conflicts
+
+    def filtered_rows(
+        self, params: dict[str, str], selections: dict[str, set[str]] | None = None
+    ) -> tuple[list[Row], dict[str, list[str]]]:
         query = params.get("query", "").strip().lower()
-        chunk_filter = params.get("chunk", "").strip()
-        status_filter = params.get("status", "").strip()
-        category_filter = params.get("category", "").strip()
+        target_re = None
+        target_pattern = params.get("target", "").strip()
+        if target_pattern:
+            try:
+                target_re = re.compile(target_pattern)
+            except re.error:
+                target_re = None  # invalid pattern → no filter
+        selections = selections or {}
+        # "included"/"excluded" filter on the derived runtime field (included == status approved).
+        runtime = params.get("runtime", "").strip()
+        # field name in the row -> selected values (empty set = no filter)
+        picks = {
+            "_chunk": {v for v in selections.get("chunk", set()) if v},
+            "status": {v for v in selections.get("status", set()) if v},
+            "category": {v for v in selections.get("category", set()) if v},
+        }
         all_rows = self.current_rows()
         problem_map = self.build_problem_map(all_rows)
         output: list[Row] = []
         for row in all_rows:
-            if chunk_filter and row.get("_chunk") != chunk_filter:
-                continue
-            if status_filter and row.get("status") != status_filter:
-                continue
-            if category_filter and row.get("category") != category_filter:
+            if any(chosen and row.get(field) not in chosen for field, chosen in picks.items()):
                 continue
             if query:
                 haystack = " ".join([row.get("roman", ""), row.get("target", ""), row.get("notes", "")]).lower()
                 if query not in haystack:
+                    continue
+            if target_re is not None and not target_re.search(row.get("target", "")):
+                continue
+            if runtime in ("included", "excluded"):
+                included = row.get("status") == "approved"
+                if (runtime == "included") != included:
                     continue
             output.append(row)
         return output, problem_map
@@ -321,9 +358,13 @@ class EditorState:
 
     def api_rows(self, query: dict[str, list[str]]) -> dict[str, object]:
         params = {key: values[-1] for key, values in query.items() if values}
+        selections = {
+            field: {v.strip() for v in query.get(field, []) if v.strip()}
+            for field in ("chunk", "status", "category")
+        }
         page = max(1, int(params.get("page", "1") or "1"))
-        page_size = min(250, max(1, int(params.get("page_size", "100") or "100")))
-        rows, problem_map = self.filtered_rows(params)
+        page_size = min(2000, max(1, int(params.get("page_size", "100") or "100")))
+        rows, problem_map = self.filtered_rows(params, selections)
         start = (page - 1) * page_size
         page_rows = rows[start : start + page_size]
         last_page = max(1, (len(rows) + page_size - 1) // page_size)
@@ -489,22 +530,35 @@ class EditorState:
         self.mark_dirty(draft.name)
         return {"meta": self.api_meta()}
 
-    def _regex_changes(self, payload: dict[str, object]) -> tuple[str, list[tuple[Row, str]]]:
+    def _resolve_target_rows(self, payload: dict[str, object]) -> list[Row]:
+        """Rows the bulk op acts on: explicit row_ids if given, else the filtered set."""
         row_ids = [str(value) for value in payload.get("row_ids", [])]
+        if row_ids:
+            return [self.find_row(row_id)[2] for row_id in row_ids]
+        flt = payload.get("filter")
+        if not isinstance(flt, dict):
+            raise EditorError("no rows selected")
+        params = {key: str(flt.get(key, "") or "") for key in ("query", "target", "runtime")}
+        selections = {
+            field: {str(v).strip() for v in (flt.get(field) or []) if str(v).strip()}
+            for field in ("chunk", "status", "category")
+        }
+        rows, _ = self.filtered_rows(params, selections)
+        return rows
+
+    def _regex_changes(self, payload: dict[str, object]) -> tuple[str, list[tuple[Row, str]]]:
         column = str(payload.get("column", ""))
         pattern = str(payload.get("pattern", ""))
         replacement = str(payload.get("replacement", ""))
         if column not in {"roman", "target", "notes"}:
             raise EditorError("regex bulk edit supports roman, target, or notes only")
-        if not row_ids:
-            raise EditorError("no rows selected")
+        rows = self._resolve_target_rows(payload)
         try:
             compiled = re.compile(pattern)
         except re.error as error:
             raise EditorError(f"invalid pattern: {error}") from error
         changes: list[tuple[Row, str]] = []
-        for row_id in row_ids:
-            _, _, row = self.find_row(row_id)
+        for row in rows:
             old = row.get(column, "")
             new = compiled.sub(replacement, old)
             if new != old:
@@ -514,12 +568,61 @@ class EditorState:
     def api_bulk_regex_preview(self, payload: dict[str, object]) -> dict[str, object]:
         _, changes = self._regex_changes(payload)
         return {
-            "changes": [{"id": row["_id"], "old": row.get(payload.get("column", ""), ""), "new": new} for row, new in changes],
+            "changes": [{"id": row["_id"], "old": row.get(payload.get("column", ""), ""), "new": new, "target": row.get("target", "")} for row, new in changes],
             "count": len(changes),
         }
 
     def api_bulk_regex_apply(self, payload: dict[str, object]) -> dict[str, object]:
         column, changes = self._regex_changes(payload)
+        if not changes:
+            return {"updated": 0, "meta": self.api_meta()}
+        self.push_undo()
+        touched: set[str] = set()
+        for row, new in changes:
+            row[column] = new
+            touched.add(row["_chunk"])
+        for name in touched:
+            self.mark_dirty(name)
+        return {"updated": len(changes), "meta": self.api_meta()}
+
+    def _regex_rules_changes(self, payload: dict[str, object]) -> tuple[str, list[tuple[Row, str]]]:
+        column = str(payload.get("column", ""))
+        raw_rules = payload.get("rules", [])
+        if column not in {"roman", "target", "notes"}:
+            raise EditorError("regex bulk edit supports roman, target, or notes only")
+        if not raw_rules:
+            raise EditorError("no rules selected")
+        rows = self._resolve_target_rows(payload)
+        compiled: list[tuple[re.Pattern[str], str]] = []
+        for rule in raw_rules:
+            pattern = str(rule.get("pattern", ""))
+            replacement = str(rule.get("replacement", ""))
+            try:
+                compiled.append((re.compile(pattern), replacement))
+            except re.error as error:
+                raise EditorError(f"invalid pattern {pattern!r}: {error}") from error
+        changes: list[tuple[Row, str]] = []
+        for row in rows:
+            old = row.get(column, "")
+            new = old
+            for regex, replacement in compiled:  # apply rules in list order
+                new = regex.sub(replacement, new)
+            if new != old:
+                changes.append((row, new))
+        return column, changes
+
+    def api_bulk_regex_rules_preview(self, payload: dict[str, object]) -> dict[str, object]:
+        column, changes = self._regex_rules_changes(payload)
+        return {
+            "changes": [
+                {"id": row["_id"], "old": row.get(column, ""), "new": new, "target": row.get("target", "")}
+                for row, new in changes
+            ],
+            "count": len(changes),
+        }
+
+    def api_bulk_regex_rules_apply(self, payload: dict[str, object]) -> dict[str, object]:
+        column, changes = self._regex_rules_changes(payload)
         if not changes:
             return {"updated": 0, "meta": self.api_meta()}
         self.push_undo()
@@ -605,7 +708,9 @@ class EditorState:
                 int(item["row"]["row"]),  # type: ignore[index]
             )
         )
-        return {"problems": problems[:1000], "total": len(problems)}
+        informational = {"status is disabled", "status is rejected"}
+        actionable = sum(1 for item in problems if item["type"] not in informational)
+        return {"problems": problems[:1000], "total": len(problems), "actionable": actionable}
 
     def strict_chunk_rows_from_current(self) -> list[chunks.ChunkRow]:
         strict_rows: list[chunks.ChunkRow] = []
@@ -691,6 +796,13 @@ class EditorState:
             self.build_runtime_from_disk()
             self.last_diff = self.git_diff()
             return {"message": "checked existing chunks and runtime CSV", "diff": self.last_diff, "meta": self.api_meta()}
+        duplicates = self.duplicate_key_conflicts()
+        if duplicates:
+            keys = ", ".join(str(c["roman"]) for c in duplicates[:5])
+            raise EditorError(
+                f"{len(duplicates)} duplicate approved key(s): {keys}" + ("…" if len(duplicates) > 5 else ""),
+                detail={"duplicate_keys": duplicates},
+            )
         conflicts = self.frequency_conflicts()
         if conflicts:
             targets = ", ".join(str(c["target"]) for c in conflicts[:5])
