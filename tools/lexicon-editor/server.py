@@ -54,7 +54,10 @@ class Handler(BaseHTTPRequestHandler):
         if isinstance(error, chunks.DataError):
             self.send_json({"error": str(error)}, HTTPStatus.BAD_REQUEST)
         elif isinstance(error, EditorError):
-            self.send_json({"error": str(error)}, error.status)
+            body = {"error": str(error)}
+            if error.detail is not None:
+                body["detail"] = error.detail
+            self.send_json(body, error.status)
         else:
             self.send_json({"error": repr(error)}, HTTPStatus.INTERNAL_SERVER_ERROR)
 

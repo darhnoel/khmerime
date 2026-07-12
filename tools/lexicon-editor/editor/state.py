@@ -36,9 +36,10 @@ Row = dict[str, str]
 
 
 class EditorError(Exception):
-    def __init__(self, message: str, status: int = HTTPStatus.BAD_REQUEST):
+    def __init__(self, message: str, status: int = HTTPStatus.BAD_REQUEST, detail: dict | None = None):
         super().__init__(message)
         self.status = status
+        self.detail = detail
 
 
 @dataclass
@@ -242,6 +243,27 @@ class EditorState:
                 warnings.setdefault(row["_id"], []).append(f"status is {row.get('status')}")
         return warnings
 
+    def frequency_conflicts(self) -> list[dict[str, object]]:
+        target_freqs: dict[tuple[str, str], list[Row]] = {}
+        for row in self.current_rows():
+            if row.get("status") == "approved":
+                target_freqs.setdefault((row.get("target", ""), row.get("freq_lang", "")), []).append(row)
+        conflicts: list[dict[str, object]] = []
+        for (target, freq_lang), group in target_freqs.items():
+            if len({row.get("freq", "") for row in group}) > 1:
+                conflicts.append(
+                    {
+                        "target": target,
+                        "freq_lang": freq_lang,
+                        "rows": [
+                            {"id": row["_id"], "roman": row.get("roman", ""), "freq": row.get("freq", "")}
+                            for row in group
+                        ],
+                    }
+                )
+        conflicts.sort(key=lambda c: (str(c["target"]), str(c["freq_lang"])))
+        return conflicts
+
     def filtered_rows(self, params: dict[str, str]) -> tuple[list[Row], dict[str, list[str]]]:
         query = params.get("query", "").strip().lower()
         chunk_filter = params.get("chunk", "").strip()
@@ -407,9 +429,12 @@ class EditorState:
             "status": chunks.VALID_STATUSES,
             "freq_lang": chunks.VALID_FREQ_LANGS,
         }
-        if column not in allowed:
-            raise EditorError("bulk edit supports category, status, or freq_lang only")
-        if value not in allowed[column]:
+        if column == "freq":
+            if not (value.isdigit() and int(value) > 0):
+                raise EditorError(f"freq must be a positive integer, got {value!r}")
+        elif column not in allowed:
+            raise EditorError("bulk edit supports category, status, freq_lang, or freq only")
+        elif value not in allowed[column]:
             raise EditorError(f"invalid {column} value {value!r}")
         if not row_ids:
             raise EditorError("no rows selected")
@@ -666,6 +691,14 @@ class EditorState:
             self.build_runtime_from_disk()
             self.last_diff = self.git_diff()
             return {"message": "checked existing chunks and runtime CSV", "diff": self.last_diff, "meta": self.api_meta()}
+        conflicts = self.frequency_conflicts()
+        if conflicts:
+            targets = ", ".join(str(c["target"]) for c in conflicts[:5])
+            raise EditorError(
+                f"{len(conflicts)} target(s) have inconsistent frequency: {targets}"
+                + ("…" if len(conflicts) > 5 else ""),
+                detail={"frequency_conflicts": conflicts},
+            )
         self.validate_all_for_save()
         self.ensure_no_external_dirty_changes()
         backup_dir = self.backup_dirty_chunks()

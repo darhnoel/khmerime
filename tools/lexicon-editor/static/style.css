@@ -654,3 +654,53 @@ pre {
   color: var(--text);
   border-color: var(--line);
 }
+
+/* --- Build error modal: frequency conflict quick-fix --- */
+#error-message {
+  min-height: auto;
+  max-height: 30vh;
+  color: var(--danger);
+}
+
+#error-conflicts {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 12px;
+  max-height: 40vh;
+  overflow-y: auto;
+}
+
+.conflict-card {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.conflict-head {
+  font-weight: 700;
+}
+
+.conflict-detail {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.conflict-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.conflict-input {
+  width: 90px;
+  min-height: 34px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--surface);
+  padding: 5px 8px;
+}

@@ -41,6 +41,80 @@ def make_state(tmp_path: Path) -> "server.EditorState":
     )
 
 
+def make_freq_conflict_state(tmp_path: Path) -> "server.EditorState":
+    chunks_dir = tmp_path / "chunks"
+    write_chunk(
+        chunks_dir / "chunk_0001.csv",
+        [
+            ["srap", "ស្រាប់", "5", "km", "words", "approved", ""],
+            ["sraab", "ស្រាប់", "12", "km", "words", "approved", ""],
+            ["thmei", "ថ្មី", "3", "km", "words", "approved", ""],
+        ],
+    )
+    return server.EditorState(
+        root=tmp_path,
+        chunks_dir=chunks_dir,
+        runtime_path=tmp_path / "roman_lookup.csv",
+    )
+
+
+class LexiconEditorFrequencyConflictTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.temporary_directory = tempfile.TemporaryDirectory()
+        self.tmp_path = Path(self.temporary_directory.name)
+
+    def tearDown(self) -> None:
+        self.temporary_directory.cleanup()
+
+    def test_frequency_conflicts_groups_rows_by_target_with_differing_freq(self) -> None:
+        state = make_freq_conflict_state(self.tmp_path)
+
+        conflicts = state.frequency_conflicts()
+
+        self.assertEqual(len(conflicts), 1)
+        conflict = conflicts[0]
+        self.assertEqual(conflict["target"], "ស្រាប់")
+        self.assertEqual(conflict["freq_lang"], "km")
+        self.assertEqual({r["freq"] for r in conflict["rows"]}, {"5", "12"})
+        self.assertEqual({r["roman"] for r in conflict["rows"]}, {"srap", "sraab"})
+        for row in conflict["rows"]:
+            self.assertIn("id", row)
+
+    def test_frequency_conflicts_empty_when_consistent(self) -> None:
+        state = make_state(self.tmp_path)
+        self.assertEqual(state.frequency_conflicts(), [])
+
+    def test_bulk_edit_freq_resolves_a_conflict(self) -> None:
+        state = make_freq_conflict_state(self.tmp_path)
+        conflict = state.frequency_conflicts()[0]
+        ids = [row["id"] for row in conflict["rows"]]
+
+        state.api_bulk_edit({"row_ids": ids, "column": "freq", "value": "12"})
+
+        self.assertEqual(state.frequency_conflicts(), [])
+
+    def test_save_build_check_raises_with_conflict_detail(self) -> None:
+        state = make_freq_conflict_state(self.tmp_path)
+        # force a dirty draft so save takes the validating path
+        row_id = state.current_rows()[0]["_id"]
+        state.api_edit_cell({"row_id": row_id, "column": "notes", "value": "x"})
+
+        with self.assertRaises(server.EditorError) as ctx:
+            state.api_save_build_check()
+
+        detail = getattr(ctx.exception, "detail", None)
+        self.assertIsNotNone(detail)
+        self.assertEqual(len(detail["frequency_conflicts"]), 1)
+        self.assertEqual(detail["frequency_conflicts"][0]["target"], "ស្រាប់")
+
+    def test_bulk_edit_freq_rejects_non_positive(self) -> None:
+        state = make_freq_conflict_state(self.tmp_path)
+        ids = [row["id"] for row in state.frequency_conflicts()[0]["rows"]]
+
+        with self.assertRaisesRegex(server.EditorError, "positive integer"):
+            state.api_bulk_edit({"row_ids": ids, "column": "freq", "value": "0"})
+
+
 class LexiconEditorBootstrapTests(unittest.TestCase):
     def test_root_resolves_to_repo_and_manager_is_importable(self) -> None:
         # Guards against the file-depth regression: state.py must resolve ROOT
@@ -82,6 +156,20 @@ class LexiconEditorStateTests(unittest.TestCase):
 
         self.assertIn("chunk_0001.csv", state.dirty_chunks)
         self.assertEqual(state.current_rows()[0]["roman"], "sraap")
+
+    def test_edit_cell_returns_dirty_flag_for_client_auto_select(self) -> None:
+        # Contract the client relies on to auto-select edited rows: a real
+        # change returns dirty=True; committing a cell to its unchanged value
+        # returns dirty=False (so tabbing through cells won't select the row).
+        state = make_state(self.tmp_path)
+        row = state.current_rows()[0]
+        row_id, current = row["_id"], row["roman"]
+
+        noop = state.api_edit_cell({"row_id": row_id, "column": "roman", "value": current})
+        self.assertFalse(noop["row"]["dirty"])
+
+        changed = state.api_edit_cell({"row_id": row_id, "column": "roman", "value": "sraap"})
+        self.assertTrue(changed["row"]["dirty"])
 
     def test_undo_reverts_the_last_edit(self) -> None:
         state = make_state(self.tmp_path)

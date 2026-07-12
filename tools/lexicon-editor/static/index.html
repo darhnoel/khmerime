@@ -153,6 +153,20 @@
       </div>
     </div>
 
+    <div id="error-modal" class="modal" role="dialog" aria-modal="true" aria-label="Build error">
+      <div class="modal-card">
+        <div class="section-head">
+          <h2>Build failed</h2>
+          <span>
+            <button id="error-copy-button" type="button" class="btn">Copy</button>
+            <button id="error-close-button" type="button" class="btn">Close</button>
+          </span>
+        </div>
+        <pre id="error-message"></pre>
+        <div id="error-conflicts"></div>
+      </div>
+    </div>
+
     <div id="regex-modal" class="modal" role="dialog" aria-modal="true" aria-label="Find and replace">
       <div class="modal-card">
         <h2>Find / Replace (regex)</h2>

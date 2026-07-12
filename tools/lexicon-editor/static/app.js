@@ -84,7 +84,9 @@ async function api(path, options = {}) {
   const response = await fetch(path, init);
   const payload = await response.json();
   if (!response.ok) {
-    throw new Error(payload.error || response.statusText);
+    const error = new Error(payload.error || response.statusText);
+    error.detail = payload.detail;
+    throw error;
   }
   return payload;
 }
@@ -301,11 +303,28 @@ function makeTable() {
     },
     columns: [
       {
+        titleFormatter() {
+          const pageIds = state.table ? state.table.getData().map((row) => row.id) : [];
+          const allChecked = pageIds.length && pageIds.every((id) => state.selectedRowIds.has(id));
+          return `<input type="checkbox" aria-label="Select all rows on page" ${allChecked ? "checked" : ""}>`;
+        },
+        headerClick(event) {
+          event.stopPropagation();
+          const pageIds = state.table.getData().map((row) => row.id);
+          const allChecked = pageIds.length && pageIds.every((id) => state.selectedRowIds.has(id));
+          for (const id of pageIds) {
+            if (allChecked) state.selectedRowIds.delete(id);
+            else state.selectedRowIds.add(id);
+          }
+          state.table.redraw(true);
+          refreshSelectionUI();
+        },
         formatter(cell) {
           const checked = state.selectedRowIds.has(cell.getRow().getData().id) ? "checked" : "";
           return `<input type="checkbox" aria-label="Select Row" ${checked}>`;
         },
         hozAlign: "center",
+        headerHozAlign: "center",
         headerSort: false,
         width: 44,
         cellClick(event, cell) {
@@ -353,7 +372,16 @@ function makeTable() {
       // Update only the edited row in place — no full-page reload/repaint.
       // Cross-row warnings stay lazy: they refresh on save, filter change, or
       // reload, not on every keystroke.
-      if (payload.row) cell.getRow().update(payload.row);
+      if (payload.row) {
+        cell.getRow().update(payload.row);
+        // Auto-accumulate genuinely-modified rows into the selection so a
+        // batch status change targets exactly the rows you edited.
+        if (payload.row.dirty && !state.selectedRowIds.has(payload.row.id)) {
+          state.selectedRowIds.add(payload.row.id);
+          cell.getRow().reformat();
+          refreshSelectionUI();
+        }
+      }
     } catch (error) {
       showMessage(error.message, 8000);
       await loadRows();
@@ -574,6 +602,11 @@ async function bulkEdit() {
 async function saveBuildCheck() {
   try {
     const payload = await postAction("/api/save-build-check", {}, false);
+    // Save drops drafts and rescans, regenerating every row ID. Any selection
+    // held from before now points at IDs that no longer exist ("unknown row"),
+    // so clear it before reloading the fresh grid.
+    state.selectedRowIds.clear();
+    state.activeRowId = null;
     if (payload.diff !== undefined) {
       $("diff-output").textContent = payload.diff || "(no diff)";
       $("diff-modal").classList.add("visible");
@@ -582,8 +615,78 @@ async function saveBuildCheck() {
     await loadProblems();
     showMessage(`${payload.message}${payload.backup_dir ? `\nBackup: ${payload.backup_dir}` : ""}`, 7000);
   } catch (error) {
-    showMessage(error.message, 12000);
+    showBuildError(error);
   }
+}
+
+function showBuildError(error) {
+  $("error-message").textContent = error.message;
+  const holder = $("error-conflicts");
+  holder.replaceChildren();
+  const conflicts = error.detail && error.detail.frequency_conflicts;
+  if (conflicts && conflicts.length) {
+    for (const conflict of conflicts) {
+      holder.appendChild(renderConflictFix(conflict));
+    }
+  }
+  $("error-modal").classList.add("visible");
+}
+
+function renderConflictFix(conflict) {
+  const card = document.createElement("div");
+  card.className = "conflict-card";
+  const head = document.createElement("div");
+  head.className = "conflict-head";
+  head.textContent = `${conflict.target} (${conflict.freq_lang})`;
+  card.appendChild(head);
+
+  const rowIds = conflict.rows.map((r) => r.id);
+  const freqs = [...new Set(conflict.rows.map((r) => r.freq))];
+
+  const detail = document.createElement("div");
+  detail.className = "conflict-detail";
+  detail.textContent = conflict.rows.map((r) => `${r.roman}=${r.freq}`).join(", ");
+  card.appendChild(detail);
+
+  const actions = document.createElement("div");
+  actions.className = "conflict-actions";
+  const apply = async (value) => {
+    try {
+      await postAction("/api/bulk-edit", { row_ids: rowIds, column: "freq", value: String(value) });
+      card.remove();
+      showMessage(`Set freq=${value} for ${conflict.target}. Re-run Build.`);
+      if (!$("error-conflicts").children.length) closeBuildError();
+    } catch (e) {
+      showMessage(e.message, 8000);
+    }
+  };
+  for (const freq of freqs) {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "btn";
+    btn.textContent = `use ${freq}`;
+    btn.addEventListener("click", () => apply(freq));
+    actions.appendChild(btn);
+  }
+  const input = document.createElement("input");
+  input.type = "number";
+  input.min = "1";
+  input.placeholder = "freq";
+  input.className = "conflict-input";
+  const custom = document.createElement("button");
+  custom.type = "button";
+  custom.className = "btn primary";
+  custom.textContent = "Set";
+  custom.addEventListener("click", () => {
+    if (input.value) apply(input.value);
+  });
+  actions.append(input, custom);
+  card.appendChild(actions);
+  return card;
+}
+
+function closeBuildError() {
+  $("error-modal").classList.remove("visible");
 }
 
 async function loadDiff() {
@@ -666,6 +769,15 @@ function wireEvents() {
   $("review-scrim").addEventListener("click", closeReview);
   $("diff-open-button").addEventListener("click", () => openDiff().catch((error) => showMessage(error.message)));
   $("diff-close-button").addEventListener("click", closeDiff);
+  $("error-close-button").addEventListener("click", closeBuildError);
+  $("error-copy-button").addEventListener("click", async () => {
+    try {
+      await navigator.clipboard.writeText($("error-message").textContent || "");
+      showMessage("Error copied to clipboard.");
+    } catch (_e) {
+      showMessage("Copy failed — select the text manually.", 6000);
+    }
+  });
   $("query-input").addEventListener("input", () => {
     window.clearTimeout(state.searchTimer);
     state.searchTimer = window.setTimeout(() => {
@@ -781,6 +893,8 @@ function wireEvents() {
       postAction("/api/redo").catch(fail);
     } else if (event.key === "Escape" && $("regex-modal").classList.contains("visible")) {
       closeRegexModal();
+    } else if (event.key === "Escape" && $("error-modal").classList.contains("visible")) {
+      closeBuildError();
     } else if (event.key === "Escape" && $("diff-modal").classList.contains("visible")) {
       closeDiff();
     } else if (event.key === "Escape" && !$("review-drawer").hidden) {
