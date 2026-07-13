@@ -329,6 +329,7 @@ mod tests {
                 score_bps: None,
                 confidence_bps: None,
                 segments: Vec::new(),
+                from_model: false,
             }],
             5,
         );

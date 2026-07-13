@@ -265,6 +265,7 @@ impl ImeSession {
             .into_iter()
             .map(|candidate| PhraseCandidate {
                 text: candidate.text,
+                from_model: candidate.from_model,
                 segments: candidate
                     .segments
                     .into_iter()

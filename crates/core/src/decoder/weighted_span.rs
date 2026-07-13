@@ -44,6 +44,9 @@ struct SpanCandidate {
     score: i32,
     score_bps: u16,
     edit_similarity: f64,
+    /// True when this span came from the model span-proposal provider (vs lexicon retrieval),
+    /// so downstream candidates can be marked as model-assisted.
+    from_model: bool,
 }
 
 #[derive(Clone, Debug, Default)]
@@ -569,6 +572,7 @@ impl WeightedSpanDecoder {
             score,
             score_bps: score_to_bps(score),
             edit_similarity: best_edit,
+            from_model: false,
         })
     }
 
@@ -908,6 +912,7 @@ impl WeightedSpanDecoder {
             score,
             score_bps: score_to_bps(score),
             edit_similarity: f64::from(confidence) / 10_000.0,
+            from_model: true,
         })
     }
 
@@ -960,11 +965,13 @@ fn beam_item_to_candidate(item: BeamItem, best_total: i32, config: &DecoderConfi
     let confidence =
         (item.spans.iter().map(|span| span.edit_similarity).sum::<f64>() / item.spans.len().max(1) as f64) * 10_000.0;
     let relative = ((total as f64 / best_total.max(1) as f64) * 10_000.0).round() as i32;
+    let from_model = item.spans.iter().any(|span| span.from_model);
 
     DecodeCandidate {
         text: item.final_text(),
         score_bps: Some(relative.clamp(0, 10_000) as u16),
         confidence_bps: Some(confidence.round().clamp(0.0, 10_000.0) as u16),
+        from_model,
         segments: item
             .spans
             .into_iter()
@@ -1340,7 +1347,7 @@ mod tests {
     use std::collections::HashMap;
     use std::sync::{Arc, OnceLock};
 
-    use super::{context_delta, pos_delta, WeightedSpanDecoder};
+    use super::{beam_item_to_candidate, context_delta, pos_delta, BeamItem, SpanCandidate, WeightedSpanDecoder};
     use crate::decoder::{DecoderConfig, DecoderMode};
     use crate::roman_lookup::{LegacyData, RankedLexicon, Transliterator};
 
@@ -1351,6 +1358,39 @@ mod tests {
             config.wfst_max_latency_ms = u64::MAX;
             Transliterator::from_default_data_with_config(config).unwrap()
         })
+    }
+
+    fn test_span(from_model: bool) -> SpanCandidate {
+        SpanCandidate {
+            start: 0,
+            end: 1,
+            input: "x".to_owned(),
+            output: "ខ".to_owned(),
+            recovered_roman: "x".to_owned(),
+            first_tag: None,
+            last_tag: None,
+            score: 0,
+            score_bps: 0,
+            edit_similarity: 0.0,
+            from_model,
+        }
+    }
+
+    // Provenance: a candidate is flagged `from_model` iff ANY of its spans came from the model
+    // provider (so the UI can mark model-assisted suggestions).
+    #[test]
+    fn candidate_flagged_from_model_when_any_span_is() {
+        let with_model = BeamItem {
+            spans: vec![test_span(false), test_span(true)],
+            ..Default::default()
+        };
+        assert!(beam_item_to_candidate(with_model, 100, &DecoderConfig::default()).from_model);
+
+        let lexicon_only = BeamItem {
+            spans: vec![test_span(false), test_span(false)],
+            ..Default::default()
+        };
+        assert!(!beam_item_to_candidate(lexicon_only, 100, &DecoderConfig::default()).from_model);
     }
 
     #[test]

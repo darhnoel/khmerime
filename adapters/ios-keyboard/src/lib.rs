@@ -74,6 +74,9 @@ impl From<&PhraseSegment> for IosSegmentEntry {
 pub struct IosPhraseCandidate {
     pub text: String,
     pub segments: Vec<IosSegmentEntry>,
+    /// True when the model provider contributed to this phrase — Swift shows a ✦ marker on
+    /// these cards.
+    pub from_model: bool,
 }
 
 impl From<&PhraseCandidate> for IosPhraseCandidate {
@@ -81,6 +84,7 @@ impl From<&PhraseCandidate> for IosPhraseCandidate {
         IosPhraseCandidate {
             text: c.text.clone(),
             segments: c.segments.iter().map(IosSegmentEntry::from).collect(),
+            from_model: c.from_model,
         }
     }
 }
@@ -378,6 +382,26 @@ mod tests {
             !state.candidates.is_empty(),
             "must still surface lexicon/fuzzy candidates"
         );
+    }
+
+    // provenance: the model-assisted flag survives PhraseCandidate -> IosPhraseCandidate so Swift
+    // can render the ✦ marker. (The full type->model-wins->✦ path is verified on device via the
+    // Standard/Smart A/B test; scoring-dependent end-to-end assertions are too brittle to unit-test.)
+    #[test]
+    fn phrase_candidate_from_model_flag_survives_mapping() {
+        let modelled = PhraseCandidate {
+            text: "ធ្វើ".to_owned(),
+            segments: vec![],
+            from_model: true,
+        };
+        assert!(IosPhraseCandidate::from(&modelled).from_model);
+
+        let lexicon = PhraseCandidate {
+            text: "ជា".to_owned(),
+            segments: vec![],
+            from_model: false,
+        };
+        assert!(!IosPhraseCandidate::from(&lexicon).from_model);
     }
 
     // #5 the debounced refine is safe with no active composition (no panic, clean state).
