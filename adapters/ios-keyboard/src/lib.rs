@@ -133,28 +133,36 @@ fn render_state(snapshot: &SessionSnapshot, result: &SessionResult) -> IosRender
 
 // ── Session handle ────────────────────────────────────────────────────────────
 
-/// Swift-visible session handle, exported via UniFFI.
-///
-/// Wraps the real `ImeSession` so every key tap goes through the full
-/// romanization → segmentation → candidate ranking pipeline.
-/// Build a fresh iOS session with the given span-proposal mode. Reuses the shared, cached
-/// transliterator data (cheap clone — no dictionary rebuild), so toggling Standard/Smart just
-/// rebuilds the lightweight view. `SpanProposalMode::Model` is inert unless a provider has been
-/// registered via `khmerime_core::register_span_proposal_provider` (paid build only).
-fn build_session(span_proposal_mode: SpanProposalMode) -> ImeSession {
-    let transliterator = Transliterator::from_shared_data_with_config(
+/// Build a fresh iOS session. The primary (live) engine is ALWAYS Standard — the keystroke hot
+/// path never runs the model. When `smart`, a Model-mode **visible refiner** is attached; it runs
+/// only via `refine_with_model` on a debounced pause, off the hot path. Reuses the shared, cached
+/// transliterator data (cheap clone — no dictionary rebuild). The model is inert unless a provider
+/// was registered via `khmerime_core::register_span_proposal_provider` (paid build only).
+fn build_session(smart: bool) -> ImeSession {
+    let live = Transliterator::from_shared_data_with_config(
         shared_transliterator_data(),
-        DecoderConfig::shadow_interactive().with_span_proposal_mode(span_proposal_mode),
+        DecoderConfig::shadow_interactive().with_span_proposal_mode(SpanProposalMode::Disabled),
     );
-    ImeSession::builder(transliterator, std::collections::HashMap::new())
+    let mut builder = ImeSession::builder(live, std::collections::HashMap::new())
         .input_mode(khmerime_session::InputMode::Roman)
         .options(ImeSessionOptions {
             segmented_preview: SegmentedPreviewMode::Enabled,
             ..Default::default()
-        })
-        .build()
+        });
+    if smart {
+        let refiner = Transliterator::from_shared_data_with_config(
+            shared_transliterator_data(),
+            DecoderConfig::shadow_interactive().with_span_proposal_mode(SpanProposalMode::Model),
+        );
+        builder = builder.visible_refiner(refiner);
+    }
+    builder.build()
 }
 
+/// Swift-visible session handle, exported via UniFFI.
+///
+/// Wraps the real `ImeSession` so every key tap goes through the full
+/// romanization → segmentation → candidate ranking pipeline.
 #[derive(uniffi::Object)]
 pub struct KhmerIMESession {
     inner: Mutex<ImeSession>,
@@ -171,7 +179,7 @@ impl KhmerIMESession {
     #[uniffi::constructor]
     pub fn new() -> Arc<Self> {
         Arc::new(KhmerIMESession {
-            inner: Mutex::new(build_session(SpanProposalMode::Disabled)),
+            inner: Mutex::new(build_session(false)),
             model_mode: std::sync::atomic::AtomicBool::new(false),
         })
     }
@@ -182,17 +190,26 @@ impl KhmerIMESession {
         self.model_mode.load(std::sync::atomic::Ordering::Relaxed)
     }
 
-    /// Toggle Standard/Smart. Rebuilds the decoder view with the model span-proposal mode on/off;
-    /// the current composition is reset (this is a settings action, not a mid-typing one). Smart
-    /// is inert unless a provider has been registered (paid build), so this never panics.
+    /// Toggle Standard/Smart. Rebuilds the view; Smart attaches the Model-mode visible refiner
+    /// (the keystroke hot path stays Standard either way). The current composition is reset (this
+    /// is a settings action, not a mid-typing one). Inert without a registered provider — never
+    /// panics.
     pub fn set_model_mode(&self, enabled: bool) {
-        let mode = if enabled {
-            SpanProposalMode::Model
-        } else {
-            SpanProposalMode::Disabled
-        };
-        *self.inner.lock().unwrap() = build_session(mode);
+        *self.inner.lock().unwrap() = build_session(enabled);
         self.model_mode.store(enabled, std::sync::atomic::Ordering::Relaxed);
+    }
+
+    /// Debounced model refine: re-decode the current composition with the Model-mode visible
+    /// refiner, OFF the keystroke hot path. Swift calls this on a typing pause (not per key). A
+    /// no-op returning the current state when there is no active composition; inert (Standard
+    /// result) when Smart is off or no provider is registered. Never panics.
+    pub fn refine_with_model(&self) -> IosRenderState {
+        let mut s = self.inner.lock().unwrap();
+        let raw = s.snapshot().preedit.clone();
+        if !raw.is_empty() {
+            s.refine_segmented_with_visible_refiner(&raw);
+        }
+        render_state(&s.snapshot(), &SessionResult::default())
     }
 
     pub fn focus_in(&self) -> IosRenderState {
@@ -353,8 +370,36 @@ mod tests {
         let s = new_session();
         s.set_model_mode(true); // Model mode, but no provider registered in this test binary
         let state = type_str(&s, "nhom");
-        assert_eq!(state.preedit, "nhom", "Standard decoding must still run under inert Smart");
-        assert!(!state.candidates.is_empty(), "must still surface lexicon/fuzzy candidates");
+        assert_eq!(
+            state.preedit, "nhom",
+            "Standard decoding must still run under inert Smart"
+        );
+        assert!(
+            !state.candidates.is_empty(),
+            "must still surface lexicon/fuzzy candidates"
+        );
+    }
+
+    // #5 the debounced refine is safe with no active composition (no panic, clean state).
+    #[test]
+    fn refine_with_model_on_empty_composition_is_safe() {
+        let s = new_session();
+        s.set_model_mode(true);
+        let state = s.refine_with_model();
+        assert!(state.preedit.is_empty());
+        assert!(state.candidates.is_empty());
+    }
+
+    // #6 the debounced refine runs mid-composition off the hot path without disturbing the roman
+    // preedit (inert re-decode when no provider is registered) — never panics.
+    #[test]
+    fn refine_with_model_mid_composition_preserves_preedit() {
+        let s = new_session();
+        s.set_model_mode(true);
+        let typed = type_str(&s, "nhom");
+        assert_eq!(typed.preedit, "nhom");
+        let refined = s.refine_with_model();
+        assert_eq!(refined.preedit, "nhom", "refine must not disturb the roman preedit");
     }
 
     // ── render_state field mapping ────────────────────────────────────────────
