@@ -6,7 +6,7 @@
 
 use std::sync::{Arc, Mutex, OnceLock};
 
-use khmerime_core::{DecoderConfig, SharedTransliteratorData, Transliterator};
+use khmerime_core::{DecoderConfig, SharedTransliteratorData, SpanProposalMode, Transliterator};
 use khmerime_session::{
     ImeSession, ImeSessionOptions, NativeKeyEvent, PhraseCandidate, PhraseSegment, SegmentPreviewEntry,
     SegmentedPreviewMode, SessionCommand, SessionResult, SessionSnapshot,
@@ -137,9 +137,31 @@ fn render_state(snapshot: &SessionSnapshot, result: &SessionResult) -> IosRender
 ///
 /// Wraps the real `ImeSession` so every key tap goes through the full
 /// romanization → segmentation → candidate ranking pipeline.
+/// Build a fresh iOS session with the given span-proposal mode. Reuses the shared, cached
+/// transliterator data (cheap clone — no dictionary rebuild), so toggling Standard/Smart just
+/// rebuilds the lightweight view. `SpanProposalMode::Model` is inert unless a provider has been
+/// registered via `khmerime_core::register_span_proposal_provider` (paid build only).
+fn build_session(span_proposal_mode: SpanProposalMode) -> ImeSession {
+    let transliterator = Transliterator::from_shared_data_with_config(
+        shared_transliterator_data(),
+        DecoderConfig::shadow_interactive().with_span_proposal_mode(span_proposal_mode),
+    );
+    ImeSession::builder(transliterator, std::collections::HashMap::new())
+        .input_mode(khmerime_session::InputMode::Roman)
+        .options(ImeSessionOptions {
+            segmented_preview: SegmentedPreviewMode::Enabled,
+            ..Default::default()
+        })
+        .build()
+}
+
 #[derive(uniffi::Object)]
 pub struct KhmerIMESession {
     inner: Mutex<ImeSession>,
+    // Standard/Smart toggle. Off = Standard (lexicon + fuzzy only). On = Smart, which enables
+    // the injected model span-proposal provider inside the decoder. Off by default so the OSS
+    // build is unchanged and a paid model is strictly opt-in.
+    model_mode: std::sync::atomic::AtomicBool,
 }
 
 #[uniffi::export]
@@ -148,20 +170,29 @@ impl KhmerIMESession {
     /// data (no external files needed on iOS).
     #[uniffi::constructor]
     pub fn new() -> Arc<Self> {
-        let transliterator = Transliterator::from_shared_data_with_config(
-            shared_transliterator_data(),
-            DecoderConfig::shadow_interactive(),
-        );
-        let session = ImeSession::builder(transliterator, std::collections::HashMap::new())
-            .input_mode(khmerime_session::InputMode::Roman)
-            .options(ImeSessionOptions {
-                segmented_preview: SegmentedPreviewMode::Enabled,
-                ..Default::default()
-            })
-            .build();
         Arc::new(KhmerIMESession {
-            inner: Mutex::new(session),
+            inner: Mutex::new(build_session(SpanProposalMode::Disabled)),
+            model_mode: std::sync::atomic::AtomicBool::new(false),
         })
+    }
+
+    /// Whether Smart (model) mode is currently enabled. The settings UI renders the toggle
+    /// from this.
+    pub fn is_model_mode(&self) -> bool {
+        self.model_mode.load(std::sync::atomic::Ordering::Relaxed)
+    }
+
+    /// Toggle Standard/Smart. Rebuilds the decoder view with the model span-proposal mode on/off;
+    /// the current composition is reset (this is a settings action, not a mid-typing one). Smart
+    /// is inert unless a provider has been registered (paid build), so this never panics.
+    pub fn set_model_mode(&self, enabled: bool) {
+        let mode = if enabled {
+            SpanProposalMode::Model
+        } else {
+            SpanProposalMode::Disabled
+        };
+        *self.inner.lock().unwrap() = build_session(mode);
+        self.model_mode.store(enabled, std::sync::atomic::Ordering::Relaxed);
     }
 
     pub fn focus_in(&self) -> IosRenderState {
@@ -286,6 +317,44 @@ mod tests {
             state = s.process_character(ch.to_string());
         }
         state
+    }
+
+    // ── Standard/Smart model-mode toggle ─────────────────────────────────────
+
+    // #1 tracer: a fresh session is in Standard mode (no model span proposals) by default,
+    // so the OSS build's behavior is unchanged and a paid model is opt-in.
+    #[test]
+    fn model_mode_off_by_default() {
+        let s = new_session();
+        assert!(!s.is_model_mode(), "fresh session must default to Standard (model off)");
+    }
+
+    // #2 the toggle turns Smart mode on.
+    #[test]
+    fn set_model_mode_true_enables_smart() {
+        let s = new_session();
+        s.set_model_mode(true);
+        assert!(s.is_model_mode(), "set_model_mode(true) must enable Smart");
+    }
+
+    // #3 toggling back returns to Standard.
+    #[test]
+    fn set_model_mode_false_returns_to_standard() {
+        let s = new_session();
+        s.set_model_mode(true);
+        s.set_model_mode(false);
+        assert!(!s.is_model_mode(), "set_model_mode(false) must return to Standard");
+    }
+
+    // #4 inert safety: enabling Smart with NO provider registered (free build, or a failed model
+    // load) must not panic — the decoder falls back to Standard and still produces candidates.
+    #[test]
+    fn smart_mode_without_provider_still_decodes() {
+        let s = new_session();
+        s.set_model_mode(true); // Model mode, but no provider registered in this test binary
+        let state = type_str(&s, "nhom");
+        assert_eq!(state.preedit, "nhom", "Standard decoding must still run under inert Smart");
+        assert!(!state.candidates.is_empty(), "must still surface lexicon/fuzzy candidates");
     }
 
     // ── render_state field mapping ────────────────────────────────────────────

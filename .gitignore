@@ -81,3 +81,8 @@ adapters/macos-imk/swift/**/xcuserdata/
 adapters/macos-imk/swift/**/*.xcuserdata/
 adapters/macos-imk/swift/**/*.xcuserdatad/
 adapters/macos-imk/swift/**/*.xcuserstate
+
+# Closed model provider must never be committed to the public repo. Path-based guard only —
+# the impl lives in a SEPARATE private repo and plugs in via the public trait at build time.
+/crates/core/src/decoder/model_provider.rs
+/crates/core/src/decoder/t5_cached.rs

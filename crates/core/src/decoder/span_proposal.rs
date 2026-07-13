@@ -1,10 +1,10 @@
-use std::sync::Arc;
+use std::sync::{Arc, OnceLock};
 
 use super::SpanProposalMode;
 
 #[allow(dead_code)]
 #[derive(Clone, Debug)]
-pub(crate) struct SpanProposalRequest<'a> {
+pub struct SpanProposalRequest<'a> {
     pub full_input: &'a str,
     pub span: &'a str,
     pub start: usize,
@@ -12,26 +12,33 @@ pub(crate) struct SpanProposalRequest<'a> {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub(crate) struct SpanProposal {
+pub struct SpanProposal {
     pub output: String,
     pub recovered_roman: String,
     pub confidence_bps: u16,
     pub source: &'static str,
 }
 
-pub(crate) trait SpanProposalProvider: Send + Sync {
+pub trait SpanProposalProvider: Send + Sync {
     fn candidate_ends(&self, full_input: &str, start: usize, chars: &[char]) -> Vec<usize>;
     fn propose(&self, request: &SpanProposalRequest<'_>) -> Vec<SpanProposal>;
+}
+
+/// Injection point for a span-proposal provider supplied by a separate build (implemented
+/// against `SpanProposalProvider`, registered once at startup). Absent = `Model` mode is inert,
+/// so the public engine never carries a provider unless one is deliberately plugged in.
+static REGISTERED_PROVIDER: OnceLock<Arc<dyn SpanProposalProvider>> = OnceLock::new();
+
+/// Register the provider used for `SpanProposalMode::Model`. First registration wins.
+pub fn register_span_proposal_provider(provider: Arc<dyn SpanProposalProvider>) {
+    let _ = REGISTERED_PROVIDER.set(provider);
 }
 
 pub(crate) fn provider_for_mode(mode: SpanProposalMode) -> Option<Arc<dyn SpanProposalProvider>> {
     match mode {
         SpanProposalMode::Disabled => None,
         SpanProposalMode::StaticTest => Some(Arc::new(StaticTestSpanProposalProvider)),
-        #[cfg(feature = "model-provider")]
-        SpanProposalMode::Model => super::model_provider::ModelSpanProposalProvider::load_from_env(),
-        #[cfg(not(feature = "model-provider"))]
-        SpanProposalMode::Model => None,
+        SpanProposalMode::Model => REGISTERED_PROVIDER.get().cloned(),
     }
 }
 
@@ -45,7 +52,7 @@ const MAX_MODEL_SPAN_LEN: usize = 12;
 /// `n` chars. Lets the lattice assemble multi-word segmentations (knhm|ttv|salarien) instead
 /// of one whole-input span.
 #[allow(dead_code)]
-pub(crate) fn candidate_span_ends(start: usize, n: usize) -> Vec<usize> {
+pub fn candidate_span_ends(start: usize, n: usize) -> Vec<usize> {
     ((start + 2)..=(start + MAX_MODEL_SPAN_LEN).min(n)).collect()
 }
 
@@ -94,10 +101,9 @@ mod tests {
     #[test]
     fn seam_is_inert_without_a_configured_provider() {
         assert!(provider_for_mode(SpanProposalMode::Disabled).is_none());
-        #[cfg(not(feature = "model-provider"))]
         assert!(
             provider_for_mode(SpanProposalMode::Model).is_none(),
-            "Model must resolve to None without the model-provider feature"
+            "Model must resolve to None until a provider is registered"
         );
     }
 
