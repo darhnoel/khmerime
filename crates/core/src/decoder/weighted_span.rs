@@ -44,6 +44,10 @@ struct SpanCandidate {
     score: i32,
     score_bps: u16,
     edit_similarity: f64,
+    /// True when this span came from the model span-proposal provider (vs lexicon retrieval),
+    /// so downstream candidates can be marked as model-assisted.
+    from_model: bool,
+    lexicon_verified: bool,
 }
 
 #[derive(Clone, Debug, Default)]
@@ -114,6 +118,10 @@ impl WeightedSpanDecoder {
                 let mut finals = proposed;
                 finals.extend(self.decode_whole_dictionary_span(request, &chars, started_at));
                 finals.extend(exact_full_span);
+                // A model proposal is an additional hypothesis, not permission to discard
+                // the Standard decoder's trusted exact-chunk phrase. Keep that anchored
+                // baseline in the same ranking competition.
+                finals.extend(self.decode_with_anchors(request, &chars, started_at));
                 finals.sort_by(|left, right| compare_beam_items(left, right, &self.config));
                 finals.truncate(self.config.max_candidates.max(self.config.beam_width));
                 return finals;
@@ -569,6 +577,8 @@ impl WeightedSpanDecoder {
             score,
             score_bps: score_to_bps(score),
             edit_similarity: best_edit,
+            from_model: false,
+            lexicon_verified: true,
         })
     }
 
@@ -882,10 +892,11 @@ impl WeightedSpanDecoder {
         span: &str,
         proposal: SpanProposal,
     ) -> Option<SpanCandidate> {
-        if proposal.output.is_empty() || !self.data.has_target(&proposal.output) {
+        if proposal.output.is_empty() {
             return None;
         }
 
+        let lexicon_verified = self.data.has_target(&proposal.output);
         let confidence = proposal.confidence_bps.min(10_000);
         let span_len = end.saturating_sub(start) as i32;
         let score = 3_200
@@ -908,6 +919,8 @@ impl WeightedSpanDecoder {
             score,
             score_bps: score_to_bps(score),
             edit_similarity: f64::from(confidence) / 10_000.0,
+            from_model: true,
+            lexicon_verified,
         })
     }
 
@@ -946,7 +959,12 @@ impl Decoder for WeightedSpanDecoder {
             .into_iter()
             .map(|item| beam_item_to_candidate(item, best_total, &self.config))
             .fold(Vec::<DecodeCandidate>::new(), |mut output, candidate| {
-                if !output.iter().any(|current| current.text == candidate.text) {
+                if let Some(current) = output.iter_mut().find(|current| current.text == candidate.text) {
+                    // Keep the best-ranked representation, but do not erase the fact that
+                    // the model independently proposed the same text. Adapters use this
+                    // provenance to show ✦ on AI alternatives.
+                    current.from_model |= candidate.from_model;
+                } else {
                     output.push(candidate);
                 }
                 output
@@ -960,11 +978,15 @@ fn beam_item_to_candidate(item: BeamItem, best_total: i32, config: &DecoderConfi
     let confidence =
         (item.spans.iter().map(|span| span.edit_similarity).sum::<f64>() / item.spans.len().max(1) as f64) * 10_000.0;
     let relative = ((total as f64 / best_total.max(1) as f64) * 10_000.0).round() as i32;
+    let from_model = item.spans.iter().any(|span| span.from_model);
+    let lexicon_verified = item.spans.iter().all(|span| span.lexicon_verified);
 
     DecodeCandidate {
         text: item.final_text(),
         score_bps: Some(relative.clamp(0, 10_000) as u16),
         confidence_bps: Some(confidence.round().clamp(0.0, 10_000.0) as u16),
+        from_model,
+        lexicon_verified,
         segments: item
             .spans
             .into_iter()
@@ -1340,7 +1362,7 @@ mod tests {
     use std::collections::HashMap;
     use std::sync::{Arc, OnceLock};
 
-    use super::{context_delta, pos_delta, WeightedSpanDecoder};
+    use super::{beam_item_to_candidate, context_delta, pos_delta, BeamItem, SpanCandidate, WeightedSpanDecoder};
     use crate::decoder::{DecoderConfig, DecoderMode};
     use crate::roman_lookup::{LegacyData, RankedLexicon, Transliterator};
 
@@ -1351,6 +1373,82 @@ mod tests {
             config.wfst_max_latency_ms = u64::MAX;
             Transliterator::from_default_data_with_config(config).unwrap()
         })
+    }
+
+    fn test_span(from_model: bool) -> SpanCandidate {
+        SpanCandidate {
+            start: 0,
+            end: 1,
+            input: "x".to_owned(),
+            output: "ខ".to_owned(),
+            recovered_roman: "x".to_owned(),
+            first_tag: None,
+            last_tag: None,
+            score: 0,
+            score_bps: 0,
+            edit_similarity: 0.0,
+            from_model,
+            lexicon_verified: true,
+        }
+    }
+
+    // Provenance: a candidate is flagged `from_model` iff ANY of its spans came from the model
+    // provider (so the UI can mark model-assisted suggestions).
+    #[test]
+    fn candidate_flagged_from_model_when_any_span_is() {
+        let with_model = BeamItem {
+            spans: vec![test_span(false), test_span(true)],
+            ..Default::default()
+        };
+        assert!(beam_item_to_candidate(with_model, 100, &DecoderConfig::default()).from_model);
+
+        let lexicon_only = BeamItem {
+            spans: vec![test_span(false), test_span(false)],
+            ..Default::default()
+        };
+        assert!(!beam_item_to_candidate(lexicon_only, 100, &DecoderConfig::default()).from_model);
+    }
+
+    #[test]
+    fn model_candidate_absent_from_lexicon_remains_visible_and_unverified() {
+        let mut config = DecoderConfig::shadow_interactive()
+            .with_mode(DecoderMode::Wfst)
+            .with_span_proposal_mode(crate::decoder::SpanProposalMode::StaticTest);
+        config.wfst_max_latency_ms = u64::MAX;
+        let transliterator = Transliterator::from_default_data_with_config(config).unwrap();
+
+        let candidate = transliterator
+            .phrase_candidates("qzx", &HashMap::new())
+            .into_iter()
+            .find(|candidate| candidate.text == "គហិបតី")
+            .expect("the model's out-of-Lexicon suggestion must remain available");
+
+        assert!(candidate.from_model);
+        assert!(!candidate.lexicon_verified);
+    }
+
+    #[test]
+    fn model_proposal_cannot_displace_an_exact_anchored_phrase() {
+        let mut config = DecoderConfig::shadow_interactive()
+            .with_mode(DecoderMode::Wfst)
+            .with_span_proposal_mode(crate::decoder::SpanProposalMode::StaticTest);
+        config.wfst_max_latency_ms = u64::MAX;
+        let transliterator = Transliterator::from_default_data_with_config(config).unwrap();
+
+        let candidates = transliterator.phrase_candidates("novpeldael", &HashMap::new());
+
+        assert_eq!(
+            candidates.first().map(|candidate| candidate.text.as_str()),
+            Some("នៅពេលដែល"),
+            "three exact Lexicon chunks must remain ahead of an unrelated whole-word model proposal; candidates={candidates:?}"
+        );
+        assert!(
+            candidates
+                .iter()
+                .find(|candidate| candidate.text == "បច្ចុប្បន្នភាព")
+                .is_some_and(|candidate| candidate.from_model),
+            "an alternative also proposed by the model must retain ✦ provenance after text deduplication; candidates={candidates:?}"
+        );
     }
 
     #[test]

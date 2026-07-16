@@ -727,6 +727,20 @@ mod tests {
     }
 
     #[test]
+    fn default_lexicon_stabilizes_mdongmkal() {
+        let transliterator = Transliterator::from_default_data().unwrap();
+
+        assert_eq!(
+            transliterator.exact_match_targets("mdongmkal"),
+            vec!["ម្ដងម្កាល".to_owned()]
+        );
+        assert_eq!(
+            transliterator.suggest("mdongmkal", &HashMap::new()).first().map(String::as_str),
+            Some("ម្ដងម្កាល")
+        );
+    }
+
+    #[test]
     fn exact_match_roman_variants_for_target_include_aliases() {
         let fixture = "jea\tជា\nchea\tជា\njear\tជារ\n";
         let transliterator = Transliterator::from_tsv_str(fixture).unwrap();

@@ -55,6 +55,11 @@ final class KeyboardSession {
     func focusIn()  -> IosRenderState { inner.focusIn() }
     func focusOut() -> IosRenderState { inner.focusOut() }
 
+    // Smart-mode model refinement is optional. Without a registered provider,
+    // the core returns the standard result unchanged.
+    func isModelMode() -> Bool { inner.isModelMode() }
+    func refineWithModel(expectedRaw: String) -> IosRenderState { inner.refineWithModel(expectedRaw: expectedRaw) }
+
     // MARK: - Key routing
 
     func sendCharacter(_ ch: String) -> IosRenderState { inner.processCharacter(ch: ch) }

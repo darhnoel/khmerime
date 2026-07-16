@@ -1,5 +1,31 @@
 import Foundation
 
+protocol ModelRefineTask: AnyObject {
+    func cancel()
+}
+
+protocol ModelRefineScheduler {
+    func schedule(after delay: TimeInterval, block: @escaping () -> Void) -> ModelRefineTask
+}
+
+final class DispatchModelRefineScheduler: ModelRefineScheduler {
+    func schedule(after delay: TimeInterval, block: @escaping () -> Void) -> ModelRefineTask {
+        let task = DispatchModelRefineTask(block: block)
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: task.workItem)
+        return task
+    }
+}
+
+private final class DispatchModelRefineTask: ModelRefineTask {
+    let workItem: DispatchWorkItem
+
+    init(block: @escaping () -> Void) {
+        workItem = DispatchWorkItem(block: block)
+    }
+
+    func cancel() { workItem.cancel() }
+}
+
 // KeyboardInputHandler
 // ====================
 // Pure-Swift input logic extracted from KeyboardViewController so it can be
@@ -48,6 +74,7 @@ final class KeyboardInputHandler {
     let proxy: TextProxy
     let session: KeyboardSession
     private let dispatcher: KeyboardDispatcher
+    private let modelRefineScheduler: ModelRefineScheduler
 
     // MARK: - State
 
@@ -62,15 +89,13 @@ final class KeyboardInputHandler {
     // one batched session block, then resets to 0.
     private var pendingHoldBackspaces = 0
 
-    // Incremented on every sendChar(). A keystroke's render is only applied
-    // if its captured generation still matches when its onMain block runs —
-    // otherwise a newer keystroke has already superseded it, so the stale
-    // render is skipped to keep the main thread from queuing up backlog.
-    private var sendGeneration = 0
-
-    // Same coalescing guard for single-tap backspace. Rapid backspace taps
-    // queue multiple session calls; only the last one's render should fire.
-    private var backspaceGeneration = 0
+    // Incremented on every forward or reverse Composition edit. An asynchronous
+    // render is only applied if its captured revision still matches, so neither
+    // typing nor Backspace can restore a result produced for older input.
+    private var compositionRevision = 0
+    // Debounced model refinement. Fires refineWithModel() on a pause (off the keystroke hot
+    // path); the model lazy-loads on the first fire.
+    private var refineTask: ModelRefineTask?
 
     // Set after deleteBackward×N + insertText(Khmer). iOS silently appends a
     // trailing space (autocorrect replacement detection) but documentContextBeforeInput
@@ -86,10 +111,16 @@ final class KeyboardInputHandler {
 
     // MARK: - Init
 
-    init(proxy: TextProxy, session: KeyboardSession, dispatcher: KeyboardDispatcher = QueuedDispatcher()) {
+    init(
+        proxy: TextProxy,
+        session: KeyboardSession,
+        dispatcher: KeyboardDispatcher = QueuedDispatcher(),
+        modelRefineScheduler: ModelRefineScheduler = DispatchModelRefineScheduler()
+    ) {
         self.proxy = proxy
         self.session = session
         self.dispatcher = dispatcher
+        self.modelRefineScheduler = modelRefineScheduler
     }
 
     // MARK: - Lifecycle
@@ -158,6 +189,29 @@ final class KeyboardInputHandler {
 
     // MARK: - Character Input
 
+    // After a typing pause, re-decode with the model (Smart mode only). The model runs
+    // off the keystroke hot path and lazy-loads on first fire. Stale fires are dropped via revision.
+    private func scheduleModelRefine() {
+        refineTask?.cancel()
+        let smart = session.isModelMode()
+        guard smart else { return }
+        let revision = compositionRevision
+        // Capture the roman NOW; pass it into the refine so Rust's staleness guard drops the result
+        // if a keystroke changes the composition between scheduling and the (async) FFI call.
+        let expectedRaw = romanBuffer
+        refineTask = modelRefineScheduler.schedule(after: 0.18) { [weak self] in
+            guard let self, self.compositionRevision == revision, !self.romanBuffer.isEmpty else { return }
+            self.dispatcher.onSession { [weak self] in
+                guard let self, self.compositionRevision == revision else { return }
+                let state = self.session.refineWithModel(expectedRaw: expectedRaw)
+                self.dispatcher.onMain { [weak self] in
+                    guard let self, self.compositionRevision == revision else { return }
+                    self.render(state)
+                }
+            }
+        }
+    }
+
     func sendChar(_ ch: String) {
         if keyboardState == .charPick {
             dispatcher.onSession { [weak self] in
@@ -181,8 +235,9 @@ final class KeyboardInputHandler {
         // returns. Skip when lastState is nil (first ever keystroke — no stale state
         // to show, and the deferred render fires quickly enough).
         if let currentState = lastState { onRender?(currentState, romanBuffer) }
-        sendGeneration += 1
-        let myGeneration = sendGeneration
+        compositionRevision += 1
+        let myRevision = compositionRevision
+        scheduleModelRefine()   // Debounced Smart refinement after the pause.
         dispatcher.onSession { [weak self] in
             guard let self else { return }
             let state = self.session.sendCharacter(ch)
@@ -197,7 +252,7 @@ final class KeyboardInputHandler {
                 }
                 // A newer keystroke has already been dispatched — its render
                 // supersedes this one, so skip to avoid a stale UI update.
-                guard myGeneration == self.sendGeneration else { return }
+                guard myRevision == self.compositionRevision else { return }
                 self.render(state)
             }
         }
@@ -305,6 +360,8 @@ final class KeyboardInputHandler {
         if !romanBuffer.isEmpty {
             romanBuffer.removeLast()
             pendingHoldBackspaces += 1
+            compositionRevision += 1
+            refineTask?.cancel()
         }
         proxy.deleteBackward()
         // No session dispatch — backspaceHoldEnded() batches them all at once.
@@ -314,6 +371,7 @@ final class KeyboardInputHandler {
         let count = pendingHoldBackspaces
         pendingHoldBackspaces = 0
         guard count > 0 else { return }
+        let myRevision = compositionRevision
         dispatcher.onSession { [weak self] in
             guard let self else { return }
             var state: IosRenderState?
@@ -321,8 +379,13 @@ final class KeyboardInputHandler {
             guard let finalState = state else { return }
             self.dispatcher.onMain { [weak self] in
                 guard let self else { return }
+                guard myRevision == self.compositionRevision else { return }
                 self.render(finalState)
-                if self.romanBuffer.isEmpty { self.onStripClear?() }
+                if self.romanBuffer.isEmpty {
+                    self.onStripClear?()
+                } else {
+                    self.scheduleModelRefine()
+                }
             }
         }
     }
@@ -332,6 +395,10 @@ final class KeyboardInputHandler {
             proxy.deleteBackward()
             return
         }
+        // Backspace changes the same Composition as forward typing. Invalidate any queued
+        // forward/model render before it can restore the pre-Backspace candidate state.
+        compositionRevision += 1
+        refineTask?.cancel()
         trailingSpace = false
         if keyboardState == .charPick {
             if let current = lastState, !current.candidates.isEmpty {
@@ -356,16 +423,19 @@ final class KeyboardInputHandler {
         } else if let currentState = lastState {
             onRender?(currentState, romanBuffer)
         }
-        backspaceGeneration += 1
-        let myBackspaceGeneration = backspaceGeneration
+        let myRevision = compositionRevision
         dispatcher.onSession { [weak self] in
             guard let self else { return }
             let state = self.session.sendBackspace()
             self.dispatcher.onMain { [weak self] in
                 guard let self else { return }
-                guard myBackspaceGeneration == self.backspaceGeneration else { return }
+                guard myRevision == self.compositionRevision else { return }
                 self.render(state)
-                if self.romanBuffer.isEmpty { self.onStripClear?() }
+                if self.romanBuffer.isEmpty {
+                    self.onStripClear?()
+                } else {
+                    self.scheduleModelRefine()
+                }
             }
         }
     }

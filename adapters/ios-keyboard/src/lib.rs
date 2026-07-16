@@ -6,7 +6,7 @@
 
 use std::sync::{Arc, Mutex, OnceLock};
 
-use khmerime_core::{DecoderConfig, SharedTransliteratorData, Transliterator};
+use khmerime_core::{DecoderConfig, SharedTransliteratorData, SpanProposalMode, Transliterator};
 use khmerime_session::{
     ImeSession, ImeSessionOptions, NativeKeyEvent, PhraseCandidate, PhraseSegment, SegmentPreviewEntry,
     SegmentedPreviewMode, SessionCommand, SessionResult, SessionSnapshot,
@@ -36,6 +36,16 @@ static SHARED_TRANSLITERATOR_DATA: OnceLock<SharedTransliteratorData> = OnceLock
 fn shared_transliterator_data() -> &'static SharedTransliteratorData {
     SHARED_TRANSLITERATOR_DATA
         .get_or_init(|| Transliterator::from_default_shared_data().expect("compiled-in lexicon data must be valid"))
+}
+
+const SMART_REFINE_MAX_LATENCY_MS: u64 = 2_000;
+
+fn smart_refiner_config() -> DecoderConfig {
+    let mut config = DecoderConfig::shadow_interactive().with_span_proposal_mode(SpanProposalMode::Model);
+    // Smart refinement runs after a typing pause, off the keystroke hot path. The iPhone SE needs
+    // more than the live decoder's 250 ms deadline for one provider inference.
+    config.wfst_max_latency_ms = SMART_REFINE_MAX_LATENCY_MS;
+    config
 }
 
 // ── Public UniFFI types ───────────────────────────────────────────────────────
@@ -74,6 +84,12 @@ impl From<&PhraseSegment> for IosSegmentEntry {
 pub struct IosPhraseCandidate {
     pub text: String,
     pub segments: Vec<IosSegmentEntry>,
+    /// True when the model provider contributed to this phrase — Swift shows a ✦ marker on
+    /// these cards.
+    pub from_model: bool,
+    /// True when every word in the phrase is present in the Lexicon. Swift colours an
+    /// unverified model marker red while leaving the Khmer text at its normal colour.
+    pub lexicon_verified: bool,
 }
 
 impl From<&PhraseCandidate> for IosPhraseCandidate {
@@ -81,6 +97,8 @@ impl From<&PhraseCandidate> for IosPhraseCandidate {
         IosPhraseCandidate {
             text: c.text.clone(),
             segments: c.segments.iter().map(IosSegmentEntry::from).collect(),
+            from_model: c.from_model,
+            lexicon_verified: c.lexicon_verified,
         }
     }
 }
@@ -133,6 +151,30 @@ fn render_state(snapshot: &SessionSnapshot, result: &SessionResult) -> IosRender
 
 // ── Session handle ────────────────────────────────────────────────────────────
 
+/// Build a fresh iOS session. The primary (live) engine is ALWAYS Standard — the keystroke hot
+/// path never runs the model. When `smart`, a Model-mode **visible refiner** is attached; it runs
+/// only via `refine_with_model` on a debounced pause, off the hot path. Reuses the shared, cached
+/// transliterator data (cheap clone — no dictionary rebuild). The model is inert unless a provider
+/// was registered via `khmerime_core::register_span_proposal_provider` (paid build only).
+fn build_session(smart: bool) -> ImeSession {
+    let live = Transliterator::from_shared_data_with_config(
+        shared_transliterator_data(),
+        DecoderConfig::shadow_interactive().with_span_proposal_mode(SpanProposalMode::Disabled),
+    );
+    let mut builder = ImeSession::builder(live, std::collections::HashMap::new())
+        .input_mode(khmerime_session::InputMode::Roman)
+        .options(ImeSessionOptions {
+            segmented_preview: SegmentedPreviewMode::Enabled,
+            ..Default::default()
+        });
+    if smart {
+        let refiner =
+            Transliterator::from_shared_data_with_config(shared_transliterator_data(), smart_refiner_config());
+        builder = builder.visible_refiner(refiner);
+    }
+    builder.build()
+}
+
 /// Swift-visible session handle, exported via UniFFI.
 ///
 /// Wraps the real `ImeSession` so every key tap goes through the full
@@ -140,6 +182,10 @@ fn render_state(snapshot: &SessionSnapshot, result: &SessionResult) -> IosRender
 #[derive(uniffi::Object)]
 pub struct KhmerIMESession {
     inner: Mutex<ImeSession>,
+    // Standard/Smart toggle. Off = Standard (lexicon + fuzzy only). On = Smart, which enables
+    // the injected model span-proposal provider inside the decoder. Off by default so the OSS
+    // build is unchanged and a paid model is strictly opt-in.
+    model_mode: std::sync::atomic::AtomicBool,
 }
 
 #[uniffi::export]
@@ -148,20 +194,38 @@ impl KhmerIMESession {
     /// data (no external files needed on iOS).
     #[uniffi::constructor]
     pub fn new() -> Arc<Self> {
-        let transliterator = Transliterator::from_shared_data_with_config(
-            shared_transliterator_data(),
-            DecoderConfig::shadow_interactive(),
-        );
-        let session = ImeSession::builder(transliterator, std::collections::HashMap::new())
-            .input_mode(khmerime_session::InputMode::Roman)
-            .options(ImeSessionOptions {
-                segmented_preview: SegmentedPreviewMode::Enabled,
-                ..Default::default()
-            })
-            .build();
         Arc::new(KhmerIMESession {
-            inner: Mutex::new(session),
+            inner: Mutex::new(build_session(false)),
+            model_mode: std::sync::atomic::AtomicBool::new(false),
         })
+    }
+
+    /// Whether Smart (model) mode is currently enabled. The settings UI renders the toggle
+    /// from this.
+    pub fn is_model_mode(&self) -> bool {
+        self.model_mode.load(std::sync::atomic::Ordering::Relaxed)
+    }
+
+    /// Toggle Standard/Smart. Rebuilds the view; Smart attaches the Model-mode visible refiner
+    /// (the keystroke hot path stays Standard either way). The current composition is reset (this
+    /// is a settings action, not a mid-typing one). Inert without a registered provider — never
+    /// panics.
+    pub fn set_model_mode(&self, enabled: bool) {
+        *self.inner.lock().unwrap() = build_session(enabled);
+        self.model_mode.store(enabled, std::sync::atomic::Ordering::Relaxed);
+    }
+
+    /// Debounced model refine: re-decode the composition with the Model-mode visible refiner, OFF
+    /// the keystroke hot path. `expected_raw` is the roman the caller captured when it *scheduled*
+    /// the refine; the session's staleness guard (`composition_raw != expected_raw`) drops the refine
+    /// if a keystroke changed the composition in between — so a stale async result never renders over
+    /// newer input. No-op/current-state when empty; inert when Smart is off or no provider registered.
+    pub fn refine_with_model(&self, expected_raw: String) -> IosRenderState {
+        let mut s = self.inner.lock().unwrap();
+        if !expected_raw.is_empty() {
+            s.refine_segmented_with_visible_refiner(&expected_raw);
+        }
+        render_state(&s.snapshot(), &SessionResult::default())
     }
 
     pub fn focus_in(&self) -> IosRenderState {
@@ -286,6 +350,127 @@ mod tests {
             state = s.process_character(ch.to_string());
         }
         state
+    }
+
+    // ── Standard/Smart model-mode toggle ─────────────────────────────────────
+
+    // #1 tracer: a fresh session is in Standard mode (no model span proposals) by default,
+    // so the OSS build's behavior is unchanged and a paid model is opt-in.
+    #[test]
+    fn model_mode_off_by_default() {
+        let s = new_session();
+        assert!(!s.is_model_mode(), "fresh session must default to Standard (model off)");
+    }
+
+    // #2 the toggle turns Smart mode on.
+    #[test]
+    fn set_model_mode_true_enables_smart() {
+        let s = new_session();
+        s.set_model_mode(true);
+        assert!(s.is_model_mode(), "set_model_mode(true) must enable Smart");
+    }
+
+    #[test]
+    fn smart_refiner_uses_debounced_device_budget() {
+        assert_eq!(smart_refiner_config().wfst_max_latency_ms, SMART_REFINE_MAX_LATENCY_MS);
+    }
+
+    // #3 toggling back returns to Standard.
+    #[test]
+    fn set_model_mode_false_returns_to_standard() {
+        let s = new_session();
+        s.set_model_mode(true);
+        s.set_model_mode(false);
+        assert!(!s.is_model_mode(), "set_model_mode(false) must return to Standard");
+    }
+
+    // #4 inert safety: enabling Smart with NO provider registered (free build, or a failed model
+    // load) must not panic — the decoder falls back to Standard and still produces candidates.
+    #[test]
+    fn smart_mode_without_provider_still_decodes() {
+        let s = new_session();
+        s.set_model_mode(true); // Model mode, but no provider registered in this test binary
+        let state = type_str(&s, "nhom");
+        assert_eq!(
+            state.preedit, "nhom",
+            "Standard decoding must still run under inert Smart"
+        );
+        assert!(
+            !state.candidates.is_empty(),
+            "must still surface lexicon/fuzzy candidates"
+        );
+    }
+
+    // provenance: the model-assisted flag survives PhraseCandidate -> IosPhraseCandidate so Swift
+    // can render the ✦ marker. (The full type->model-wins->✦ path is verified on device via the
+    // Standard/Smart A/B test; scoring-dependent end-to-end assertions are too brittle to unit-test.)
+    #[test]
+    fn phrase_candidate_from_model_flag_survives_mapping() {
+        let modelled = PhraseCandidate {
+            text: "ធ្វើ".to_owned(),
+            segments: vec![],
+            from_model: true,
+            lexicon_verified: true,
+        };
+        assert!(IosPhraseCandidate::from(&modelled).from_model);
+
+        let lexicon = PhraseCandidate {
+            text: "ជា".to_owned(),
+            segments: vec![],
+            from_model: false,
+            lexicon_verified: true,
+        };
+        assert!(!IosPhraseCandidate::from(&lexicon).from_model);
+    }
+
+    #[test]
+    fn phrase_candidate_lexicon_verification_survives_ios_mapping() {
+        let unverified = PhraseCandidate {
+            text: "គហិបតី".to_owned(),
+            segments: vec![],
+            from_model: true,
+            lexicon_verified: false,
+        };
+
+        assert!(!IosPhraseCandidate::from(&unverified).lexicon_verified);
+    }
+
+    // #5 the debounced refine is safe with no active composition (no panic, clean state).
+    #[test]
+    fn refine_with_model_on_empty_composition_is_safe() {
+        let s = new_session();
+        s.set_model_mode(true);
+        let state = s.refine_with_model(String::new());
+        assert!(state.preedit.is_empty());
+        assert!(state.candidates.is_empty());
+    }
+
+    // #6 the debounced refine runs mid-composition off the hot path without disturbing the roman
+    // preedit (inert re-decode when no provider is registered) — never panics.
+    #[test]
+    fn refine_with_model_mid_composition_preserves_preedit() {
+        let s = new_session();
+        s.set_model_mode(true);
+        let typed = type_str(&s, "nhom");
+        assert_eq!(typed.preedit, "nhom");
+        let refined = s.refine_with_model("nhom".to_owned());
+        assert_eq!(refined.preedit, "nhom", "refine must not disturb the roman preedit");
+    }
+
+    // #7 staleness guard: a refine whose captured raw no longer matches the composition is dropped
+    // (no-op), so a stale async result can never render over newer input.
+    #[test]
+    fn refine_with_model_drops_stale_raw() {
+        let s = new_session();
+        s.set_model_mode(true);
+        let typed = type_str(&s, "nhom");
+        assert_eq!(typed.preedit, "nhom");
+        // Scheduled against "nho" but composition is now "nhom" -> guard drops it, preedit intact.
+        let refined = s.refine_with_model("nho".to_owned());
+        assert_eq!(
+            refined.preedit, "nhom",
+            "stale refine must not disturb the current composition"
+        );
     }
 
     // ── render_state field mapping ────────────────────────────────────────────

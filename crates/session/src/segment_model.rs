@@ -179,7 +179,7 @@ where
     })
 }
 
-fn build_segmented_session_from_pairs<S>(
+pub(crate) fn build_segmented_session_from_pairs<S>(
     raw_input: &str,
     pairs: Vec<(String, String)>,
     history: &HashMap<String, usize>,

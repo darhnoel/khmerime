@@ -81,3 +81,9 @@ adapters/macos-imk/swift/**/xcuserdata/
 adapters/macos-imk/swift/**/*.xcuserdata/
 adapters/macos-imk/swift/**/*.xcuserdatad/
 adapters/macos-imk/swift/**/*.xcuserstate
+
+# Optional private build inputs may be checked out here locally.
+/private/
+
+# Generated local build specification for optional private integrations.
+/adapters/ios-keyboard/swift/project-paid.yml

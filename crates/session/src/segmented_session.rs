@@ -15,7 +15,7 @@ use khmerime_core::Transliterator;
 use crate::adapter_contract::{PhraseCandidate, PhraseSegment, SegmentedPreviewMode, SessionResult};
 use crate::ime_session::{exact_matches_first, offset_index, recompute_segment_ranges_and_raw, ImeSession};
 use crate::segment_model::{
-    build_segmented_session, move_session_focus, normalize_visible_suggestions,
+    build_segmented_session, build_segmented_session_from_pairs, move_session_focus, normalize_visible_suggestions,
     reflow_segmented_session_from_selection, SegmentedChoice, SegmentedSession,
 };
 
@@ -25,6 +25,16 @@ use crate::segment_model::{
 pub struct SegmentedRefinement {
     pub(crate) segmented_session: Option<SegmentedSession>,
     pub(crate) candidates: Vec<String>,
+    pub(crate) phrase_candidates: Vec<PhraseCandidate>,
+}
+
+fn has_khmer(text: &str) -> bool {
+    text.chars().any(|ch| ('\u{1780}'..='\u{17FF}').contains(&ch))
+}
+
+fn would_degrade_to_roman(current: &[String], refinement: &SegmentedRefinement) -> bool {
+    current.first().is_some_and(|candidate| has_khmer(candidate))
+        && !refinement.candidates.first().is_some_and(|candidate| has_khmer(candidate))
 }
 
 /// The model compute for a segmented refinement — **pure**: reads the refiner + input + history,
@@ -37,8 +47,21 @@ pub fn compute_segmented_refinement(
     raw: &str,
     history: &HashMap<String, usize>,
 ) -> SegmentedRefinement {
-    let observation = refiner.shadow_observation(raw, history);
-    let segmented_session = build_segmented_session(&observation, raw, history, &|input, hist| {
+    // `phrase_candidates` runs Weighted Span once and preserves model provenance. Reuse that
+    // single result for both the strip and Phrase Wheel; calling `shadow_observation` as well
+    // would run the model twice on every pause.
+    let decoded_phrases = refiner.phrase_candidates(raw, history);
+    let top_segments = decoded_phrases
+        .first()
+        .map(|candidate| {
+            candidate
+                .segments
+                .iter()
+                .map(|segment| (segment.input.clone(), segment.output.clone()))
+                .collect()
+        })
+        .unwrap_or_default();
+    let segmented_session = build_segmented_session_from_pairs(raw, top_segments, history, 0, &|input, hist| {
         exact_matches_first(
             refiner,
             input,
@@ -50,10 +73,47 @@ pub fn compute_segmented_refinement(
         raw,
         normalize_visible_suggestions(refiner.suggest(raw, history)),
     );
+    let phrase_candidates = decoded_phrases
+        .into_iter()
+        .map(|candidate| PhraseCandidate {
+            text: candidate.text,
+            from_model: candidate.from_model,
+            lexicon_verified: candidate.lexicon_verified,
+            segments: candidate
+                .segments
+                .into_iter()
+                .map(|segment| PhraseSegment {
+                    input: segment.input,
+                    output: segment.output,
+                })
+                .collect(),
+        })
+        .collect::<Vec<_>>();
+    // A whole-word model rescue intentionally has one segment, while a Segmented Session is
+    // only created for two or more. Keep that winner visible instead of falling back to Shadow
+    // mode's Standard-only `suggest()` list.
+    let candidates = if segmented_session.is_none() {
+        merge_phrase_outputs_first(&phrase_candidates, candidates)
+    } else {
+        candidates
+    };
     SegmentedRefinement {
         segmented_session,
         candidates,
+        phrase_candidates,
     }
+}
+
+fn merge_phrase_outputs_first(phrases: &[PhraseCandidate], fallback: Vec<String>) -> Vec<String> {
+    let mut merged = Vec::new();
+    let mut seen = std::collections::HashSet::new();
+    for candidate in phrases.iter().map(|candidate| candidate.text.clone()).chain(fallback) {
+        let key = crate::segment_model::normalized_suggestion_key(&candidate);
+        if seen.insert(key) {
+            merged.push(candidate);
+        }
+    }
+    merged
 }
 
 impl ImeSession {
@@ -265,6 +325,8 @@ impl ImeSession {
             .into_iter()
             .map(|candidate| PhraseCandidate {
                 text: candidate.text,
+                from_model: candidate.from_model,
+                lexicon_verified: candidate.lexicon_verified,
                 segments: candidate
                     .segments
                     .into_iter()
@@ -329,8 +391,13 @@ impl ImeSession {
         };
         // Same compute as the lock-free path; synchronous here so the apply always matches.
         let refinement = compute_segmented_refinement(&refiner, &self.composition_raw, &self.history);
+        if would_degrade_to_roman(&self.candidates, &refinement) {
+            return self.segmented_session.is_some();
+        }
         self.segmented_session = refinement.segmented_session;
         self.candidates = refinement.candidates;
+        self.phrase_candidates = refinement.phrase_candidates;
+        self.selected_phrase_index = 0;
         self.selected_index = 0;
         self.segmented_session.is_some()
     }
@@ -372,8 +439,13 @@ impl ImeSession {
         if self.segmented_session.is_some() && self.selection_touched {
             return true;
         }
+        if would_degrade_to_roman(&self.candidates, &refinement) {
+            return self.segmented_session.is_some();
+        }
         self.segmented_session = refinement.segmented_session;
         self.candidates = refinement.candidates;
+        self.phrase_candidates = refinement.phrase_candidates;
+        self.selected_phrase_index = 0;
         self.selected_index = 0;
         self.segmented_session.is_some()
     }
@@ -396,6 +468,11 @@ impl ImeSession {
 
 #[cfg(test)]
 mod tests {
+    use std::collections::HashMap;
+
+    use khmerime_core::{DecoderConfig, Transliterator};
+
+    use crate::ime_session::ImeSession;
     use crate::test_support::{
         phase_a_session_without_segmented_preview, segmented_default_session_like_ibus_bridge, session, type_ascii,
     };
@@ -413,6 +490,7 @@ mod tests {
         let stale = super::SegmentedRefinement {
             segmented_session: None,
             candidates: vec!["STALE".to_string()],
+            phrase_candidates: Vec::new(),
         };
         let applied = session.apply_segmented_refinement("oldraw", stale);
 
@@ -421,6 +499,49 @@ mod tests {
             session.snapshot().candidates,
             before,
             "candidates must not be clobbered by a stale apply"
+        );
+    }
+
+    #[test]
+    fn delayed_refinement_cannot_replace_a_khmer_winner_with_raw_roman() {
+        let mut session = session();
+        type_ascii(&mut session, "jea");
+        assert_eq!(session.snapshot().candidates.first().map(String::as_str), Some("ជា"));
+
+        let degraded = super::SegmentedRefinement {
+            segmented_session: None,
+            candidates: vec!["jea".to_string()],
+            phrase_candidates: Vec::new(),
+        };
+        let applied = session.apply_segmented_refinement("jea", degraded);
+
+        assert!(!applied, "a delayed refinement that only recovered Roman must be rejected");
+        assert_eq!(
+            session.snapshot().candidates.first().map(String::as_str),
+            Some("ជា"),
+            "the already-visible Khmer winner must remain stable"
+        );
+    }
+
+    #[test]
+    fn inline_visible_refine_keeps_existing_khmer_when_refiner_only_has_roman() {
+        let live = Transliterator::from_tsv_str_with_config("jea\tជា\n", DecoderConfig::shadow_interactive())
+            .expect("live fixture");
+        let roman_only_refiner =
+            Transliterator::from_tsv_str_with_config("zzz\tហ្ស៊ី\n", DecoderConfig::shadow_interactive())
+                .expect("refiner fixture");
+        let mut session = ImeSession::builder(live, HashMap::new())
+            .visible_refiner(roman_only_refiner)
+            .build();
+        session.focus_in();
+        type_ascii(&mut session, "jea");
+
+        session.refine_segmented_with_visible_refiner("jea");
+
+        assert_eq!(
+            session.snapshot().candidates.first().map(String::as_str),
+            Some("ជា"),
+            "the actual synchronous iOS refine path must not degrade Khmer to Roman"
         );
     }
 

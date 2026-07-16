@@ -7,10 +7,11 @@ const state = {
   total: 0,
   searchTimer: null,
   activeRowId: null,
-  activeTab: "grid-panel",
   gridScrollTop: 0,
   gridScrollLeft: 0,
   selectedRowIds: new Set(),
+  problems: null,
+  regexApply: null,
 };
 
 const $ = (id) => document.getElementById(id);
@@ -27,34 +28,26 @@ function readSavedView() {
 function writeSavedView() {
   const view = {
     query: $("query-input")?.value || "",
-    chunk: $("chunk-filter")?.value || "",
-    status: $("status-filter")?.value || "",
-    category: $("category-filter")?.value || "",
+    target: $("target-input")?.value || "",
+    runtime: $("runtime-filter")?.value || "",
+    filters: Object.fromEntries(FILTERS.map((f) => [f.key, f.values()])),
     page: state.page,
     pageSize: state.pageSize,
     activeRowId: state.activeRowId,
-    activeTab: state.activeTab,
     gridScrollTop: state.gridScrollTop,
     gridScrollLeft: state.gridScrollLeft,
   };
   window.localStorage.setItem(STORAGE_KEY, JSON.stringify(view));
 }
 
-function restoreSelectValue(id, value) {
-  if (value === undefined || value === null) return;
-  const node = $(id);
-  if ([...node.options].some((option) => option.value === value)) {
-    node.value = value;
-  }
-}
-
 function restoreSavedViewControls() {
   const saved = readSavedView();
   if (typeof saved.query === "string") $("query-input").value = saved.query;
-  restoreSelectValue("chunk-filter", saved.chunk);
-  restoreSelectValue("status-filter", saved.status);
-  restoreSelectValue("category-filter", saved.category);
-  if ([50, 100, 250].includes(Number(saved.pageSize))) {
+  if (typeof saved.target === "string") $("target-input").value = saved.target;
+  if (["", "included", "excluded"].includes(saved.runtime)) $("runtime-filter").value = saved.runtime;
+  const savedFilters = saved.filters || {};
+  for (const f of FILTERS) f.set(savedFilters[f.key] || []);
+  if ([50, 100, 250, 500, 1000, 1500, 2000].includes(Number(saved.pageSize))) {
     state.pageSize = Number(saved.pageSize);
     $("page-size").value = String(state.pageSize);
   }
@@ -62,7 +55,6 @@ function restoreSavedViewControls() {
     state.page = Number(saved.page);
   }
   if (typeof saved.activeRowId === "string") state.activeRowId = saved.activeRowId;
-  if (typeof saved.activeTab === "string") state.activeTab = saved.activeTab;
   state.gridScrollTop = Number(saved.gridScrollTop) || 0;
   state.gridScrollLeft = Number(saved.gridScrollLeft) || 0;
 }
@@ -86,7 +78,9 @@ async function api(path, options = {}) {
   const response = await fetch(path, init);
   const payload = await response.json();
   if (!response.ok) {
-    throw new Error(payload.error || response.statusText);
+    const error = new Error(payload.error || response.statusText);
+    error.detail = payload.detail;
+    throw error;
   }
   return payload;
 }
@@ -131,39 +125,155 @@ function selectedOrActiveIds() {
   return state.activeRowId ? [state.activeRowId] : [];
 }
 
-function filters() {
-  return {
-    query: $("query-input").value.trim(),
-    chunk: $("chunk-filter").value,
-    status: $("status-filter").value,
-    category: $("category-filter").value,
+function refreshSelectionUI() {
+  const count = selectedOrActiveIds().length;
+  const selected = selectedIds().length;
+  $("selection-count").textContent = selected
+    ? `${selected} selected`
+    : count
+      ? "1 active"
+      : "0 selected";
+}
+
+const POPOVERS = {
+  "set-popover": "set-open-button",
+  "overflow-popover": "overflow-open-button",
+  "chunk-filter-popover": "chunk-filter-button",
+  "status-filter-popover": "status-filter-button",
+  "category-filter-popover": "category-filter-button",
+};
+
+function closePopovers(except) {
+  for (const [id, trigger] of Object.entries(POPOVERS)) {
+    if (id === except) continue;
+    $(id).hidden = true;
+    $(trigger).setAttribute("aria-expanded", "false");
+  }
+}
+
+function applyFilters() {
+  state.page = 1;
+  state.gridScrollTop = 0;
+  loadRows().catch((error) => showMessage(error.message));
+}
+
+// Reset all filters and scope the view to a single chunk (used when jumping
+// to a specific row from add/duplicate/problem-open).
+function focusChunk(name) {
+  $("query-input").value = "";
+  $("target-input").value = "";
+  $("runtime-filter").value = "";
+  for (const f of FILTERS) f.set(f.key === "chunk" ? [name] : []);
+}
+
+// One multi-select dropdown filter (chunk, status, category). Owns a Set of
+// selected values and renders a tristate "All" header + a checkbox list.
+function makeMultiFilter({ key, prefix, allLabel, noun, options }) {
+  const state_set = new Set();
+  const el = (suffix) => $(`${prefix}-${suffix}`);
+  const label = () => {
+    const n = state_set.size;
+    if (n === 0) return allLabel;
+    if (n === 1) return [...state_set][0];
+    return `${n} ${noun}`;
   };
+  const render = () => {
+    const all = options();
+    const selected = state_set.size;
+    el("button").textContent = label();
+    const allBox = el("all");
+    allBox.checked = selected > 0 && selected === all.length;
+    allBox.indeterminate = selected > 0 && selected < all.length;
+    el("count").textContent = selected ? `${selected} / ${all.length}` : "";
+    const list = el("list");
+    list.replaceChildren();
+    for (const name of all) {
+      const row = document.createElement("label");
+      row.className = "chunk-filter-row";
+      const box = document.createElement("input");
+      box.type = "checkbox";
+      box.checked = state_set.has(name);
+      box.addEventListener("change", () => {
+        box.checked ? state_set.add(name) : state_set.delete(name);
+        render();
+        applyFilters();
+      });
+      const text = document.createElement("span");
+      text.textContent = name;
+      row.append(box, text);
+      list.appendChild(row);
+    }
+  };
+  const set = (values) => {
+    const valid = new Set(options());
+    state_set.clear();
+    for (const v of values || []) if (valid.has(v)) state_set.add(v);
+    if (state.meta) render();
+  };
+  const wire = () => {
+    el("button").addEventListener("click", (event) => {
+      event.stopPropagation();
+      togglePopover(`${prefix}-popover`, `${prefix}-button`);
+    });
+    el("popover").addEventListener("click", (event) => event.stopPropagation());
+    el("all").addEventListener("click", (event) => {
+      const selectAll = state_set.size < options().length;
+      set(selectAll ? options() : []);
+      event.target.checked = selectAll;
+      applyFilters();
+    });
+  };
+  return { key, prefix, values: () => [...state_set], set, render, wire, popoverId: `${prefix}-popover`, buttonId: `${prefix}-button` };
+}
+
+const FILTERS = [
+  makeMultiFilter({ key: "chunk", prefix: "chunk-filter", allLabel: "All chunks", noun: "chunks", options: () => state.meta.chunks }),
+  makeMultiFilter({ key: "status", prefix: "status-filter", allLabel: "All status", noun: "statuses", options: () => state.meta.statuses }),
+  makeMultiFilter({ key: "category", prefix: "category-filter", allLabel: "All categories", noun: "categories", options: () => state.meta.categories }),
+];
+const filterByKey = (key) => FILTERS.find((f) => f.key === key);
+
+function togglePopover(popoverId, triggerId) {
+  const popover = $(popoverId);
+  const willOpen = popover.hidden;
+  closePopovers(willOpen ? popoverId : null);
+  popover.hidden = !willOpen;
+  $(triggerId).setAttribute("aria-expanded", String(willOpen));
+}
+
+function openContextMenu(pageX, pageY) {
+  // Reuse the overflow menu at the cursor — same items, same handlers.
+  closePopovers("overflow-popover");
+  const menu = $("overflow-popover");
+  menu.classList.add("context-menu");
+  menu.hidden = false;
+  const rect = menu.getBoundingClientRect();
+  const x = Math.min(pageX, window.innerWidth - rect.width - 8);
+  const y = Math.min(pageY, window.innerHeight - rect.height - 8);
+  menu.style.left = `${Math.max(8, x)}px`;
+  menu.style.top = `${Math.max(8, y)}px`;
 }
 
 function movementBlocked() {
-  const current = filters();
-  return Boolean(current.query || current.status || current.category);
+  const anyFilter = FILTERS.some((f) => f.values().length);
+  return Boolean($("query-input").value.trim() || $("target-input").value.trim() || $("runtime-filter").value || anyFilter);
 }
 
 async function loadMeta() {
   state.meta = await api("/api/meta");
-  fillSelect($("chunk-filter"), state.meta.chunks, true);
-  fillSelect($("status-filter"), state.meta.statuses, true);
-  fillSelect($("category-filter"), state.meta.categories, true);
   restoreSavedViewControls();
+  for (const f of FILTERS) f.render();
   updateBulkValues();
   renderDirty();
 }
 
-function statusText() {
-  if (!state.meta) return "Loading...";
-  const dirty = state.meta.dirty_chunks.length ? `Dirty: ${state.meta.dirty_chunks.join(", ")}` : "No dirty chunks";
-  const external = state.meta.external_changes.length ? ` External changes: ${state.meta.external_changes.join(", ")}` : "";
-  return `${dirty}.${external}`;
-}
-
 function renderDirty() {
-  $("status-line").textContent = statusText();
+  const edited = state.meta.edited_rows || 0;
+  $("save-label").textContent = edited ? `Build (${edited})` : "Build";
+  $("save-button").classList.toggle("has-edits", edited > 0);
+  $("save-button").title = edited
+    ? `Save Build Check — ${edited} edited row(s) in ${state.meta.dirty_chunks.join(", ")}`
+    : "Save Build Check";
   $("undo-button").disabled = !state.meta.can_undo;
   $("redo-button").disabled = !state.meta.can_redo;
   const lines = [
@@ -178,16 +288,32 @@ function renderDirty() {
 }
 
 function params() {
-  const current = filters();
   const query = new URLSearchParams({
     page: String(state.page),
     page_size: String(state.pageSize),
-    query: current.query,
-    chunk: current.chunk,
-    status: current.status,
-    category: current.category,
+    query: $("query-input").value.trim(),
+    target: $("target-input").value.trim(),
+    runtime: $("runtime-filter").value,
   });
+  for (const f of FILTERS) for (const v of f.values()) query.append(f.key, v);
   return query.toString();
+}
+
+// The filter the grid is currently showing, as a plain object (for bulk ops).
+function currentFilter() {
+  const filter = {
+    query: $("query-input").value.trim(),
+    target: $("target-input").value.trim(),
+    runtime: $("runtime-filter").value,
+  };
+  for (const f of FILTERS) filter[f.key] = f.values();
+  return filter;
+}
+
+// Regex scope: explicit checked/active rows win; otherwise the whole filtered set.
+function regexScope() {
+  const ids = selectedOrActiveIds();
+  return ids.length ? { row_ids: ids } : { filter: currentFilter() };
 }
 
 async function loadRows() {
@@ -210,6 +336,7 @@ async function loadRows() {
   $("total-label").textContent = `${state.total} rows`;
   $("prev-page").disabled = state.page <= 1;
   $("next-page").disabled = state.page >= state.lastPage;
+  refreshSelectionUI();
   writeSavedView();
 }
 
@@ -248,8 +375,8 @@ function issueFormatter(cell) {
 
 function makeTable() {
   state.table = new Tabulator("#grid", {
-    height: "62vh",
-    layout: "fitDataStretch",
+    height: "100%",
+    layout: "fitColumns",
     index: "id",
     selectableRows: "highlight",
     editTriggerEvent: "click",
@@ -264,11 +391,32 @@ function makeTable() {
     },
     columns: [
       {
+        titleFormatter() {
+          const pageIds = state.table ? state.table.getData().map((row) => row.id) : [];
+          const allChecked = pageIds.length && pageIds.every((id) => state.selectedRowIds.has(id));
+          return `<input type="checkbox" aria-label="Select all rows on page" tabindex="-1" style="pointer-events:none" ${allChecked ? "checked" : ""}>`;
+        },
+        headerClick(event, column) {
+          event.stopPropagation();
+          const pageIds = state.table.getData().map((row) => row.id);
+          const allChecked = pageIds.length && pageIds.every((id) => state.selectedRowIds.has(id));
+          for (const id of pageIds) {
+            if (allChecked) state.selectedRowIds.delete(id);
+            else state.selectedRowIds.add(id);
+          }
+          // redraw(true) repaints body cells but not the header formatter — update the header box directly.
+          const headerBox = column.getElement().querySelector("input[type=checkbox]");
+          if (headerBox) headerBox.checked = !allChecked;
+          state.table.redraw(true);
+          refreshSelectionUI();
+        },
         formatter(cell) {
           const checked = state.selectedRowIds.has(cell.getRow().getData().id) ? "checked" : "";
-          return `<input type="checkbox" aria-label="Select Row" ${checked}>`;
+          // Display only: cellClick owns the state, so block the native toggle to avoid double-flip.
+          return `<input type="checkbox" aria-label="Select Row" tabindex="-1" style="pointer-events:none" ${checked}>`;
         },
         hozAlign: "center",
+        headerHozAlign: "center",
         headerSort: false,
         width: 44,
         cellClick(event, cell) {
@@ -282,21 +430,22 @@ function makeTable() {
           }
           state.activeRowId = id;
           row.reformat();
+          refreshSelectionUI();
         },
       },
-      { title: "chunk", field: "chunk", width: 128, headerSort: false },
-      { title: "row", field: "row", width: 70, headerSort: false },
-      { title: "orig", field: "orig_line", width: 70, headerSort: false },
-      { title: "runtime", field: "runtime", width: 92, formatter: runtimeFormatter, headerSort: false },
-      { title: "roman", field: "roman", editor: "input", width: 170, headerSort: false },
-      { title: "target", field: "target", editor: "input", width: 190, headerSort: false },
-      { title: "freq", field: "freq", editor: "number", width: 82, headerSort: false, editorParams: { min: 1, step: 1 } },
-      { title: "lang", field: "freq_lang", editor: "list", width: 90, headerSort: false, editorParams: () => ({ values: state.meta.freq_langs }) },
-      { title: "category", field: "category", editor: "list", width: 128, headerSort: false, editorParams: () => ({ values: state.meta.categories }) },
-      { title: "status", field: "status", editor: "list", width: 118, headerSort: false, editorParams: () => ({ values: state.meta.statuses }) },
-      { title: "notes", field: "notes", editor: "input", minWidth: 220, headerSort: false },
-      { title: "errors", field: "errors", formatter: issueFormatter, width: 190, headerSort: false },
-      { title: "warnings", field: "warnings", formatter: issueFormatter, width: 230, headerSort: false },
+      { title: "chunk", field: "chunk", width: 120, headerSort: false },
+      { title: "row", field: "row", width: 62, headerSort: false },
+      { title: "orig", field: "orig_line", width: 62, headerSort: false },
+      { title: "runtime", field: "runtime", width: 84, formatter: runtimeFormatter, headerSort: false },
+      { title: "roman", field: "roman", editor: "input", widthGrow: 2, minWidth: 150, headerSort: false },
+      { title: "target", field: "target", editor: "input", widthGrow: 2, minWidth: 150, headerSort: false },
+      { title: "freq", field: "freq", editor: "number", width: 72, headerSort: false, editorParams: { min: 1, step: 1 } },
+      { title: "lang", field: "freq_lang", editor: "list", width: 78, headerSort: false, editorParams: () => ({ values: state.meta.freq_langs }) },
+      { title: "category", field: "category", editor: "list", width: 116, headerSort: false, editorParams: () => ({ values: state.meta.categories }) },
+      { title: "status", field: "status", editor: "list", width: 100, headerSort: false, editorParams: () => ({ values: state.meta.statuses }) },
+      { title: "notes", field: "notes", editor: "input", widthGrow: 3, minWidth: 200, headerSort: false },
+      { title: "errors", field: "errors", formatter: issueFormatter, widthGrow: 1, minWidth: 120, headerSort: false },
+      { title: "warnings", field: "warnings", formatter: issueFormatter, widthGrow: 1, minWidth: 140, headerSort: false },
     ],
   });
 
@@ -311,10 +460,20 @@ function makeTable() {
       if (payload.meta) {
         state.meta = payload.meta;
         renderDirty();
-      } else {
-        await loadMeta();
       }
-      await loadRows();
+      // Update only the edited row in place — no full-page reload/repaint.
+      // Cross-row warnings stay lazy: they refresh on save, filter change, or
+      // reload, not on every keystroke.
+      if (payload.row) {
+        cell.getRow().update(payload.row);
+        // Auto-accumulate genuinely-modified rows into the selection so a
+        // batch status change targets exactly the rows you edited.
+        if (payload.row.dirty && !state.selectedRowIds.has(payload.row.id)) {
+          state.selectedRowIds.add(payload.row.id);
+          cell.getRow().reformat();
+          refreshSelectionUI();
+        }
+      }
     } catch (error) {
       showMessage(error.message, 8000);
       await loadRows();
@@ -324,7 +483,16 @@ function makeTable() {
     state.activeRowId = row.getData().id;
     document.querySelectorAll(".tabulator-row.row-active").forEach((node) => node.classList.remove("row-active"));
     row.getElement().classList.add("row-active");
+    refreshSelectionUI();
     writeSavedView();
+  });
+  state.table.on("rowContext", (event, row) => {
+    event.preventDefault();
+    const id = row.getData().id;
+    if (!state.selectedRowIds.has(id)) state.activeRowId = id;
+    row.getElement().classList.add("row-active");
+    refreshSelectionUI();
+    openContextMenu(event.pageX, event.pageY);
   });
   state.table.on("tableBuilt", () => {
     const holder = tableHolder();
@@ -338,6 +506,7 @@ function makeTable() {
 
 async function postAction(path, body = {}, reload = true) {
   const payload = await api(path, { method: "POST", body });
+  closePopovers(null);
   if (payload.meta) {
     state.meta = payload.meta;
     renderDirty();
@@ -345,6 +514,7 @@ async function postAction(path, body = {}, reload = true) {
     await loadMeta();
   }
   if (reload) await loadRows();
+  refreshSelectionUI();
   return payload;
 }
 
@@ -356,10 +526,10 @@ async function addRow() {
     body.after_row_id = rows[0].id;
   } else if (state.activeRowId) {
     body.after_row_id = state.activeRowId;
-  } else if (current.chunk) {
-    body.chunk = current.chunk;
+  } else if (current.chunks.length === 1) {
+    body.chunk = current.chunks[0];
   } else {
-    showMessage("Select a row or choose a chunk before adding.");
+    showMessage("Select a row or filter to a single chunk before adding.");
     return;
   }
   const payload = await api("/api/add-row", { method: "POST", body });
@@ -371,10 +541,7 @@ async function addRow() {
     state.activeRowId = payload.row.id;
     state.selectedRowIds.clear();
     state.selectedRowIds.add(payload.row.id);
-    $("chunk-filter").value = payload.row.chunk;
-    $("query-input").value = "";
-    $("status-filter").value = "";
-    $("category-filter").value = "";
+    focusChunk(payload.row.chunk);
     state.page = Math.max(1, Math.ceil(Number(payload.row.row || 1) / state.pageSize));
     state.gridScrollTop = 0;
   }
@@ -398,10 +565,7 @@ async function duplicateRow() {
     state.activeRowId = payload.row.id;
     state.selectedRowIds.clear();
     state.selectedRowIds.add(payload.row.id);
-    $("chunk-filter").value = payload.row.chunk;
-    $("query-input").value = "";
-    $("status-filter").value = "";
-    $("category-filter").value = "";
+    focusChunk(payload.row.chunk);
     state.page = Math.max(1, Math.ceil(Number(payload.row.row || 1) / state.pageSize));
     state.gridScrollTop = 0;
   }
@@ -428,6 +592,224 @@ async function softRemove() {
   if (!ids.length) return showMessage("Select rows first.");
   if (!window.confirm(`Soft remove ${ids.length} selected row(s)?`)) return;
   await postAction("/api/soft-remove", { row_ids: ids });
+  state.selectedRowIds.clear();
+  state.activeRowId = null;
+  refreshSelectionUI();
+}
+
+async function deleteRows() {
+  const ids = selectedOrActiveIds();
+  if (!ids.length) return showMessage("Select rows or click a row first.");
+  await postAction("/api/delete-rows", { row_ids: ids });
+  state.selectedRowIds.clear();
+  state.activeRowId = null;
+  showMessage(`Deleted ${ids.length} row(s). Undo (Ctrl+Z) or Save-time backup restores them.`);
+}
+
+// Predefined roman-normalization rules, applied in list order (overlaps like
+// tteak/teak are ordered so the longer one wins first).
+const REGEX_RULES = [
+  { pattern: "tteak", replacement: "tta" },
+  { pattern: "veak", replacement: "va" },
+  { pattern: "yeak", replacement: "ya" },
+  { pattern: "neak", replacement: "na" },
+  { pattern: "teak", replacement: "ta" },
+  { pattern: "geak", replacement: "ga" },
+  { pattern: "jeak", replacement: "ja" },
+  { pattern: "peak", replacement: "pa" },
+  { pattern: "reak", replacement: "ra" },
+  { pattern: "leak", replacement: "la" },
+  { pattern: "vva", replacement: "va" },
+  { pattern: "mma", replacement: "ma" },
+  { pattern: "oanh", replacement: "anh" },
+  { pattern: "uum", replacement: "um" },
+  { pattern: "meak", replacement: "ma" },
+  { pattern: "oach", replacement: "ach" },
+  { pattern: "oam", replacement: "am" },
+  { pattern: "oan", replacement: "an" },
+  { pattern: "au$", replacement: "ov" },
+  { pattern: "^au", replacement: "av" },
+  { pattern: "ros$", replacement: "ruos" },
+];
+
+const RULE_ORDER_KEY = "khmerime.lexiconEditor.ruleOrder.v1";
+
+function loadRuleOrder() {
+  try {
+    const saved = JSON.parse(window.localStorage.getItem(RULE_ORDER_KEY) || "[]");
+    // Keep only valid indices, then append any new/missing rules at the end.
+    const valid = saved.filter((i) => Number.isInteger(i) && i >= 0 && i < REGEX_RULES.length);
+    const seen = new Set(valid);
+    for (let i = 0; i < REGEX_RULES.length; i++) if (!seen.has(i)) valid.push(i);
+    return [...new Set(valid)];
+  } catch (_e) {
+    return REGEX_RULES.map((_, i) => i);
+  }
+}
+
+function saveRuleOrder(order) {
+  window.localStorage.setItem(RULE_ORDER_KEY, JSON.stringify(order));
+}
+
+function renderRegexRules() {
+  const list = $("regex-rules-list");
+  list.replaceChildren();
+  for (const index of loadRuleOrder()) {
+    const rule = REGEX_RULES[index];
+    const row = document.createElement("label");
+    row.className = "chunk-filter-row regex-rule-row";
+    row.draggable = true;
+    row.dataset.index = String(index);
+    const handle = document.createElement("span");
+    handle.className = "drag-handle";
+    handle.textContent = "⠿";
+    handle.setAttribute("aria-hidden", "true");
+    const box = document.createElement("input");
+    box.type = "checkbox";
+    box.dataset.index = String(index);
+    box.className = "regex-rule-box";
+    const text = document.createElement("span");
+    text.innerHTML = `<code>${rule.pattern}</code> → <code>${rule.replacement}</code>`;
+    row.append(handle, box, text);
+    wireRuleDrag(row, list);
+    list.appendChild(row);
+  }
+  $("regex-rules-all").checked = false;
+}
+
+function wireRuleDrag(row, list) {
+  row.addEventListener("dragstart", (e) => {
+    row.classList.add("dragging");
+    e.dataTransfer.effectAllowed = "move";
+  });
+  row.addEventListener("dragend", () => {
+    row.classList.remove("dragging");
+    saveRuleOrder([...list.querySelectorAll(".regex-rule-row")].map((r) => Number(r.dataset.index)));
+    $("regex-apply-button").disabled = true;
+  });
+  row.addEventListener("dragover", (e) => {
+    e.preventDefault();
+    const dragging = list.querySelector(".dragging");
+    if (!dragging || dragging === row) return;
+    const rect = row.getBoundingClientRect();
+    const after = e.clientY > rect.top + rect.height / 2;
+    list.insertBefore(dragging, after ? row.nextSibling : row);
+  });
+}
+
+function selectedRules() {
+  // querySelectorAll returns document (visual) order, which is the apply order.
+  return [...document.querySelectorAll(".regex-rule-box")]
+    .filter((box) => box.checked)
+    .map((box) => REGEX_RULES[Number(box.dataset.index)]);
+}
+
+function regexBody() {
+  return {
+    ...regexScope(),
+    column: $("regex-column").value,
+    pattern: $("regex-pattern").value,
+    replacement: $("regex-replacement").value,
+  };
+}
+
+// Render preview changes as a table: old | new | Khmer target.
+function renderPreviewTable(list, changes) {
+  list.replaceChildren();
+  if (!changes.length) {
+    list.textContent = "No rows match — nothing would change.";
+    return;
+  }
+  const table = document.createElement("table");
+  table.className = "preview-table";
+  table.innerHTML =
+    "<thead><tr><th>from</th><th>to</th><th>target</th></tr></thead>";
+  const body = document.createElement("tbody");
+  for (const change of changes) {
+    const tr = document.createElement("tr");
+    const cells = [change.old, change.new, change.target || ""];
+    for (const [i, text] of cells.entries()) {
+      const td = document.createElement("td");
+      td.textContent = text;
+      if (i === 2) td.className = "preview-target";
+      tr.appendChild(td);
+    }
+    body.appendChild(tr);
+  }
+  table.appendChild(body);
+  list.appendChild(table);
+}
+
+async function regexRulesPreview() {
+  const rules = selectedRules();
+  if (!rules.length) return showMessage("Tick at least one rule.");
+  const body = { ...regexScope(), column: "roman", rules };
+  try {
+    const payload = await api("/api/bulk-regex-rules-preview", { method: "POST", body });
+    renderPreviewTable($("regex-preview-list"), payload.changes);
+    $("regex-count").textContent = `${payload.count} row(s) would change`;
+    state.regexApplyMode = "rules";
+    state.regexApply = async () => {
+      const result = await postAction("/api/bulk-regex-rules-apply", body);
+      return result.updated;
+    };
+    $("regex-apply-button").disabled = !payload.count;
+  } catch (error) {
+    showMessage(error.message, 8000);
+  }
+}
+
+async function regexPreview() {
+  const body = regexBody();
+  try {
+    const payload = await api("/api/bulk-regex-preview", { method: "POST", body });
+    renderPreviewTable($("regex-preview-list"), payload.changes);
+    $("regex-count").textContent = `${payload.count} row(s) would change`;
+    state.regexApplyMode = "manual";
+    state.regexApply = async () => {
+      const result = await postAction("/api/bulk-regex-apply", body);
+      return result.updated;
+    };
+    $("regex-apply-button").disabled = !payload.count;
+  } catch (error) {
+    showMessage(error.message, 8000);
+  }
+}
+
+async function regexApply() {
+  if (!state.regexApply) return;
+  try {
+    const lastMode = state.regexApplyMode;
+    const updated = await state.regexApply();
+    refreshSelectionUI();
+    showMessage(`Applied to ${updated} row(s).`);
+    // Keep the modal, rule ticks, and selection (apply mutates in place — IDs stay valid),
+    // then re-preview so Apply reflects the now-changed rows.
+    $("regex-apply-button").disabled = true;
+    state.regexApply = null;
+    if (lastMode === "rules") await regexRulesPreview();
+    else if (lastMode === "manual") await regexPreview();
+  } catch (error) {
+    showMessage(error.message, 8000);
+  }
+}
+
+function openRegexModal() {
+  $("regex-preview-list").replaceChildren();
+  $("regex-count").textContent = "";
+  $("regex-apply-button").disabled = true;
+  state.regexApply = null;
+  const selected = selectedOrActiveIds().length;
+  $("regex-scope").textContent = selected
+    ? `Applies to ${selected} selected row(s).`
+    : `Applies to all ${state.total} row(s) matching the current filter.`;
+  renderRegexRules();
+  $("regex-modal").classList.add("visible");
+  $("regex-pattern").focus();
+}
+
+function closeRegexModal() {
+  $("regex-modal").classList.remove("visible");
 }
 
 async function moveRows(direction) {
@@ -440,26 +822,144 @@ async function moveRows(direction) {
 async function bulkEdit() {
   const ids = selectedOrActiveIds();
   if (!ids.length) return showMessage("Select rows or click a row first.");
-  await postAction("/api/bulk-edit", {
-    row_ids: ids,
-    column: $("bulk-column").value,
-    value: $("bulk-value").value,
-  });
-  showMessage(`Applied ${$("bulk-column").value}=${$("bulk-value").value} to ${ids.length} row(s).`);
+  const column = $("bulk-column").value;
+  const value = $("bulk-value").value;
+  await postAction("/api/bulk-edit", { row_ids: ids, column, value });
+  state.selectedRowIds.clear();
+  state.activeRowId = null;
+  refreshSelectionUI();
+  showMessage(`Applied ${column}=${value} to ${ids.length} row(s).`);
 }
 
 async function saveBuildCheck() {
   try {
     const payload = await postAction("/api/save-build-check", {}, false);
+    // Save drops drafts and rescans, regenerating every row ID. Any selection
+    // held from before now points at IDs that no longer exist ("unknown row"),
+    // so clear it before reloading the fresh grid.
+    state.selectedRowIds.clear();
+    state.activeRowId = null;
     if (payload.diff !== undefined) {
       $("diff-output").textContent = payload.diff || "(no diff)";
-      switchTab("diff-panel");
+      $("diff-modal").classList.add("visible");
     }
     await loadRows();
+    await loadProblems();
     showMessage(`${payload.message}${payload.backup_dir ? `\nBackup: ${payload.backup_dir}` : ""}`, 7000);
   } catch (error) {
-    showMessage(error.message, 12000);
+    showBuildError(error);
   }
+}
+
+function showBuildError(error) {
+  $("error-message").textContent = error.message;
+  const holder = $("error-conflicts");
+  holder.replaceChildren();
+  const detail = error.detail || {};
+  for (const dup of detail.duplicate_keys || []) {
+    holder.appendChild(renderDuplicateFix(dup));
+  }
+  for (const conflict of detail.frequency_conflicts || []) {
+    holder.appendChild(renderConflictFix(conflict));
+  }
+  $("error-modal").classList.add("visible");
+}
+
+function renderDuplicateFix(dup) {
+  const card = document.createElement("div");
+  card.className = "conflict-card";
+  const head = document.createElement("div");
+  head.className = "conflict-head";
+  head.textContent = `${dup.roman} → ${dup.target} (${dup.freq_lang})`;
+  card.appendChild(head);
+
+  const detail = document.createElement("div");
+  detail.className = "conflict-detail";
+  detail.textContent = "Approved in two places — disable one to keep a single runtime entry.";
+  card.appendChild(detail);
+
+  const disableOne = async (rowId) => {
+    try {
+      await postAction("/api/bulk-edit", { row_ids: [rowId], column: "status", value: "disabled" });
+      card.remove();
+      showMessage(`Disabled a duplicate ${dup.roman}. Re-run Build.`);
+      if (!$("error-conflicts").children.length) closeBuildError();
+    } catch (e) {
+      showMessage(e.message, 8000);
+    }
+  };
+  for (const row of dup.rows) {
+    const line = document.createElement("div");
+    line.className = "conflict-actions";
+    const label = document.createElement("span");
+    label.className = "conflict-detail";
+    label.textContent = `${row.chunk} (freq ${row.freq})`;
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "btn";
+    btn.textContent = "disable this";
+    btn.addEventListener("click", () => disableOne(row.id));
+    line.append(label, btn);
+    card.appendChild(line);
+  }
+  return card;
+}
+
+function renderConflictFix(conflict) {
+  const card = document.createElement("div");
+  card.className = "conflict-card";
+  const head = document.createElement("div");
+  head.className = "conflict-head";
+  head.textContent = `${conflict.target} (${conflict.freq_lang})`;
+  card.appendChild(head);
+
+  const rowIds = conflict.rows.map((r) => r.id);
+  const freqs = [...new Set(conflict.rows.map((r) => r.freq))];
+
+  const detail = document.createElement("div");
+  detail.className = "conflict-detail";
+  detail.textContent = conflict.rows.map((r) => `${r.roman}=${r.freq}`).join(", ");
+  card.appendChild(detail);
+
+  const actions = document.createElement("div");
+  actions.className = "conflict-actions";
+  const apply = async (value) => {
+    try {
+      await postAction("/api/bulk-edit", { row_ids: rowIds, column: "freq", value: String(value) });
+      card.remove();
+      showMessage(`Set freq=${value} for ${conflict.target}. Re-run Build.`);
+      if (!$("error-conflicts").children.length) closeBuildError();
+    } catch (e) {
+      showMessage(e.message, 8000);
+    }
+  };
+  for (const freq of freqs) {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "btn";
+    btn.textContent = `use ${freq}`;
+    btn.addEventListener("click", () => apply(freq));
+    actions.appendChild(btn);
+  }
+  const input = document.createElement("input");
+  input.type = "number";
+  input.min = "1";
+  input.placeholder = "freq";
+  input.className = "conflict-input";
+  const custom = document.createElement("button");
+  custom.type = "button";
+  custom.className = "btn primary";
+  custom.textContent = "Set";
+  custom.addEventListener("click", () => {
+    if (input.value) apply(input.value);
+  });
+  actions.append(input, custom);
+  card.appendChild(actions);
+  return card;
+}
+
+function closeBuildError() {
+  $("error-modal").classList.remove("visible");
 }
 
 async function loadDiff() {
@@ -468,11 +968,19 @@ async function loadDiff() {
 }
 
 async function loadProblems() {
-  const payload = await api("/api/problems");
-  $("problems-count").textContent = `${payload.total} problem entries`;
+  state.problems = await api("/api/problems");
+  renderProblems();
+}
+
+function renderProblems() {
+  const payload = state.problems;
+  if (!payload) return;
+  const typeFilter = $("problem-type-filter").value;
+  const shown = typeFilter ? payload.problems.filter((item) => item.type === typeFilter) : payload.problems;
+  $("problems-count").textContent = `${shown.length} shown / ${payload.total} total`;
   const list = $("problems-list");
   list.replaceChildren();
-  for (const item of payload.problems) {
+  for (const item of shown) {
     const row = item.row;
     const element = document.createElement("div");
     element.className = "problem-item";
@@ -485,47 +993,81 @@ async function loadProblems() {
     open.type = "button";
     open.textContent = "Open";
     open.addEventListener("click", async () => {
-      $("chunk-filter").value = row.chunk;
-      $("query-input").value = "";
-      $("status-filter").value = "";
-      $("category-filter").value = "";
+      focusChunk(row.chunk);
       state.activeRowId = row.id;
       state.page = Math.max(1, Math.ceil(Number(row.row || 1) / state.pageSize));
       state.gridScrollTop = 0;
-      switchTab("grid-panel");
+      closeReview();
       await loadRows();
     });
     element.append(type, detail, open);
     list.appendChild(element);
   }
+  updateReviewBadge();
 }
 
-function switchTab(panelId) {
-  state.activeTab = panelId;
-  document.querySelectorAll(".tab").forEach((node) => node.classList.toggle("active", node.dataset.tab === panelId));
-  document.querySelectorAll(".panel").forEach((node) => node.classList.toggle("active", node.id === panelId));
-  writeSavedView();
+async function openReview() {
+  $("review-drawer").hidden = false;
+  $("review-scrim").hidden = false;
+  await loadProblems();
+}
+
+function closeReview() {
+  $("review-drawer").hidden = true;
+  $("review-scrim").hidden = true;
+}
+
+async function openDiff() {
+  await loadDiff();
+  $("diff-modal").classList.add("visible");
+}
+
+function closeDiff() {
+  $("diff-modal").classList.remove("visible");
+}
+
+function updateReviewBadge() {
+  const badge = $("review-badge");
+  // Badge counts actionable problems only — disabled/rejected rows are
+  // deliberate, not issues to flag.
+  const count = state.problems ? (state.problems.actionable ?? state.problems.total) : 0;
+  badge.textContent = String(count);
+  badge.hidden = count === 0;
 }
 
 function wireEvents() {
-  document.querySelectorAll(".tab").forEach((node) => node.addEventListener("click", () => switchTab(node.dataset.tab)));
-  $("query-input").addEventListener("input", () => {
+  $("review-open-button").addEventListener("click", () => openReview().catch((error) => showMessage(error.message)));
+  $("review-close-button").addEventListener("click", closeReview);
+  $("review-scrim").addEventListener("click", closeReview);
+  $("diff-open-button").addEventListener("click", () => openDiff().catch((error) => showMessage(error.message)));
+  $("diff-close-button").addEventListener("click", closeDiff);
+  $("error-close-button").addEventListener("click", closeBuildError);
+  $("error-copy-button").addEventListener("click", async () => {
+    try {
+      await navigator.clipboard.writeText($("error-message").textContent || "");
+      showMessage("Error copied to clipboard.");
+    } catch (_e) {
+      showMessage("Copy failed — select the text manually.", 6000);
+    }
+  });
+  const debouncedSearch = () => {
     window.clearTimeout(state.searchTimer);
     state.searchTimer = window.setTimeout(() => {
       state.page = 1;
       state.gridScrollTop = 0;
       loadRows().catch((error) => showMessage(error.message));
     }, 180);
-  });
-  ["chunk-filter", "status-filter", "category-filter"].forEach((id) => {
-    $(id).addEventListener("change", () => {
-      state.page = 1;
-      state.gridScrollTop = 0;
-      loadRows().catch((error) => showMessage(error.message));
-    });
-  });
+  };
+  $("query-input").addEventListener("input", debouncedSearch);
+  $("target-input").addEventListener("input", debouncedSearch);
+  for (const f of FILTERS) f.wire();
   $("page-size").addEventListener("change", () => {
     state.pageSize = Number($("page-size").value);
+    state.page = 1;
+    state.gridScrollTop = 0;
+    loadRows().catch((error) => showMessage(error.message));
+  });
+  $("runtime-filter").addEventListener("change", () => {
     state.page = 1;
     state.gridScrollTop = 0;
     loadRows().catch((error) => showMessage(error.message));
@@ -550,11 +1092,45 @@ function wireEvents() {
   $("move-bottom-button").addEventListener("click", () => moveRows("bottom").catch((error) => showMessage(error.message)));
   $("bulk-column").addEventListener("change", updateBulkValues);
   $("bulk-apply-button").addEventListener("click", () => bulkEdit().catch((error) => showMessage(error.message)));
+  $("set-open-button").addEventListener("click", (event) => {
+    event.stopPropagation();
+    togglePopover("set-popover", "set-open-button");
+  });
+  $("overflow-open-button").addEventListener("click", (event) => {
+    event.stopPropagation();
+    $("overflow-popover").classList.remove("context-menu");
+    $("overflow-popover").style.left = "";
+    $("overflow-popover").style.top = "";
+    togglePopover("overflow-popover", "overflow-open-button");
+  });
+  document.addEventListener("click", () => closePopovers(null));
+  ["set-popover", "overflow-popover"].forEach((id) =>
+    $(id).addEventListener("click", (event) => event.stopPropagation()),
+  );
+  $("delete-row-button").addEventListener("click", () => deleteRows().catch((error) => showMessage(error.message)));
+  $("regex-open-button").addEventListener("click", openRegexModal);
+  $("regex-preview-button").addEventListener("click", () => regexPreview().catch((error) => showMessage(error.message)));
+  $("regex-rules-preview-button").addEventListener("click", () => regexRulesPreview().catch((error) => showMessage(error.message)));
+  $("regex-apply-button").addEventListener("click", () => regexApply().catch((error) => showMessage(error.message)));
+  $("regex-cancel-button").addEventListener("click", closeRegexModal);
+  $("regex-rules-all").addEventListener("change", (event) => {
+    for (const box of document.querySelectorAll(".regex-rule-box")) box.checked = event.target.checked;
+    $("regex-apply-button").disabled = true;
+  });
+  ["regex-pattern", "regex-replacement", "regex-column"].forEach((id) =>
+    $(id).addEventListener("input", () => {
+      $("regex-apply-button").disabled = true;
+    }),
+  );
+  $("regex-rules-list").addEventListener("change", () => {
+    $("regex-apply-button").disabled = true;
+  });
   $("undo-button").addEventListener("click", () => postAction("/api/undo").catch((error) => showMessage(error.message)));
   $("redo-button").addEventListener("click", () => postAction("/api/redo").catch((error) => showMessage(error.message)));
   $("save-button").addEventListener("click", saveBuildCheck);
   $("refresh-diff-button").addEventListener("click", () => loadDiff().catch((error) => showMessage(error.message)));
   $("refresh-problems-button").addEventListener("click", () => loadProblems().catch((error) => showMessage(error.message)));
+  $("problem-type-filter").addEventListener("change", renderProblems);
   $("discard-button").addEventListener("click", async () => {
     if (!window.confirm("Discard all unsaved draft changes?")) return;
     await postAction("/api/discard-draft");
@@ -576,19 +1152,37 @@ function wireEvents() {
 
   window.addEventListener("beforeunload", writeSavedView);
 
+  function typingTarget(event) {
+    const node = event.target;
+    if (!node) return false;
+    if (node.isContentEditable) return true;
+    const tag = node.tagName;
+    return tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT";
+  }
+
+  const fail = (error) => showMessage(error.message);
+
   document.addEventListener("keydown", (event) => {
     if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "s") {
       event.preventDefault();
       saveBuildCheck();
     } else if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "z") {
       event.preventDefault();
-      postAction("/api/undo").catch((error) => showMessage(error.message));
+      postAction("/api/undo").catch(fail);
     } else if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "y") {
       event.preventDefault();
-      postAction("/api/redo").catch((error) => showMessage(error.message));
-    } else if (event.key === "Delete" && selectedIds().length) {
+      postAction("/api/redo").catch(fail);
+    } else if (event.key === "Escape" && $("regex-modal").classList.contains("visible")) {
+      closeRegexModal();
+    } else if (event.key === "Escape" && $("error-modal").classList.contains("visible")) {
+      closeBuildError();
+    } else if (event.key === "Escape" && $("diff-modal").classList.contains("visible")) {
+      closeDiff();
+    } else if (event.key === "Escape" && !$("review-drawer").hidden) {
+      closeReview();
+    } else if (event.key === "Delete" && !typingTarget(event) && selectedOrActiveIds().length) {
       event.preventDefault();
-      softRemove().catch((error) => showMessage(error.message));
+      deleteRows().catch(fail);
     }
   });
 }
@@ -597,7 +1191,6 @@ async function init() {
   wireEvents();
   await loadMeta();
   makeTable();
-  switchTab(state.activeTab || "grid-panel");
   await loadRows();
   await loadProblems();
 }

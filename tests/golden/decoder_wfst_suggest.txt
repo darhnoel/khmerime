@@ -15,7 +15,7 @@ input: ttov
 top_n: 2
 suggestions:
 1. ទៅ
-2. ទៅ៏
+2. ទៅ៏!
 
 [[case]]
 name: single_span_sronos
@@ -23,12 +23,12 @@ input: sronos
 top_n: 7
 suggestions:
 1. ស្រណោះ
-2. ស្រីណាស់
-3. ស្រីហ្ន
-4. ស្រីង៉ោះៗ
-5. ស្រីងរ
-6. ស្រែណាស់
-7. ស្រណាស់
+2. ស្រីហ្ន
+3. ស្រូវហ្ន
+4. ស្រីណ
+5. ស្រូវណ
+6. ស្រីញាស់
+7. ស្រូវញាស់
 
 [[case]]
 name: exact_phrase_khnhomttov
@@ -40,7 +40,7 @@ suggestions:
 3. ក្នុងហ៊ុមទៅ
 4. គ្នាហោមទៅ
 5. គ្នាហ៊ុមទៅ
-6. ក្នុងហ៊ុមទៅ៏
+6. ក្នុងហ៊ុមទៅ៏!
 
 [[case]]
 name: beam_phrase_saensronors
