@@ -446,7 +446,7 @@ ttumboar,ទំព័រ,522,km,generated,draft,tonle:s1; reverse=2en; weak_cove
 ttumpoar,ទំព័រ,522,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=2; rank=1; beams=10; score=-0.2227
 daenh,ដេញ,518,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.6717
 dens,ដេញ,518,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.1957
-rih,រិះ,517,km,generated,approved,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.4134
+rih,រិះ,517,km,generated,disabled,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.4134
 rys,រិះ,517,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.3593; collision=1; existing_targets=ឫស
 bbor,ពរ,516,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=2; rank=1; beams=10; score=-0.3617
 bor,ពរ,516,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=2; rank=3; beams=10; score=-0.4170; collision=1; existing_targets=បង្ក|បន្ត|បរ
@@ -2012,7 +2012,7 @@ sokhomeol,សុខុមាល,94,km,generated,draft,tonle:s1; reverse=2en; wea
 thtreay,ទ្រាយ,93,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.2759
 ttreoy,ទ្រាយ,93,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.2867
 bamnacs,បំណាច់,93,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=2; rank=3; beams=10; score=-0.2863
-brongauy,ព្រងើយ,93,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=2; rank=3; beams=10; score=-0.2875
+brongeuy,ព្រងើយ,93,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=2; rank=3; beams=10; score=-0.2875
 rab,រប,93,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.4223; collision=1; existing_targets=រ៉ាប់
 rop,រប,93,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.3939
 sahabrotebttekar,សហប្រតិបត្តិការ,93,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=2; rank=2; beams=10; score=-0.1386
@@ -2566,7 +2566,7 @@ samley,សំឡី,60,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1
 somlei,សំឡី,60,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.2272; collision=1; existing_targets=សម្លី
 srakor,ស្រករ,60,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.2318
 srokar,ស្រករ,60,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.2428
-khiong,ខ្យង,59,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=2; rank=3; beams=10; score=-0.3333
+khyong,ខ្យង,59,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=2; rank=3; beams=10; score=-0.3333
 chonghon,ចង្ហាន់,59,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=2; rank=3; beams=10; score=-0.2440
 chriet,ជ្រៀត,59,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.3285
 jrieth,ជ្រៀត,59,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.2753
@@ -3047,7 +3047,7 @@ rangea,រងា,40,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; r
 rongeo,រងា,40,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.1917
 rae,រេ,40,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-1.0676
 roe,រេ,40,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-1.2339
-romphauy,រំភើយ,40,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.2919
+rompheuy,រំភើយ,40,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.2919
 rumphery,រំភើយ,40,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.2037
 sboi,ស្បៃ,40,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.3872
 spai,ស្បៃ,40,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.3720
@@ -9983,7 +9983,7 @@ jomraek,ជម្រែក,1,km,generated,draft,tonle:s1; reverse=2en; weak_cove
 jomreaek,ជម្រែក,1,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.2412
 chomroung,ជម្រោង,1,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.2040
 jomraung,ជម្រោង,1,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.2395
-chomlauy,ជម្លើយ,1,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.3167; collision=1; existing_targets=ចម្លើយ
+chomleuy,ជម្លើយ,1,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.3167; collision=1; existing_targets=ចម្លើយ
 jomlery,ជម្លើយ,1,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.2135
 chorcheay,ជរជាយ,1,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=3; beams=10; score=-0.2870
 jorjeay,ជរជាយ,1,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.2381
@@ -10163,7 +10163,7 @@ jerngsak,ជើងសក់,1,km,generated,draft,tonle:s1; reverse=2en; weak_cov
 cherngsa,ជើងសា,1,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=2; rank=3; beams=10; score=-0.2635
 jaungseh,ជើងសេះ,1,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=2; rank=2; beams=10; score=-0.1701
 jerngseh,ជើងសេះ,1,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=2; rank=1; beams=10; score=-0.1497
-chauy,ជើយ,1,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=2; rank=3; beams=10; score=-0.3982
+cheuy,ជើយ,1,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=2; rank=3; beams=10; score=-0.3982
 joeanloean,ជឿនលឿន,1,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=2; rank=1; beams=10; score=-0.2263
 joeunloean,ជឿនលឿន,1,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=2; rank=3; beams=10; score=-0.3128
 jieth,ជៀត,1,km,generated,draft,tonle:s1; reverse=2en; weak_coverage=1; rank=2; beams=10; score=-0.3241
