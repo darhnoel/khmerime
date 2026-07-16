@@ -215,15 +215,15 @@ impl KhmerIMESession {
         self.model_mode.store(enabled, std::sync::atomic::Ordering::Relaxed);
     }
 
-    /// Debounced model refine: re-decode the current composition with the Model-mode visible
-    /// refiner, OFF the keystroke hot path. Swift calls this on a typing pause (not per key). A
-    /// no-op returning the current state when there is no active composition; inert (Standard
-    /// result) when Smart is off or no provider is registered. Never panics.
-    pub fn refine_with_model(&self) -> IosRenderState {
+    /// Debounced model refine: re-decode the composition with the Model-mode visible refiner, OFF
+    /// the keystroke hot path. `expected_raw` is the roman the caller captured when it *scheduled*
+    /// the refine; the session's staleness guard (`composition_raw != expected_raw`) drops the refine
+    /// if a keystroke changed the composition in between — so a stale async result never renders over
+    /// newer input. No-op/current-state when empty; inert when Smart is off or no provider registered.
+    pub fn refine_with_model(&self, expected_raw: String) -> IosRenderState {
         let mut s = self.inner.lock().unwrap();
-        let raw = s.snapshot().raw_preedit.clone();
-        if !raw.is_empty() {
-            s.refine_segmented_with_visible_refiner(&raw);
+        if !expected_raw.is_empty() {
+            s.refine_segmented_with_visible_refiner(&expected_raw);
         }
         render_state(&s.snapshot(), &SessionResult::default())
     }
@@ -440,7 +440,7 @@ mod tests {
     fn refine_with_model_on_empty_composition_is_safe() {
         let s = new_session();
         s.set_model_mode(true);
-        let state = s.refine_with_model();
+        let state = s.refine_with_model(String::new());
         assert!(state.preedit.is_empty());
         assert!(state.candidates.is_empty());
     }
@@ -453,8 +453,24 @@ mod tests {
         s.set_model_mode(true);
         let typed = type_str(&s, "nhom");
         assert_eq!(typed.preedit, "nhom");
-        let refined = s.refine_with_model();
+        let refined = s.refine_with_model("nhom".to_owned());
         assert_eq!(refined.preedit, "nhom", "refine must not disturb the roman preedit");
+    }
+
+    // #7 staleness guard: a refine whose captured raw no longer matches the composition is dropped
+    // (no-op), so a stale async result can never render over newer input.
+    #[test]
+    fn refine_with_model_drops_stale_raw() {
+        let s = new_session();
+        s.set_model_mode(true);
+        let typed = type_str(&s, "nhom");
+        assert_eq!(typed.preedit, "nhom");
+        // Scheduled against "nho" but composition is now "nhom" -> guard drops it, preedit intact.
+        let refined = s.refine_with_model("nho".to_owned());
+        assert_eq!(
+            refined.preedit, "nhom",
+            "stale refine must not disturb the current composition"
+        );
     }
 
     // ── render_state field mapping ────────────────────────────────────────────

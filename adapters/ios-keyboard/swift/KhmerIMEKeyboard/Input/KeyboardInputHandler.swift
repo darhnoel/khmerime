@@ -196,11 +196,14 @@ final class KeyboardInputHandler {
         let smart = session.isModelMode()
         guard smart else { return }
         let revision = compositionRevision
+        // Capture the roman NOW; pass it into the refine so Rust's staleness guard drops the result
+        // if a keystroke changes the composition between scheduling and the (async) FFI call.
+        let expectedRaw = romanBuffer
         refineTask = modelRefineScheduler.schedule(after: 0.18) { [weak self] in
             guard let self, self.compositionRevision == revision, !self.romanBuffer.isEmpty else { return }
             self.dispatcher.onSession { [weak self] in
                 guard let self, self.compositionRevision == revision else { return }
-                let state = self.session.refineWithModel()
+                let state = self.session.refineWithModel(expectedRaw: expectedRaw)
                 self.dispatcher.onMain { [weak self] in
                     guard let self, self.compositionRevision == revision else { return }
                     self.render(state)

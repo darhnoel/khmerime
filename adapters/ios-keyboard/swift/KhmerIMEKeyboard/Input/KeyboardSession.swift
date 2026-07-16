@@ -58,7 +58,7 @@ final class KeyboardSession {
     // Smart-mode model refinement is optional. Without a registered provider,
     // the core returns the standard result unchanged.
     func isModelMode() -> Bool { inner.isModelMode() }
-    func refineWithModel() -> IosRenderState { inner.refineWithModel() }
+    func refineWithModel(expectedRaw: String) -> IosRenderState { inner.refineWithModel(expectedRaw: expectedRaw) }
 
     // MARK: - Key routing
 
