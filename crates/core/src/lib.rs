@@ -12,10 +12,10 @@ mod segment_refine;
 mod utils;
 
 pub use crate::decoder::{
-    candidate_span_ends, register_span_proposal_provider, suggest_manual_character_candidates, DecodeCandidate,
-    DecodeFailure, DecodeRequest, DecodeResult, DecodeSegment, DecoderConfig, DecoderMode, ManualComposeCandidate,
-    ManualComposeKind, ShadowMismatch, ShadowObservation, ShadowSummary, SpanProposal, SpanProposalMode,
-    SpanProposalProvider, SpanProposalRequest,
+    candidate_span_ends, register_span_proposal_provider, span_proposal_provider_is_registered,
+    suggest_manual_character_candidates, DecodeCandidate, DecodeFailure, DecodeRequest, DecodeResult, DecodeSegment,
+    DecoderConfig, DecoderMode, ManualComposeCandidate, ManualComposeKind, ShadowMismatch, ShadowObservation,
+    ShadowSummary, SpanProposal, SpanProposalMode, SpanProposalProvider, SpanProposalRequest,
 };
 pub use crate::roman_lookup::{
     AppliedSuggestion, Entry, LexiconError, Result, SharedTransliteratorData, Transliterator,

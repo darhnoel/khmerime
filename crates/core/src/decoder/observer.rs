@@ -330,6 +330,7 @@ mod tests {
                 confidence_bps: None,
                 segments: Vec::new(),
                 from_model: false,
+                lexicon_verified: true,
             }],
             5,
         );

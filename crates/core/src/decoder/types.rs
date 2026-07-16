@@ -40,6 +40,9 @@ pub struct DecodeCandidate {
     /// candidate — lets the UI mark model-assisted suggestions. Always false for
     /// lexicon/fuzzy-only candidates.
     pub from_model: bool,
+    /// True when every output span is present in the Lexicon. Model proposals may be
+    /// visible while false so adapters can warn without suppressing a potentially valid word.
+    pub lexicon_verified: bool,
 }
 
 #[derive(Clone, Debug)]

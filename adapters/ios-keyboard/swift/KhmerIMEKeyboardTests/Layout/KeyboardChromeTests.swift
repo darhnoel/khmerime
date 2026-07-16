@@ -87,7 +87,9 @@ final class KeyboardChromeTests: XCTestCase {
             commitText: nil,
             segmentEditActive: segmentEditActive,
             segmentEditIndex: nil,
-            phraseCandidates: phraseCandidates.map { IosPhraseCandidate(text: $0, segments: []) },
+            phraseCandidates: phraseCandidates.map {
+                IosPhraseCandidate(text: $0, segments: [], fromModel: false, lexiconVerified: true)
+            },
             selectedPhraseIndex: selectedPhraseIndex
         )
     }

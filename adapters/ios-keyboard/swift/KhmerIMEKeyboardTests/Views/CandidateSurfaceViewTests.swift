@@ -55,7 +55,9 @@ final class CandidateSurfaceViewTests: XCTestCase {
         IosRenderState(
             candidates: candidates, selectedIndex: nil, preedit: "", segments: [],
             focusedSegmentIndex: nil, commitText: nil, segmentEditActive: segmentEditActive, segmentEditIndex: nil,
-            phraseCandidates: phrases.map { IosPhraseCandidate(text: $0, segments: []) },
+            phraseCandidates: phrases.map {
+                IosPhraseCandidate(text: $0, segments: [], fromModel: false, lexiconVerified: true)
+            },
             selectedPhraseIndex: 0
         )
     }

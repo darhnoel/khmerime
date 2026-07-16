@@ -34,6 +34,11 @@ pub fn register_span_proposal_provider(provider: Arc<dyn SpanProposalProvider>) 
     let _ = REGISTERED_PROVIDER.set(provider);
 }
 
+/// Whether this linked engine instance has received a model provider.
+pub fn span_proposal_provider_is_registered() -> bool {
+    REGISTERED_PROVIDER.get().is_some()
+}
+
 pub(crate) fn provider_for_mode(mode: SpanProposalMode) -> Option<Arc<dyn SpanProposalProvider>> {
     match mode {
         SpanProposalMode::Disabled => None,
@@ -60,7 +65,17 @@ struct StaticTestSpanProposalProvider;
 
 impl StaticTestSpanProposalProvider {
     fn rows() -> &'static [(&'static str, &'static str)] {
-        &[("knhm", "ខ្ញុំ"), ("ttv", "ទៅ"), ("salarien", "សាលារៀន")]
+        &[
+            ("knhm", "ខ្ញុំ"),
+            ("ttv", "ទៅ"),
+            ("salarien", "សាលារៀន"),
+            // Deliberately wrong whole-word proposal for an input that the Lexicon can
+            // already compose from three exact chunks: nov|pel|dael -> នៅ|ពេល|ដែល.
+            ("novpeldael", "បច្ចុប្បន្នភាព"),
+            // Deliberately absent from the test Lexicon: exercises an exploratory model
+            // suggestion that must remain visible but visibly unverified.
+            ("qzx", "គហិបតី"),
+        ]
     }
 }
 

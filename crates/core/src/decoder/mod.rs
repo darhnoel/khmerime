@@ -17,7 +17,8 @@ pub(crate) use self::observer::{build_shadow_observation, ShadowReport};
 pub use self::observer::{ShadowMismatch, ShadowObservation, ShadowSummary};
 pub(crate) use self::span_proposal::provider_for_mode;
 pub use self::span_proposal::{
-    candidate_span_ends, register_span_proposal_provider, SpanProposal, SpanProposalProvider, SpanProposalRequest,
+    candidate_span_ends, register_span_proposal_provider, span_proposal_provider_is_registered, SpanProposal,
+    SpanProposalProvider, SpanProposalRequest,
 };
 pub use self::types::{DecodeCandidate, DecodeFailure, DecodeRequest, DecodeResult, DecodeSegment, DecoderMode};
 pub(crate) use self::weighted_span::WeightedSpanDecoder;

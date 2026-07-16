@@ -88,6 +88,11 @@ final class StripView: UIView, KeyboardStripDisplaying {
     private func rebuildKhmerRow(state: IosRenderState) {
         let texts = StripPresentationSpec.segmentKhmerTexts(state: state)
         let focusedIdx = StripPresentationSpec.focusedSegmentIndex(state: state)
+        let selectedIndex = Int(state.selectedPhraseIndex)
+        let selectedPhrase = state.phraseCandidates.indices.contains(selectedIndex)
+            ? state.phraseCandidates[selectedIndex]
+            : nil
+        let needsUnverifiedMarker = selectedPhrase?.fromModel == true && selectedPhrase?.lexiconVerified == false
 
         if texts.isEmpty {
             let candidate = state.candidates.isEmpty ? "" :
@@ -109,12 +114,26 @@ final class StripView: UIView, KeyboardStripDisplaying {
             for (idx, lbl) in visible.enumerated() {
                 let text = texts[idx]
                 let focused = idx == focusedIdx
-                if focused {
-                    lbl.attributedText = NSAttributedString(string: text, attributes: [
-                        .font: UIFont.systemFont(ofSize: 18, weight: .bold),
-                        .foregroundColor: UIColor.label,
-                        .underlineStyle: NSUnderlineStyle.single.rawValue,
-                    ])
+                let showsMarker = needsUnverifiedMarker && idx == 0
+                if focused || showsMarker {
+                    var attributes: [NSAttributedString.Key: Any] = [
+                        .font: focused
+                            ? UIFont.systemFont(ofSize: 18, weight: .bold)
+                            : UIFont.systemFont(ofSize: 18),
+                        .foregroundColor: focused ? UIColor.label : UIColor.secondaryLabel,
+                    ]
+                    if focused {
+                        attributes[.underlineStyle] = NSUnderlineStyle.single.rawValue
+                    }
+                    let markedText = NSMutableAttributedString(
+                        string: showsMarker ? "✦ " + text : text,
+                        attributes: attributes
+                    )
+                    if showsMarker {
+                        markedText.addAttribute(.foregroundColor, value: UIColor.systemRed,
+                            range: NSRange(location: 0, length: 1))
+                    }
+                    lbl.attributedText = markedText
                 } else {
                     lbl.attributedText = nil
                     lbl.text = text

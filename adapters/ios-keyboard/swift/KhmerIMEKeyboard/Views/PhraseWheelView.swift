@@ -40,7 +40,15 @@ final class PhraseWheelView: UIView, KeyboardCandidateRowDisplaying {
         let selectedIndex = Int(state.selectedPhraseIndex)
         let alternatives = state.phraseCandidates.enumerated()
             .filter { index, _ in index != selectedIndex }
-            .map { index, phrase in (index: index, text: phrase.text) }
+            // ✦ marks a phrase contributed by an optional model provider. Prepended to the text only —
+            // no layout change, safe for the strip's glyph stack.
+            .map { index, phrase in
+                (
+                    index: index,
+                    text: phrase.fromModel ? "✦ " + phrase.text : phrase.text,
+                    markerColor: phrase.fromModel && !phrase.lexiconVerified ? UIColor.systemRed : nil
+                )
+            }
         rebuild(alternatives: alternatives)
     }
 
@@ -99,13 +107,24 @@ final class PhraseWheelView: UIView, KeyboardCandidateRowDisplaying {
 
     // MARK: - Cards
 
-    private func rebuild(alternatives: [(index: Int, text: String)]) {
+    private func rebuild(alternatives: [(index: Int, text: String, markerColor: UIColor?)]) {
         tappableLabels = pool.sync(count: alternatives.count, in: stack)
         for (index, label) in tappableLabels.enumerated() {
-            label.text = alternatives[index].text
-            label.tag = alternatives[index].index
+            let alternative = alternatives[index]
             label.font = .systemFont(ofSize: 20, weight: .regular)
             label.textColor = .label
+            if let markerColor = alternative.markerColor {
+                let text = NSMutableAttributedString(
+                    string: alternative.text,
+                    attributes: [.foregroundColor: UIColor.label]
+                )
+                text.addAttribute(.foregroundColor, value: markerColor, range: NSRange(location: 0, length: 1))
+                label.attributedText = text
+            } else {
+                label.attributedText = nil
+                label.text = alternative.text
+            }
+            label.tag = alternatives[index].index
         }
         setNeedsLayout()
     }

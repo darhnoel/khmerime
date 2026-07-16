@@ -38,6 +38,16 @@ fn shared_transliterator_data() -> &'static SharedTransliteratorData {
         .get_or_init(|| Transliterator::from_default_shared_data().expect("compiled-in lexicon data must be valid"))
 }
 
+const SMART_REFINE_MAX_LATENCY_MS: u64 = 2_000;
+
+fn smart_refiner_config() -> DecoderConfig {
+    let mut config = DecoderConfig::shadow_interactive().with_span_proposal_mode(SpanProposalMode::Model);
+    // Smart refinement runs after a typing pause, off the keystroke hot path. The iPhone SE needs
+    // more than the live decoder's 250 ms deadline for one provider inference.
+    config.wfst_max_latency_ms = SMART_REFINE_MAX_LATENCY_MS;
+    config
+}
+
 // ── Public UniFFI types ───────────────────────────────────────────────────────
 
 /// One entry in the expanded segment panel / phrase bar.
@@ -77,6 +87,9 @@ pub struct IosPhraseCandidate {
     /// True when the model provider contributed to this phrase — Swift shows a ✦ marker on
     /// these cards.
     pub from_model: bool,
+    /// True when every word in the phrase is present in the Lexicon. Swift colours an
+    /// unverified model marker red while leaving the Khmer text at its normal colour.
+    pub lexicon_verified: bool,
 }
 
 impl From<&PhraseCandidate> for IosPhraseCandidate {
@@ -85,6 +98,7 @@ impl From<&PhraseCandidate> for IosPhraseCandidate {
             text: c.text.clone(),
             segments: c.segments.iter().map(IosSegmentEntry::from).collect(),
             from_model: c.from_model,
+            lexicon_verified: c.lexicon_verified,
         }
     }
 }
@@ -154,10 +168,8 @@ fn build_session(smart: bool) -> ImeSession {
             ..Default::default()
         });
     if smart {
-        let refiner = Transliterator::from_shared_data_with_config(
-            shared_transliterator_data(),
-            DecoderConfig::shadow_interactive().with_span_proposal_mode(SpanProposalMode::Model),
-        );
+        let refiner =
+            Transliterator::from_shared_data_with_config(shared_transliterator_data(), smart_refiner_config());
         builder = builder.visible_refiner(refiner);
     }
     builder.build()
@@ -209,7 +221,7 @@ impl KhmerIMESession {
     /// result) when Smart is off or no provider is registered. Never panics.
     pub fn refine_with_model(&self) -> IosRenderState {
         let mut s = self.inner.lock().unwrap();
-        let raw = s.snapshot().preedit.clone();
+        let raw = s.snapshot().raw_preedit.clone();
         if !raw.is_empty() {
             s.refine_segmented_with_visible_refiner(&raw);
         }
@@ -358,6 +370,11 @@ mod tests {
         assert!(s.is_model_mode(), "set_model_mode(true) must enable Smart");
     }
 
+    #[test]
+    fn smart_refiner_uses_debounced_device_budget() {
+        assert_eq!(smart_refiner_config().wfst_max_latency_ms, SMART_REFINE_MAX_LATENCY_MS);
+    }
+
     // #3 toggling back returns to Standard.
     #[test]
     fn set_model_mode_false_returns_to_standard() {
@@ -393,6 +410,7 @@ mod tests {
             text: "ធ្វើ".to_owned(),
             segments: vec![],
             from_model: true,
+            lexicon_verified: true,
         };
         assert!(IosPhraseCandidate::from(&modelled).from_model);
 
@@ -400,8 +418,21 @@ mod tests {
             text: "ជា".to_owned(),
             segments: vec![],
             from_model: false,
+            lexicon_verified: true,
         };
         assert!(!IosPhraseCandidate::from(&lexicon).from_model);
+    }
+
+    #[test]
+    fn phrase_candidate_lexicon_verification_survives_ios_mapping() {
+        let unverified = PhraseCandidate {
+            text: "គហិបតី".to_owned(),
+            segments: vec![],
+            from_model: true,
+            lexicon_verified: false,
+        };
+
+        assert!(!IosPhraseCandidate::from(&unverified).lexicon_verified);
     }
 
     // #5 the debounced refine is safe with no active composition (no panic, clean state).

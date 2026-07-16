@@ -42,6 +42,7 @@ impl Decoder for LegacyDecoder {
                 confidence_bps: None,
                 segments: Vec::new(),
                 from_model: false,
+                lexicon_verified: true,
             })
         {
             if !candidates.iter().any(|current| current.text == candidate.text) {
@@ -103,6 +104,7 @@ impl LegacyDecoder {
                     confidence_bps: Some(9_200),
                     segments,
                     from_model: false,
+                    lexicon_verified: true,
                 }
             })
             .collect()
