@@ -36,6 +36,13 @@ pub struct DecodeCandidate {
     pub score_bps: Option<u16>,
     pub confidence_bps: Option<u16>,
     pub segments: Vec<DecodeSegment>,
+    /// True when the model span-proposal provider contributed at least one span to this
+    /// candidate — lets the UI mark model-assisted suggestions. Always false for
+    /// lexicon/fuzzy-only candidates.
+    pub from_model: bool,
+    /// True when every output span is present in the Lexicon. Model proposals may be
+    /// visible while false so adapters can warn without suppressing a potentially valid word.
+    pub lexicon_verified: bool,
 }
 
 #[derive(Clone, Debug)]

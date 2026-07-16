@@ -676,6 +676,27 @@ final class KeyboardInputHandlerTests: XCTestCase {
             "backspaceHoldEnded must produce exactly one render, not one per hold fire")
     }
 
+    func test_backspaceHoldEnded_reschedulesModelRefineForShortenedComposition() {
+        let scheduler = ManualModelRefineScheduler()
+        let handler = KeyboardInputHandler(
+            proxy: MockTextProxy(),
+            session: KeyboardSession(),
+            dispatcher: SynchronousDispatcher(),
+            modelRefineScheduler: scheduler
+        )
+        handler.focusIn()
+        type("khn", into: handler)
+        XCTAssertTrue(scheduler.firePending(), "forward typing must schedule the initial Smart refinement")
+
+        handler.backspaceHoldFired() // "khn" -> "kh"
+        handler.backspaceHoldFired() // "kh" -> "k"
+        handler.backspaceHoldEnded()
+
+        XCTAssertTrue(scheduler.firePending(),
+            "releasing held Backspace must schedule Smart refinement for the shortened Composition")
+        XCTAssertEqual(handler.lastState?.preedit, "k")
+    }
+
     // MARK: - Render coalescing
 
     func test_sendChar_skipsStaleRenderWhenNewerKeystrokeSupersedesIt() {
@@ -746,6 +767,78 @@ final class KeyboardInputHandlerTests: XCTestCase {
         XCTAssertEqual(renderCount, 3,
             "deferred backspace renders are coalesced; optimistic renders always fire immediately")
     }
+
+    func test_backspace_invalidatesInFlightForwardRender() {
+        let proxy = MockTextProxy()
+        let dispatcher = QueueingDispatcher()
+        let handler = KeyboardInputHandler(proxy: proxy, session: KeyboardSession(), dispatcher: dispatcher)
+        handler.focusIn()
+
+        handler.sendChar("k")       // queues the forward session render
+        handler.backspaceTapped()   // the Composition is now empty
+
+        dispatcher.sessionBlocks[0]() // forward result queues main render #0
+        dispatcher.sessionBlocks[1]() // backspace result queues main render #1
+
+        var renderedPreedits: [String] = []
+        handler.onRender = { state, _ in renderedPreedits.append(state.preedit) }
+
+        dispatcher.mainBlocks[0]() // stale forward result must be ignored
+        dispatcher.mainBlocks[1]() // current empty-Composition result may render
+
+        XCTAssertEqual(renderedPreedits, [""],
+            "Backspace must prevent an in-flight forward result from restoring stale Composition state")
+    }
+
+    func test_forwardInput_invalidatesInFlightBackspaceRender() {
+        let dispatcher = QueueingDispatcher()
+        let handler = KeyboardInputHandler(
+            proxy: MockTextProxy(),
+            session: KeyboardSession(),
+            dispatcher: dispatcher,
+            modelRefineScheduler: ManualModelRefineScheduler()
+        )
+        handler.focusIn()
+
+        type("kh", into: handler)
+        dispatcher.sessionBlocks.forEach { $0() }
+        dispatcher.mainBlocks.forEach { $0() }
+        dispatcher.sessionBlocks.removeAll()
+        dispatcher.mainBlocks.removeAll()
+
+        handler.backspaceTapped() // "kh" -> "k"; queues Backspace result
+        handler.sendChar("n")     // "k" -> "kn"; supersedes that result
+        dispatcher.sessionBlocks[0]()
+        dispatcher.sessionBlocks[1]()
+
+        var renderedPreedits: [String] = []
+        handler.onRender = { state, _ in renderedPreedits.append(state.preedit) }
+        dispatcher.mainBlocks[0]() // stale Backspace result must be ignored
+        dispatcher.mainBlocks[1]() // current forward result may render
+
+        XCTAssertEqual(renderedPreedits, ["kn"],
+            "forward input must prevent an in-flight Backspace result from restoring stale Composition state")
+    }
+
+    func test_backspace_reschedulesModelRefineForShortenedComposition() {
+        let proxy = MockTextProxy()
+        let scheduler = ManualModelRefineScheduler()
+        let handler = KeyboardInputHandler(
+            proxy: proxy,
+            session: KeyboardSession(),
+            dispatcher: SynchronousDispatcher(),
+            modelRefineScheduler: scheduler
+        )
+        handler.focusIn()
+        type("kh", into: handler)
+        XCTAssertTrue(scheduler.firePending(), "forward typing must schedule the initial Smart refinement")
+
+        handler.backspaceTapped() // "kh" -> "k"
+
+        XCTAssertTrue(scheduler.firePending(),
+            "Backspace must schedule Smart refinement for the shortened Composition")
+        XCTAssertEqual(handler.lastState?.preedit, "k")
+    }
 }
 
 // MARK: - Test Doubles
@@ -763,5 +856,31 @@ final class QueueingDispatcher: KeyboardDispatcher {
 
     func onMain(_ work: @escaping () -> Void) {
         mainBlocks.append(work)
+    }
+}
+
+private final class ManualModelRefineTask: ModelRefineTask {
+    private(set) var isCancelled = false
+    let block: () -> Void
+
+    init(block: @escaping () -> Void) { self.block = block }
+    func cancel() { isCancelled = true }
+}
+
+private final class ManualModelRefineScheduler: ModelRefineScheduler {
+    private var pending: [ManualModelRefineTask] = []
+
+    func schedule(after _: TimeInterval, block: @escaping () -> Void) -> ModelRefineTask {
+        let task = ManualModelRefineTask(block: block)
+        pending.append(task)
+        return task
+    }
+
+    @discardableResult
+    func firePending() -> Bool {
+        guard let index = pending.firstIndex(where: { !$0.isCancelled }) else { return false }
+        let task = pending.remove(at: index)
+        task.block()
+        return true
     }
 }

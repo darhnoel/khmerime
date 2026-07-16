@@ -150,6 +150,11 @@ pub struct PhraseCandidate {
     /// This hypothesis's own segmentation (one entry per word), for the wheel card's
     /// Roman Row and for Level-2 editing. Its outputs concatenate to `text`.
     pub segments: Vec<PhraseSegment>,
+    /// True when the model provider contributed to this phrase — for the UI's model-assisted
+    /// marker.
+    pub from_model: bool,
+    /// True when every word in this hypothesis is present in the Lexicon.
+    pub lexicon_verified: bool,
 }
 
 /// One word inside a **Phrase Candidate**: its roman slice and Khmer output.

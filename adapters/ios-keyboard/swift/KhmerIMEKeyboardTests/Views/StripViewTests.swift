@@ -30,4 +30,33 @@ final class StripViewTests: XCTestCase {
 
         XCTAssertNil(idx, "no segments visible — any tap must fall through to the row handler")
     }
+
+    func test_selectedUnverifiedModelPhrase_coloursOnlyTheStripStarRed() {
+        let strip = StripView()
+        let state = IosRenderState(
+            candidates: [], selectedIndex: nil, preedit: "gahebbadei",
+            segments: [IosSegmentEntry(output: "គហិបតី", input: "gahebbadei", focused: false)],
+            focusedSegmentIndex: nil, commitText: nil, segmentEditActive: false, segmentEditIndex: nil,
+            phraseCandidates: [
+                IosPhraseCandidate(text: "គហិបតី", segments: [], fromModel: true, lexiconVerified: false),
+                IosPhraseCandidate(text: "គហបតី", segments: [], fromModel: true, lexiconVerified: true),
+            ],
+            selectedPhraseIndex: 0
+        )
+
+        strip.render(state, romanBuffer: "gahebbadei")
+
+        let label = visibleLabels(in: strip).first { $0.attributedText?.string == "✦ គហិបតី" }
+        XCTAssertEqual(label?.attributedText?.attribute(.foregroundColor, at: 0, effectiveRange: nil) as? UIColor,
+            .systemRed, "the selected unverified Phrase Candidate needs the same red marker in the Strip")
+        XCTAssertEqual(label?.attributedText?.attribute(.foregroundColor, at: 2, effectiveRange: nil) as? UIColor,
+            .secondaryLabel, "the Khmer text itself must retain the Strip's normal colour")
+    }
+
+    private func visibleLabels(in view: UIView) -> [UILabel] {
+        view.subviews.flatMap { subview -> [UILabel] in
+            let current = (subview as? UILabel).map { [$0] } ?? []
+            return current + visibleLabels(in: subview)
+        }
+    }
 }

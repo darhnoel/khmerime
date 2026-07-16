@@ -3,30 +3,26 @@ roman,target,freq,freq_lang
 a,អ,1,km
 a,អា,244,km
 aa,អា,244,km
-aa,អា!,1,km
 aa,អា៎,1,km
 aaah,អាះ,1,km
 aab,អាប,13,km
 aab,អាប់,138,km
-aabachon,អាប់ចុន,1,km
-aabalab,អាបឡាប,1,km
-aaban,អាបណ,1,km
-aabanak,អាបណក,1,km
+aabana,អាបណ,1,km
+aabanaka,អាបណក,1,km
 aabannakabbadebatea,អបណ្ណកប្បដិបទា,1,km
 aabao,អាបោ,1,km
-aabapatrab,អាប់ប៉ត្រាប់,1,km
+aabat,អាប័ទ,1,km
+aabatte,អាបត្តិ,1,km
 aabayiksatta,អាបាយិកសត្ត,1,km
+aabchon,អាប់ចុន,1,km
+aablab,អាបឡាប,1,km
 aabneka,អាបណិកា,1,km
-aaboat,អាប័ទ,1,km
 aabochchha,អាបុច្ឆា,1,km
 aabochchhan,អាបុច្ឆន,1,km
 aabochchhon,អាបុច្ឆន,1,km
-aabochon,អាប់ចុន,1,km
-aabolab,អាបឡាប,1,km
 aabon,អាបណ,1,km
 aabonok,អាបណក,1,km
 aabopotrab,អាប់ប៉ត្រាប់,1,km
-aabtte,អាបត្តិ,1,km
 aach,អាច,26432,km
 aachao,អាចោរ,22,km
 aachar,អាចារ,1,km
@@ -41,13 +37,13 @@ aachor,អាចោរ,22,km
 aachoriy,អាចរិយ,1,km
 aachoy,អាចយ,1,km
 aadana,អាដានា,1,km
-aadmpor,អាឌម្ពរ,1,km
+aadompor,អាឌម្ពរ,1,km
 aagear,អាគារ,173,km
 aagearik,អាគារិក,1,km
 aageariy,អាគារិយ,1,km
 aagheat,អាឃាត,1,km
-aagheataneak,អាឃាតនៈ,1,km
-aagheatoneak,អាឃាតនៈ,1,km
+aagheatana,អាឃាតនៈ,1,km
+aagheatona,អាឃាតនៈ,1,km
 aaghousan,អាឃោសន,1,km
 aaghouson,អាឃោសន,1,km
 aaghr,អឃ៌,1,km
@@ -334,6 +330,7 @@ abbroub,អបរូប,1,km
 abbroubba,អបរូបា,1,km
 abbrrakkal,អបរកាល,1,km
 abbveat,អបវាទ,1,km
+abchon,អាប់ចុន,1,km
 abetvinhnhean,អបេតវិញ្ញាណ,1,km
 abhaodneaksab,អប្ផោដនសព្ទ,1,km
 abhaso,អផាសុ,1,km
@@ -347,6 +344,7 @@ abhttouk,អផ្ទក់,1,km
 abonhnhaphisangkha,អបុញ្ញាភិសង្ខារ,1,km
 abonhnhaphisongkha,អបុញ្ញាភិសង្ខារ,1,km
 abonhnhleaph,អបុញ្ញលាភ,1,km
+abpatrab,អាប់ប៉ត្រាប់,1,km
 abphaodnosap,អប្ផោដនសព្ទ,1,km
 abrakar,អប្រការ,1,km
 abramat,អប្រមាថ,1,km
@@ -1277,12 +1275,12 @@ anhnhhabortt,អញ្ញបទ,1,km
 anhnhhateak,អញ្ញាត,1,km
 anhnhhateakkjonh,អញ្ញាតកជន,1,km
 anhnhhathapheab,អញ្ញថាភាព,1,km
+anhnhhattra,អញ្ញត្រ,1,km
+anhnhhattrasb,អញ្ញត្រសព្ទ,1,km
 anhnhhaveattakam,អញ្ញវាទកម្ម,1,km
 anhnhheakbortt,អញ្ញបទ,1,km
 anhnhheakthapheab,អញ្ញថាភាព,1,km
 anhnhheakveatteakkam,អញ្ញវាទកម្ម,1,km
-anhnhhoattreak,អញ្ញត្រ,1,km
-anhnhhoattreaksb,អញ្ញត្រសព្ទ,1,km
 anhnhobat,អញ្ញបទ,1,km
 anhnhobtthamphit,អញ្ញូបត្ថម្ភិត,1,km
 anhnhothapheap,អញ្ញថាភាព,1,km
@@ -1702,8 +1700,8 @@ aphey,អភ័យ,99,km
 aphi,អភិ,1,km
 aphibal,អភិបាល,603,km
 aphibray,អភិប្រាយ,1,km
-aphibrneboat,អភិប្រណិប័ត,1,km
-aphibrneboatan,អភិប្រណិប័តន៍,1,km
+aphibronebat,អភិប្រណិប័ត,1,km
+aphibronebat,អភិប្រណិប័តន៍,1,km
 aphibrornibat,អភិប្រណិប័ត,1,km
 aphibrornibat,អភិប្រណិប័តន៍,1,km
 aphijon,អភិជន,74,km
@@ -1802,7 +1800,7 @@ aphyeagom,អភ្យាគម,1,km
 aphyeagott,អភ្យាគត,1,km
 aphyeakom,អភ្យាគម,1,km
 aphyeakot,អភ្យាគត,1,km
-apoatthor,អព័ទ្ធ,1,km
+apoat,អព័ទ្ធ,1,km
 apohearrik,អព្វោហារិក,1,km
 apohearrika,អព្វោហារិកា,1,km
 apol,អពល,1,km
@@ -2175,8 +2173,8 @@ attanaomatyathibbay,អត្តនោមត្យាធិប្បាយ,1,km
 attanorbot,អត្តនោបទ,1,km
 attanormat,អត្តនោម័តិ,1,km
 attanoubat,អត្តនោបទ,1,km
-attanoumoate,អត្តនោម័តិ,1,km
 attanoumtyathibbay,អត្តនោមត្យាធិប្បាយ,1,km
+attanumate,អត្តនោម័តិ,1,km
 atteareakjon,អទារជន,1,km
 attearun,អទារុណ,1,km
 atteasab,អទាសព្យ,1,km
@@ -2217,7 +2215,7 @@ atthikret,អធិក្រឹតិ,1,km
 atthikrorm,អធិក្រម,1,km
 atthilok,អធិលោក,1,km
 atthimmanika,អធិមានិកា,1,km
-atthimmoat,អធិមត្ត,1,km
+atthimmat,អធិមត្ត,1,km
 atthimokh,អធិមោក្ខ,1,km
 atthimutti,អធិមុត្តិ,1,km
 atthin,អធីន,1,km
@@ -2381,6 +2379,7 @@ ayaskan,អយស្កាន្ត,1,km
 ayaskomph,អយស្កុម្ភ,1,km
 ayasmai,អយស្ម័យ,1,km
 ayat,អាយ៉ាត់,1,km
+ayat,អាយ័ត,1,km
 ayau,អយោ,1,km
 ayeachan,អាយាចន,1,km
 ayeachaneak,អាយាចនៈ,1,km
@@ -2388,7 +2387,6 @@ ayeachon,អាយាចន,1,km
 ayeachoneak,អាយាចនៈ,1,km
 ayida,អយីដា,1,km
 aylompeay,អាយលម្ពាយ,1,km
-ayoat,អាយ័ត,1,km
 ayong,អាយ៉ង,4,km
 ayonokal,អយនកាល,1,km
 ayonopheak,អយនភាគ,1,km
@@ -2757,6 +2755,7 @@ bamrah,បម្រះ,4,km
 bamram,បម្រាម,148,km
 bamras,បម្រាស,1,km
 bamras,បម្រាស់,1,km
+bamrer,បម្រើ,1109,km
 bamrous,បម្រោស,1,km
 bamrueng,បម្រឹង,1,km
 bamrung,បម្រុង,163,km
@@ -3074,9 +3073,9 @@ banhnhaem,បញ្ញែម,1,km
 banhnhan,បញ្ញាណ,1,km
 banhnhanurub,បញ្ញានុរូប,1,km
 banhnhaphea,បញ្ញាភា,1,km
+banhnhatt,បញ្ញត្ត,1,km
+banhnhatte,បញ្ញត្តិ,11,km
 banhnherkaek,បញ្ញើក្អែក,1,km
-banhnhott,បញ្ញត្ត,1,km
-banhnhotte,បញ្ញត្តិ,11,km
 banhnhu,បញ្ញើ,60,km
 banhrong,បាញ់រង,1,km
 banhrorng,បាញ់រង,1,km
@@ -3379,7 +3378,6 @@ bathavy,បឋវី,1,km
 bathom,បឋម,492,km
 bati,បាទី,47,km
 batmul,បាទមូល,1,km
-batobanhnhotte,បទបញ្ញត្តិ,1,km
 batochamrieng,បទចម្រៀង,3,km
 batodthan,បទដ្ឋាន,59,km
 batolat,ប៉ាតឡាត,1,km
@@ -3599,6 +3597,7 @@ bbanhchoseil,បញ្ចសីល,1,km
 bbanhchotep,បញ្ចទេព,1,km
 bbanhha,បញ្ហា,5007,km
 bbanhnha,បញ្ញា,339,km
+bbanhnhatte,បញ្ញត្តិ,11,km
 bbanhnhavorn,បញ្ញវន្ត,1,km
 bbanit,បណីត,1,km
 bbann,ប៉ាន់,212,km
@@ -5058,8 +5057,6 @@ bonhnhan,បញ្ញាណ,1,km
 bonhnhanurub,បញ្ញានុរូប,1,km
 bonhnhaphea,បញ្ញាភា,1,km
 bonhnherkaek,បញ្ញើក្អែក,1,km
-bonhnhott,បញ្ញត្ត,1,km
-bonhnhotte,បញ្ញត្តិ,11,km
 bonhnhu,បញ្ញើ,60,km
 bonlae,បន្លែ,720,km
 bonlas,បន្លាស់,74,km
@@ -5347,6 +5344,7 @@ bossoroth,បុស្សរថ,1,km
 bot,បត់,310,km
 bot,បទ,7271,km
 bot,ប៊ុត,14,km
+botbanhnhatte,បទបញ្ញត្តិ,1,km
 botbonghanh,បទបង្ហាញ,1,km
 botchaung,បត់ជើង,1,km
 boteanukrom,បទានុក្រម,1,km
@@ -5627,7 +5625,6 @@ bramerl,ប្រមើល,1,km
 brames,ប្រមេះ,3,km
 brameul,ប្រមើល,1,km
 bramiel,ប្រមៀល,1,km
-bramoat,ប្រាមោទ្យ,1,km
 bramol,ប្រមល់,17,km
 bramol,ប្រមូល,800,km
 bramom,ប្រមុំ,2,km
@@ -5657,7 +5654,7 @@ branak,ប្រណាក,3,km
 branam,ប្រណម,1,km
 branam,ប្រណាម,1,km
 branang,ប្រណាំង,172,km
-braneboatan,ប្រណិប័តន៍,2,km
+branebat,ប្រណិប័តន៍,2,km
 branei,ប្រណី,187,km
 braneit,ប្រណីត,275,km
 braneitahar,ប្រណីតាហារ,1,km
@@ -5801,7 +5798,6 @@ bratepheak,ប្រតិភាគ,1,km
 bratephean,ប្រតិភាណ,1,km
 bratephu,ប្រតិភូ,58,km
 bratepoat,ប្រតិព័ទ្ធ,4,km
-bratepoatthor,ប្រតិព័ទ្ធ,4,km
 bratepol,ប្រតិពល,1,km
 bratepon,ប្រតិពន្ធ,1,km
 brateponthor,ប្រតិពន្ធ,1,km
@@ -5878,8 +5874,8 @@ bravottesastrar,ប្រវត្តិសាស្ត្រ,52,km
 bravuek,ប្រវឹក,1,km
 bray,ប្រាយ,22,km
 brayaeng,ប្រយែង,30,km
+brayat,ប្រយ័ត,1,km
 brayat,ប្រយ័ត្ន,823,km
-brayoat,ប្រយ័ត,1,km
 brayoch,ប្រយោជន៍,826,km
 brayoleach,ប្រាយលាជ,1,km
 brayongku,ប្រយង្គុ,1,km
@@ -6238,7 +6234,7 @@ bronaengbronaong,ប្រណែងប្រណោង,1,km
 bronak,ប្រណាក,3,km
 bronam,ប្រណាម,1,km
 bronang,ប្រណាំង,172,km
-broneboaton,ប្រណិប័តន៍,2,km
+bronebat,ប្រណិប័តន៍,2,km
 bronei,ប្រណី,187,km
 broneit,ប្រណីត,275,km
 broneitahar,ប្រណីតាហារ,1,km
@@ -6453,8 +6449,6 @@ brotemeakor,ប្រតិមាករ,1,km
 brotepheak,ប្រតិភាគ,1,km
 brotephean,ប្រតិភាណ,1,km
 brotephu,ប្រតិភូ,58,km
-brotepoat,ប្រតិព័ទ្ធ,4,km
-brotepoatthor,ប្រតិព័ទ្ធ,4,km
 brotepol,ប្រតិពល,1,km
 brotepon,ប្រតិពន្ធ,1,km
 broteponthor,ប្រតិពន្ធ,1,km
@@ -6724,7 +6718,7 @@ chal,ចាល,8,km
 chal,ចាល់,15,km
 chalachal,ចលាចល,10,km
 chalana,ចលនា,179,km
-chaloat,ចល័ត,196,km
+chalat,ចល័ត,196,km
 chalona,ចលនា,179,km
 chalonachak,ចលនាចក្រ,1,km
 chalonovottho,ចលនវត្ថុ,1,km
@@ -10133,7 +10127,7 @@ hoat,ហោត្រ,1,km
 hoatel,ហោតិល,1,km
 hoateul,ហោតិល,1,km
 hoathaong,ហ័តហោង,1,km
-hoathoang,ហ័តហោង,1,km
+hoathoung,ហ័តហោង,1,km
 hoatirl,ហោតិល,1,km
 hoatrai,ហោត្រ័យ,1,km
 hoatrak,ហោត្រ,1,km
@@ -13030,6 +13024,7 @@ khokhet,ខខិត,1,km
 khol,ខុល,3,km
 khom,ខម,143,km
 khom,ខំ,1226,km
+khomar,កុមារ,1197,km
 khomatous,ខមាទោស,1,km
 khomot,ខំអត់,2,km
 khomrean,ខំរៀន,8,km
@@ -15937,6 +15932,7 @@ mdea,ម្ដា,4,km
 mdech,ម្ដេច,29,km
 mdg,ម្ដង,3715,km
 mdong,ម្ដង,3715,km
+mdongmkal,ម្ដងម្កាល,1,km
 mdorng,ម្ដង,3715,km
 mduum,ម្ដុំ,40,km
 me,មេ,1572,km
@@ -19098,6 +19094,7 @@ phleu,ភ្លឺ,563,km
 phlex,ភ្លេច,887,km
 phliek,ផ្លៀក,1,km
 phliek,ភ្លៀក,1,km
+phlieng,ភ្លៀង,841,km
 phlihphlaeh,ភ្លីះភ្លែះ,1,km
 phliphlau,ភ្លីភ្លើ,1,km
 phliphler,ភ្លីភ្លើ,1,km
@@ -19405,8 +19402,8 @@ phouchoniy,ភោជនីយ,1,km
 phouk,ផូក,1,km
 phouk,ភោគ,2,km
 phoukda,ភោក្ដា,1,km
-phouksamboat,ភោគសម្ប័ទ,1,km
-phouksomboat,ភោគសម្ប័ទ,1,km
+phouksambat,ភោគសម្ប័ទ,1,km
+phouksombat,ភោគសម្ប័ទ,1,km
 phoumirea,ភោមីរា,1,km
 phoung,ផូង,1,km
 phouropheav,ភោរភាវ,1,km
@@ -20939,7 +20936,7 @@ rabb,រ៉ាប់,416,km
 raborong,រ៉ាប់រង,1,km
 rachal,រចល់,1,km
 rachana,រចនា,219,km
-rachaneaboatmor,រចនាប័ទ្ម,1,km
+rachanabat,រចនាប័ទ្ម,1,km
 rachanebatum,រចនាបទុម,1,km
 rachchobbavenei,រជ្ជប្បវេណី,1,km
 rachchobbaveney,រជ្ជប្បវេណី,1,km
@@ -20954,7 +20951,7 @@ rachchosomey,រជ្ជសម័យ,1,km
 rachchoteayeat,រជ្ជទាយាទ,1,km
 rachchubkaron,រជ្ជូបករណ៍,1,km
 rachchubokar,រជ្ជូបការ,1,km
-rachoneaboatmor,រចនាប័ទ្ម,1,km
+rachonabat,រចនាប័ទ្ម,1,km
 rachoneabotum,រចនាបទុម,1,km
 rada,រ៉ាដា,9,km
 radthaphibal,រដ្ឋាភិបាល,1,km
@@ -22262,7 +22259,7 @@ roserb,រសើប,8,km
 rosev,រសេវ,1,km
 rosiel,រសៀល,204,km
 rosmei,រស្មី,27,km
-rosmeimoat,រស្មីម័ត,1,km
+rosmeimat,រស្មីម័ត,1,km
 rosoeb,រសឹប,1,km
 rosoebrosieb,រសឹបរសៀប,1,km
 rosoebrosiev,រសឹបរសៀវ,1,km
@@ -22396,6 +22393,7 @@ rouhenei,រោហិណី,1,km
 rouheney,រោហិណី,1,km
 rouhet,រោហិត,1,km
 rouk,រោក,1,km
+rouk,រោគ,1178,km
 roukea,រោគា,9,km
 roukeapeath,រោគាពាធ,1,km
 roukeayotaneak,រោគាយតនៈ,1,km
@@ -23150,6 +23148,7 @@ samaak,សំអក,1,km
 samaang,សម្អាង,274,km
 samaang,សំអាង,97,km
 samaaok,សំអោក,1,km
+samaat,សម្អាត,873,km
 samaat,សំអាត,72,km
 samabtte,សមាបត្តិ,1,km
 samach,សមាជ,5,km
@@ -23201,6 +23200,7 @@ sambaor,សំបោរ,47,km
 sambar,សម្បារ,130,km
 sambar,សំបារ,1,km
 sambat,សម្បត្តិ,1005,km
+sambat,សម្ប័ទ,1,km
 sambath,សម្បត្តិ,1005,km
 sambath,សំបថ,1,km
 sambaum,សម្បើម,81,km
@@ -23216,7 +23216,6 @@ sambbayouk,សម្បយោគ,1,km
 sambbayutt,សម្បយុត្ត,1,km
 samberm,សម្បើម,81,km
 sambeum,សម្បើម,81,km
-samboat,សម្ប័ទ,1,km
 sambod,សំបុដ,1,km
 sambojeanmusavat,សម្បជានមុសាវាទ,1,km
 sambojonhnheak,សម្បជញ្ញៈ,1,km
@@ -23859,8 +23858,8 @@ sannidthan,សន្និដ្ឋាន,220,km
 sanniph,សន្និភ,1,km
 sannipnthon,សន្និពន្ធន៍,1,km
 sanniponthor,សន្និពន្ធ,1,km
+sannisat,សន្និស័ទ,1,km
 sanniseit,សន្និសីទ,11,km
-sannisoat,សន្និស័ទ,1,km
 sannissetaseil,សន្និស្សិតសីល,1,km
 sannithi,សន្និធិ,1,km
 sanniveas,សន្និវាស,8,km
@@ -24037,8 +24036,8 @@ saraphonhnh,សរភញ្ញ,1,km
 sarapormean,សារព័ត៌មាន,642,km
 sarasamkhan,សារសំខាន់,3,km
 saratheat,សារធាតុ,616,km
-saravoatrar,សារវ័ត្រ,1,km
-saravoatror,សារវ័ត្រ,1,km
+saravoat,សារវ័ត្រ,1,km
+saravoatr,សារវ័ត្រ,1,km
 saray,សារាយ,19,km
 sarb,ស្អាប់,10,km
 sarbab,សារបាប់,1,km
@@ -24230,6 +24229,7 @@ satya,សត្យ,1,km
 satya,សត្យា,11,km
 satyathidthan,សត្យាធិដ្ឋាន,1,km
 sau,សៅ,340,km
+sau,សៅរ៍,661,km
 sauchey,សៅជៃ,1,km
 saudau,សៅដៅ,1,km
 saudiarabia,អារ៉ាប៊ីសាអូឌីត,1,km
@@ -24876,7 +24876,7 @@ slotei,ស្លុតី,1,km
 slotey,ស្លុតី,1,km
 slounh,ស្លូញ,1,km
 slout,ស្លូត,74,km
-sloutboat,ស្លូតបូត,1,km
+sloutbot,ស្លូតបូត,1,km
 sloutbout,ស្លូតបូត,1,km
 slovakia,ស្លូវ៉ាគី,1,km
 slovenia,ស្លូវេនី,1,km
@@ -25026,6 +25026,7 @@ sngaeuk,ស្ងើក,1,km
 sngaeun,ស្ងើន,1,km
 sngaor,ស្ងោរ,47,km
 sngat,ស្ងាត់,870,km
+sngatt,ស្ងាត់,870,km
 sngeam,ស្ងៀម,183,km
 sngiem,ស្ងៀម,183,km
 sngob,ស្ងប់,327,km
@@ -25300,6 +25301,7 @@ sombach,សម្បាច់,1,km
 sombaeng,សម្បែង,88,km
 sombar,សម្បារ,130,km
 sombat,សម្បត្តិ,1005,km
+sombat,សម្ប័ទ,1,km
 sombath,សម្បត្តិ,1005,km
 sombaum,សម្បើម,81,km
 sombbahar,សម្បហារ,1,km
@@ -25314,7 +25316,6 @@ sombbayutt,សម្បយុត្ត,1,km
 somberm,សម្បើម,81,km
 sombeum,សម្បើម,81,km
 sombo,សម្បូរ,880,km
-somboat,សម្ប័ទ,1,km
 sombojeanmusavat,សម្បជានមុសាវាទ,1,km
 sombojonhnheak,សម្បជញ្ញៈ,1,km
 sombok,សម្បក,55,km
@@ -25801,8 +25802,8 @@ sonnidthan,សន្និដ្ឋាន,220,km
 sonniph,សន្និភ,1,km
 sonnipnthon,សន្និពន្ធន៍,1,km
 sonniponthor,សន្និពន្ធ,1,km
+sonnisat,សន្និស័ទ,1,km
 sonniseit,សន្និសីទ,11,km
-sonnisoat,សន្និស័ទ,1,km
 sonnithi,សន្និធិ,1,km
 sonniveas,សន្និវាស,8,km
 sonnives,សន្និវេស,1,km
@@ -25903,7 +25904,6 @@ soprohmochari,សព្រហ្មចារី,1,km
 soprohmocharini,សព្រហ្មចារិនី,1,km
 soptae,សព្វតែ,2,km
 sopthngai,សព្វថ្ងៃ,1,km
-soptor,សព្ទ,25,km
 sor,សរ,1189,km
 sor,សុរ,2,km
 sorb,ស្អប់,211,km
@@ -25957,7 +25957,7 @@ sorsaphouchon,សុរសភោជន,1,km
 sorse,សរសេរ,526,km
 sorser,សរសើរ,2636,km
 sorsophouchon,សុរសភោជន,1,km
-sorsvoat,សរស្វ័ត,1,km
+sorsvat,សរស្វ័ត,1,km
 sorub,សុរូប,1,km
 sory,ស្អយ,1,km
 sorya,សូរ្យ,62,km
@@ -26364,6 +26364,7 @@ sraotrar,ស្រោត្រ,1,km
 sraotreyeak,ស្រោត្រិយៈ,1,km
 sraotror,ស្រោត្រ,1,km
 srap,ស្រព,13,km
+srap,ស្រាប់,2214,km
 srapab,ស្រប៉ាប,1,km
 srapaeuk,ស្រប៉ើក,1,km
 srapeab,ស្រពាប,1,km
@@ -26433,7 +26434,7 @@ srei,ស្រី,19164,km
 sreibrasaeur,ស្រីប្រសើរ,1,km
 sreibrosaeur,ស្រីប្រសើរ,1,km
 sreii,ស្រី,19164,km
-sreimoat,ស្រីម័ត,1,km
+sreimat,ស្រីម័ត,1,km
 sreimotei,ស្រីមតី,1,km
 sreisaophoan,ស្រីសោភ័ណ,1,km
 sreisaophorn,ស្រីសោភ័ណ,1,km
@@ -26985,7 +26986,6 @@ svaybrorvott,ស្វ័យប្រវត្ត,1,km
 svaybrovott,ស្វ័យប្រវត្ត,1,km
 svaychanti,ស្វាយចន្ទី,1,km
 svaychonti,ស្វាយចន្ទី,1,km
-svayoat,ស្វយ័ត,29,km
 svayomphu,ស្វយម្ភូ,1,km
 svayomporea,ស្វយម្ពរា,1,km
 svaypheap,ស្វ័យភាព,1,km
@@ -27021,8 +27021,6 @@ svosdei,ស្វស្ដី,1,km
 svostek,ស្វស្តិក,1,km
 svot,ស្វត,1,km
 svotes,ស្វទេស,1,km
-svoyat,ស្វយ័ត,29,km
-svoyoat,ស្វយ័ត,29,km
 svoyomphu,ស្វយម្ភូ,1,km
 svoyomporea,ស្វយម្ពរា,1,km
 sweden,ស៊ុយអែត,1,km
@@ -27130,6 +27128,7 @@ tamlunh,តម្លុញ,1,km
 tamluoh,តម្លោះ,1,km
 tamnal,តំណាល,11,km
 tamnan,តាំណាន,1,km
+tamnang,តំណាង,1156,km
 tamnang,តំណាំង,1,km
 tamnaong,តំណោង,1,km
 tamnech,តំណិច,1,km
@@ -27751,7 +27750,9 @@ tomlorb,ទម្លាប់,687,km
 tomlueng,តម្លឹង,15,km
 tomlunh,តម្លុញ,1,km
 tomluoh,តម្លោះ,1,km
+tomnaeng,តំណែង,902,km
 tomnak,ទំនាក់,2699,km
+tomnang,តំណាង,1156,km
 tomneaktomnorng,ទំនាក់ទំនង,1,km
 tomnor,តំណ,30,km
 tomottham,តមត្ថំ,1,km
@@ -27774,6 +27775,7 @@ tomrong,តម្រង់,94,km
 tomrov,តម្រូវ,1126,km
 tomruem,តម្រឹម,4,km
 tomruot,តម្រួត,2,km
+tomruv,តម្រូវ,1126,km
 tomruy,តម្រុយ,39,km
 tomtthakeriya,តុមត្ថកិរិយា,1,km
 tomtthokeriya,តុមត្ថកិរិយា,1,km
@@ -28034,6 +28036,7 @@ trieb,ត្រៀប,1,km
 triebtra,ត្រៀបត្រា,5,km
 triek,ត្រៀក,1,km
 triel,ត្រៀល,1,km
+triem,ត្រៀម,2019,km
 trinidadandtobago,ទ្រីនីដាដនិងតូបាហ្គោ,1,km
 trirm,ត្រឹម,5467,km
 trlob,ត្រប់,15,km
@@ -28427,6 +28430,7 @@ tthlob,ធ្លាប់,4755,km
 tthlok,ធ្លក,4,km
 tthlorb,ធ្លាប់,4755,km
 tthlorbtae,ធ្លាប់តែ,238,km
+tthlou,ធ្លោ,1177,km
 tthlouy,ធ្លោយ,8,km
 tthlu,ធ្លូ,1,km
 tthluh,ធ្លុះ,25,km
@@ -28732,7 +28736,7 @@ ttokkhenanubbatean,ទក្ខិណានុប្បទាន,1,km
 ttokkhenanubbotean,ទក្ខិណានុប្បទាន,1,km
 ttokkhenanutis,ទក្ខិណានុទិស,1,km
 ttokkhenaotok,ទក្ខិណោទក,1,km
-ttokkhenapoatr,ទក្ខិណាព័ត៌,1,km
+ttokkhenapoa,ទក្ខិណាព័ត៌,1,km
 ttokkhenatean,ទក្ខិណាទាន,1,km
 ttokkhenatis,ទក្ខិណទិស,1,km
 ttokkhenavodd,ទក្ខិណាវដ្ដ,1,km
@@ -29330,6 +29334,7 @@ ttuvalu,ទូវ៉ាលូ,1,km
 ttuymuy,ទុយមុយ,1,km
 ttve,ទ្វេ,188,km
 ttvea,ទ្វារ,814,km
+ttvear,ទ្វារ,814,km
 ttvearbal,ទ្វារបាល,1,km
 ttvearbatei,ទ្វារបតី,1,km
 ttvearbotey,ទ្វារបតី,1,km
@@ -29442,7 +29447,7 @@ ubbaneayika,ឧបនាយិកា,1,km
 ubbaneayok,ឧបនាយក,1,km
 ubbanhnhasakatha,ឧបញ្ញាសកថា,1,km
 ubbanimnton,ឧបនិមន្តន៍,1,km
-ubbanisoat,ឧបនិស័ទ,1,km
+ubbanisat,ឧបនិស័ទ,1,km
 ubbanissai,ឧបនិស្ស័យ,1,km
 ubbanithi,ឧបនិធិ,1,km
 ubbanyasakatha,ឧបន្យាសកថា,1,km
@@ -29456,7 +29461,7 @@ ubbarim,ឧបរិម,1,km
 ubbarimotis,ឧបរិមទិស,1,km
 ubbarouth,ឧបរោធ,1,km
 ubbasakk,ឧបសគ្គ,1,km
-ubbasamboat,ឧបសម្ប័ទ,1,km
+ubbasambat,ឧបសម្ប័ទ,1,km
 ubbasambonn,ឧបសម្បន្ន,1,km
 ubbasambonnea,ឧបសម្បន្នា,1,km
 ubbasambot,ឧបសម្បទ,1,km
@@ -29574,7 +29579,7 @@ uphoy,ឧភយ,1,km
 upveth,ឧព្វេធ,1,km
 urai,ឧរ៉ៃ,1,km
 urea,ឧរា,1,km
-urochchhoat,ឧរច្ឆ័ទ,1,km
+urochchhat,ឧរច្ឆ័ទ,1,km
 urok,ឧរគ,1,km
 urongkor,ឧរង្គ,1,km
 urubatei,ឧរុបតី,1,km
@@ -29690,6 +29695,7 @@ vallaphea,វល្លភា,1,km
 vallapheak,វល្លភៈ,1,km
 valmike,វល្មីកិ,1,km
 valy,វលី,1,km
+vanaroat,វនរ័តន៍,1,km
 vang,វ៉ាង,67,km
 vang,ហ្វង់,1,km
 vangmukh,វ៉ាងមុខ,1,km
@@ -29988,6 +29994,7 @@ vibak,វិបាក,134,km
 vibakkhar,វិបក្ខ,1,km
 vibarit,វិបរិត,1,km
 vibat,វិបត្តិ,467,km
+vibat,វិប័ទ,1,km
 vibath,វិបត្តិ,467,km
 vibbadesara,វិប្បដិសារៈ,1,km
 vibbadesarei,វិប្បដិសារី,12,km
@@ -30011,7 +30018,6 @@ vibboleab,វិប្បលាប,1,km
 vibbovas,វិប្បវាស,1,km
 vibboyouk,វិប្បយោគ,1,km
 vibllas,វិបល្លាស,1,km
-viboat,វិប័ទ,1,km
 vibokkhor,វិបក្ខ,1,km
 vibol,វិបុល,58,km
 vibolopheap,វិបុលភាព,4,km
@@ -30487,8 +30493,7 @@ vonobbate,វនប្បតិ,1,km
 vonobbote,វនប្បតិ,1,km
 vonontor,វនន្តរ,1,km
 vonoroat,វនរ័ត,1,km
-vonoroatan,វនរ័តន៍,1,km
-vonoroaton,វនរ័តន៍,1,km
+vonoroat,វនរ័តន៍,1,km
 vonorouk,វណរោគ,1,km
 vonosbate,វនស្បតិ,1,km
 vonosbote,វនស្បតិ,1,km
@@ -30672,8 +30677,6 @@ wat,វត្ត,1826,km
 webpage,គេហទំព័រ,1,km
 website,គេហទំព័រ,1,km
 wuhan,វូហាន,350,km
-y,យើង,16360,km
-y,យ៉,5,km
 yab,យ៉ាប់,70,km
 yabachha,យ៉ាបឆា,1,km
 yabayeun,យ៉ាប់យ៉ឺន,1,km
@@ -30870,8 +30873,8 @@ youchon,យោជន៍,1,km
 youchonea,យោជនា,1,km
 youk,យោក,1,km
 youk,យោគ,99,km
-youkboatrar,យោក្ប័ត្រ,1,km
-youkboatror,យោក្ប័ត្រ,1,km
+youkbat,យោក្ប័ត្រ,1,km
+youkbatr,យោក្ប័ត្រ,1,km
 youkeavochar,យោគាវចរ,1,km
 youkeavochor,យោគាវចរ,1,km
 youkin,យោគិន,1,km
@@ -30915,8 +30918,8 @@ yuk,យុក,1,km
 yuk,យុគ,141,km
 yukk,យុក,1,km
 yukkakreah,យុគគ្រាះ,1,km
-yukkboatrar,យុកក្ប័ត្រ,1,km
-yukkboatror,យុកក្ប័ត្រ,1,km
+yukkbat,យុកក្ប័ត្រ,1,km
+yukkbatr,យុកក្ប័ត្រ,1,km
 yukkreah,យុគគ្រាះ,1,km
 yuklopintu,យុគលពិន្ទុ,1,km
 yuknthor,យុគន្ធរ,1,km
@@ -30973,9 +30976,9 @@ yyabyern,យ៉ាប់យ៉ឺន,1,km
 yyabyeun,យ៉ាប់យ៉ឺន,1,km
 yyadam,យ៉ាដាំ,1,km
 yyak,យ៉ាក,23,km
+yyanattho,យ៉ាន័ត្ថុ,1,km
 yyang,យ៉ាង,28036,km
 yyangna,យ៉ាងណា,34,km
-yyanoattho,យ៉ាន័ត្ថុ,1,km
 yyark,យ៉ាក,23,km
 yyaueah,យ៉ើះ,1,km
 yyaur,យ៉ើ,1,km

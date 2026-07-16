@@ -50,6 +50,28 @@ final class PhraseWheelViewTests: XCTestCase {
         XCTAssertFalse(wheel.hasAlternatives)
     }
 
+    func test_unverifiedModelPhrase_coloursOnlyTheStarRed() {
+        let wheel = PhraseWheelView()
+        let state = IosRenderState(
+            candidates: [], selectedIndex: nil, preedit: "", segments: [],
+            focusedSegmentIndex: nil, commitText: nil, segmentEditActive: false, segmentEditIndex: nil,
+            phraseCandidates: [
+                IosPhraseCandidate(text: "គហបតី", segments: [], fromModel: false, lexiconVerified: true),
+                IosPhraseCandidate(text: "គហិបតី", segments: [], fromModel: true, lexiconVerified: false),
+            ],
+            selectedPhraseIndex: 0
+        )
+
+        wheel.render(state)
+
+        let label = visibleLabels(in: wheel).first
+        XCTAssertEqual(label?.attributedText?.string, "✦ គហិបតី")
+        XCTAssertEqual(label?.attributedText?.attribute(.foregroundColor, at: 0, effectiveRange: nil) as? UIColor,
+            .systemRed, "the unverified model marker must be red")
+        XCTAssertEqual(label?.attributedText?.attribute(.foregroundColor, at: 2, effectiveRange: nil) as? UIColor,
+            .label, "the Khmer suggestion itself must keep the normal text colour")
+    }
+
     // MARK: - Helpers
 
     private func makeState(phrases: [String], selectedPhraseIndex: UInt64 = 0) -> IosRenderState {
@@ -62,7 +84,9 @@ final class PhraseWheelViewTests: XCTestCase {
             commitText: nil,
             segmentEditActive: false,
             segmentEditIndex: nil,
-            phraseCandidates: phrases.map { IosPhraseCandidate(text: $0, segments: []) },
+            phraseCandidates: phrases.map {
+                IosPhraseCandidate(text: $0, segments: [], fromModel: false, lexiconVerified: true)
+            },
             selectedPhraseIndex: selectedPhraseIndex
         )
     }
@@ -72,6 +96,15 @@ final class PhraseWheelViewTests: XCTestCase {
         for sub in view.subviews {
             if let label = sub as? UILabel, !label.isHidden { result.append(label.text) }
             result += visibleLabelTexts(in: sub)
+        }
+        return result
+    }
+
+    private func visibleLabels(in view: UIView) -> [UILabel] {
+        var result: [UILabel] = []
+        for sub in view.subviews {
+            if let label = sub as? UILabel, !label.isHidden { result.append(label) }
+            result += visibleLabels(in: sub)
         }
         return result
     }
