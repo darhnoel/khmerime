@@ -21,6 +21,10 @@ class KhmerInputHandler(
     private var trailingSpace = false
     private var lastState: KhmerRenderState? = null
 
+    // Debounced, off-hot-path model refine (Smart mode only). Renders through the
+    // same `render` path so a refined result updates the strip/preview.
+    private val modelRefiner = ModelRefiner(session, dispatcher) { state -> render(state) }
+
     // Counts how many roman-buffer chars were deleted by backspaceHoldFired()
     // without a matching session call. backspaceHoldEnded() drains this with
     // one batched session block, then resets to 0.
@@ -45,6 +49,7 @@ class KhmerInputHandler(
     }
 
     fun focusOut() {
+        modelRefiner.cancel()
         session.focusOut()
     }
 
@@ -76,6 +81,9 @@ class KhmerInputHandler(
                     romanBuffer = ""
                 }
                 render(state)
+                // Smart mode: schedule a debounced model refine of the live composition,
+                // off this keystroke's hot path. No-op in Standard (no visible refiner).
+                if (romanBuffer.isNotEmpty() && session.isModelMode()) modelRefiner.schedule(romanBuffer)
             }
         }
     }
@@ -267,6 +275,7 @@ class KhmerInputHandler(
 
     private fun commitComposition() {
         if (keyboardState == KeyboardState.SuggestCharacter) return
+        modelRefiner.cancel()
         val state = session.processEnter()
         val khmer = if (state.segments.isEmpty()) {
             state.commitText ?: ""

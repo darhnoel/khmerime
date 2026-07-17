@@ -29,6 +29,17 @@ class KhmerImeSession {
     fun enterCharPick(): KhmerRenderState = parse(nativeEnterCharPick(nativeHandle))
     fun exitCharPick(): KhmerRenderState = parse(nativeExitCharPick(nativeHandle))
 
+    // Standard/Smart toggle. Off = Standard (lexicon + fuzzy only). On = Smart, which attaches the
+    // Model-mode visible refiner; the keystroke hot path stays Standard either way. Inert without a
+    // registered provider.
+    fun setModelMode(smart: Boolean) = nativeSetModelMode(nativeHandle, smart)
+    fun isModelMode(): Boolean = nativeIsModelMode(nativeHandle)
+
+    // Debounced model refine, OFF the keystroke hot path. `expectedRaw` is the roman captured when
+    // the refine was scheduled; a stale one is dropped by the Rust staleness guard.
+    fun refineWithModel(expectedRaw: String): KhmerRenderState =
+        parse(nativeRefineWithModel(nativeHandle, expectedRaw))
+
     private external fun nativeCreate(): Long
     private external fun nativeDestroy(handle: Long)
     private external fun nativeFocusIn(handle: Long): String
@@ -44,6 +55,9 @@ class KhmerImeSession {
     private external fun nativeSelectPhrase(handle: Long, index: Int): String
     private external fun nativeEnterCharPick(handle: Long): String
     private external fun nativeExitCharPick(handle: Long): String
+    private external fun nativeSetModelMode(handle: Long, smart: Boolean)
+    private external fun nativeIsModelMode(handle: Long): Boolean
+    private external fun nativeRefineWithModel(handle: Long, expectedRaw: String): String
 
     companion object {
         init {
