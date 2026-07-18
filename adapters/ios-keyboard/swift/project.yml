@@ -46,11 +46,18 @@ targets:
     deploymentTarget: "16.0"
     sources:
       - path: KhmerIME
+      # Shared with the keyboard extension: the app's Settings toggle writes this preference; the
+      # extension reads it. Both compile the same source; the App Group makes the value shared.
+      - path: KhmerIMEKeyboard/Input/SmartModePreference.swift
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.khmerime.KhmerIME
         INFOPLIST_FILE: KhmerIME/Info.plist
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        # App Group so the host-app Settings toggle and the keyboard extension share the Smart-mode
+        # preference (UserDefaults suite group.com.khmerime). Kept in project.yml so xcodegen regen
+        # doesn't drop the capability.
+        CODE_SIGN_ENTITLEMENTS: KhmerIME/KhmerIME.entitlements
     dependencies:
       - target: KhmerIMEKeyboard
         embed: true
@@ -67,6 +74,8 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.khmerime.KhmerIME.Keyboard
         INFOPLIST_FILE: KhmerIMEKeyboard/Info.plist
+        # Same App Group as the host app — the extension reads the shared Smart-mode preference.
+        CODE_SIGN_ENTITLEMENTS: KhmerIMEKeyboard/KhmerIMEKeyboard.entitlements
     dependencies:
       - framework: Frameworks/KhmerIME.xcframework
         embed: false
@@ -82,6 +91,7 @@ targets:
       - path: KhmerIMEKeyboard/Input/KeyboardInputHandler.swift
       - path: KhmerIMEKeyboard/Input/KeyboardSession.swift
       - path: KhmerIMEKeyboard/Input/KeyboardState.swift
+      - path: KhmerIMEKeyboard/Input/SmartModePreference.swift
       - path: KhmerIMEKeyboard/Input/TextProxy.swift
       - path: KhmerIMEKeyboard/Controller/KeyboardResourceTeardown.swift
       - path: KhmerIMEKeyboard/Layout/KeyboardChrome.swift

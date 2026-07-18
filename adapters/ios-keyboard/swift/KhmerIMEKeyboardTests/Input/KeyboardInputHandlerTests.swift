@@ -678,9 +678,11 @@ final class KeyboardInputHandlerTests: XCTestCase {
 
     func test_backspaceHoldEnded_reschedulesModelRefineForShortenedComposition() {
         let scheduler = ManualModelRefineScheduler()
+        let session = KeyboardSession()
+        session.setModelMode(true) // Smart refine only schedules when Smart is enabled.
         let handler = KeyboardInputHandler(
             proxy: MockTextProxy(),
-            session: KeyboardSession(),
+            session: session,
             dispatcher: SynchronousDispatcher(),
             modelRefineScheduler: scheduler
         )
@@ -823,9 +825,11 @@ final class KeyboardInputHandlerTests: XCTestCase {
     func test_backspace_reschedulesModelRefineForShortenedComposition() {
         let proxy = MockTextProxy()
         let scheduler = ManualModelRefineScheduler()
+        let session = KeyboardSession()
+        session.setModelMode(true) // Smart refine only schedules when Smart is enabled.
         let handler = KeyboardInputHandler(
             proxy: proxy,
-            session: KeyboardSession(),
+            session: session,
             dispatcher: SynchronousDispatcher(),
             modelRefineScheduler: scheduler
         )
