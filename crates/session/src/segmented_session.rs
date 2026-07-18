@@ -34,7 +34,10 @@ fn has_khmer(text: &str) -> bool {
 
 fn would_degrade_to_roman(current: &[String], refinement: &SegmentedRefinement) -> bool {
     current.first().is_some_and(|candidate| has_khmer(candidate))
-        && !refinement.candidates.first().is_some_and(|candidate| has_khmer(candidate))
+        && !refinement
+            .candidates
+            .first()
+            .is_some_and(|candidate| has_khmer(candidate))
 }
 
 /// The model compute for a segmented refinement — **pure**: reads the refiner + input + history,
@@ -515,7 +518,10 @@ mod tests {
         };
         let applied = session.apply_segmented_refinement("jea", degraded);
 
-        assert!(!applied, "a delayed refinement that only recovered Roman must be rejected");
+        assert!(
+            !applied,
+            "a delayed refinement that only recovered Roman must be rejected"
+        );
         assert_eq!(
             session.snapshot().candidates.first().map(String::as_str),
             Some("ជា"),
