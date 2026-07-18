@@ -58,6 +58,9 @@ final class KeyboardSession {
     // Smart-mode model refinement is optional. Without a registered provider,
     // the core returns the standard result unchanged.
     func isModelMode() -> Bool { inner.isModelMode() }
+    // Standard/Smart toggle. Rebuilds the session; Smart attaches the Model-mode visible refiner.
+    // Inert without a registered provider (the flag flips regardless). Never panics.
+    func setModelMode(_ enabled: Bool) { inner.setModelMode(enabled: enabled) }
     func refineWithModel(expectedRaw: String) -> IosRenderState { inner.refineWithModel(expectedRaw: expectedRaw) }
 
     // MARK: - Key routing

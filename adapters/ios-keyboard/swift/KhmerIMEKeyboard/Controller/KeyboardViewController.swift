@@ -195,6 +195,10 @@ class KeyboardViewController: UIInputViewController {
     private func setupKeyboardResources(reason: String) {
         logMemory("\(reason) vc=\(debugID) active=\(Self.activeDebugControllerCount)")
         let session = KeyboardSession()
+        // Register an optional provider (no-op in the OSS build), then honor the saved Standard/Smart
+        // choice (shared App Group). Inert without a registered provider, so the OSS build stays Standard.
+        AiModelArming.armIfNeeded()
+        session.setModelMode(SmartModePreference().isEnabled)
         logMemory("after KeyboardSession() vc=\(debugID) active=\(Self.activeDebugControllerCount)")
         handler = KeyboardInputHandler(proxy: DocumentProxyWrapper(textDocumentProxy), session: session)
         setupLayout()

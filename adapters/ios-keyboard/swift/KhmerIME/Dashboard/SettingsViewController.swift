@@ -1,24 +1,38 @@
 import UIKit
 
-// SettingsViewController — Iteration 3 (ADR-0011). Only About is functional
-// today: iOS has no learned-history persistence or next-word prediction yet,
-// and the host app doesn't link the engine, so the toggle, Custom Words, and
-// Clear Learned History show as "Coming soon" until that bridge exists.
+// SettingsViewController — Iteration 3 (ADR-0011). The Standard/Smart toggle persists a shared
+// preference the keyboard extension reads (see SmartModePreference); it's inert without a registered
+// provider, so in the OSS build it has no visible effect. Custom Words and Clear Learned History
+// still show "Coming soon" (iOS has no learned-history persistence yet).
 final class SettingsViewController: UITableViewController {
 
     private struct Item {
         let title: String
         let detail: String
         let isMuted: Bool
+        // A switch row (Standard/Smart toggle) instead of a detail-text row.
+        let isSwitch: Bool
+
+        init(title: String, detail: String, isMuted: Bool, isSwitch: Bool = false) {
+            self.title = title
+            self.detail = detail
+            self.isMuted = isMuted
+            self.isSwitch = isSwitch
+        }
     }
     private struct Section {
         let header: String
         let items: [Item]
     }
 
-    private let sections: [Section] = [
+    private let smartMode = SmartModePreference()
+
+    private lazy var sections: [Section] = [
         Section(header: String(localized: "settings.section.prediction"),
-                items: [Item(title: String(localized: "settings.item.nextWord"), detail: String(localized: "settings.comingSoon"), isMuted: true)]),
+                items: [
+                    Item(title: String(localized: "settings.item.smartMode"), detail: "", isMuted: false, isSwitch: true),
+                    Item(title: String(localized: "settings.item.nextWord"), detail: String(localized: "settings.comingSoon"), isMuted: true),
+                ]),
         Section(header: String(localized: "settings.section.words"),
                 items: [Item(title: String(localized: "settings.item.customWords"), detail: String(localized: "settings.comingSoon"), isMuted: true)]),
         Section(header: String(localized: "settings.section.data"),
@@ -59,7 +73,17 @@ final class SettingsViewController: UITableViewController {
         cell.detailTextLabel?.text = item.detail
         cell.detailTextLabel?.textColor = Brand.ivoryDim
         cell.selectionStyle = .none
+        if item.isSwitch {
+            let toggle = UISwitch()
+            toggle.isOn = smartMode.isEnabled
+            toggle.addTarget(self, action: #selector(smartModeToggled(_:)), for: .valueChanged)
+            cell.accessoryView = toggle
+        }
         return cell
+    }
+
+    @objc private func smartModeToggled(_ sender: UISwitch) {
+        smartMode.setEnabled(sender.isOn)
     }
 
     private static var versionString: String {
