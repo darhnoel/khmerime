@@ -263,6 +263,12 @@ impl ImeSession {
         self.segmented_session.is_some()
     }
 
+    /// Whether a Model-mode visible refiner is attached. Adapters read this as the
+    /// Standard/Smart state instead of tracking a separate flag.
+    pub fn visible_refiner_active(&self) -> bool {
+        self.visible_refiner.is_some()
+    }
+
     #[deprecated(note = "install live, visible, and commit engines together with replace_engines_with_refiners")]
     pub fn set_commit_refiner(&mut self, commit_refiner: Transliterator) {
         self.commit_refiner = Some(commit_refiner);

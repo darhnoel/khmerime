@@ -34,6 +34,7 @@
     <string name="settings_section_words">មុខងារបញ្ចូលពាក្យ</string>
     <string name="settings_section_data">មុខងារទិន្នន័យ</string>
     <string name="settings_section_about">អំពី</string>
+    <string name="settings_smart_mode">របៀបឆ្លាតវៃ</string>
     <string name="settings_next_word">ទស្សន៍ទាយពាក្យបន្ទាប់</string>
     <string name="settings_custom_words">បញ្ចូលពាក្យផ្ទាល់ខ្លួន</string>
     <string name="settings_clear_history">សម្អាតប្រវត្តិពាក្យ</string>

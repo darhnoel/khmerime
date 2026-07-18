@@ -12,13 +12,24 @@ class SuggestionChipView(context: Context) : View(context) {
 
     private var text: String = ""
     private var isSelected: Boolean = false
+    private var fromModel: Boolean = false
+    private var lexiconVerified: Boolean = true
     private var onClick: () -> Unit = {}
 
-    // Re-styles a pooled chip for its new candidate/selection state instead
-    // of allocating a new view.
-    fun update(text: String, isSelected: Boolean, onClick: () -> Unit) {
+    // Re-styles a pooled chip for its new candidate/selection state instead of allocating a new
+    // view. ADR-0016: a model phrase (`fromModel`) shows a ✦; it's drawn RED only when the phrase
+    // is NOT lexicon-verified (out-of-Lexicon = unverified trust warning), else the normal color.
+    fun update(
+        text: String,
+        isSelected: Boolean,
+        fromModel: Boolean = false,
+        lexiconVerified: Boolean = true,
+        onClick: () -> Unit,
+    ) {
         this.text = text
         this.isSelected = isSelected
+        this.fromModel = fromModel
+        this.lexiconVerified = lexiconVerified
         this.onClick = onClick
         // New text may be wider/narrower — re-measure so the box fits the whole phrase.
         requestLayout()
@@ -28,8 +39,12 @@ class SuggestionChipView(context: Context) : View(context) {
     // Size the box to its text (+ breathing room), with a minimum so short word
     // candidates stay uniformly tappable. A whole-phrase card therefore extends to
     // cover the full phrase instead of clipping at a fixed width.
+    // Red ✦ marker (ADR-0016): drawn before the label when the model contributed to this phrase.
+    private val markerGlyph = "✦ "
+
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
-        val contentWidth = textPaint.measureText(text) + horizontalPadding * 2
+        val markerWidth = if (fromModel) textPaint.measureText(markerGlyph) else 0f
+        val contentWidth = markerWidth + textPaint.measureText(text) + horizontalPadding * 2
         val width = maxOf(minWidth.toFloat(), contentWidth).toInt()
         setMeasuredDimension(
             resolveSize(width, widthMeasureSpec),
@@ -59,6 +74,15 @@ class SuggestionChipView(context: Context) : View(context) {
             context.resources.displayMetrics,
         )
     }
+    // The ✦ marker, drawn left-aligned before the label. Red iff the model phrase is unverified.
+    private val markerPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        textAlign = Paint.Align.LEFT
+        textSize = TypedValue.applyDimension(
+            TypedValue.COMPLEX_UNIT_SP, 18f,
+            context.resources.displayMetrics,
+        )
+    }
+    private val unverifiedMarkerColor = 0xFFE53935.toInt() // material red 600 — reads on light + dark
 
     private val rect = RectF()
     private val cornerRadius get() = height * 0.28f
@@ -73,12 +97,21 @@ class SuggestionChipView(context: Context) : View(context) {
         rect.set(0f, 0f, width.toFloat(), height.toFloat())
         canvas.drawRoundRect(rect, cornerRadius, cornerRadius, bgPaint)
         canvas.drawRoundRect(rect, cornerRadius, cornerRadius, borderPaint)
-        canvas.drawText(
-            text,
-            width / 2f,
-            height / 2f - (textPaint.descent() + textPaint.ascent()) / 2f,
-            textPaint,
-        )
+
+        val baseline = height / 2f - (textPaint.descent() + textPaint.ascent()) / 2f
+        if (fromModel) {
+            // ✦ shows for any model phrase; it's red only when unverified (out-of-Lexicon), else the
+            // normal text color. Center the [✦ + label] pair: marker left-aligned, label centered
+            // in the remaining width.
+            markerPaint.color = if (!lexiconVerified) unverifiedMarkerColor else textPaint.color
+            val markerWidth = markerPaint.measureText(markerGlyph)
+            val labelWidth = textPaint.measureText(text)
+            val start = (width - markerWidth - labelWidth) / 2f
+            canvas.drawText(markerGlyph, start, baseline, markerPaint)
+            canvas.drawText(text, start + markerWidth + labelWidth / 2f, baseline, textPaint)
+        } else {
+            canvas.drawText(text, width / 2f, baseline, textPaint)
+        }
     }
 
     override fun onTouchEvent(event: MotionEvent): Boolean {

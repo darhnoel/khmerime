@@ -87,3 +87,10 @@ adapters/macos-imk/swift/**/*.xcuserstate
 
 # Generated local build specification for optional private integrations.
 /adapters/ios-keyboard/swift/project-paid.yml
+
+# AI Android overlay: model provider glue + bundled model assets dropped into the
+# public adapter tree by `private/tonle/ai.mk` (ai-android-glue / ai-android-assets). Never
+# committed to the public repo. The AI .so reuses the gitignored jniLibs/ path.
+/adapters/android-ime/app/src/main/java/com/khmerime/input/AiModelProvider.kt
+/adapters/android-ime/app/src/main/assets/tonle/
+/adapters/android-ime/app/src/debug/AndroidManifest.xml

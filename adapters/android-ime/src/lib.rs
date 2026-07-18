@@ -8,9 +8,9 @@
 use std::collections::HashMap;
 
 use jni::objects::{JObject, JString};
-use jni::sys::{jint, jlong, jstring};
+use jni::sys::{jboolean, jint, jlong, jstring};
 use jni::JNIEnv;
-use khmerime_core::{DecoderConfig, Transliterator};
+use khmerime_core::{DecoderConfig, SpanProposalMode, Transliterator};
 use khmerime_session::{
     ImeSession, ImeSessionOptions, InputMode, NativeKeyEvent, PhraseCandidate, SegmentPreviewEntry,
     SegmentedPreviewMode, SessionCommand, SessionResult, SessionSnapshot,
@@ -56,6 +56,12 @@ struct RenderState {
 struct PhraseCandidateJson {
     text: String,
     segments: Vec<SegmentEntry>,
+    // True when the model contributed at least one span to this phrase (ADR-0016) — the UI shows a
+    // ✦. Phrase-level, same as iOS. Always false for lexicon/fuzzy-only phrases.
+    from_model: bool,
+    // True iff every span is a real Lexicon target. When a model phrase is NOT verified, the ✦ is
+    // drawn red (the unverified/out-of-Lexicon trust warning). Verified model phrases: normal ✦.
+    lexicon_verified: bool,
 }
 
 impl From<&PhraseCandidate> for PhraseCandidateJson {
@@ -71,6 +77,8 @@ impl From<&PhraseCandidate> for PhraseCandidateJson {
                     focused: false,
                 })
                 .collect(),
+            from_model: candidate.from_model,
+            lexicon_verified: candidate.lexicon_verified,
         }
     }
 }
@@ -102,7 +110,11 @@ fn make_render_state(snapshot: &SessionSnapshot, result: &SessionResult) -> Rend
         commit_text: result.commit_text.clone(),
         segment_edit_active: snapshot.segment_edit_active,
         segment_edit_index: snapshot.segment_edit_index.map(|i| i as u64),
-        phrase_candidates: snapshot.phrase_candidates.iter().map(PhraseCandidateJson::from).collect(),
+        phrase_candidates: snapshot
+            .phrase_candidates
+            .iter()
+            .map(PhraseCandidateJson::from)
+            .collect(),
         selected_phrase_index: snapshot.selected_phrase_index as u64,
     }
 }
@@ -115,16 +127,56 @@ fn render_json(env: &mut JNIEnv, snapshot: &SessionSnapshot, result: &SessionRes
 
 // ── Session helpers ───────────────────────────────────────────────────────────
 
-fn build_session() -> ImeSession {
-    let transliterator = Transliterator::from_default_data_with_config(DecoderConfig::shadow_interactive())
-        .expect("compiled-in lexicon must be valid");
-    ImeSession::builder(transliterator, HashMap::new())
+// Smart refinement runs after a typing pause, off the keystroke hot path, so it gets a longer
+// deadline than the live decoder for one provider inference.
+const SMART_REFINE_MAX_LATENCY_MS: u64 = 2_000;
+
+fn smart_refiner_config() -> DecoderConfig {
+    let mut config = DecoderConfig::shadow_interactive().with_span_proposal_mode(SpanProposalMode::Model);
+    config.wfst_max_latency_ms = SMART_REFINE_MAX_LATENCY_MS;
+    config
+}
+
+/// Build a fresh Android session. The primary (live) engine is ALWAYS Standard — the keystroke
+/// hot path never runs the model. When `smart`, a Model-mode **visible refiner** is attached; it
+/// runs only via `refine_with_model` on a debounced pause, off the hot path. The model is inert
+/// unless a provider was registered via `khmerime_core::register_span_proposal_provider` (paid
+/// build only). Unlike iOS, Android keeps the full SearchIndex (no `no-search-index` feature).
+fn build_session(smart: bool) -> ImeSession {
+    let live = Transliterator::from_default_data_with_config(
+        DecoderConfig::shadow_interactive().with_span_proposal_mode(SpanProposalMode::Disabled),
+    )
+    .expect("compiled-in lexicon must be valid");
+    let mut builder = ImeSession::builder(live, HashMap::new())
         .input_mode(InputMode::Roman)
         .options(ImeSessionOptions {
             segmented_preview: SegmentedPreviewMode::Enabled,
             ..Default::default()
-        })
-        .build()
+        });
+    if smart {
+        let refiner = Transliterator::from_default_data_with_config(smart_refiner_config())
+            .expect("compiled-in lexicon must be valid");
+        builder = builder.visible_refiner(refiner);
+    }
+    builder.build()
+}
+
+/// Toggle Standard/Smart by rebuilding the session in place. Smart attaches the Model-mode visible
+/// refiner (the keystroke hot path stays Standard either way). The current composition is reset —
+/// this is a settings action, not a mid-typing one. Inert without a registered provider; never panics.
+fn set_model_mode(session: &mut ImeSession, smart: bool) {
+    *session = build_session(smart);
+}
+
+/// Debounced model refine: re-decode the composition with the Model-mode visible refiner, OFF the
+/// keystroke hot path. `expected_raw` is the roman the caller captured when it *scheduled* the
+/// refine; the session's staleness guard (`composition_raw != expected_raw`) drops the refine if a
+/// keystroke changed the composition in between, so a stale async result never renders over newer
+/// input. No-op when empty; inert when Standard or no provider is registered.
+fn refine_with_model(session: &mut ImeSession, expected_raw: &str) {
+    if !expected_raw.is_empty() {
+        session.refine_segmented_with_visible_refiner(expected_raw);
+    }
 }
 
 // Safety: `handle` must be a pointer produced by `nativeCreate` that has not
@@ -137,7 +189,9 @@ unsafe fn session_mut(handle: jlong) -> &'static mut ImeSession {
 
 #[no_mangle]
 pub extern "C" fn Java_com_khmerime_input_KhmerImeSession_nativeCreate(_env: JNIEnv, _obj: JObject) -> jlong {
-    Box::into_raw(Box::new(build_session())) as jlong
+    // Always Standard on create; the service enables Smart from the saved SmartModePreference via
+    // nativeSetModelMode. Inert without a registered provider, so the OSS build stays Standard.
+    Box::into_raw(Box::new(build_session(false))) as jlong
 }
 
 #[no_mangle]
@@ -286,6 +340,40 @@ pub extern "C" fn Java_com_khmerime_input_KhmerImeSession_nativeEnterCharPick(
 }
 
 #[no_mangle]
+pub extern "C" fn Java_com_khmerime_input_KhmerImeSession_nativeSetModelMode(
+    _env: JNIEnv,
+    _obj: JObject,
+    handle: jlong,
+    smart: jboolean,
+) {
+    let s = unsafe { session_mut(handle) };
+    set_model_mode(s, smart != 0);
+}
+
+#[no_mangle]
+pub extern "C" fn Java_com_khmerime_input_KhmerImeSession_nativeIsModelMode(
+    _env: JNIEnv,
+    _obj: JObject,
+    handle: jlong,
+) -> jboolean {
+    let s = unsafe { session_mut(handle) };
+    s.visible_refiner_active() as jboolean
+}
+
+#[no_mangle]
+pub extern "C" fn Java_com_khmerime_input_KhmerImeSession_nativeRefineWithModel(
+    mut env: JNIEnv,
+    _obj: JObject,
+    handle: jlong,
+    expected_raw: JString,
+) -> jstring {
+    let s = unsafe { session_mut(handle) };
+    let raw = env.get_string(&expected_raw).expect("get_string must not fail");
+    refine_with_model(s, &raw.to_string_lossy());
+    render_json(&mut env, &s.snapshot(), &SessionResult::default())
+}
+
+#[no_mangle]
 pub extern "C" fn Java_com_khmerime_input_KhmerImeSession_nativeExitCharPick(
     mut env: JNIEnv,
     _obj: JObject,
@@ -294,4 +382,57 @@ pub extern "C" fn Java_com_khmerime_input_KhmerImeSession_nativeExitCharPick(
     let s = unsafe { session_mut(handle) };
     s.process_command(SessionCommand::SetInputMode(InputMode::Roman));
     render_json(&mut env, &s.snapshot(), &SessionResult::default())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn smart_session_attaches_a_model_visible_refiner() {
+        let standard = build_session(false);
+        assert!(
+            !standard.visible_refiner_active(),
+            "Standard must have no model refiner"
+        );
+
+        let smart = build_session(true);
+        assert!(
+            smart.visible_refiner_active(),
+            "Smart must attach the Model-mode visible refiner"
+        );
+    }
+
+    #[test]
+    fn set_model_mode_swaps_the_session_in_place() {
+        let mut s = build_session(false);
+        set_model_mode(&mut s, true);
+        assert!(s.visible_refiner_active(), "set_model_mode(true) must enable Smart");
+        set_model_mode(&mut s, false);
+        assert!(
+            !s.visible_refiner_active(),
+            "set_model_mode(false) must return to Standard"
+        );
+    }
+
+    fn type_str(s: &mut ImeSession, text: &str) {
+        for ch in text.chars() {
+            s.process_native_key_event(key_event(ch as u32));
+        }
+    }
+
+    #[test]
+    fn refine_with_model_drops_stale_raw() {
+        let mut s = build_session(true);
+        s.focus_in();
+        type_str(&mut s, "nhom");
+        assert_eq!(s.snapshot().preedit, "nhom");
+        // Scheduled against "nho" but composition is now "nhom" -> guard drops it, preedit intact.
+        refine_with_model(&mut s, "nho");
+        assert_eq!(
+            s.snapshot().preedit,
+            "nhom",
+            "stale refine must not disturb the current composition"
+        );
+    }
 }

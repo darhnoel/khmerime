@@ -24,4 +24,6 @@ data class KhmerSegmentEntry(
 data class KhmerPhraseCandidate(
     val text: String = "",
     val segments: List<KhmerSegmentEntry> = emptyList(),
+    @SerializedName("from_model") val fromModel: Boolean = false,
+    @SerializedName("lexicon_verified") val lexiconVerified: Boolean = true,
 )
