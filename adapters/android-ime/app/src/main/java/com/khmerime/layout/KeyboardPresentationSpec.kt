@@ -10,7 +10,12 @@ enum class ChromeRows { None, CandidateOnly, StripAndCandidate, StripOnly }
 
 // One selectable card in the Phrase Wheel: the phrase text plus its index into the
 // render state's phraseCandidates (so a tap maps to selectPhrase).
-data class PhraseAlternative(val index: Int, val text: String)
+data class PhraseAlternative(
+    val index: Int,
+    val text: String,
+    val fromModel: Boolean = false,
+    val lexiconVerified: Boolean = true,
+)
 
 object KeyboardPresentationSpec {
     fun suggestionCandidates(state: KhmerRenderState): List<String> = state.candidates
@@ -19,7 +24,8 @@ object KeyboardPresentationSpec {
     // strip previews (selectedPhraseIndex). Empty → the strip stands alone.
     fun phraseAlternatives(state: KhmerRenderState): List<PhraseAlternative> =
         state.phraseCandidates.mapIndexedNotNull { index, candidate ->
-            if (index == state.selectedPhraseIndex) null else PhraseAlternative(index, candidate.text)
+            if (index == state.selectedPhraseIndex) null
+            else PhraseAlternative(index, candidate.text, candidate.fromModel, candidate.lexiconVerified)
         }
 
     // Composition shows the Phrase Wheel in the chip row; CharPick and Segment Edit show

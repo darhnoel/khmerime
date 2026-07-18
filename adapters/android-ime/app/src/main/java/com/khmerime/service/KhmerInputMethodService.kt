@@ -3,6 +3,7 @@ package com.khmerime.service
 import com.khmerime.input.InputConnectionProxy
 import com.khmerime.input.resolveEnterBehavior
 import com.khmerime.input.KhmerInputHandler
+import com.khmerime.input.SmartModePreference
 import com.khmerime.input.KhmerImeSession
 import com.khmerime.input.KhmerRenderState
 import com.khmerime.input.KeyboardState
@@ -82,6 +83,8 @@ class KhmerInputMethodService : InputMethodService() {
 
     override fun onStartInput(info: EditorInfo, restarting: Boolean) {
         super.onStartInput(info, restarting)
+        // Honor the saved Standard/Smart choice. Inert without a registered provider (OSS build).
+        session.setModelMode(SmartModePreference.isEnabled(this))
         val ic = currentInputConnection ?: return
         val proxy = InputConnectionProxy(ic)
         handler = KhmerInputHandler(proxy, session).also { h ->
@@ -259,6 +262,9 @@ class KhmerInputMethodService : InputMethodService() {
                 chips[chipIndex].update(
                     text = KeyboardPresentationSpec.candidateDisplayLabel(alternative.text),
                     isSelected = false,
+                    // ✦ marks a model-contributed phrase; red when unverified (ADR-0016), as on iOS.
+                    fromModel = alternative.fromModel,
+                    lexiconVerified = alternative.lexiconVerified,
                     onClick = { handler?.selectPhrase(alternative.index) },
                 )
             }

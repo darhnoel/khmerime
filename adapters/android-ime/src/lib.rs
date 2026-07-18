@@ -56,6 +56,12 @@ struct RenderState {
 struct PhraseCandidateJson {
     text: String,
     segments: Vec<SegmentEntry>,
+    // True when the model contributed at least one span to this phrase (ADR-0016) — the UI shows a
+    // ✦. Phrase-level, same as iOS. Always false for lexicon/fuzzy-only phrases.
+    from_model: bool,
+    // True iff every span is a real Lexicon target. When a model phrase is NOT verified, the ✦ is
+    // drawn red (the unverified/out-of-Lexicon trust warning). Verified model phrases: normal ✦.
+    lexicon_verified: bool,
 }
 
 impl From<&PhraseCandidate> for PhraseCandidateJson {
@@ -71,6 +77,8 @@ impl From<&PhraseCandidate> for PhraseCandidateJson {
                     focused: false,
                 })
                 .collect(),
+            from_model: candidate.from_model,
+            lexicon_verified: candidate.lexicon_verified,
         }
     }
 }
@@ -181,6 +189,8 @@ unsafe fn session_mut(handle: jlong) -> &'static mut ImeSession {
 
 #[no_mangle]
 pub extern "C" fn Java_com_khmerime_input_KhmerImeSession_nativeCreate(_env: JNIEnv, _obj: JObject) -> jlong {
+    // Always Standard on create; the service enables Smart from the saved SmartModePreference via
+    // nativeSetModelMode. Inert without a registered provider, so the OSS build stays Standard.
     Box::into_raw(Box::new(build_session(false))) as jlong
 }
 
