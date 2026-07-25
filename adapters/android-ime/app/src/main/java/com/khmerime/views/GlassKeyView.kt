@@ -45,6 +45,13 @@ open class GlassKeyView(
 
     private val animator = GlassKeyPressAnimator(onUpdate = { applySquish(it) })
 
+    // Keypress preview bubble (iOS parity). Set by the service for letter keys only;
+    // fired on press/release so an overlay can float a magnified label above the key.
+    var onPreviewShow: ((GlassKeyView) -> Unit)? = null
+    var onPreviewHide: (() -> Unit)? = null
+
+    val previewLabel: String get() = key.label
+
     override fun onDraw(canvas: Canvas) {
         val dark = isDark
         bgPaint.color = if (isActive) GlassColorSpec.toggleActiveBackground(dark)
@@ -70,15 +77,18 @@ open class GlassKeyView(
         when (event.actionMasked) {
             MotionEvent.ACTION_DOWN -> {
                 animator.press()
+                onPreviewShow?.invoke(this)
                 return true
             }
             MotionEvent.ACTION_UP -> {
                 animator.release()
+                onPreviewHide?.invoke()
                 if (event.x in 0f..width.toFloat() && event.y in 0f..height.toFloat()) onClick()
                 return true
             }
             MotionEvent.ACTION_CANCEL -> {
                 animator.release()
+                onPreviewHide?.invoke()
                 return true
             }
         }

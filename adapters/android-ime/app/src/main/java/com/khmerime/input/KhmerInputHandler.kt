@@ -76,7 +76,7 @@ class KhmerInputHandler(
             dispatcher.onMain {
                 val committed = state.commitText
                 if (committed != null && committed.isNotEmpty()) {
-                    repeat(romanBuffer.length) { proxy.deleteBackward() }
+                    proxy.deleteBackward(romanBuffer.length)
                     proxy.insertText(committed)
                     romanBuffer = ""
                 }

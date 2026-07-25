@@ -29,7 +29,16 @@ IOS_ABA_SOURCE = ROOT / "site/download/assets/my-aba-cropped.png"
 IOS_ABA_DEST = IOS_ASSETS / "ABAQR.imageset/aba.png"
 
 ANDROID_LOGO_PNG = ROOT / "adapters/android-ime/app/src/main/res/drawable-nodpi/khmerime_logo_card.png"
+ANDROID_RES = ROOT / "adapters/android-ime/app/src/main/res"
 
+# Legacy raster launcher-icon sizes (px) per density bucket (Android pre-26 fallback).
+ANDROID_MIPMAP_SIZES = {
+    "mdpi": 48,
+    "hdpi": 72,
+    "xhdpi": 96,
+    "xxhdpi": 144,
+    "xxxhdpi": 192,
+}
 PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
 
 
@@ -62,7 +71,99 @@ def generate_ios_assets() -> None:
 
 
 def generate_android_assets() -> None:
-    copy_square_png(default_icon_source(), ANDROID_LOGO_PNG, "Android LogoCard")
+    source = default_icon_source()
+    copy_square_png(source, ANDROID_LOGO_PNG, "Android LogoCard")
+    generate_android_launcher_icons(source)
+
+
+def generate_android_launcher_icons(source: Path) -> None:
+    """Wire the launcher/store icon from the same canonical logo iOS uses.
+
+    Adaptive icon (API 26+): a foreground drawable on a solid background color pulled
+    from the logo, referenced by mipmap-anydpi-v26/*.xml — the launcher masks and
+    scales it to every density, so it's the icon on modern devices and the Play
+    listing. Legacy raster mipmaps (pre-26 fallback) are downscaled via sips; if sips
+    is unavailable (CI/bootstrap), they're skipped with a warning since adaptive
+    covers all supported devices.
+    """
+    width, height, bit_depth, color_type, rows = read_png_rows(source)
+    # Pull the adaptive-icon background color from the logo's own background (RGBA
+    # source); RGB sources have no alpha to sample, so fall back to the brand orange.
+    background = (
+        icon_background(rows, width, height, bit_depth)
+        if color_type == 6
+        else (226, 143, 88)
+    )
+
+    # Adaptive: solid background color + foreground = the logo (flattened to RGB).
+    # Foreground is a density-independent raster in drawable-nodpi; the launcher
+    # scales it per device.
+    background_hex = "#%02X%02X%02X" % background
+    write_adaptive_icon_resources(background_hex)
+    fg_dest = ANDROID_RES / "drawable-nodpi/ic_launcher_foreground.png"
+    fg_dest.parent.mkdir(parents=True, exist_ok=True)
+    flatten_png_alpha(source, fg_dest)
+    print(f"generated {fg_dest.relative_to(ROOT)}")
+
+    # Legacy raster fallback (pre-26).
+    if shutil.which("sips") is None:
+        print(
+            "warning: sips unavailable — skipping legacy raster launcher icons; "
+            "adaptive icon covers API 26+ devices and the Play listing.",
+            file=sys.stderr,
+        )
+        return
+    flat_source = fg_dest  # the RGB foreground; also serves as the legacy square icon
+    for bucket, size in ANDROID_MIPMAP_SIZES.items():
+        for name in ("ic_launcher", "ic_launcher_round"):
+            dest = ANDROID_RES / f"mipmap-{bucket}" / f"{name}.webp"
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            resize_to_webp(flat_source, dest, size)
+    print(f"generated legacy raster launcher icons ({len(ANDROID_MIPMAP_SIZES)} densities)")
+
+
+def write_adaptive_icon_resources(background_hex: str) -> None:
+    anydpi = ANDROID_RES / "mipmap-anydpi-v26"
+    anydpi.mkdir(parents=True, exist_ok=True)
+    xml = (
+        '<?xml version="1.0" encoding="utf-8"?>\n'
+        '<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">\n'
+        '    <background android:drawable="@color/ic_launcher_background" />\n'
+        '    <foreground android:drawable="@drawable/ic_launcher_foreground" />\n'
+        '</adaptive-icon>\n'
+    )
+    (anydpi / "ic_launcher.xml").write_text(xml)
+    (anydpi / "ic_launcher_round.xml").write_text(xml)
+
+    values = ANDROID_RES / "values"
+    values.mkdir(parents=True, exist_ok=True)
+    (values / "ic_launcher_background.xml").write_text(
+        '<?xml version="1.0" encoding="utf-8"?>\n'
+        '<resources>\n'
+        f'    <color name="ic_launcher_background">{background_hex}</color>\n'
+        '</resources>\n'
+    )
+
+
+def resize_to_webp(source: Path, dest: Path, size: int) -> None:
+    with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as tmp:
+        tmp_png = Path(tmp.name)
+    try:
+        subprocess.run(
+            ["sips", "--resampleHeightWidth", str(size), str(size), str(source), "--out", str(tmp_png)],
+            check=True, capture_output=True, text=True,
+        )
+        if shutil.which("cwebp") is not None:
+            subprocess.run(
+                ["cwebp", "-quiet", "-lossless", str(tmp_png), "-o", str(dest)],
+                check=True, capture_output=True, text=True,
+            )
+        else:
+            # No cwebp: Android also accepts PNG mipmaps. Write .png alongside so the
+            # build still finds a raster fallback.
+            shutil.copyfile(tmp_png, dest.with_suffix(".png"))
+    finally:
+        tmp_png.unlink(missing_ok=True)
 
 
 def default_icon_source() -> Path:
