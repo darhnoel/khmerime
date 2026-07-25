@@ -19,6 +19,11 @@ class InputConnectionProxy(private val ic: InputConnection) : TextProxy {
         ic.deleteSurroundingText(1, 0)
     }
 
+    // One IPC deletes the whole roman buffer instead of one call per char.
+    override fun deleteBackward(count: Int) {
+        if (count > 0) ic.deleteSurroundingText(count, 0)
+    }
+
     override val textBeforeCursor: String?
         get() = ic.getTextBeforeCursor(256, 0)?.toString()
 

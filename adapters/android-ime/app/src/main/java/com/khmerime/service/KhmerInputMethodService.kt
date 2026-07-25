@@ -15,8 +15,11 @@ import com.khmerime.layout.KeyboardLayerSpec
 import com.khmerime.layout.KeyboardPresentationSpec
 import com.khmerime.layout.KeyViewFactory
 import com.khmerime.layout.KeyViewStyle
+import com.khmerime.layout.QwertyCharacterGridLayout
 import com.khmerime.views.BackspaceKeyView
+import com.khmerime.views.GlassKeyView
 import com.khmerime.views.GlassKeyViewFactory
+import com.khmerime.views.KeyPreviewPopup
 import com.khmerime.views.PreeditStripView
 import com.khmerime.views.SuggestionChipView
 import com.khmerime.views.ViewPool
@@ -53,6 +56,7 @@ class KhmerInputMethodService : InputMethodService() {
 
     private var candidateStrip: LinearLayout? = null
     private var keyboardLayer: LinearLayout? = null
+    private var keyPreviewPopup: KeyPreviewPopup? = null
     private var preeditStrip: PreeditStripView? = null
     private var systemBottomSpacer: View? = null
     private var candidateScroll: View? = null
@@ -123,10 +127,18 @@ class KhmerInputMethodService : InputMethodService() {
         candidateStrip = root.findViewById(R.id.candidate_strip)
         candidateScroll = root.findViewById(R.id.candidate_scroll)
         keyboardLayer = root.findViewById(R.id.keyboard_layer)
+        keyPreviewPopup = KeyPreviewPopup(this)
         systemBottomSpacer = root.findViewById(R.id.system_bottom_spacer)
         applySystemBottomSpacing(root)
         renderKeyboardLayer(KeyboardLayer.Qwerty)
         return root
+    }
+
+    override fun onFinishInputView(finishingInput: Boolean) {
+        // Dismiss any live preview bubble so its PopupWindow doesn't leak when the
+        // keyboard hides mid-press.
+        keyPreviewPopup?.hide()
+        super.onFinishInputView(finishingInput)
     }
 
     private fun applyWindowBlur() {
@@ -171,7 +183,8 @@ class KhmerInputMethodService : InputMethodService() {
             handler?.keyboardState ?: KeyboardState.Qwerty,
         )
 
-        KeyboardLayerSpec.rows(layer).forEach { keys ->
+        val rows = KeyboardLayerSpec.rows(layer)
+        rows.forEachIndexed { rowIndex, keys ->
             val row = LinearLayout(this).apply {
                 orientation = LinearLayout.HORIZONTAL
                 gravity = Gravity.CENTER
@@ -184,25 +197,77 @@ class KhmerInputMethodService : InputMethodService() {
                     bottomMargin = 2.dp()
                 }
             }
-            keys.forEach { key ->
-                val view = factory.makeKeyView(this, key) { handleKey(key) }
-                if (view is BackspaceKeyView) {
-                    view.onHoldFire = { handler?.backspaceHoldFired() }
-                    view.onHoldEnd = { handler?.backspaceHoldEnded() }
-                }
-                view.layoutParams = LinearLayout.LayoutParams(
-                    0,
-                    LinearLayout.LayoutParams.MATCH_PARENT,
-                    KeyViewStyle.weightFor(key),
-                ).apply {
-                    marginStart = 2.dp()
-                    marginEnd = 2.dp()
-                }
-                row.addView(view)
-            }
+            addGridRow(row, keys, factory, isQwertyLetterRow(layer, rowIndex, keys))
             container.addView(row)
         }
     }
+
+    // Rows 2 (asdfghjkl) and 3 (✦ + zxcvbnm + ⌫) of the QWERTY layer get iOS-parity
+    // geometry: letter keys keep the row-1 width (weight 1); row 2 is centered with
+    // side-inset spacers; row 3's edge controls widen to fill. Every other row keeps
+    // the plain weighted fill.
+    private fun isQwertyLetterRow(layer: KeyboardLayer, rowIndex: Int, keys: List<KeyboardKey>): Boolean =
+        layer == KeyboardLayer.Qwerty && (rowIndex == 1 || rowIndex == 2)
+
+    private fun addGridRow(
+        row: LinearLayout,
+        keys: List<KeyboardKey>,
+        factory: KeyViewFactory,
+        gridRow: Boolean,
+    ) {
+        // iOS QwertyCharacterGridLayout is pure ratios of the letter-key width, so a
+        // representative width makes the spacer/control weights exact without a measure pass.
+        val grid = QwertyCharacterGridLayout(availableWidth = REFERENCE_ROW_WIDTH, spacing = KEY_GAP_PX)
+        val letterCount = keys.count { it.action == KeyboardKeyAction.Insert }
+
+        if (gridRow && letterCount == 9) {
+            // Row 2: center 9 constant-width letters with an inset spacer each side.
+            val insetWeight = grid.row2SideInset / grid.characterKeyWidth
+            row.addView(spacer(insetWeight))
+            keys.forEach { row.addView(gridKeyView(factory, it, 1f)) }
+            row.addView(spacer(insetWeight))
+            return
+        }
+        if (gridRow && letterCount == 7) {
+            // Row 3: wide edge controls around 7 constant-width letters.
+            val controlWeight = grid.row3ControlWidth / grid.characterKeyWidth
+            keys.forEach { key ->
+                val weight = if (key.action == KeyboardKeyAction.Insert) 1f else controlWeight
+                row.addView(gridKeyView(factory, key, weight))
+            }
+            return
+        }
+        // Every other row: plain weighted fill.
+        keys.forEach { row.addView(gridKeyView(factory, it, KeyViewStyle.weightFor(it))) }
+    }
+
+    private fun gridKeyView(factory: KeyViewFactory, key: KeyboardKey, weight: Float): View {
+        val view = factory.makeKeyView(this, key) { handleKey(key) }
+        if (view is BackspaceKeyView) {
+            view.onHoldFire = { handler?.backspaceHoldFired() }
+            view.onHoldEnd = { handler?.backspaceHoldEnded() }
+        }
+        // Keypress preview bubble on letter keys only (iOS parity — no bubble over
+        // space/backspace/return/toggles).
+        if (key.action == KeyboardKeyAction.Insert && view is GlassKeyView) {
+            view.onPreviewShow = { keyPreviewPopup?.show(it, it.previewLabel) }
+            view.onPreviewHide = { keyPreviewPopup?.hide() }
+        }
+        view.layoutParams = LinearLayout.LayoutParams(
+            0,
+            LinearLayout.LayoutParams.MATCH_PARENT,
+            weight,
+        ).apply {
+            marginStart = 2.dp()
+            marginEnd = 2.dp()
+        }
+        return view
+    }
+
+    private fun spacer(weight: Float): View =
+        View(this).apply {
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, weight)
+        }
 
     private fun handleKey(key: KeyboardKey) {
         when (key.action) {
@@ -220,6 +285,14 @@ class KhmerInputMethodService : InputMethodService() {
     }
 
     private fun Int.dp(): Int = (this * resources.displayMetrics.density).toInt()
+
+    private companion object {
+        // Reference dimensions for QwertyCharacterGridLayout. The layout is pure ratios
+        // of the letter-key width, so any representative row width yields exact spacer /
+        // edge-control weights; these approximate a typical phone row.
+        const val REFERENCE_ROW_WIDTH = 360f
+        const val KEY_GAP_PX = 6f
+    }
 
     private fun renderKeyboardState(state: KeyboardState) {
         renderKeyboardLayer(KeyboardPresentationSpec.keyboardLayerForState(state))
