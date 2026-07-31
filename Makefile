@@ -282,7 +282,9 @@ platform-test-android: platform-android-assets
 # Prerequisites: cargo install cargo-ndk && rustup target add aarch64-linux-android
 # Override ABI with: make platform-build-android ANDROID_ABI=x86_64
 platform-build-android: platform-android-assets
-	cargo ndk -t $(ANDROID_ABI) -o $(ANDROID_JNI_LIBS) build -p khmerime_android_ime
+	# --release: an unoptimized (debug) .so makes the decoder ~100x slower on-device
+	# (multi-second suggest() on long input). iOS/macOS already build release; Android must too.
+	cargo ndk -t $(ANDROID_ABI) -o $(ANDROID_JNI_LIBS) build -p khmerime_android_ime --release
 	cd $(ANDROID_ADAPTER_DIR) && JAVA_HOME="$(ANDROID_JAVA_HOME)" PATH="$(ANDROID_JAVA_HOME)/bin:$(PATH)" ./gradlew :app:assembleDebug
 
 android-adb-device:
@@ -302,7 +304,7 @@ platform-install-android: android-adb-device platform-build-android
 
 # Fast loop: rebuild Rust + APK and reinstall (assumes cargo-ndk already set up).
 platform-reinstall-android: android-adb-device platform-android-assets
-	cargo ndk -t $(ANDROID_ABI) -o $(ANDROID_JNI_LIBS) build -p khmerime_android_ime
+	cargo ndk -t $(ANDROID_ABI) -o $(ANDROID_JNI_LIBS) build -p khmerime_android_ime --release
 	cd $(ANDROID_ADAPTER_DIR) && JAVA_HOME="$(ANDROID_JAVA_HOME)" PATH="$(ANDROID_JAVA_HOME)/bin:$(PATH)" ./gradlew :app:assembleDebug
 	-adb uninstall $(ANDROID_LEGACY_PACKAGE) >/dev/null 2>&1
 	adb install -r $(ANDROID_APK)

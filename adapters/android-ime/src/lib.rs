@@ -164,7 +164,14 @@ fn build_session(smart: bool) -> ImeSession {
 /// Toggle Standard/Smart by rebuilding the session in place. Smart attaches the Model-mode visible
 /// refiner (the keystroke hot path stays Standard either way). The current composition is reset —
 /// this is a settings action, not a mid-typing one. Inert without a registered provider; never panics.
+///
+/// No-op when already in the requested mode. Rebuilding re-parses the full compiled lexicon (a
+/// multi-second, main-thread operation), so this MUST NOT run on every focus — `onStartInput` calls
+/// it each time, and without this guard the redundant rebuild blocks the keyboard from drawing.
 fn set_model_mode(session: &mut ImeSession, smart: bool) {
+    if session.visible_refiner_active() == smart {
+        return;
+    }
     *session = build_session(smart);
 }
 
@@ -412,6 +419,32 @@ mod tests {
         assert!(
             !s.visible_refiner_active(),
             "set_model_mode(false) must return to Standard"
+        );
+    }
+
+    // Regression: onStartInput calls set_model_mode on every focus. A same-mode call must NOT rebuild
+    // the session (rebuilding re-parses the full lexicon on the main thread — the keyboard-load lag).
+    // Proxy for "did not rebuild": an in-progress composition survives a same-mode call, but a
+    // mode-change resets it.
+    #[test]
+    fn set_model_mode_same_mode_does_not_rebuild() {
+        let mut s = build_session(false);
+        s.focus_in();
+        type_str(&mut s, "nhom");
+        assert_eq!(s.snapshot().preedit, "nhom");
+
+        set_model_mode(&mut s, false); // same mode → must be a no-op
+        assert_eq!(
+            s.snapshot().preedit,
+            "nhom",
+            "same-mode set_model_mode must not rebuild (composition must survive)"
+        );
+
+        set_model_mode(&mut s, true); // mode change → rebuild, composition resets
+        assert_eq!(
+            s.snapshot().preedit,
+            "",
+            "mode-change set_model_mode rebuilds the session (composition resets)"
         );
     }
 
