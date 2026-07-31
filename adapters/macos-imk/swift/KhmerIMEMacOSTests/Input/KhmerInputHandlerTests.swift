@@ -56,6 +56,78 @@ final class KhmerInputHandlerTests: XCTestCase {
             "nothing may be committed while composing")
     }
 
+    // Backspacing the whole Composition away must clear the host's marked range.
+    // An empty marked string is the only way to tell the client "there is no
+    // preedit"; skipping the call leaves the last character stuck on screen.
+    func test_backspacingWholeCompositionClearsMarkedText() {
+        let (handler, client) = makeHandler()
+        type("nhom", into: handler)
+        XCTAssertEqual(client.markedText, "nhom", "precondition: preedit is showing")
+
+        for _ in 0..<4 {
+            _ = handler.handleKey(keyval: 0xFF08, macKeycode: 0, modifierFlags: 0) // BackSpace
+        }
+
+        XCTAssertEqual(client.markedText, "",
+            "the last Backspace must clear the marked text, not leave it stuck")
+        XCTAssertTrue(client.text.isEmpty,
+            "backspacing a composition away must not commit anything")
+    }
+
+    // Clearing the marked range is only correct when there was something marked.
+    // Sending setMarkedText("") on every render — including keys that never composed —
+    // wedges picky IMK clients (Notes stops accepting input entirely).
+    func test_keysThatNeverCompose_doNotSpamEmptyMarkedText() {
+        let (handler, client) = makeHandler()
+
+        // A ⌘-combo passes through without composing; it must not touch marked text.
+        _ = handler.handleKey(
+            keyval: 0x63, macKeycode: 8,
+            modifierFlags: UInt32(NSEvent.ModifierFlags.command.rawValue)
+        )
+
+        XCTAssertTrue(client.ops.isEmpty,
+            "a key that never composed must not send any marked-text op; got \(client.ops)")
+    }
+
+    // Composition-Consuming Enter (ADR-0017): with no Composition active, Enter must
+    // NOT be consumed so the host application decides what Return means — send the
+    // message, insert a newline, trigger the default button. Consuming an idle Enter
+    // is what made a committing Enter also send on Facebook.
+    func test_enterWithoutComposition_isNotConsumed() {
+        let (handler, _) = makeHandler()
+
+        let consumed = handler.handleKey(keyval: 0xFF0D, macKeycode: 0, modifierFlags: 0)
+
+        XCTAssertFalse(consumed,
+            "an idle Enter must pass through to the application (ADR-0017)")
+    }
+
+    func test_enterWhileComposing_isConsumed() {
+        let (handler, _) = makeHandler()
+        type("nhom", into: handler)
+
+        let consumed = handler.handleKey(keyval: 0xFF0D, macKeycode: 0, modifierFlags: 0)
+
+        XCTAssertTrue(consumed,
+            "the Enter that commits a Composition must be swallowed, so the host never sees a Return")
+    }
+
+    // Command-modified keys are never text input on macOS: ⌘A / ⌘C / ⌘V belong to the
+    // application. Composing them as Khmer (the Command bit was not mapped, so ⌘C
+    // arrived as a bare 'c') swallowed the user's copy/paste shortcuts.
+    func test_commandModifiedKey_isNotConsumedAndTypesNothing() {
+        let (handler, client) = makeHandler()
+        let command = UInt32(NSEvent.ModifierFlags.command.rawValue)
+
+        let consumed = handler.handleKey(keyval: 0x63, macKeycode: 8, modifierFlags: command) // ⌘C
+
+        XCTAssertFalse(consumed,
+            "⌘-combos must pass through to the application, not be consumed as input")
+        XCTAssertTrue(client.text.isEmpty && client.markedText.isEmpty,
+            "⌘C must not compose or commit any text")
+    }
+
     func test_spaceSelectsNextCandidateAndEnterCommitsVisibleChoice() {
         let (handler, client) = makeHandler()
         var updated: MacosRenderState?

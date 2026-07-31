@@ -124,17 +124,36 @@ final class CandidatePanel: NSPanel {
     func update(_ state: MacosRenderState) {
         rebuildSegments(state.segments)
         let selectedIdx = state.selectedIndex.map { Int($0) } ?? 0
-        let entries = CandidateDisplayFormatter.displayEntries(
+
+        // Paint one page, not the whole list (ADR-0013 — macOS opts in at page size 10).
+        // The page is derived from the selection, so it flips as Space cycles past a
+        // boundary and digit keys 1–9/0 line up with the visible rows. Bounding the row
+        // count is also what keeps the panel small enough to sit below the caret.
+        let page = CandidatePanelLayout.pageSlice(
             candidates: state.candidates,
-            metadata: state.candidateDisplay
+            selectedIndex: selectedIdx,
+            pageSize: Self.pageSize
         )
-        rebuildCandidates(entries, selectedIndex: selectedIdx)
+        let pageMetadata = CandidatePanelLayout.pageSlice(
+            candidates: state.candidateDisplay,
+            selectedIndex: selectedIdx,
+            pageSize: Self.pageSize
+        ).rows
+        let entries = CandidateDisplayFormatter.displayEntries(
+            candidates: page.rows,
+            metadata: pageMetadata
+        )
+        rebuildCandidates(entries, selectedIndex: page.selectedRow)
 
         let hasSegments = !state.segments.isEmpty
         segmentStack.isHidden = !hasSegments
         separator.isHidden    = !hasSegments
         resizeToFit(hasSegments: hasSegments, candidateCount: entries.count)
     }
+
+    /// Rows painted per page. Must equal the session's `page_size` (ADR-0013
+    /// constraint 4) or page-relative digit selection breaks.
+    static let pageSize = 10
 
     func show(below caretRect: NSRect) {
         let screen = NSScreen.screens.first(where: { $0.frame.contains(caretRect.origin) })

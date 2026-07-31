@@ -80,8 +80,14 @@ use khmerime_session::{
 
 uniffi::setup_scaffolding!("khmerime_macos_imk");
 
-fn macos_live_decoder_config() -> DecoderConfig {
+pub fn macos_live_decoder_config() -> DecoderConfig {
     let mut config = DecoderConfig::shadow_interactive();
+    // Keystroke budget (ADR-0005). `shadow_interactive` defaults to the 250 ms *refiner*
+    // budget; on the live path that lets a long composition block the keypress — measured
+    // at ~544 ms for a single keystroke on a 15-character buffer, which is the "stutters
+    // when typing fast" report. IBus's live path uses 75 ms; macOS matches it so a slow
+    // decode degrades to the cheaper result instead of holding the keystroke.
+    config.wfst_max_latency_ms = 75;
     if let Ok(mode) = std::env::var("KHMERIME_DECODER_MODE") {
         let mode = match mode.as_str() {
             "hybrid" => DecoderMode::Hybrid,
@@ -240,6 +246,7 @@ impl MacosIMKSession {
     /// loading indicator if desired.
     #[uniffi::constructor]
     pub fn new() -> Arc<Self> {
+        install_panic_logger();
         let session = Arc::new(MacosIMKSession {
             inner: Mutex::new(None),
             ready: Arc::new((Mutex::new(false), Condvar::new())),
@@ -261,6 +268,10 @@ impl MacosIMKSession {
                 .input_mode(input_mode)
                 .options(ImeSessionOptions {
                     segmented_preview: SegmentedPreviewMode::Enabled,
+                    // macOS opts into ADR-0013 paging. Must stay equal to the panel's
+                    // painted row count (CandidatePanel.pageSize) or page-relative digit
+                    // selection breaks — `0` selects the tenth row only when page_size is 10.
+                    page_size: MACOS_PAGE_SIZE,
                     ..Default::default()
                 });
             if span_provider_active() {
@@ -317,7 +328,41 @@ impl MacosIMKSession {
         self.generation.fetch_add(1, Ordering::Relaxed); // invalidates any in-flight refine
         let evdev_keycode = keycode_mac_to_evdev(mac_keycode);
         let xkb_state = modifier_flags_to_xkb_state(modifier_flags);
+
+        // Up/Down jump a whole page on macOS (ADR-0018). Translated here rather than in
+        // the shared session so IBus and TSF keep their one-step Up/Down.
+        let page_direction = match keyval {
+            KEY_UP => -1,
+            KEY_DOWN => 1,
+            _ => 0,
+        };
+
         self.with_session(|s| {
+            if page_direction != 0 {
+                let snapshot = s.snapshot();
+                let len = snapshot.candidates.len();
+                if len > 0 {
+                    let selected = snapshot.selected_index.unwrap_or(0);
+                    let target =
+                        page_jump_target(selected, len, MACOS_PAGE_SIZE, page_direction);
+                    // Reach the target through the session's own cycling, so selection
+                    // bookkeeping (selection_touched, segment sync) stays consistent.
+                    let steps = (target as isize - selected as isize)
+                        .rem_euclid(len as isize) as usize;
+                    let mut result = SessionResult {
+                        consumed: true,
+                        ..SessionResult::default()
+                    };
+                    for _ in 0..steps {
+                        result = s.process_native_key_event(key_event(
+                            KEY_DOWN,
+                            keycode_mac_to_evdev(0),
+                            xkb_state,
+                        ));
+                    }
+                    return render_state(&s.snapshot(), &result, true);
+                }
+            }
             let result = s.process_native_key_event(key_event(keyval, evdev_keycode, xkb_state));
             render_state(&s.snapshot(), &result, true)
         })
@@ -474,6 +519,82 @@ pub fn keycode_mac_to_evdev(mac_keycode: u16) -> u32 {
         0x32 => 41, // kVK_ANSI_Grave → KEY_GRAVE
         _ => 0,
     }
+}
+
+/// Writes any Rust panic to a file before the process dies.
+///
+/// The release profile is `panic = "abort"`, so a panic kills the input method
+/// instantly — IMK relaunches it silently and macOS writes no usable crash report, so
+/// the user just sees the keyboard stop working for a moment. This hook makes such a
+/// death diagnosable: the message and location land in the log file below.
+fn install_panic_logger() {
+    use std::sync::Once;
+    static ONCE: Once = Once::new();
+    ONCE.call_once(|| {
+        let previous = std::panic::take_hook();
+        std::panic::set_hook(Box::new(move |info| {
+            let location = info
+                .location()
+                .map(|l| format!("{}:{}", l.file(), l.line()))
+                .unwrap_or_else(|| "<unknown>".to_owned());
+            let message = info.to_string();
+            if let Ok(mut file) = std::fs::OpenOptions::new()
+                .create(true)
+                .append(true)
+                .open(panic_log_path())
+            {
+                use std::io::Write;
+                let _ = writeln!(file, "[khmerime-panic] {location} :: {message}");
+            }
+            previous(info);
+        }));
+    });
+}
+
+/// Where `install_panic_logger` records panics.
+///
+/// The input method is sandboxed (required for third-party IMEs), so `$HOME` here is
+/// the app's container — the real path is
+/// `~/Library/Containers/com.khmerime.inputmethod.KhmerIMEMacOS/Data/Library/Logs/`.
+/// Writes outside the container are silently denied, which is why os_log and
+/// home-directory files both come up empty when debugging this process.
+fn panic_log_path() -> std::path::PathBuf {
+    let home = std::env::var("HOME").unwrap_or_else(|_| "/tmp".to_owned());
+    std::path::PathBuf::from(home).join("Library/Logs/khmerime-imk-panic.log")
+}
+
+/// Rows the macOS candidate panel paints per page. Single source of truth: it feeds
+/// `ImeSessionOptions.page_size` (so digit selection is page-relative, ADR-0013) and
+/// the Up/Down page jump (ADR-0018). `CandidatePanel.pageSize` on the Swift side must
+/// match this value.
+pub const MACOS_PAGE_SIZE: usize = 10;
+
+/// X11 keysyms for the arrow keys, as delivered by `KeyvalMapping` on the Swift side.
+const KEY_UP: u32 = 0xFF52;
+const KEY_DOWN: u32 = 0xFF54;
+
+/// The candidate index a page jump lands on (ADR-0018).
+///
+/// `direction` is +1 for Down (next page) and -1 for Up (previous page). The row
+/// within the page is preserved where possible and clamped to the destination page's
+/// length, so a short final page (the lone raw roman fallback) is reachable without
+/// overshooting. Pages wrap, matching the way Space wraps the selection.
+///
+/// This lives in the macOS adapter on purpose: the shared session's `handle_up` /
+/// `handle_down` stay one-step so IBus and TSF behavior is unchanged.
+pub fn page_jump_target(selected: usize, len: usize, page_size: usize, direction: isize) -> usize {
+    if len == 0 {
+        return 0;
+    }
+    let page_size = page_size.max(1);
+    let page_count = len.div_ceil(page_size);
+    let current_page = selected / page_size;
+    let row = selected % page_size;
+
+    let next_page = (current_page as isize + direction).rem_euclid(page_count as isize) as usize;
+    let page_start = next_page * page_size;
+    let page_len = (len - page_start).min(page_size);
+    page_start + row.min(page_len - 1)
 }
 
 /// Maps `NSEvent.modifierFlags` bits to XKB-style modifier state bits.
