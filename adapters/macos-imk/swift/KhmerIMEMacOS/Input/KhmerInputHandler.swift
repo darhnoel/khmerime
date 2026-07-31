@@ -27,6 +27,10 @@ final class KhmerInputHandler {
     /// Panel must hide (no candidates, no segments).
     var onPanelHide: (() -> Void)?
 
+    /// Whether the client currently holds a marked range, so the empty-string clear is
+    /// sent once on the marked → unmarked transition rather than on every render.
+    private var hasMarkedText = false
+
     // MARK: - Init
 
     init(client: TextClient, session: MacosImkSession) {
@@ -54,10 +58,24 @@ final class KhmerInputHandler {
     // MARK: - Key handling
 
     func handleKey(keyval: UInt32, macKeycode: UInt16, modifierFlags: UInt32) -> Bool {
+        // ⌘-combos (⌘A / ⌘C / ⌘V / ⌘Z …) are application commands, never text input.
+        // The session has no notion of Command — without this guard ⌘C arrives as a
+        // bare 'c', composes as Khmer, and reports itself consumed, swallowing the
+        // shortcut. Finish any live Composition first so the commit is not lost, then
+        // decline the event so macOS routes it to the application.
+        if modifierFlags & Self.commandKeyMask != 0 {
+            render(session.cancelComposition())
+            return false
+        }
+
         let state = session.handleEvent(keyval: keyval, macKeycode: macKeycode, modifierFlags: modifierFlags)
         render(state)
         return state.consumed
     }
+
+    /// `NSEvent.ModifierFlags.command` — the raw AppKit bit, kept here so the guard
+    /// works on the primitive the controller passes across the boundary.
+    private static let commandKeyMask: UInt32 = 1 << 20
 
     // MARK: - Cursor / mode
 
@@ -75,8 +93,18 @@ final class KhmerInputHandler {
         if let text = state.commitText, !text.isEmpty {
             client.insertText(text)
         }
-        if !state.preedit.isEmpty || state.commitText != nil {
+        // Mirror the preedit, and clear it exactly once when the composition ends.
+        // Both halves matter: skipping the empty call strands the last character in
+        // the client, while sending it on every render — including keys that never
+        // composed — spams clients that track marked state and wedges the picky ones
+        // (Notes stops accepting input). So: write while marking, and write the empty
+        // string only on the marked → unmarked transition.
+        if !state.preedit.isEmpty {
             client.setMarkedText(state.preedit)
+            hasMarkedText = true
+        } else if hasMarkedText {
+            client.setMarkedText("")
+            hasMarkedText = false
         }
         if state.candidates.isEmpty && state.segments.isEmpty {
             onPanelHide?()

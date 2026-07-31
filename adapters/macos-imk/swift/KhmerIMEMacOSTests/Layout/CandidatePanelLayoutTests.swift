@@ -11,6 +11,46 @@ final class CandidatePanelLayoutTests: XCTestCase {
     private let screen = CGRect(x: 0, y: 0, width: 1440, height: 900)
     private let panel = CGSize(width: 480, height: 120)
 
+    // ADR-0013 paging, macOS opting in at page_size 10. Painting every candidate made
+    // the panel tall enough that it could not fit below the caret, so the screen clamp
+    // overrode the caret anchor and parked it mid-screen.
+    func test_pageSlice_showsOnlyTheSelectedCandidatesPage() {
+        let all = (0..<21).map { "c\($0)" }
+
+        let firstPage = CandidatePanelLayout.pageSlice(candidates: all, selectedIndex: 0, pageSize: 10)
+
+        XCTAssertEqual(firstPage.rows, Array(all[0..<10]),
+            "a 21-candidate list must paint only the first 10 rows")
+        XCTAssertEqual(firstPage.selectedRow, 0,
+            "the selected candidate's row is page-relative")
+    }
+
+    // Space cycles the selection one at a time; when it crosses a page boundary the
+    // painted page flips with it (ADR-0013 — pagination emerges from cursor movement,
+    // there is no separate page key).
+    func test_pageSlice_flipsToTheSecondPageWhenSelectionCrossesTheBoundary() {
+        let all = (0..<21).map { "c\($0)" }
+
+        let secondPage = CandidatePanelLayout.pageSlice(candidates: all, selectedIndex: 10, pageSize: 10)
+
+        XCTAssertEqual(secondPage.rows, Array(all[10..<20]),
+            "selecting index 10 must flip to the second page")
+        XCTAssertEqual(secondPage.selectedRow, 0,
+            "index 10 is the first row of page two")
+    }
+
+    // The raw roman fallback is the last candidate (ADR-0013). A final short page must
+    // paint only what exists rather than padding or overrunning.
+    func test_pageSlice_lastPageIsShortNotPadded() {
+        let all = (0..<21).map { "c\($0)" }
+
+        let lastPage = CandidatePanelLayout.pageSlice(candidates: all, selectedIndex: 20, pageSize: 10)
+
+        XCTAssertEqual(lastPage.rows, ["c20"],
+            "the 21st candidate sits alone on a short final page")
+        XCTAssertEqual(lastPage.selectedRow, 0)
+    }
+
     func test_panelSitsBelowCaretWithoutOverlappingIt() {
         // Caret mid-screen with a real line height.
         let caret = CGRect(x: 200, y: 500, width: 2, height: 18)

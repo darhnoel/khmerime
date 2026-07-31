@@ -38,6 +38,27 @@ enum CandidatePanelLayout {
         return CGPoint(x: x, y: y)
     }
 
+    /// The rows the panel paints for the current selection, and where the selection
+    /// sits within them. macOS opts into ADR-0013 paging at `pageSize` 10: the page is
+    /// derived arithmetically from the selection (`selectedIndex / pageSize`), matching
+    /// the session's own page math, so digit keys line up with the visible rows.
+    ///
+    /// Bounding the row count is also what keeps the panel positionable — an unbounded
+    /// list grows taller than the space below the caret, and the screen clamp then
+    /// overrides the caret anchor entirely.
+    static func pageSlice<T>(
+        candidates: [T],
+        selectedIndex: Int,
+        pageSize: Int
+    ) -> (rows: [T], selectedRow: Int) {
+        let size = max(1, pageSize)
+        let index = max(0, min(selectedIndex, max(0, candidates.count - 1)))
+        let start = (index / size) * size
+        let end = min(start + size, candidates.count)
+        guard start < end else { return ([], 0) }
+        return (Array(candidates[start..<end]), index - start)
+    }
+
     /// The marked-text character index to ask the IMK client for via
     /// attributes(forCharacterIndex:lineHeightRectangle:). Targets the LAST glyph
     /// of the preedit so the line rect tracks the end of the composition (the

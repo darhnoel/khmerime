@@ -45,7 +45,7 @@
 //! | session_ready_state_is_false_before_warmup_completes          | TODO   |
 //! | session_segment_entries_populate_render_state                 | TODO   |
 
-use khmerime_macos_imk::{keycode_mac_to_evdev, MacosIMKSession, MacosRenderState};
+use khmerime_macos_imk::{keycode_mac_to_evdev, page_jump_target, MacosIMKSession, MacosRenderState};
 
 const NS_SHIFT_KEY_MASK: u32 = 1 << 17;
 
@@ -490,4 +490,75 @@ fn session_segment_entries_populate_render_state() {
         assert!(!seg.input.is_empty(), "segment input must be non-empty");
         assert!(!seg.output.is_empty(), "segment output must be non-empty");
     }
+}
+
+// ── Page navigation (ADR-0018) ────────────────────────────────────────────────
+// Up/Down jump a whole page on macOS. The math lives in the adapter so the shared
+// session — and therefore IBus and TSF — keep their one-step Up/Down behavior.
+
+#[test]
+fn page_jump_moves_a_whole_page_keeping_the_row() {
+    // 21 candidates, page size 10 → pages [0..10), [10..20), [20..21).
+    // From row 3 of page 1, Down lands on row 3 of page 2.
+    assert_eq!(page_jump_target(3, 21, 10, 1), 13);
+    // …and Up from there returns to row 3 of page 1.
+    assert_eq!(page_jump_target(13, 21, 10, -1), 3);
+}
+
+#[test]
+fn page_jump_clamps_to_a_short_final_page() {
+    // Page 3 holds only index 20 (the raw roman fallback). Jumping down from row 5
+    // of page 2 clamps to that page's single row rather than overshooting the list.
+    assert_eq!(page_jump_target(15, 21, 10, 1), 20);
+}
+
+#[test]
+fn page_jump_wraps_like_space_does() {
+    // Down from the last page wraps to the first (Space wraps via rem_euclid, so
+    // page jumping stays consistent with it).
+    assert_eq!(page_jump_target(20, 21, 10, 1), 0);
+    // Up from the first page wraps to the last.
+    assert_eq!(page_jump_target(3, 21, 10, -1), 20);
+}
+
+#[test]
+fn session_survives_long_space_autorepeat() {
+    // Held Space (key autorepeat) fires handle_event many times in a row, including
+    // on an empty composition where there are no candidates to cycle.
+    let s = session();
+    for _ in 0..200 {
+        let _ = s.handle_event(0x0020, 0, 0);
+    }
+    // …and again with a live composition, cycling far past the end of the list.
+    let _ = type_str(&s, "knhom");
+    for _ in 0..200 {
+        let _ = s.handle_event(0x0020, 0, 0);
+    }
+}
+
+#[test]
+fn page_jump_survives_a_stale_selection_past_the_end() {
+    // The candidate list shrinks as the user types, so a selection index captured
+    // before the shrink can exceed the new length. Underflowing here would abort the
+    // whole input method (release builds are panic = "abort").
+    assert_eq!(page_jump_target(50, 3, 10, 1), 0);
+    assert_eq!(page_jump_target(50, 3, 10, -1), 0);
+    // Degenerate inputs must not panic either.
+    assert_eq!(page_jump_target(0, 0, 10, 1), 0);
+    assert_eq!(page_jump_target(0, 1, 0, 1), 0);
+}
+
+
+
+#[test]
+fn live_keystroke_path_carries_a_latency_budget() {
+    // ADR-0005: the keystroke path must degrade rather than block. Without an explicit
+    // budget the live config inherits the 250 ms *refiner* default, and a long
+    // composition then stalls the keypress (measured ~544 ms at 15 chars before this was
+    // set; ~207 ms after). IBus's live path uses 75 ms; macOS matches it.
+    assert_eq!(
+        khmerime_macos_imk::macos_live_decoder_config().wfst_max_latency_ms,
+        75,
+        "the live keystroke decoder must keep the 75 ms interactive budget"
+    );
 }
