@@ -18,13 +18,24 @@ command -v xcodebuild >/dev/null 2>&1 || { echo "xcodebuild (Xcode) required" >&
 SIGN_ARGS=(CODE_SIGNING_ALLOWED=NO)
 [ "${KHMERIME_IOS_SIGN:-0}" = "1" ] && SIGN_ARGS=(-allowProvisioningUpdates)
 
+# Stamp the Product Version and a build number onto BOTH targets. The app and the
+# keyboard extension must carry identical versions or App Store Connect rejects the
+# upload, and every upload needs a build number that account has never used before —
+# so KHMERIME_IOS_BUILD_NUMBER must be bumped for each one (mirrors
+# KHMERIME_ANDROID_VERSION_CODE on the Play side).
+BUILD_NUMBER="${KHMERIME_IOS_BUILD_NUMBER:-1}"
+VERSION_ARGS=(
+	"MARKETING_VERSION=${VERSION}"
+	"CURRENT_PROJECT_VERSION=${BUILD_NUMBER}"
+)
+
 # 1. xcframework + xcodeproj (canonical build — reused)
 make -C "${ROOT_DIR}" platform-build-ios
 # 2. archive
 mkdir -p "${DIST_DIR}"
 xcodebuild -project "${ROOT_DIR}/adapters/ios-keyboard/swift/KhmerIME.xcodeproj" \
 	-scheme KhmerIME -configuration Release -destination 'generic/platform=iOS' \
-	-archivePath "${ARCHIVE}" "${SIGN_ARGS[@]}" archive
+	-archivePath "${ARCHIVE}" "${SIGN_ARGS[@]}" "${VERSION_ARGS[@]}" archive
 
-echo "built ${ARCHIVE}"
+echo "built ${ARCHIVE} (version ${VERSION}, build ${BUILD_NUMBER})"
 echo "  ship: xcodebuild -exportArchive -archivePath ${ARCHIVE} ... (needs a profile; see PACKAGING.md)"

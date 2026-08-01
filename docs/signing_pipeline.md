@@ -44,36 +44,43 @@ emits unsigned — that's expected under local-first).
 
 ---
 
-## Phase 2 — iOS: App Store / TestFlight  ⬜ not started
+## Phase 2 — iOS: App Store / TestFlight  ✅ wired · 🔒 blocked on Apple Distribution cert
 
 **Goal:** `dist/ios/*.xcarchive` → signed `.ipa` → uploaded to App Store Connect.
 Keyboards ship via the App Store only.
 
-**Current state:**
-- `scripts/platforms/ios/keyboard/build_archive.sh` builds an **unsigned** archive
-  (`CODE_SIGNING_ALLOWED=NO`); `KHMERIME_IOS_SIGN=1` archives signed *if* Xcode
-  automatic signing is already set up.
-- `adapters/ios-keyboard/ExportOptions.example.plist` exists (method `app-store`,
-  team 9289LTXAT7, automatic). **No `-exportArchive` step and no upload step wired.**
+**One command:**
+
+```bash
+make ios-release
+```
+
+It archives signed (`KHMERIME_IOS_SIGN=1`), exports the `.ipa`, then validates and
+uploads. Each half is gated by its config file, and an absent config degrades with
+instructions instead of failing — the same rule the macOS and Android flows follow:
+
+| Config (git-ignored)                              | Absent → |
+|---------------------------------------------------|----------|
+| `adapters/ios-keyboard/ExportOptions.plist`        | stop after the archive |
+| `adapters/ios-keyboard/appstore-upload.local.sh`   | export the `.ipa`, skip upload |
+
+Both have committed `*.example` templates to copy.
 
 **Credentials to obtain (you):**
-- **Apple Distribution** cert (you only have `Apple Development` today).
+- **Apple Distribution** cert — the current blocker. `security find-identity -v -p
+  codesigning` shows only `Apple Development` and `Developer ID Application`. Create it
+  in Xcode → Settings → Accounts → Manage Certificates → `+` → Apple Distribution.
 - **Distribution provisioning profiles for BOTH** the container app *and* the keyboard
   appex — two bundle IDs, both need a profile.
-- **App Store Connect API key** for CLI upload: `.p8` file + Key ID + Issuer ID.
+- **App Store Connect API key** for CLI upload: `.p8` + Key ID + Issuer ID, created at
+  App Store Connect → Users and Access → Integrations, **App Manager** role. Apple
+  serves the `.p8` once — save and back it up.
 
-**Files to touch:**
-- Copy `ExportOptions.example.plist` → `adapters/ios-keyboard/ExportOptions.plist` (git-ignored).
-- `build_archive.sh` (or a new `ios-package` step): after archiving, run
-  `xcodebuild -exportArchive -archivePath <archive> -exportOptionsPlist ExportOptions.plist -exportPath dist/ios` → `.ipa`.
-- Upload step: `xcrun altool --upload-app -f <ipa> --type ios --apiKey <KeyID> --apiIssuer <IssuerID>`
-  (or Transporter / `fastlane deliver`). Gate on the API-key env being present.
-
-**Done when:** archive exports a signed `.ipa` and it appears in App Store Connect /
-TestFlight.
+**Done when:** `make ios-release` uploads and the build appears in TestFlight
+(processing takes a few minutes after upload).
 
 **Gotcha:** the appex profile is the usual failure point — both app and keyboard must
-be covered or export fails.
+be covered or export fails. `xcodebuild`'s error names the offending bundle ID.
 
 ---
 

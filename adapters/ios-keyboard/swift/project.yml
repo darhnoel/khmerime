@@ -9,6 +9,19 @@ settings:
   base:
     SWIFT_VERSION: "5.0"
     IPHONEOS_DEPLOYMENT_TARGET: "16.0"
+    # iPhone only (1). Left unset, Xcode targets iPhone *and* iPad, which makes the
+    # App Store demand iPad screenshots and review the app on a device the keyboard
+    # layout has never been tested against. Raise to "1,2" when iPad is deliberately
+    # supported and verified.
+    TARGETED_DEVICE_FAMILY: "1"
+    # Version comes from the repo's Product Version, never a hardcoded plist value —
+    # the app and the keyboard extension must agree or App Store Connect rejects the
+    # upload. Both Info.plists read these via $(MARKETING_VERSION) /
+    # $(CURRENT_PROJECT_VERSION); release builds override them on the xcodebuild
+    # command line (see scripts/platforms/ios/keyboard/build_archive.sh), so these
+    # defaults only apply to local dev builds.
+    MARKETING_VERSION: "0.0.0"
+    CURRENT_PROJECT_VERSION: "1"
     CODE_SIGN_STYLE: Automatic
     CODE_SIGN_IDENTITY: "Apple Development"
     DEVELOPMENT_TEAM: "9289LTXAT7"
@@ -52,6 +65,9 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.khmerime.KhmerIME
+        # Must be set per-target: xcodegen writes its own "1,2" default onto every
+        # iOS target, and a target-level value overrides settings.base.
+        TARGETED_DEVICE_FAMILY: "1"
         INFOPLIST_FILE: KhmerIME/Info.plist
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         # App Group so the host-app Settings toggle and the keyboard extension share the Smart-mode
@@ -73,6 +89,9 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.khmerime.KhmerIME.Keyboard
+        # The appex must match the container app's device family, or the App Store
+        # rejects the pair as inconsistent.
+        TARGETED_DEVICE_FAMILY: "1"
         INFOPLIST_FILE: KhmerIMEKeyboard/Info.plist
         # Same App Group as the host app — the extension reads the shared Smart-mode preference.
         CODE_SIGN_ENTITLEMENTS: KhmerIMEKeyboard/KhmerIMEKeyboard.entitlements

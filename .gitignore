@@ -66,6 +66,7 @@ adapters/android-ime/app/src/main/res/drawable-nodpi/khmerime_logo_card.png
 adapters/macos-imk/macos-signing.local.mk
 adapters/android-ime/keystore.properties
 adapters/ios-keyboard/ExportOptions.plist
+adapters/ios-keyboard/appstore-upload.local.sh
 adapters/windows-tsf/signing.local.ps1
 # signing key material — never commit, anywhere in the tree
 *.jks
