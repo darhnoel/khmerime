@@ -1,4 +1,4 @@
-.PHONY: help web web-release web-phone web-local desktop stats suggest suggest-wfst suggest-shadow shadow-eval data-split data-build data-check lexicon-editor visualize-lexicon visualize-lexicon-streamlit download-page fmt test test-golden test-ui platform-check platform-check-linux platform-check-android platform-check-ios platform-check-macos platform-check-windows platform-ios-assets platform-android-assets platform-build-ios platform-test-ios platform-install-ios-sim platform-reinstall-ios-sim platform-install-ios-device platform-reinstall-ios-device platform-build-macos platform-diagnose-macos platform-install-macos platform-reinstall-macos platform-build-windows platform-install-windows platform-uninstall-windows platform-reinstall-windows platform-smoke-windows-notepad platform-smoke-windows-notepad-python windows-package linux-package macos-package android-package ios-package package ibus-install ibus-uninstall ibus-smoke paper-current paper-current-clean platform-test-android platform-build-android android-adb-device platform-install-android platform-reinstall-android setup-hooks
+.PHONY: help web web-release web-phone web-local desktop stats suggest suggest-wfst suggest-shadow shadow-eval data-split data-build data-check lexicon-editor visualize-lexicon visualize-lexicon-streamlit download-page fmt test test-golden test-ui platform-check platform-check-linux platform-check-android platform-check-ios platform-check-macos platform-check-windows platform-ios-assets platform-android-assets platform-build-ios platform-test-ios platform-install-ios-sim platform-reinstall-ios-sim platform-install-ios-device platform-reinstall-ios-device platform-build-macos platform-diagnose-macos platform-install-macos platform-reinstall-macos platform-build-windows platform-install-windows platform-uninstall-windows platform-reinstall-windows platform-smoke-windows-notepad platform-smoke-windows-notepad-python windows-package linux-package macos-package android-package ios-package ios-release package ibus-install ibus-uninstall ibus-smoke paper-current paper-current-clean platform-test-android platform-build-android android-adb-device platform-install-android platform-reinstall-android setup-hooks
 
 DX ?= dx
 PYTHON ?= python3
@@ -130,6 +130,7 @@ help:
 	"  make macos-package               Build the macOS .pkg (unsigned) under dist/macos/" \
 	"  make android-package             Build the Android release .aab under dist/android/" \
 	"  make ios-package                 Build the iOS .xcarchive (unsigned) under dist/ios/" \
+	"  make ios-release                 Signed archive -> .ipa -> App Store Connect (needs Apple Distribution cert)" \
 	"  make package                     Build every artifact this host can, into dist/ (see PACKAGING.md)" \
 	"  make ibus-install                Build and install KhmerIME IBus engine files (may use sudo)" \
 	"  make ibus-uninstall              Remove KhmerIME IBus engine files" \
@@ -480,6 +481,13 @@ android-package:
 
 ios-package:
 	bash scripts/platforms/ios/keyboard/build_archive.sh
+
+# Archive → signed .ipa → App Store Connect. Needs an Apple Distribution cert and
+# ExportOptions.plist; uploads only when appstore-upload.local.sh is present.
+# Archives signed (KHMERIME_IOS_SIGN=1) because an unsigned archive cannot be exported.
+ios-release:
+	KHMERIME_IOS_SIGN=1 bash scripts/platforms/ios/keyboard/build_archive.sh
+	bash scripts/platforms/ios/keyboard/export_ipa.sh
 
 # One command: build every distributable artifact THIS host can produce, into dist/.
 # No single host does all five — Apple targets need macOS, .deb needs Linux, .msi needs Windows.

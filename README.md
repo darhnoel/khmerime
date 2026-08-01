@@ -123,6 +123,20 @@ flows back through the adapter to update the preedit or commit text in the
 application. The adapter and the bridge mechanism differ per platform (see
 [docs/platforms/](docs/platforms/)).
 
+## Bring your own model
+
+The decoder is deterministic by design, but romanized Khmer is ambiguous — `kmean` has
+several valid readings and only context decides between them. So the engine exposes a
+seam where a learned model can propose word spans, behind a trait, off the keystroke hot
+path, under a latency budget, with the deterministic engine still holding the final say.
+
+With no provider registered the seam is inert and the keyboard behaves exactly as it does
+today. Plug one in and it starts influencing ranking, with model-derived candidates marked
+as such.
+
+If ambiguous-script input interests you, that seam is an open invitation:
+**[docs/model-provider-challenge.md](docs/model-provider-challenge.md)**.
+
 ```mermaid
 sequenceDiagram
     participant User
@@ -146,6 +160,8 @@ sequenceDiagram
 - [docs/platforms/](docs/platforms/) — per-platform native packaging and install
 - [docs/architecture/](docs/architecture/) — cross-platform performance patterns and subsystem design
 - [docs/adr/](docs/adr/) — architecture decision records
+- [docs/model-provider-challenge.md](docs/model-provider-challenge.md) — the span-proposal seam, and an invitation to plug your own model into it
+- [docs/known-limitations.md](docs/known-limitations.md) — behaviors that look like bugs but are not fixable here
 
 ## Data Credits
 
