@@ -18,7 +18,23 @@ class InMemoryTextProxy : TextProxy {
 
     override val textBeforeCursor: String get() = buffer.toString()
 
+    // Test-only selection model: setSelection(s) marks `s` as the trailing
+    // selected region of the field; deleteSelection() removes it.
+    private var selection: String? = null
+    fun setSelection(text: String) { selection = text }
+
+    override val selectedText: String? get() = selection
+
+    override fun deleteSelection() {
+        val s = selection ?: return
+        val at = buffer.lastIndexOf(s)
+        if (at >= 0) buffer.delete(at, at + s.length)
+        selection = null
+    }
+
     override fun insertText(text: String) {
+        // Inserting over a selection replaces it (real IME behavior).
+        deleteSelection()
         buffer.append(text)
     }
 

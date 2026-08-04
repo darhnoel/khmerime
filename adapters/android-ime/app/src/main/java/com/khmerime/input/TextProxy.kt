@@ -18,6 +18,16 @@ interface TextProxy {
 
     val textBeforeCursor: String?
 
+    // Non-null when the host field has a non-empty selection. Backspace (and any
+    // char insert) must replace the whole selection, not delete a single char —
+    // deleteSurroundingText(1,0) does not touch a selection. Default null keeps
+    // proxies that don't model selection (tests, simple fields) behaving as before.
+    val selectedText: String? get() = null
+
+    // Replace the current selection with nothing (bulk-delete selected text).
+    // Default no-op for proxies without selection support.
+    fun deleteSelection() {}
+
     // Performs the host field's Editor Action (Search / Go / Send / …) instead of
     // inserting text. Returns whether the field consumed it. See CONTEXT.md
     // "Editor Action".

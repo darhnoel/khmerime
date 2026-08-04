@@ -51,8 +51,14 @@ import androidx.core.view.WindowInsetsCompat
 
 class KhmerInputMethodService : InputMethodService() {
 
-    private val session = KhmerImeSession()
+    // PROCESS-WIDE singleton. The IME framework recreates this service on each
+    // keyboard show/hide, and a per-instance `KhmerImeSession()` rebuilt the full
+    // lexicon+stats every time (~1.5s, measured). The session is the stateless
+    // engine (per-editor state lives in the handler, rebuilt each onStartInput),
+    // so it is safe to build ONCE per process and reuse. (Mirrors the iOS rule:
+    // "A new Session must not reload the full lexicon.")
     private var handler: KhmerInputHandler? = null
+    private val mainHandler = android.os.Handler(android.os.Looper.getMainLooper())
 
     private var candidateStrip: LinearLayout? = null
     private var keyboardLayer: LinearLayout? = null
@@ -87,17 +93,24 @@ class KhmerInputMethodService : InputMethodService() {
 
     override fun onStartInput(info: EditorInfo, restarting: Boolean) {
         super.onStartInput(info, restarting)
-        // Honor the saved Standard/Smart choice. Inert without a registered provider (OSS build).
-        session.setModelMode(SmartModePreference.isEnabled(this))
-        val ic = currentInputConnection ?: return
-        val proxy = InputConnectionProxy(ic)
-        handler = KhmerInputHandler(proxy, session).also { h ->
-            h.enterBehavior = resolveEnterBehavior(info.imeOptions, info.inputType)
-            h.onRender = ::renderState
-            h.onTransition = ::renderKeyboardState
-            h.onSuggestCharacterReset = ::resetSuggestCharacterSuggestions
-            h.focusIn()
-        }
+        // Wire the handler when the shared session is ready. If it's already built
+        // (the common case after first launch) this runs synchronously; on the very
+        // first open it defers until the background build lands — the keyboard shows
+        // immediately and typing attaches a moment later. `handler == null` before
+        // then makes keystrokes safe no-ops (see onKey paths).
+        ensureSession({ s ->
+            // still focused on the same editor?
+            val ic = currentInputConnection ?: return@ensureSession
+            s.setModelMode(SmartModePreference.isEnabled(this))
+            val proxy = InputConnectionProxy(ic)
+            handler = KhmerInputHandler(proxy, s).also { h ->
+                h.enterBehavior = resolveEnterBehavior(info.imeOptions, info.inputType)
+                h.onRender = ::renderState
+                h.onTransition = ::renderKeyboardState
+                h.onSuggestCharacterReset = ::resetSuggestCharacterSuggestions
+                h.focusIn()
+            }
+        }, mainHandler)
     }
 
     // Enter behavior is resolved by the shared, unit-tested resolveEnterBehavior()
@@ -292,6 +305,33 @@ class KhmerInputMethodService : InputMethodService() {
         // edge-control weights; these approximate a typical phone row.
         const val REFERENCE_ROW_WIDTH = 360f
         const val KEY_GAP_PX = 6f
+
+        // Process-wide session singleton, built ONCE on a BACKGROUND thread.
+        // Two problems this solves:
+        //   1. per-instance sessions rebuilt the lexicon (~1.5s) every keyboard
+        //      open — the singleton reuses it, and makes set_model_mode's
+        //      "skip if already in this mode" guard actually work.
+        //   2. even the first build (~4.5s: lexicon + smart refiner) blocked the
+        //      main thread. Building it off-thread lets the keyboard open
+        //      instantly; onStartInput wires the handler once the session lands.
+        @Volatile private var sharedSession: KhmerImeSession? = null
+        private val sessionWaiters = java.util.concurrent.CopyOnWriteArrayList<(KhmerImeSession) -> Unit>()
+
+        // Kick the build once, off the main thread. Idempotent.
+        @Synchronized
+        fun ensureSession(onReady: (KhmerImeSession) -> Unit, main: android.os.Handler) {
+            sharedSession?.let { onReady(it); return }
+            sessionWaiters.add(onReady)
+            if (sessionWaiters.size > 1) return           // build already in flight
+            Thread({
+                val s = KhmerImeSession()
+                sharedSession = s
+                main.post {
+                    sessionWaiters.forEach { it(s) }
+                    sessionWaiters.clear()
+                }
+            }, "khmer-session-build").apply { isDaemon = true }.start()
+        }
     }
 
     private fun renderKeyboardState(state: KeyboardState) {
