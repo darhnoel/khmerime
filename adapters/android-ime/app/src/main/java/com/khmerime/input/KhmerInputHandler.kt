@@ -89,6 +89,21 @@ class KhmerInputHandler(
     }
 
     fun sendBackspace() {
+        // A selection deletes as a whole, regardless of mode. deleteSurroundingText
+        // (what deleteBackward uses) does not touch a selection, so bulk-delete of
+        // selected text was a no-op before this. Also drop any speculative roman
+        // buffer, since the field state we tracked is gone.
+        if (proxy.selectedText != null) {
+            proxy.deleteSelection()
+            if (romanBuffer.isNotEmpty()) {
+                romanBuffer = ""
+                dispatcher.onSession {
+                    val state = session.processBackspace()
+                    dispatcher.onMain { render(state) }
+                }
+            }
+            return
+        }
         if (keyboardState == KeyboardState.English) {
             proxy.deleteBackward()
             return

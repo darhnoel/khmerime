@@ -46,6 +46,32 @@ class KhmerInputHandlerBehaviorTest {
         assertTrue("focusIn + focusOut must leave text empty", textField.text.isEmpty())
     }
 
+    // ── Selection delete ───────────────────────────────────────────────────────
+
+    @Test
+    fun backspaceDeletesEntireSelectionNotOneChar() {
+        val (handler, textField) = makeHandler()
+        textField.insertText("hello world")
+        textField.setSelection("world")   // "world" is selected
+
+        handler.sendBackspace()
+
+        assertEquals(
+            "backspace with a selection must delete the whole selection",
+            "hello ", textField.text,
+        )
+    }
+
+    @Test
+    fun backspaceWithoutSelectionStillDeletesOneChar() {
+        val (handler, textField) = makeHandler()
+        textField.insertText("abc")
+
+        handler.sendBackspace()
+
+        assertEquals("backspace with no selection deletes a single char", "ab", textField.text)
+    }
+
     // ── Tracer bullet ──────────────────────────────────────────────────────────
 
     @Test
