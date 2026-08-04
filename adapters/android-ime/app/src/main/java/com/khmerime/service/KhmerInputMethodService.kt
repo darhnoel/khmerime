@@ -122,6 +122,20 @@ class KhmerInputMethodService : InputMethodService() {
         super.onFinishInput()
     }
 
+    // Fired when the cursor/selection changes — including when the host clears the
+    // field externally (search-box ✖, select-all + delete). The handler resets the
+    // composition + strip if our speculative roman no longer matches the field, so
+    // stale suggestions don't linger after an external clear.
+    override fun onUpdateSelection(
+        oldSelStart: Int, oldSelEnd: Int, newSelStart: Int, newSelEnd: Int,
+        candidatesStart: Int, candidatesEnd: Int,
+    ) {
+        super.onUpdateSelection(
+            oldSelStart, oldSelEnd, newSelStart, newSelEnd, candidatesStart, candidatesEnd,
+        )
+        handler?.externalTextDidChange()
+    }
+
     // ── View creation ──────────────────────────────────────────────────────────
 
     override fun onCreateInputView(): View {

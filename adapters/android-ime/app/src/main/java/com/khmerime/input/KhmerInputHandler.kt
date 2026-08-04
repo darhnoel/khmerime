@@ -53,6 +53,29 @@ class KhmerInputHandler(
         session.focusOut()
     }
 
+    // Called by the service on onUpdateSelection — an external/host change to the
+    // field (search-box ✖, select-all + delete, tap elsewhere). If we have a live
+    // roman buffer but the text before the cursor no longer ends with it, the
+    // field was cleared/changed outside the keyboard: reset the composition and
+    // clear the suggestion strip. Mirrors iOS KeyboardInputHandler.textDidChange.
+    fun externalTextDidChange() {
+        if (romanBuffer.isEmpty()) return
+        // Our speculative roman is inserted at the cursor, so if the field wasn't
+        // changed externally the text before the cursor still ends with it.
+        val before = proxy.textBeforeCursor ?: ""
+        if (before.endsWith(romanBuffer)) return
+        // External clear/change: reset composition + strip.
+        romanBuffer = ""
+        modelRefiner.cancel()
+        dispatcher.onSession {
+            session.processEnter()               // flush/reset the session composition
+            dispatcher.onMain {
+                render(KhmerRenderState())        // empty strip: no candidates/preedit/segments
+                if (keyboardState == KeyboardState.SuggestCharacter) transitionTo(KeyboardState.Qwerty)
+            }
+        }
+    }
+
     // ── Key actions ───────────────────────────────────────────────────────────
 
     fun sendChar(ch: String) {

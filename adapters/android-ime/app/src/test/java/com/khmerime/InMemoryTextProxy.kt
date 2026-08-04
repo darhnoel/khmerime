@@ -42,6 +42,13 @@ class InMemoryTextProxy : TextProxy {
         if (buffer.isNotEmpty()) buffer.deleteCharAt(buffer.length - 1)
     }
 
+    // Test-only: simulate the host clearing the field outside the keyboard
+    // (search-box ✖, select-all + delete). The keyboard is not told via a key.
+    fun clearExternally() {
+        buffer.setLength(0)
+        selection = null
+    }
+
     override fun performEditorAction(actionId: Int): Boolean {
         lastEditorAction = actionId
         return true
