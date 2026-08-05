@@ -30,16 +30,16 @@ final class GlassKeyButtonTests: XCTestCase {
             "each touchesBegan must fire onPress — rapid overlapping taps must both register")
     }
 
-    func test_touchesBegan_performsOneKeyHaptic() {
+    func test_touchesBegan_performsOneSystemInputFeedback() {
         let btn = GlassKeyButton()
         btn.configureForTesting(runner: synchronousRunner)
-        var haptics = 0
-        btn.configureHapticsForTesting { haptics += 1 }
+        var feedbackCount = 0
+        btn.configureInputFeedbackForTesting { feedbackCount += 1 }
 
         btn.touchesBegan(Set(), with: nil)
         btn.touchesEnded(Set(), with: nil)
 
-        XCTAssertEqual(haptics, 1)
+        XCTAssertEqual(feedbackCount, 1)
     }
 
     // The press animation scales the button to 92%. UIKit hit-tests through the

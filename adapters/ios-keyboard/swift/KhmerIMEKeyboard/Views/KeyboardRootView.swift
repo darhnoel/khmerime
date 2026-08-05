@@ -1,5 +1,9 @@
 import UIKit
 
+final class KeyboardInputHostView: UIInputView, UIInputViewAudioFeedback {
+    var enableInputClicksWhenVisible: Bool { true }
+}
+
 protocol KeyboardStripDisplaying: AnyObject {
     func render(_ state: IosRenderState, romanBuffer: String)
     func clear()
