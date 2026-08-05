@@ -30,6 +30,13 @@ IOS_ABA_DEST = IOS_ASSETS / "ABAQR.imageset/aba.png"
 
 ANDROID_LOGO_PNG = ROOT / "adapters/android-ime/app/src/main/res/drawable-nodpi/khmerime_logo_card.png"
 ANDROID_RES = ROOT / "adapters/android-ime/app/src/main/res"
+ANDROID_MARK_SOURCE = ROOT / "logo/logo_design.icon/Assets/logo.png"
+ANDROID_ICON_BACKGROUND = (189, 111, 89)  # #BD6F59
+ANDROID_ICON_SIZE = 1024
+# Pixel Launcher zooms adaptive foregrounds during presentation. Keep the artwork
+# comfortably inside Android's theoretical 66/108 dp safe zone so the keyboard's
+# lower bar remains visible under real launcher masks and motion effects.
+ANDROID_SAFE_ZONE = 500
 
 # Legacy raster launcher-icon sizes (px) per density bucket (Android pre-26 fallback).
 ANDROID_MIPMAP_SIZES = {
@@ -73,11 +80,11 @@ def generate_ios_assets() -> None:
 def generate_android_assets() -> None:
     source = default_icon_source()
     copy_square_png(source, ANDROID_LOGO_PNG, "Android LogoCard")
-    generate_android_launcher_icons(source)
+    generate_android_launcher_icons(ANDROID_MARK_SOURCE)
 
 
-def generate_android_launcher_icons(source: Path) -> None:
-    """Wire the launcher/store icon from the same canonical logo iOS uses.
+def generate_android_launcher_icons(mark_source: Path) -> None:
+    """Generate a native adaptive icon from the canonical transparent mark.
 
     Adaptive icon (API 26+): a foreground drawable on a solid background color pulled
     from the logo, referenced by mipmap-anydpi-v26/*.xml — the launcher masks and
@@ -86,23 +93,15 @@ def generate_android_launcher_icons(source: Path) -> None:
     is unavailable (CI/bootstrap), they're skipped with a warning since adaptive
     covers all supported devices.
     """
-    width, height, bit_depth, color_type, rows = read_png_rows(source)
-    # Pull the adaptive-icon background color from the logo's own background (RGBA
-    # source); RGB sources have no alpha to sample, so fall back to the brand orange.
-    background = (
-        icon_background(rows, width, height, bit_depth)
-        if color_type == 6
-        else (226, 143, 88)
-    )
+    if not mark_source.exists():
+        raise RuntimeError(f"Android mark source is missing: {mark_source}")
 
-    # Adaptive: solid background color + foreground = the logo (flattened to RGB).
-    # Foreground is a density-independent raster in drawable-nodpi; the launcher
-    # scales it per device.
-    background_hex = "#%02X%02X%02X" % background
+    background_hex = "#%02X%02X%02X" % ANDROID_ICON_BACKGROUND
     write_adaptive_icon_resources(background_hex)
     fg_dest = ANDROID_RES / "drawable-nodpi/ic_launcher_foreground.png"
     fg_dest.parent.mkdir(parents=True, exist_ok=True)
-    flatten_png_alpha(source, fg_dest)
+    foreground_rows = android_foreground_rows(mark_source)
+    write_rgba_png(fg_dest, ANDROID_ICON_SIZE, ANDROID_ICON_SIZE, foreground_rows)
     print(f"generated {fg_dest.relative_to(ROOT)}")
 
     # Legacy raster fallback (pre-26).
@@ -113,13 +112,89 @@ def generate_android_launcher_icons(source: Path) -> None:
             file=sys.stderr,
         )
         return
-    flat_source = fg_dest  # the RGB foreground; also serves as the legacy square icon
+    with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as tmp:
+        flat_source = Path(tmp.name)
+    flat_rows = composite_rgba_rows(foreground_rows, ANDROID_ICON_BACKGROUND)
+    write_rgb_png(flat_source, ANDROID_ICON_SIZE, ANDROID_ICON_SIZE, flat_rows)
     for bucket, size in ANDROID_MIPMAP_SIZES.items():
         for name in ("ic_launcher", "ic_launcher_round"):
             dest = ANDROID_RES / f"mipmap-{bucket}" / f"{name}.webp"
             dest.parent.mkdir(parents=True, exist_ok=True)
             resize_to_webp(flat_source, dest, size)
+    flat_source.unlink(missing_ok=True)
     print(f"generated legacy raster launcher icons ({len(ANDROID_MIPMAP_SIZES)} densities)")
+
+
+def android_foreground_rows(source: Path) -> list[bytes]:
+    """Fit and optically centre the letter and keyboard motif independently."""
+    width, height, bit_depth, color_type, rows = read_png_rows(source)
+    if color_type != 6:
+        raise RuntimeError("Android mark must be a transparent RGBA PNG")
+    pixels = [rgba_samples(row, bit_depth) for row in rows]
+
+    occupied_rows = [y for y, row in enumerate(pixels) if any(pixel[3] for pixel in row)]
+    if not occupied_rows:
+        raise RuntimeError("Android mark is empty")
+    # The largest transparent horizontal gap separates the Khmer letter from the
+    # keyboard/Morse motif. Treating them as two pieces lets both share a true
+    # optical centre even when their source canvases differ.
+    split_after = max(
+        zip(occupied_rows, occupied_rows[1:]), key=lambda pair: pair[1] - pair[0]
+    )[0]
+    groups = [(occupied_rows[0], split_after), (next(y for y in occupied_rows if y > split_after), occupied_rows[-1])]
+    boxes = [alpha_bounds(pixels, y0, y1) for y0, y1 in groups]
+    combined_height = boxes[0][3] - boxes[0][1] + 1 + boxes[1][3] - boxes[1][1] + 1
+    source_gap = boxes[1][1] - boxes[0][3] - 1
+    combined_height += source_gap
+    widest = max(box[2] - box[0] + 1 for box in boxes)
+    scale = min(ANDROID_SAFE_ZONE / widest, ANDROID_SAFE_ZONE / combined_height)
+
+    scaled = [resize_crop_rgba(pixels, box, scale) for box in boxes]
+    gap = round(source_gap * scale)
+    total_height = len(scaled[0]) + gap + len(scaled[1])
+    top = (ANDROID_ICON_SIZE - total_height) // 2
+    canvas = [bytearray(ANDROID_ICON_SIZE * 4) for _ in range(ANDROID_ICON_SIZE)]
+    for piece in scaled:
+        piece_width = len(piece[0]) // 4
+        left = (ANDROID_ICON_SIZE - piece_width) // 2
+        for row in piece:
+            canvas[top][left * 4 : left * 4 + len(row)] = row
+            top += 1
+        if piece is scaled[0]:
+            top += gap
+    return [bytes(row) for row in canvas]
+
+
+def alpha_bounds(pixels: list[list[tuple[int, int, int, int]]], y0: int, y1: int) -> tuple[int, int, int, int]:
+    points = [(x, y) for y in range(y0, y1 + 1) for x, pixel in enumerate(pixels[y]) if pixel[3]]
+    return min(x for x, _ in points), y0, max(x for x, _ in points), y1
+
+
+def resize_crop_rgba(
+    pixels: list[list[tuple[int, int, int, int]]], box: tuple[int, int, int, int], scale: float
+) -> list[bytes]:
+    left, top, right, bottom = box
+    source_width, source_height = right - left + 1, bottom - top + 1
+    target_width, target_height = max(1, round(source_width * scale)), max(1, round(source_height * scale))
+    output = []
+    for target_y in range(target_height):
+        source_y = min(bottom, top + int(target_y / scale))
+        row = bytearray()
+        for target_x in range(target_width):
+            source_x = min(right, left + int(target_x / scale))
+            row.extend(pixels[source_y][source_x])
+        output.append(bytes(row))
+    return output
+
+
+def composite_rgba_rows(rows: list[bytes], background: tuple[int, int, int]) -> list[bytes]:
+    output = []
+    for row in rows:
+        rgb = bytearray()
+        for red, green, blue, alpha in rgba_samples(row, 8):
+            rgb.extend(composite(channel, bg, alpha) for channel, bg in zip((red, green, blue), background))
+        output.append(bytes(rgb))
+    return output
 
 
 def write_adaptive_icon_resources(background_hex: str) -> None:
@@ -447,11 +522,19 @@ def paeth(left: int, up: int, up_left: int) -> int:
 
 
 def write_rgb_png(path: Path, width: int, height: int, rows: list[bytes]) -> None:
+    write_png(path, width, height, 2, rows)
+
+
+def write_rgba_png(path: Path, width: int, height: int, rows: list[bytes]) -> None:
+    write_png(path, width, height, 6, rows)
+
+
+def write_png(path: Path, width: int, height: int, color_type: int, rows: list[bytes]) -> None:
     def chunk(name: bytes, payload: bytes) -> bytes:
         crc = binascii.crc32(name + payload) & 0xFFFFFFFF
         return struct.pack(">I", len(payload)) + name + payload + struct.pack(">I", crc)
 
-    ihdr = struct.pack(">IIBBBBB", width, height, 8, 2, 0, 0, 0)
+    ihdr = struct.pack(">IIBBBBB", width, height, 8, color_type, 0, 0, 0)
     raw = b"".join(b"\x00" + row for row in rows)
     path.write_bytes(
         PNG_SIGNATURE

@@ -20,13 +20,14 @@
             android:paddingEnd="40dp"
             android:paddingBottom="32dp">
 
-            <TextView
+            <ImageView
                 android:layout_width="64dp"
                 android:layout_height="64dp"
-                android:gravity="center"
-                android:text="⌨"
-                android:textColor="@color/brand_amber"
-                android:textSize="36sp" />
+                android:contentDescription="@null"
+                android:importantForAccessibility="no"
+                android:padding="6dp"
+                android:src="@drawable/ic_tip_keyboard"
+                android:tint="@color/brand_amber" />
 
             <TextView
                 android:layout_width="match_parent"
@@ -67,13 +68,14 @@
             android:paddingTop="32dp"
             android:paddingBottom="32dp">
 
-            <TextView
+            <ImageView
                 android:layout_width="64dp"
                 android:layout_height="64dp"
-                android:gravity="center"
-                android:text="📝"
-                android:textColor="@color/brand_amber"
-                android:textSize="36sp" />
+                android:contentDescription="@null"
+                android:importantForAccessibility="no"
+                android:padding="6dp"
+                android:src="@drawable/ic_tip_text"
+                android:tint="@color/brand_amber" />
 
             <TextView
                 android:layout_width="match_parent"
@@ -114,13 +116,14 @@
             android:paddingTop="32dp"
             android:paddingBottom="32dp">
 
-            <TextView
+            <ImageView
                 android:layout_width="64dp"
                 android:layout_height="64dp"
-                android:gravity="center"
-                android:text="🔤"
-                android:textColor="@color/brand_amber"
-                android:textSize="36sp" />
+                android:contentDescription="@null"
+                android:importantForAccessibility="no"
+                android:padding="6dp"
+                android:src="@drawable/ic_tip_character"
+                android:tint="@color/brand_amber" />
 
             <TextView
                 android:layout_width="match_parent"
@@ -161,13 +164,14 @@
             android:paddingTop="32dp"
             android:paddingBottom="32dp">
 
-            <TextView
+            <ImageView
                 android:layout_width="64dp"
                 android:layout_height="64dp"
-                android:gravity="center"
-                android:text="🌐"
-                android:textColor="@color/brand_amber"
-                android:textSize="36sp" />
+                android:contentDescription="@null"
+                android:importantForAccessibility="no"
+                android:padding="6dp"
+                android:src="@drawable/ic_tip_globe"
+                android:tint="@color/brand_amber" />
 
             <TextView
                 android:layout_width="match_parent"
