@@ -18,10 +18,13 @@ data class PhraseAlternative(
 )
 
 object KeyboardPresentationSpec {
-    // The live roman string already provides immediate typing feedback. While its
-    // deferred decode is pending, reserve both suggestion rows and keep their last
-    // decoded contents in place instead of collapsing the chrome.
-    fun pendingDecodeChromeRows(): ChromeRows = ChromeRows.StripAndCandidate
+    // The live roman string is immediate typing feedback, so reserve the roman strip
+    // while its decode is pending — but NOT the candidate row. Hardcoding
+    // StripAndCandidate reserved two rows even on the first keystroke (no candidates
+    // yet), leaving an empty second row that never collapsed — the "2 rows of space"
+    // divergence from iOS. The real decode expands to StripAndCandidate when
+    // candidates actually exist.
+    fun pendingDecodeChromeRows(): ChromeRows = ChromeRows.StripOnly
 
     fun suggestionCandidates(state: KhmerRenderState): List<String> = state.candidates
 

@@ -17,10 +17,11 @@ import org.junit.Test
 
 class KeyboardPresentationSpecTest {
     @Test
-    fun pendingDecodeKeepsBothSuggestionRowsVisible() {
+    fun pendingDecodeReservesOnlyTheRomanStripNotAnEmptyCandidateRow() {
         assertEquals(
-            "roman typing feedback must not collapse either suggestion row",
-            ChromeRows.StripAndCandidate,
+            "while decode is pending, reserve only the roman strip — reserving the " +
+                "candidate row too left an empty second row that never collapsed",
+            ChromeRows.StripOnly,
             KeyboardPresentationSpec.pendingDecodeChromeRows(),
         )
     }

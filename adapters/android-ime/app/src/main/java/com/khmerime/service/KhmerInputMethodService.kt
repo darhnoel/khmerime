@@ -66,6 +66,7 @@ class KhmerInputMethodService : InputMethodService() {
     private var preeditStrip: PreeditStripView? = null
     private var systemBottomSpacer: View? = null
     private var candidateScroll: View? = null
+    private var currentChromeRows: ChromeRows? = null
     private var currentLayer = KeyboardLayer.Qwerty
 
     private val candidateChipPool = ViewPool<SuggestionChipView>(
@@ -146,6 +147,10 @@ class KhmerInputMethodService : InputMethodService() {
         // the old hierarchy can be garbage-collected, and so sync() re-adds
         // chips to the new candidate strip instead of leaving them on the old.
         candidateChipPool.clear()
+        // Fresh views have their XML-default visibility, so the cached chrome state no
+        // longer reflects them — reset it or the applyChrome guard could skip the first
+        // real apply after a rebuild.
+        currentChromeRows = null
         applyWindowBlur()
         val root = layoutInflater.inflate(R.layout.keyboard, null)
         root.setBackgroundColor(Color.TRANSPARENT)
@@ -378,10 +383,19 @@ class KhmerInputMethodService : InputMethodService() {
     // Three-state input chrome (parity with iOS): collapse the rows a mode is not
     // using so the keyboard reclaims their height. See KeyboardPresentationSpec.chromeRows.
     private fun applyChrome(rows: ChromeRows) {
+        // Skip if the row config is unchanged (parity with iOS setChromeRows' guard).
+        // Without this, every keystroke re-applied visibility — and with GONE that is a
+        // relayout each time, so fast typing made the keyboard flicker. Only a real
+        // transition touches the layout now.
+        if (rows == currentChromeRows) return
+        currentChromeRows = rows
+        // GONE, not INVISIBLE: a collapsed row must reclaim its height, not sit there
+        // as a transparent-but-space-occupying gap (the "empty 2 rows" bug). INVISIBLE
+        // keeps the layout slot; GONE removes it so the keyboard shrinks.
         preeditStrip?.visibility =
-            if (rows == ChromeRows.StripAndCandidate || rows == ChromeRows.StripOnly) View.VISIBLE else View.INVISIBLE
+            if (rows == ChromeRows.StripAndCandidate || rows == ChromeRows.StripOnly) View.VISIBLE else View.GONE
         candidateScroll?.visibility =
-            if (rows == ChromeRows.CandidateOnly || rows == ChromeRows.StripAndCandidate) View.VISIBLE else View.INVISIBLE
+            if (rows == ChromeRows.CandidateOnly || rows == ChromeRows.StripAndCandidate) View.VISIBLE else View.GONE
     }
 
     private fun resetSuggestCharacterSuggestions() {
@@ -398,7 +412,15 @@ class KhmerInputMethodService : InputMethodService() {
     // disabled until renderState replaces them with the new composition's choices.
     private fun renderPendingDecode(roman: String) {
         preeditStrip?.showPendingRoman(roman)
-        applyChrome(KeyboardPresentationSpec.pendingDecodeChromeRows())
+        // Don't shrink the chrome mid-composition. The real decode alternates between
+        // StripOnly and StripAndCandidate; if the pending state forced a smaller row set
+        // on each keystroke, the height flapped between 1 and 2 rows while typing. Reserve
+        // at least what's already showing — only ever grow to StripOnly, never collapse a
+        // visible candidate row. The next real decode settles the exact rows.
+        val current = currentChromeRows
+        val pending = KeyboardPresentationSpec.pendingDecodeChromeRows()
+        val rows = if (current == ChromeRows.StripAndCandidate) current else pending
+        applyChrome(rows)
         setCandidateInteractionEnabled(false)
     }
 
