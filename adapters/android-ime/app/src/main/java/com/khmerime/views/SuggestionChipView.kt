@@ -115,6 +115,7 @@ class SuggestionChipView(context: Context) : View(context) {
     }
 
     override fun onTouchEvent(event: MotionEvent): Boolean {
+        if (!isEnabled) return false
         when (event.actionMasked) {
             MotionEvent.ACTION_UP -> {
                 if (event.x in 0f..width.toFloat() && event.y in 0f..height.toFloat()) onClick()

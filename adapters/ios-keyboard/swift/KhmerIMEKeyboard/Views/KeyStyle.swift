@@ -17,9 +17,16 @@ class GlassKeyButton: UIButton {
     var previewLabel: String?
     var onPreviewChanged: ((GlassKeyButton, String?) -> Void)?
 
+    private static let keyHapticGenerator: UIImpactFeedbackGenerator = {
+        let generator = UIImpactFeedbackGenerator(style: .light)
+        generator.prepare()
+        return generator
+    }()
+
     private var isPressed = false
     private var isPreviewVisible = false
     private var pressAnimator: GlassKeyPressAnimator?
+    private var hapticForTesting: (() -> Void)?
 
     private lazy var blurView: UIVisualEffectView = {
         let v = UIVisualEffectView(effect: UIBlurEffect(style: .systemUltraThinMaterial))
@@ -46,7 +53,12 @@ class GlassKeyButton: UIButton {
         )
     }
 
+    func configureHapticsForTesting(_ performHaptic: @escaping () -> Void) {
+        hapticForTesting = performHaptic
+    }
+
     override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
+        performKeyPressHaptic()
         showPreviewIfNeeded()
         onPress?()
         super.touchesBegan(touches, with: event)
@@ -107,6 +119,15 @@ class GlassKeyButton: UIButton {
         }
         pressAnimator = animator
         return animator
+    }
+
+    private func performKeyPressHaptic() {
+        if let hapticForTesting {
+            hapticForTesting()
+            return
+        }
+        Self.keyHapticGenerator.impactOccurred(intensity: 0.5)
+        Self.keyHapticGenerator.prepare()
     }
 
     private func applySquish(_ squish: CGFloat) {

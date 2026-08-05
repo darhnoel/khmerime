@@ -17,9 +17,9 @@ import com.khmerime.layout.KeyViewFactory
 import com.khmerime.layout.KeyViewStyle
 import com.khmerime.layout.QwertyCharacterGridLayout
 import com.khmerime.views.BackspaceKeyView
-import com.khmerime.views.GlassKeyView
 import com.khmerime.views.GlassKeyViewFactory
-import com.khmerime.views.KeyPreviewPopup
+import com.khmerime.views.GlassKeyView
+import com.khmerime.views.KeyPreviewOverlay
 import com.khmerime.views.PreeditStripView
 import com.khmerime.views.SuggestionChipView
 import com.khmerime.views.ViewPool
@@ -62,7 +62,7 @@ class KhmerInputMethodService : InputMethodService() {
 
     private var candidateStrip: LinearLayout? = null
     private var keyboardLayer: LinearLayout? = null
-    private var keyPreviewPopup: KeyPreviewPopup? = null
+    private var keyPreviewOverlay: KeyPreviewOverlay? = null
     private var preeditStrip: PreeditStripView? = null
     private var systemBottomSpacer: View? = null
     private var candidateScroll: View? = null
@@ -106,6 +106,7 @@ class KhmerInputMethodService : InputMethodService() {
             handler = KhmerInputHandler(proxy, s).also { h ->
                 h.enterBehavior = resolveEnterBehavior(info.imeOptions, info.inputType)
                 h.onRender = ::renderState
+                h.onPendingDecode = ::renderPendingDecode
                 h.onTransition = ::renderKeyboardState
                 h.onSuggestCharacterReset = ::resetSuggestCharacterSuggestions
                 h.focusIn()
@@ -154,7 +155,7 @@ class KhmerInputMethodService : InputMethodService() {
         candidateStrip = root.findViewById(R.id.candidate_strip)
         candidateScroll = root.findViewById(R.id.candidate_scroll)
         keyboardLayer = root.findViewById(R.id.keyboard_layer)
-        keyPreviewPopup = KeyPreviewPopup(this)
+        keyPreviewOverlay = root.findViewById(R.id.key_preview_overlay)
         systemBottomSpacer = root.findViewById(R.id.system_bottom_spacer)
         applySystemBottomSpacing(root)
         renderKeyboardLayer(KeyboardLayer.Qwerty)
@@ -162,9 +163,7 @@ class KhmerInputMethodService : InputMethodService() {
     }
 
     override fun onFinishInputView(finishingInput: Boolean) {
-        // Dismiss any live preview bubble so its PopupWindow doesn't leak when the
-        // keyboard hides mid-press.
-        keyPreviewPopup?.hide()
+        keyPreviewOverlay?.hideImmediately()
         super.onFinishInputView(finishingInput)
     }
 
@@ -297,8 +296,8 @@ class KhmerInputMethodService : InputMethodService() {
         // Keypress preview bubble on letter keys only (iOS parity — no bubble over
         // space/backspace/return/toggles).
         if (key.action == KeyboardKeyAction.Insert && view is GlassKeyView) {
-            view.onPreviewShow = { keyPreviewPopup?.show(it, it.previewLabel) }
-            view.onPreviewHide = { keyPreviewPopup?.hide() }
+            view.onPreviewShow = { keyPreviewOverlay?.show(it, it.previewLabel) }
+            view.onPreviewHide = { keyPreviewOverlay?.hide() }
         }
         view.layoutParams = LinearLayout.LayoutParams(
             0,
@@ -380,9 +379,9 @@ class KhmerInputMethodService : InputMethodService() {
     // using so the keyboard reclaims their height. See KeyboardPresentationSpec.chromeRows.
     private fun applyChrome(rows: ChromeRows) {
         preeditStrip?.visibility =
-            if (rows == ChromeRows.StripAndCandidate || rows == ChromeRows.StripOnly) View.VISIBLE else View.GONE
+            if (rows == ChromeRows.StripAndCandidate || rows == ChromeRows.StripOnly) View.VISIBLE else View.INVISIBLE
         candidateScroll?.visibility =
-            if (rows == ChromeRows.CandidateOnly || rows == ChromeRows.StripAndCandidate) View.VISIBLE else View.GONE
+            if (rows == ChromeRows.CandidateOnly || rows == ChromeRows.StripAndCandidate) View.VISIBLE else View.INVISIBLE
     }
 
     private fun resetSuggestCharacterSuggestions() {
@@ -393,6 +392,15 @@ class KhmerInputMethodService : InputMethodService() {
     }
 
     // ── Render ─────────────────────────────────────────────────────────────────
+
+    // Deferred keystroke pending its decode: the roman is already immediate feedback,
+    // so keep both last-decoded suggestion rows visible. Their stale tap targets stay
+    // disabled until renderState replaces them with the new composition's choices.
+    private fun renderPendingDecode(roman: String) {
+        preeditStrip?.showPendingRoman(roman)
+        applyChrome(KeyboardPresentationSpec.pendingDecodeChromeRows())
+        setCandidateInteractionEnabled(false)
+    }
 
     private fun renderState(state: KhmerRenderState) {
         val keyboardState = handler?.keyboardState
@@ -427,6 +435,14 @@ class KhmerInputMethodService : InputMethodService() {
                     onClick = { handler?.selectCandidate(index) },
                 )
             }
+        }
+        setCandidateInteractionEnabled(true)
+    }
+
+    private fun setCandidateInteractionEnabled(enabled: Boolean) {
+        val strip = candidateStrip ?: return
+        for (index in 0 until strip.childCount) {
+            strip.getChildAt(index).isEnabled = enabled
         }
     }
 }

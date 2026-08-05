@@ -17,6 +17,15 @@ import org.junit.Test
 
 class KeyboardPresentationSpecTest {
     @Test
+    fun pendingDecodeKeepsBothSuggestionRowsVisible() {
+        assertEquals(
+            "roman typing feedback must not collapse either suggestion row",
+            ChromeRows.StripAndCandidate,
+            KeyboardPresentationSpec.pendingDecodeChromeRows(),
+        )
+    }
+
+    @Test
     fun suggestCharacterCandidatesStayInSuggestionBarWithoutReplacingQwertyLayout() {
         val state = KhmerRenderState(
             candidates = listOf("ក", "ខ"),

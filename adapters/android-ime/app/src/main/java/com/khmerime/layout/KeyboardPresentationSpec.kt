@@ -18,6 +18,11 @@ data class PhraseAlternative(
 )
 
 object KeyboardPresentationSpec {
+    // The live roman string already provides immediate typing feedback. While its
+    // deferred decode is pending, reserve both suggestion rows and keep their last
+    // decoded contents in place instead of collapsing the chrome.
+    fun pendingDecodeChromeRows(): ChromeRows = ChromeRows.StripAndCandidate
+
     fun suggestionCandidates(state: KhmerRenderState): List<String> = state.candidates
 
     // The Phrase Wheel cards (ADR-0015): whole-phrase alternatives EXCLUDING the one the

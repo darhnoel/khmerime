@@ -677,4 +677,43 @@ class KhmerInputHandlerBehaviorTest {
             textField.text,
         )
     }
+
+    // ── Deferred decode ─────────────────────────────────────────────────────────
+
+    @Test
+    fun typingSignalsPendingDecodeUntilPause() {
+        val dispatcher = RecordingDispatcher()
+        val (handler, _) = makeHandler(dispatcher)
+        var pendingRomans = mutableListOf<String>()
+        var lastCandidates: List<String> = emptyList()
+        handler.onPendingDecode = { roman -> pendingRomans.add(roman) }
+        handler.onRender = { state -> lastCandidates = state.candidates }
+
+        // Type fast: each key reports the growing roman and does NOT
+        // decode candidates yet — the delayed recompute is captured, not run.
+        type("nhom", into = handler)
+        assertEquals(
+            "every keystroke reports its live roman while suggestions stay in place",
+            listOf("n", "nh", "nho", "nhom"), pendingRomans,
+        )
+        assertTrue("no candidates are decoded while typing", lastCandidates.isEmpty())
+
+        // Typing pauses → the debounced decode fires once → real candidates appear.
+        dispatcher.runPendingDelayed()
+        assertTrue("the deferred decode produces real candidates on pause", lastCandidates.isNotEmpty())
+    }
+
+    @Test
+    fun fastTypingDecodesOnlyOnceOnPauseNotPerKey() {
+        val dispatcher = RecordingDispatcher()
+        val (handler, _) = makeHandler(dispatcher)
+        var renders = 0
+        handler.onRender = { renders++ }
+
+        type("nhom", into = handler)
+        assertEquals("no decode/render happens during fast typing", 0, renders)
+
+        dispatcher.runPendingDelayed()
+        assertEquals("exactly one decode/render lands on pause", 1, renders)
+    }
 }

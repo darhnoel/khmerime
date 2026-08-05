@@ -30,6 +30,18 @@ final class GlassKeyButtonTests: XCTestCase {
             "each touchesBegan must fire onPress — rapid overlapping taps must both register")
     }
 
+    func test_touchesBegan_performsOneKeyHaptic() {
+        let btn = GlassKeyButton()
+        btn.configureForTesting(runner: synchronousRunner)
+        var haptics = 0
+        btn.configureHapticsForTesting { haptics += 1 }
+
+        btn.touchesBegan(Set(), with: nil)
+        btn.touchesEnded(Set(), with: nil)
+
+        XCTAssertEqual(haptics, 1)
+    }
+
     // The press animation scales the button to 92%. UIKit hit-tests through the
     // scaled geometry, so a re-tap landing in the outer "dead ring" (inside the
     // layout frame but outside the shrunken visual) is routed past the button and

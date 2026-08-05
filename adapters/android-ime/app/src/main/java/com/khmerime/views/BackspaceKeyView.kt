@@ -36,6 +36,7 @@ class BackspaceKeyView(
     override fun onTouchEvent(event: MotionEvent): Boolean {
         when (event.actionMasked) {
             MotionEvent.ACTION_DOWN -> {
+                performKeyPressHaptic()
                 pressAnimator.press()
                 repeater.beginHold()
                 return true

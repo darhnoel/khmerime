@@ -1,16 +1,20 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    android:orientation="vertical"
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:background="#D1D5DB">
+
+    <LinearLayout
+        android:orientation="vertical"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content">
 
     <!-- Preedit strip: roman row + tappable Khmer segment row -->
     <com.khmerime.views.PreeditStripView
         android:id="@+id/preedit_strip"
         android:layout_width="match_parent"
         android:layout_height="60dp"
-        android:visibility="gone"
+        android:visibility="invisible"
         android:background="@android:color/transparent" />
 
     <!-- Candidate strip -->
@@ -18,7 +22,7 @@
         android:id="@+id/candidate_scroll"
         android:layout_width="match_parent"
         android:layout_height="52dp"
-        android:visibility="gone"
+        android:visibility="invisible"
         android:background="@android:color/transparent"
         android:scrollbars="none">
 
@@ -45,4 +49,15 @@
         android:layout_width="match_parent"
         android:layout_height="12dp" />
 
-</LinearLayout>
+    </LinearLayout>
+
+    <com.khmerime.views.KeyPreviewOverlay
+        android:id="@+id/key_preview_overlay"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:visibility="gone"
+        android:clickable="false"
+        android:focusable="false"
+        android:importantForAccessibility="no" />
+
+</FrameLayout>
