@@ -20,7 +20,6 @@ class GlassKeyButton: UIButton {
     private var isPressed = false
     private var isPreviewVisible = false
     private var pressAnimator: GlassKeyPressAnimator?
-    private var inputFeedbackForTesting: (() -> Void)?
 
     private lazy var blurView: UIVisualEffectView = {
         let v = UIVisualEffectView(effect: UIBlurEffect(style: .systemUltraThinMaterial))
@@ -47,12 +46,7 @@ class GlassKeyButton: UIButton {
         )
     }
 
-    func configureInputFeedbackForTesting(_ performFeedback: @escaping () -> Void) {
-        inputFeedbackForTesting = performFeedback
-    }
-
     override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
-        performKeyPressFeedback()
         showPreviewIfNeeded()
         onPress?()
         super.touchesBegan(touches, with: event)
@@ -113,14 +107,6 @@ class GlassKeyButton: UIButton {
         }
         pressAnimator = animator
         return animator
-    }
-
-    private func performKeyPressFeedback() {
-        if let inputFeedbackForTesting {
-            inputFeedbackForTesting()
-            return
-        }
-        UIDevice.current.playInputClick()
     }
 
     private func applySquish(_ squish: CGFloat) {

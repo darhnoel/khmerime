@@ -5,9 +5,7 @@ protocol KeyboardStripDisplaying: AnyObject {
     func clear()
 }
 
-final class KeyboardRootView: UIView, UIInputViewAudioFeedback {
-    var enableInputClicksWhenVisible: Bool { true }
-
+final class KeyboardRootView: UIView {
     private let stripDisplay: KeyboardStripDisplaying
     private let candidateRowDisplay: KeyboardCandidateRowDisplaying
     private let qwertyView: UIView

@@ -3,12 +3,6 @@ import XCTest
 
 final class KeyboardRootViewTests: XCTestCase {
 
-    func test_keyboardRootEnablesSystemInputClicks() {
-        let rootView = makeRootView().rootView
-
-        XCTAssertTrue(rootView.enableInputClicksWhenVisible)
-    }
-
     func test_initialStateShowsQwertyLayerOnly() {
         let fixture = makeRootView()
 
