@@ -361,6 +361,17 @@ class KeyboardViewController: UIInputViewController {
     }
 }
 
+// MARK: - Key-press feedback
+
+// The controller's own view IS the extension's UIInputView. Conforming here (not on
+// KeyboardRootView, which is a plain subview) is what lets UIDevice.playInputClick()
+// — called from GlassKeyButton.touchesBegan — actually emit the user's configured
+// keyboard sound/haptic, WITHOUT changing the custom layout. Requires Full Access and
+// the user's keyboard-feedback setting; otherwise it silently no-ops.
+extension KeyboardViewController: UIInputViewAudioFeedback {
+    var enableInputClicksWhenVisible: Bool { true }
+}
+
 // MARK: - UIView helper
 
 private extension UIView {
