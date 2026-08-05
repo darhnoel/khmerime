@@ -86,10 +86,6 @@ class KeyboardViewController: UIInputViewController {
 
     // MARK: - Lifecycle
 
-    override func loadView() {
-        view = KeyboardInputHostView(frame: .zero, inputViewStyle: .keyboard)
-    }
-
     override func viewDidLoad() {
         super.viewDidLoad()
         setupKeyboardResources(reason: "launch")

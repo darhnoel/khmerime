@@ -1,15 +1,13 @@
 import UIKit
 
-final class KeyboardInputHostView: UIInputView, UIInputViewAudioFeedback {
-    var enableInputClicksWhenVisible: Bool { true }
-}
-
 protocol KeyboardStripDisplaying: AnyObject {
     func render(_ state: IosRenderState, romanBuffer: String)
     func clear()
 }
 
-final class KeyboardRootView: UIView {
+final class KeyboardRootView: UIView, UIInputViewAudioFeedback {
+    var enableInputClicksWhenVisible: Bool { true }
+
     private let stripDisplay: KeyboardStripDisplaying
     private let candidateRowDisplay: KeyboardCandidateRowDisplaying
     private let qwertyView: UIView
