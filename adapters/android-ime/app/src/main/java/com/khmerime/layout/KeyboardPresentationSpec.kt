@@ -106,16 +106,19 @@ object KeyboardPresentationSpec {
         if (keyboardState == KeyboardState.SuggestCharacter) {
             return if (state.candidates.isEmpty()) ChromeRows.None else ChromeRows.CandidateOnly
         }
+        // Collapse gate must match iOS KeyboardChrome.rows exactly: the strip is worth
+        // its height when the roman hint OR the segments OR the preedit have content —
+        // not romanHint alone. Checking only romanHint made Android auto-collapse the
+        // strip in states where iOS keeps it (segments/preedit present, hint empty).
+        val hasStripContent =
+            romanHint.isNotEmpty() || state.segments.isNotEmpty() || state.preedit.isNotEmpty()
+        if (!hasStripContent) return ChromeRows.None
         // The candidate row is the Phrase Wheel (alternatives) during normal composition,
         // or the word candidate row while editing a segment. When neither has anything to
         // show, the strip stands alone (StripOnly) so the row collapses (ADR-0015).
         val candidateRowVisible =
             if (state.segmentEditActive) state.candidates.isNotEmpty()
             else phraseAlternatives(state).isNotEmpty()
-        return when {
-            candidateRowVisible -> ChromeRows.StripAndCandidate
-            romanHint.isNotEmpty() -> ChromeRows.StripOnly
-            else -> ChromeRows.None
-        }
+        return if (candidateRowVisible) ChromeRows.StripAndCandidate else ChromeRows.StripOnly
     }
 }
