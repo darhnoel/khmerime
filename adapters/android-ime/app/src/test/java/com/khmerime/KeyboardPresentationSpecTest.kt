@@ -17,6 +17,16 @@ import org.junit.Test
 
 class KeyboardPresentationSpecTest {
     @Test
+    fun pendingDecodeReservesOnlyTheRomanStripNotAnEmptyCandidateRow() {
+        assertEquals(
+            "while decode is pending, reserve only the roman strip — reserving the " +
+                "candidate row too left an empty second row that never collapsed",
+            ChromeRows.StripOnly,
+            KeyboardPresentationSpec.pendingDecodeChromeRows(),
+        )
+    }
+
+    @Test
     fun suggestCharacterCandidatesStayInSuggestionBarWithoutReplacingQwertyLayout() {
         val state = KhmerRenderState(
             candidates = listOf("ក", "ខ"),
@@ -296,6 +306,32 @@ class KeyboardPresentationSpecTest {
         assertEquals(
             ChromeRows.StripOnly,
             KeyboardPresentationSpec.chromeRows(KeyboardState.Qwerty, "khn", state),
+        )
+    }
+
+    @Test
+    fun chromeRowsKeepsStripWhenSegmentsPresentButRomanHintEmpty() {
+        // iOS parity: the strip is worth its height when segments (or preedit) exist,
+        // even if the roman hint resolves empty. Android used to collapse to None here,
+        // auto-collapsing the strip earlier than iOS.
+        val state = KhmerRenderState(
+            segments = listOf(seg("khnhom", "ខ្ញុំ")),
+            candidates = emptyList(),
+        )
+        assertEquals(
+            "segments present must keep the strip (StripOnly), matching iOS",
+            ChromeRows.StripOnly,
+            KeyboardPresentationSpec.chromeRows(KeyboardState.Qwerty, "", state),
+        )
+    }
+
+    @Test
+    fun chromeRowsKeepsStripWhenPreeditPresentButRomanHintEmpty() {
+        val state = KhmerRenderState(preedit = "khnhom", candidates = emptyList())
+        assertEquals(
+            "preedit present must keep the strip (StripOnly), matching iOS",
+            ChromeRows.StripOnly,
+            KeyboardPresentationSpec.chromeRows(KeyboardState.Qwerty, "", state),
         )
     }
 

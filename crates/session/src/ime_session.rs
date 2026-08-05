@@ -433,6 +433,20 @@ impl ImeSession {
         self.process_key_event(event.keyval, event.keycode, event.state)
     }
 
+    // Run the candidate decode for the current composition. Pairs with
+    // `process_printable_deferred`: call this once typing pauses so the UI can
+    // replace its preserved suggestions with current candidates and segments.
+    pub fn recompute_now(&mut self) -> SessionResult {
+        if self.composition_raw.is_empty() {
+            return SessionResult::default();
+        }
+        self.recompute_composition_state();
+        SessionResult {
+            consumed: true,
+            ..SessionResult::default()
+        }
+    }
+
     pub fn process_key_event(&mut self, keyval: u32, keycode: u32, state: u32) -> SessionResult {
         if !self.enabled {
             return SessionResult::default();
@@ -509,6 +523,20 @@ impl ImeSession {
     }
 
     fn handle_printable(&mut self, ch: char) -> SessionResult {
+        self.handle_printable_inner(ch, false)
+    }
+
+    // Append a roman char WITHOUT running the expensive candidate decode. The
+    // caller must run `recompute_now()` once typing pauses to produce candidates.
+    // Used by the Android deferred path so fast typing doesn't pay the per-key
+    // decode (300–800 ms) it was queueing before. Single-keycap auto-commit
+    // (digit/symbol) still decodes eagerly — it needs candidates to fire and is
+    // cheap on a 1-char composition.
+    pub fn process_printable_deferred(&mut self, ch: char) -> SessionResult {
+        self.handle_printable_inner(ch, true)
+    }
+
+    fn handle_printable_inner(&mut self, ch: char, deferred: bool) -> SessionResult {
         let normalized = if ch.is_ascii_alphabetic() {
             ch.to_ascii_lowercase()
         } else {
@@ -518,7 +546,13 @@ impl ImeSession {
             return self.handle_segment_edit_printable(normalized);
         }
         self.composition_raw.push(normalized);
-        self.recompute_composition_state();
+        // Skip the decode when deferring, unless this could be a single-keycap
+        // auto-commit (needs candidates now, and a 1-char decode is cheap).
+        let eager = !deferred
+            || (self.composition_raw.chars().count() == 1 && is_single_keycap_char(normalized));
+        if eager {
+            self.recompute_composition_state();
+        }
         if self.should_auto_commit_single_keycap(normalized) {
             let commit_text = self.selected_or_raw_fallback();
             self.reset();
@@ -754,6 +788,40 @@ mod tests {
 
     use crate::adapter_contract::{InputMode, NativeKeyEvent, SessionCommand};
     use crate::test_support::{paged_session, session, type_ascii};
+
+    #[test]
+    fn deferred_printable_appends_without_decoding_then_recompute_matches_eager() {
+        // Eager reference: type the whole word the normal way.
+        let mut eager = session();
+        type_ascii(&mut eager, "khnhom");
+        let eager_candidates = eager.snapshot().candidates;
+        assert!(!eager_candidates.is_empty(), "eager path must produce candidates");
+
+        // Deferred: same chars, no per-key decode.
+        let mut deferred = session();
+        for ch in "khnhom".chars() {
+            deferred.process_printable_deferred(ch);
+        }
+        assert_eq!(deferred.snapshot().raw_preedit, "khnhom", "roman keeps up");
+        assert!(
+            deferred.snapshot().candidates.is_empty(),
+            "no decode ran during deferred typing"
+        );
+
+        // On pause, one recompute produces the same candidates as the eager path.
+        deferred.recompute_now();
+        assert_eq!(deferred.snapshot().candidates, eager_candidates);
+    }
+
+    #[test]
+    fn deferred_single_keycap_still_auto_commits() {
+        // A digit is a single-keycap auto-commit char; deferred must still decode
+        // it (1-char, cheap) so `1` -> `១` commits instantly.
+        let mut session = session();
+        let result = session.process_printable_deferred('1');
+        assert_eq!(result.commit_text.as_deref(), Some("១"));
+        assert!(session.snapshot().preedit.is_empty());
+    }
 
     #[test]
     fn command_surface_accepts_native_key_event() {

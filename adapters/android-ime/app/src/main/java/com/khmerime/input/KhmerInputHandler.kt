@@ -25,6 +25,21 @@ class KhmerInputHandler(
     // same `render` path so a refined result updates the strip/preview.
     private val modelRefiner = ModelRefiner(session, dispatcher) { state -> render(state) }
 
+    // Deferred path: fast typing appends roman without the expensive per-key candidate
+    // decode. Instead each keystroke keeps the last suggestions and (re)schedules one decode
+    // that runs once typing pauses (RECOMPUTE_DEBOUNCE_MS). See ModelRefiner for the
+    // same debounce+revision guard shape.
+    private val recomputer = ModelRefiner(
+        session,
+        dispatcher,
+        debounceMs = RECOMPUTE_DEBOUNCE_MS,
+        op = { s, _ -> s.recomputeNow() },
+    ) { state ->
+        render(state)
+        // The decode has landed; in Smart mode refine it once (still off the hot path).
+        if (romanBuffer.isNotEmpty() && session.isModelMode()) modelRefiner.schedule(romanBuffer)
+    }
+
     // Counts how many roman-buffer chars were deleted by backspaceHoldFired()
     // without a matching session call. backspaceHoldEnded() drains this with
     // one batched session block, then resets to 0.
@@ -39,6 +54,9 @@ class KhmerInputHandler(
     var enterBehavior: EnterBehavior = EnterBehavior.Newline
 
     var onRender: ((KhmerRenderState) -> Unit)? = null
+    // Fired when a deferred keystroke is pending its decode. Carries the live roman
+    // so the UI can update it without discarding the last decoded suggestion rows.
+    var onPendingDecode: ((String) -> Unit)? = null
     var onTransition: ((KeyboardState) -> Unit)? = null
     var onSuggestCharacterReset: (() -> Unit)? = null
 
@@ -50,7 +68,32 @@ class KhmerInputHandler(
 
     fun focusOut() {
         modelRefiner.cancel()
+        recomputer.cancel()
         session.focusOut()
+    }
+
+    // Called by the service on onUpdateSelection — an external/host change to the
+    // field (search-box ✖, select-all + delete, tap elsewhere). If we have a live
+    // roman buffer but the text before the cursor no longer ends with it, the
+    // field was cleared/changed outside the keyboard: reset the composition and
+    // clear the suggestion strip. Mirrors iOS KeyboardInputHandler.textDidChange.
+    fun externalTextDidChange() {
+        if (romanBuffer.isEmpty()) return
+        // Our speculative roman is inserted at the cursor, so if the field wasn't
+        // changed externally the text before the cursor still ends with it.
+        val before = proxy.textBeforeCursor ?: ""
+        if (before.endsWith(romanBuffer)) return
+        // External clear/change: reset composition + strip.
+        romanBuffer = ""
+        modelRefiner.cancel()
+        recomputer.cancel()
+        dispatcher.onSession {
+            session.processEnter()               // flush/reset the session composition
+            dispatcher.onMain {
+                render(KhmerRenderState())        // empty strip: no candidates/preedit/segments
+                if (keyboardState == KeyboardState.SuggestCharacter) transitionTo(KeyboardState.Qwerty)
+            }
+        }
     }
 
     // ── Key actions ───────────────────────────────────────────────────────────
@@ -71,19 +114,24 @@ class KhmerInputHandler(
         trailingSpace = false
         proxy.insertText(ch)
         romanBuffer += ch
+        // Deferred path: append the roman WITHOUT the per-key candidate decode (the
+        // 300–800 ms cost that made fast typing churn). Update the roman immediately and
+        // let `recomputer` run the decode once typing pauses. Single-keycap auto-commit
+        // (digit/symbol) still comes back from the deferred call and is applied at once.
+        onPendingDecode?.invoke(romanBuffer)
         dispatcher.onSession {
-            val state = session.processCharacter(ch)
+            val state = session.processCharacterDeferred(ch)
             dispatcher.onMain {
                 val committed = state.commitText
                 if (committed != null && committed.isNotEmpty()) {
                     proxy.deleteBackward(romanBuffer.length)
                     proxy.insertText(committed)
                     romanBuffer = ""
+                    recomputer.cancel()
+                    render(state)
+                    return@onMain
                 }
-                render(state)
-                // Smart mode: schedule a debounced model refine of the live composition,
-                // off this keystroke's hot path. No-op in Standard (no visible refiner).
-                if (romanBuffer.isNotEmpty() && session.isModelMode()) modelRefiner.schedule(romanBuffer)
+                if (romanBuffer.isNotEmpty()) recomputer.schedule(romanBuffer)
             }
         }
     }
@@ -127,6 +175,9 @@ class KhmerInputHandler(
         }
         if (romanBuffer.isNotEmpty()) romanBuffer = romanBuffer.dropLast(1)
         proxy.deleteBackward()
+        // Drop any deferred decode from prior keystrokes so its stale result can't
+        // land after this backspace's fresh decode.
+        recomputer.cancel()
         dispatcher.onSession {
             val state = session.processBackspace()
             dispatcher.onMain { render(state) }
@@ -291,6 +342,7 @@ class KhmerInputHandler(
     private fun commitComposition() {
         if (keyboardState == KeyboardState.SuggestCharacter) return
         modelRefiner.cancel()
+        recomputer.cancel()
         val state = session.processEnter()
         val khmer = if (state.segments.isEmpty()) {
             state.commitText ?: ""

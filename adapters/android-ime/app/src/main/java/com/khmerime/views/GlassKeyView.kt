@@ -6,8 +6,10 @@ import android.graphics.Canvas
 import android.graphics.Paint
 import android.graphics.RectF
 import android.util.TypedValue
+import android.view.HapticFeedbackConstants
 import android.view.MotionEvent
 import android.view.View
+import android.view.ViewConfiguration
 
 open class GlassKeyView(
     context: Context,
@@ -43,10 +45,14 @@ open class GlassKeyView(
         invalidate()
     }
 
-    private val animator = GlassKeyPressAnimator(onUpdate = { applySquish(it) })
+    protected open fun performKeyPressHaptic() {
+        performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
+    }
 
-    // Keypress preview bubble (iOS parity). Set by the service for letter keys only;
-    // fired on press/release so an overlay can float a magnified label above the key.
+    private val animator = GlassKeyPressAnimator(onUpdate = { applySquish(it) })
+    private val touchSlop = ViewConfiguration.get(context).scaledTouchSlop.toFloat()
+
+    // Keypress preview bubble. Set by the service for character-producing keys.
     var onPreviewShow: ((GlassKeyView) -> Unit)? = null
     var onPreviewHide: (() -> Unit)? = null
 
@@ -76,6 +82,7 @@ open class GlassKeyView(
     override fun onTouchEvent(event: MotionEvent): Boolean {
         when (event.actionMasked) {
             MotionEvent.ACTION_DOWN -> {
+                performKeyPressHaptic()
                 animator.press()
                 onPreviewShow?.invoke(this)
                 return true
@@ -83,7 +90,11 @@ open class GlassKeyView(
             MotionEvent.ACTION_UP -> {
                 animator.release()
                 onPreviewHide?.invoke()
-                if (event.x in 0f..width.toFloat() && event.y in 0f..height.toFloat()) onClick()
+                if (event.x in -touchSlop..width + touchSlop &&
+                    event.y in -touchSlop..height + touchSlop
+                ) {
+                    onClick()
+                }
                 return true
             }
             MotionEvent.ACTION_CANCEL -> {

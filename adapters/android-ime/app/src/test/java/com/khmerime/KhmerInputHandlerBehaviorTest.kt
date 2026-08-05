@@ -72,6 +72,42 @@ class KhmerInputHandlerBehaviorTest {
         assertEquals("backspace with no selection deletes a single char", "ab", textField.text)
     }
 
+    // ── External clear (e.g. search-box ✖) ──────────────────────────────────────
+
+    @Test
+    fun externalFieldClearResetsCompositionAndStrip() {
+        val (handler, textField) = makeHandler()
+        var lastCandidates: List<String> = listOf("stale")
+        handler.onRender = { state -> lastCandidates = state.candidates }
+        type("nh", into = handler)                       // build a composition + candidates
+
+        // The host clears the field externally (search-box ✖ / select-all-delete);
+        // the keyboard is told via a selection update, not a key.
+        textField.clearExternally()
+        handler.externalTextDidChange()
+
+        assertTrue(
+            "after an external field clear, the suggestion strip must be cleared; got $lastCandidates",
+            lastCandidates.isEmpty(),
+        )
+
+        // And the buffer is reset: typing starts a FRESH composition, not appended
+        // to the stale one.
+        type("k", into = handler)
+        assertEquals("roman preedit restarts fresh after external clear", "k", textField.text)
+    }
+
+    @Test
+    fun externalTextDidChangeIsNoOpWhenBufferStillMatches() {
+        val (handler, textField) = makeHandler()
+        type("nh", into = handler)
+        val before = textField.text
+
+        handler.externalTextDidChange()                  // field still ends with our buffer
+
+        assertEquals("no external change → field untouched", before, textField.text)
+    }
+
     // ── Tracer bullet ──────────────────────────────────────────────────────────
 
     @Test
@@ -640,5 +676,44 @@ class KhmerInputHandlerBehaviorTest {
             "nhom",
             textField.text,
         )
+    }
+
+    // ── Deferred decode ─────────────────────────────────────────────────────────
+
+    @Test
+    fun typingSignalsPendingDecodeUntilPause() {
+        val dispatcher = RecordingDispatcher()
+        val (handler, _) = makeHandler(dispatcher)
+        var pendingRomans = mutableListOf<String>()
+        var lastCandidates: List<String> = emptyList()
+        handler.onPendingDecode = { roman -> pendingRomans.add(roman) }
+        handler.onRender = { state -> lastCandidates = state.candidates }
+
+        // Type fast: each key reports the growing roman and does NOT
+        // decode candidates yet — the delayed recompute is captured, not run.
+        type("nhom", into = handler)
+        assertEquals(
+            "every keystroke reports its live roman while suggestions stay in place",
+            listOf("n", "nh", "nho", "nhom"), pendingRomans,
+        )
+        assertTrue("no candidates are decoded while typing", lastCandidates.isEmpty())
+
+        // Typing pauses → the debounced decode fires once → real candidates appear.
+        dispatcher.runPendingDelayed()
+        assertTrue("the deferred decode produces real candidates on pause", lastCandidates.isNotEmpty())
+    }
+
+    @Test
+    fun fastTypingDecodesOnlyOnceOnPauseNotPerKey() {
+        val dispatcher = RecordingDispatcher()
+        val (handler, _) = makeHandler(dispatcher)
+        var renders = 0
+        handler.onRender = { renders++ }
+
+        type("nhom", into = handler)
+        assertEquals("no decode/render happens during fast typing", 0, renders)
+
+        dispatcher.runPendingDelayed()
+        assertEquals("exactly one decode/render lands on pause", 1, renders)
     }
 }

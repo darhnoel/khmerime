@@ -56,3 +56,21 @@ skip candidate decode) and a `decode_candidates()` call. Then in
 `KhmerInputHandler.sendChar`, insert immediately and debounce `decode_candidates`
 like the model refiner. Keep commit synchronous so auto-commit still feels
 instant.
+
+## Update: debounce was tried and REJECTED (2026-08-04)
+
+Debouncing the decode (append char via a no-decode path, run the decode ~90 ms
+after a typing pause) was implemented and measured on-device — **it made normal
+typing worse** and was reverted.
+
+Why it failed: each decode (`recompute_composition_state`) is **300–800 ms**
+regardless of when it runs. Normal typing has >90 ms between keys, so every key
+still triggered its own decode — now with an added 90 ms delay before it. The
+debounce only helps typists faster than the window, which real users are not.
+
+**The real enemy is the per-decode cost itself (300–800 ms), not its timing.**
+Debouncing cannot fix that. Before any further attempt, PROFILE which phase of
+`recompute_composition_state` eats the time (segmentation vs candidate build vs
+WFST search — note `wfst_max_latency_ms=250` did NOT change it, so the cost is
+likely upstream of the WFST cap). Fix at the source (make the decode faster or
+incremental), not by moving when it runs.

@@ -6,6 +6,12 @@ class GlassKeyButton: UIButton {
     // hit-test dead ring the scale would otherwise create (see point(inside:with:)).
     static let pressScaleDepth: CGFloat = 0.08
 
+    private static let keyHapticGenerator: UIImpactFeedbackGenerator = {
+        let generator = UIImpactFeedbackGenerator(style: .light)
+        generator.prepare()
+        return generator
+    }()
+
     var isGlassActive = false {
         didSet { updateGlassAppearance() }
     }
@@ -20,6 +26,7 @@ class GlassKeyButton: UIButton {
     private var isPressed = false
     private var isPreviewVisible = false
     private var pressAnimator: GlassKeyPressAnimator?
+    private var inputFeedbackForTesting: (() -> Void)?
 
     private lazy var blurView: UIVisualEffectView = {
         let v = UIVisualEffectView(effect: UIBlurEffect(style: .systemUltraThinMaterial))
@@ -46,7 +53,12 @@ class GlassKeyButton: UIButton {
         )
     }
 
+    func configureInputFeedbackForTesting(_ performFeedback: @escaping () -> Void) {
+        inputFeedbackForTesting = performFeedback
+    }
+
     override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
+        performKeyPressFeedback()
         showPreviewIfNeeded()
         onPress?()
         super.touchesBegan(touches, with: event)
@@ -107,6 +119,16 @@ class GlassKeyButton: UIButton {
         }
         pressAnimator = animator
         return animator
+    }
+
+    private func performKeyPressFeedback() {
+        if let inputFeedbackForTesting {
+            inputFeedbackForTesting()
+            return
+        }
+        UIDevice.current.playInputClick()
+        Self.keyHapticGenerator.impactOccurred(intensity: 0.5)
+        Self.keyHapticGenerator.prepare()
     }
 
     private func applySquish(_ squish: CGFloat) {

@@ -22,50 +22,41 @@ built in, for Play Store upload.
 The provider is inert without the `.so` symbol, so the public (OSS) build stays
 Standard-only and never references any of this.
 
-## ⚠️ Current gap: the glue targets DEBUG, not release
+## One-command signed AAB: `ai-android-release`
 
-`ai-android-glue` copies the manifest overlay to **`app/src/debug/`**, and
-`ai-android-apk` runs **`assembleDebug`**. So today the AI build only produces a
-**debug APK** — not shippable to Play Store (unsigned/oversized/slow-cold-start).
+`ai.mk` has a dedicated release target that wires the provider into the
+**release** variant, builds a signed bundle, and **verifies** the model +
+arming provider are actually in it (so you can never ship a dormant build).
 
-To ship, the AI glue must also apply to the **release** variant and build a
-signed AAB. Steps below; the makefile change is a follow-up (`ai-android-release`).
+### Prerequisites (one-time)
+- `cargo install cargo-ndk` and `rustup target add aarch64-linux-android`
+- `adapters/android-ime/keystore.properties` (gitignored) with your **upload**
+  keystore — Play App Signing re-signs with the real key on upload. See
+  `keystore.properties.example`. Generate a key with:
+  ```bash
+  keytool -genkey -v -keystore khmerime-upload.jks -keyalg RSA -keysize 2048 \
+          -validity 10000 -alias khmerime
+  ```
 
-## Producing a production AAB (manual, until `ai-android-release` exists)
+### Build
+```bash
+cd khmerime-lab/runtime/tonle-native
+make -f ai.mk ai-android                                  # stage .so + model + glue (once)
+make -f ai.mk ai-android-release \
+  KHMERIME_PACKAGE_VERSION=1.0.0 \
+  KHMERIME_ANDROID_VERSION_CODE=1                          # bump the CODE every upload
+```
+Output: `adapters/android-ime/app/build/outputs/bundle/release/app-release.aab`,
+already signed and verified to contain `tonle-model/model.safetensors` and the
+`AiModelInitializer` provider.
 
-1. **Signing** — create `adapters/android-ime/keystore.properties` (gitignored;
-   see `keystore.properties.example`) pointing at your upload keystore. Without
-   it, the release variant builds **unsigned**.
+**Do NOT** use the public `build_aab.sh` / `android-package` — those rebuild the
+FREE `.so` over the provider-armed one and ship a bundle with the model present
+but no provider (dormant Smart mode). Always use `ai-android-release`.
 
-2. **Layer the AI assets** into the tree:
-   ```bash
-   cd khmerime-lab/runtime/tonle-native
-   make -f ai.mk ai-android            # .so + assets + glue (debug variant)
-   ```
-
-3. **Make the provider manifest apply to release too.** The overlay currently
-   lands in `app/src/debug/`. Copy it to the release variant as well:
-   ```bash
-   cp app/src/debug/AndroidManifest.xml app/src/release/AndroidManifest.xml
-   ```
-   (This file is gitignored — it's the AI drop-in, not source.)
-
-4. **Build the signed release AAB:**
-   ```bash
-   cd adapters/android-ime
-   JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home" \
-     ./gradlew :app:bundleRelease
-   # -> app/build/outputs/bundle/release/app-release.aab
-   ```
-
-5. **Verify** the AAB contains the model + provider:
-   ```bash
-   unzip -l app/build/outputs/bundle/release/app-release.aab | grep -E 'tonle|libkhmerime_android_ime'
-   ```
-   Expect `assets/tonle/tonle-model/model.safetensors`, `vocab.trie`, and the
-   arm64 `.so`.
-
-6. **Upload** `app-release.aab` to the Play Console.
+- `KHMERIME_PACKAGE_VERSION` → `versionName` (the Play "app version").
+- `KHMERIME_ANDROID_VERSION_CODE` → `versionCode`, **must be unique and
+  increasing on every Play upload**.
 
 ## Runtime notes for production
 - **Cold start**: the model (~18.6 MB) is extracted to `filesDir` on first launch

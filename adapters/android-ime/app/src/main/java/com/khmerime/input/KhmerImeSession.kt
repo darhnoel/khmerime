@@ -18,6 +18,11 @@ class KhmerImeSession {
     fun focusIn(): KhmerRenderState = parse(nativeFocusIn(nativeHandle))
     fun focusOut(): KhmerRenderState = parse(nativeFocusOut(nativeHandle))
     fun processCharacter(ch: String): KhmerRenderState = parse(nativeProcessCharacter(nativeHandle, ch))
+    // Deferred path: append the roman char without the candidate decode. The caller
+    // preserves the last suggestions until recomputeNow() supplies current ones.
+    fun processCharacterDeferred(ch: String): KhmerRenderState = parse(nativeProcessCharacterDeferred(nativeHandle, ch))
+    // Run the deferred decode once typing pauses; fills the real candidates/segments.
+    fun recomputeNow(): KhmerRenderState = parse(nativeRecomputeNow(nativeHandle))
     fun processBackspace(): KhmerRenderState = parse(nativeProcessBackspace(nativeHandle))
     fun processSpace(): KhmerRenderState = parse(nativeProcessSpace(nativeHandle))
     fun processEnter(): KhmerRenderState = parse(nativeProcessEnter(nativeHandle))
@@ -45,6 +50,8 @@ class KhmerImeSession {
     private external fun nativeFocusIn(handle: Long): String
     private external fun nativeFocusOut(handle: Long): String
     private external fun nativeProcessCharacter(handle: Long, ch: String): String
+    private external fun nativeProcessCharacterDeferred(handle: Long, ch: String): String
+    private external fun nativeRecomputeNow(handle: Long): String
     private external fun nativeProcessBackspace(handle: Long): String
     private external fun nativeProcessSpace(handle: Long): String
     private external fun nativeProcessEnter(handle: Long): String

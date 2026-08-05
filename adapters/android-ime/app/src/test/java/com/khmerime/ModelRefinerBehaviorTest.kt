@@ -20,7 +20,7 @@ class ModelRefinerBehaviorTest {
     ): Pair<ModelRefiner, KhmerImeSession> {
         val session = KhmerImeSession()
         session.setModelMode(true)
-        val refiner = ModelRefiner(session, dispatcher, onRefined)
+        val refiner = ModelRefiner(session, dispatcher, onRefined = onRefined)
         return Pair(refiner, session)
     }
 

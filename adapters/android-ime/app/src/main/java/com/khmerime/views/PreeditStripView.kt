@@ -63,6 +63,16 @@ class PreeditStripView @JvmOverloads constructor(
         khmerRowPool.sync(0)
     }
 
+    // The roman line is already immediate typing feedback. Keep the last decoded
+    // Khmer row visible while the next decode is pending, but remove its stale tap
+    // targets until render() replaces it with choices for the new composition.
+    fun showPendingRoman(romanHint: String) {
+        romanRow.text = romanHint
+        for (index in 0 until khmerRow.childCount) {
+            khmerRow.getChildAt(index).setOnClickListener(null)
+        }
+    }
+
     private fun renderKhmerRow(state: KhmerRenderState) {
         val texts = KeyboardPresentationSpec.segmentKhmerTexts(state)
         val focusedIdx = KeyboardPresentationSpec.focusedSegmentIndex(state)

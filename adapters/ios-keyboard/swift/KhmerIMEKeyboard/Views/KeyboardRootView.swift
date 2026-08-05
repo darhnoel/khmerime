@@ -5,7 +5,13 @@ protocol KeyboardStripDisplaying: AnyObject {
     func clear()
 }
 
+// NOTE: input-click feedback is NOT wired here. KeyboardRootView is a plain UIView
+// added as a subview of the controller's view; making it a UIInputView (or hosting
+// it in one) breaks the custom keyboard layout. playInputClick routes through the
+// controller's own UIInputView instead — see KeyboardViewController's
+// UIInputViewAudioFeedback conformance.
 final class KeyboardRootView: UIView {
+
     private let stripDisplay: KeyboardStripDisplaying
     private let candidateRowDisplay: KeyboardCandidateRowDisplaying
     private let qwertyView: UIView

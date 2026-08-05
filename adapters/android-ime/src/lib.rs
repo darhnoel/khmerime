@@ -244,6 +244,34 @@ pub extern "C" fn Java_com_khmerime_input_KhmerImeSession_nativeProcessCharacter
     render_json(&mut env, &s.snapshot(), &result)
 }
 
+// Append a roman char WITHOUT the candidate decode. Kotlin keeps the last decoded
+// suggestions visible until nativeRecomputeNow supplies current ones after a pause.
+#[no_mangle]
+pub extern "C" fn Java_com_khmerime_input_KhmerImeSession_nativeProcessCharacterDeferred(
+    mut env: JNIEnv,
+    _obj: JObject,
+    handle: jlong,
+    ch: JString,
+) -> jstring {
+    let s = unsafe { session_mut(handle) };
+    let ch_str = env.get_string(&ch).expect("get_string must not fail");
+    let c = ch_str.to_str().unwrap_or("?").chars().next().unwrap_or('?');
+    let result = s.process_printable_deferred(c);
+    render_json(&mut env, &s.snapshot(), &result)
+}
+
+// Run the deferred candidate decode for the current composition (on typing pause).
+#[no_mangle]
+pub extern "C" fn Java_com_khmerime_input_KhmerImeSession_nativeRecomputeNow(
+    mut env: JNIEnv,
+    _obj: JObject,
+    handle: jlong,
+) -> jstring {
+    let s = unsafe { session_mut(handle) };
+    let result = s.recompute_now();
+    render_json(&mut env, &s.snapshot(), &result)
+}
+
 #[no_mangle]
 pub extern "C" fn Java_com_khmerime_input_KhmerImeSession_nativeProcessBackspace(
     mut env: JNIEnv,
