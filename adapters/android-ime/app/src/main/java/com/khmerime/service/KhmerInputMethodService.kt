@@ -179,7 +179,12 @@ class KhmerInputMethodService : InputMethodService() {
 
     private fun applySystemBottomSpacing(root: View) {
         val fallbackBottom = 12.dp()
-        setSystemBottomSpacerHeight(fallbackBottom)
+        // Seed the spacer with the REAL bottom inset before first paint so the
+        // keyboard doesn't render short and then jump up when the async inset
+        // listener fires a frame later. Prefer the already-attached window insets;
+        // fall back to the system navigation-bar height; then a small default.
+        val initialBottom = maxOf(fallbackBottom, currentBottomInset(root))
+        setSystemBottomSpacerHeight(initialBottom)
         ViewCompat.setOnApplyWindowInsetsListener(root) { _, insets ->
             val bottomInset = insets
                 .getInsets(WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.ime())
@@ -188,6 +193,21 @@ class KhmerInputMethodService : InputMethodService() {
             insets
         }
         ViewCompat.requestApplyInsets(root)
+    }
+
+    // Best available bottom inset at layout time, before the async listener fires.
+    private fun currentBottomInset(root: View): Int {
+        ViewCompat.getRootWindowInsets(root)?.let { insets ->
+            val b = insets
+                .getInsets(WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.ime())
+                .bottom
+            if (b > 0) return b
+        }
+        // Not attached yet: use the system navigation-bar height so the first
+        // frame is already the right size (the common cause of the open-jump).
+        @Suppress("DiscouragedApi", "InternalInsetResource")
+        val id = resources.getIdentifier("navigation_bar_height", "dimen", "android")
+        return if (id > 0) resources.getDimensionPixelSize(id) else 0
     }
 
     private fun setSystemBottomSpacerHeight(height: Int) {
