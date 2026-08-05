@@ -17,8 +17,11 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:background="@color/brand_ink"
-        app:itemIconTint="@color/brand_ivory_dim"
-        app:itemTextColor="@color/brand_ivory_dim"
+        app:itemActiveIndicatorStyle="@null"
+        app:itemIconSize="24dp"
+        app:itemIconTint="@color/dashboard_tab_tint"
+        app:itemTextColor="@color/dashboard_tab_tint"
+        app:labelVisibilityMode="labeled"
         app:menu="@menu/dashboard_nav" />
 
 </LinearLayout>

@@ -3,17 +3,17 @@
     <item
         android:id="@+id/nav_settings"
         android:title="@string/dashboard_tab_settings"
-        android:icon="@android:drawable/ic_menu_preferences" />
+        android:icon="@drawable/ic_tab_settings" />
     <item
         android:id="@+id/nav_tips"
         android:title="@string/dashboard_tab_tips"
-        android:icon="@android:drawable/ic_menu_info_details" />
+        android:icon="@drawable/ic_tab_tips" />
     <item
         android:id="@+id/nav_characters"
         android:title="@string/chars_tab"
-        android:icon="@android:drawable/ic_menu_sort_alphabetically" />
+        android:icon="@drawable/ic_tab_characters" />
     <item
         android:id="@+id/nav_support"
         android:title="@string/dashboard_tab_support"
-        android:icon="@android:drawable/ic_menu_help" />
+        android:icon="@drawable/ic_tab_support" />
 </menu>
