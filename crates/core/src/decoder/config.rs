@@ -7,8 +7,8 @@ pub enum SpanProposalMode {
     /// Test-only built-in provider used to prove that external span proposals
     /// can participate in the weighted-span lattice before wiring a real model.
     StaticTest,
-    /// A pluggable model span-proposal provider, loaded from env when a model-provider impl is
-    /// compiled in (see the `model-provider` feature); `None` otherwise.
+    /// A pluggable span-proposal provider, registered at startup by a separate provider build
+    /// (`register_span_proposal_provider`); inert when none is registered.
     Model,
 }
 

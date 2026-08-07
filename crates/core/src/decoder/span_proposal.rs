@@ -50,7 +50,7 @@ pub(crate) fn provider_for_mode(mode: SpanProposalMode) -> Option<Arc<dyn SpanPr
 /// Max roman span length a model provider is asked to transliterate — covers the longest
 /// single Lexicon words (salarien=8, vinichchhai=11). Longer would blow up the query count;
 /// the decoder's `over_budget` bail caps the rest.
-#[allow(dead_code)] // used by the model-provider seam (feature-gated) + tests
+#[allow(dead_code)] // used by a registered span-proposal provider + tests
 const MAX_MODEL_SPAN_LEN: usize = 12;
 
 /// Span ends a model provider offers from `start`: every length 2..=MAX that still fits in
