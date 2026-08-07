@@ -34,21 +34,21 @@
     <string name="settings_section_words">មុខងារបញ្ចូលពាក្យ</string>
     <string name="settings_section_data">មុខងារទិន្នន័យ</string>
     <string name="settings_section_about">អំពី</string>
-    <string name="settings_smart_mode">របៀបឆ្លាតវៃ</string>
-    <string name="settings_next_word">ទស្សន៍ទាយពាក្យបន្ទាប់</string>
-    <string name="settings_custom_words">បញ្ចូលពាក្យផ្ទាល់ខ្លួន</string>
+    <string name="settings_smart_mode">បញ្ញាសិប្បនិម្មិត</string>
+    <string name="settings_next_word">ការទស្សន៍ទាយពាក្យបន្ទាប់</string>
+    <string name="settings_custom_words">ពាក្យផ្ទាល់ខ្លួន</string>
     <string name="settings_clear_history">សម្អាតប្រវត្តិពាក្យ</string>
-    <string name="settings_coming_soon">កំពុងអភិវឌ្ឍ</string>
+    <string name="settings_coming_soon">នឹងមកដល់ឆាប់ៗ</string>
     <string name="settings_version">ជំនាន់</string>
 
-    <string name="tip_1_headline">វាយអក្សរខ្មែរ ដោយប្រើអក្សរឡាតាំង</string>
-    <string name="tip_1_body">វាយ "somrak" KhmerIME នឹងណែនាំនូវពាក្យ "សម្រាក"។ បន្ទាប់មកអ្នកគ្រាន់តែចុចលើពាក្យដែលបានណែនាំ ឬចុច Enter ដើម្បីសម្រេចបញ្ចូល។</string>
-    <string name="tip_2_headline">វាយពាក្យវែង ដោយមិនចាំបាច់ប្រើ space</string>
-    <string name="tip_2_body">សម្រាប់ពាក្យវែង KhmerIME បង្ហាញការបំបែកជាផ្នែកដែលអ្នកអាចកែសម្រួលបានដោយមិនចាំបាច់វាយម្ដងមួយពាក្យ។</string>
+    <string name="tip_1_headline">វាយអក្សរខ្មែរដោយប្រើអក្សរឡាតាំង</string>
+    <string name="tip_1_body">វាយ somrak នោះ KhmerIME នឹងស្នើ សម្រាក។ ជ្រើសពាក្យដែលបានស្នើដោយប៉ះលើពាក្យនោះ ឬចុច↩︎ដើម្បីសម្រេចបញ្ចូលពាក្យ។</string>
+    <string name="tip_2_headline">សរសេរកន្សោមពាក្យតែម្ដង</string>
+    <string name="tip_2_body">អ្នកអាចវាយ​មិនត្រឹមតែម្ដងមួយពាក្យៗនោះទេ​​​ អ្នកក៏អាចវាយជាកន្សោមពាក្យផងដែរ។</string>
     <string name="tip_3_headline">ឈ្មោះ និងពាក្យកម្ចី</string>
-    <string name="tip_3_body">ចុចកូនសោដើម្បីវាយពាក្យ ឬឈ្មោះដែលម៉ាស៊ីនមិនអាចស្មានបាន។ វាយអក្សរឡាតាំងមួយដើម្បីមើលតួអក្សរខ្មែរ រួចជ្រើសរើសដើម្បីបញ្ចូល។</string>
-    <string name="tip_4_headline">ប្រើក្ដារចុចរួមមួយ</string>
-    <string name="tip_4_body">ចុច EN ដើម្បីប្រើប្រាស់ភាសាអង់គ្លេស។ ចុច EN ម្ដងទៀតដើម្បីត្រឡប់ទៅប្រើភាសាខ្មែរវិញ។</string>
+    <string name="tip_3_body">ចុច ✦ សម្រាប់វាយពាក្យឬឈ្មោះដែល KhmerIMEមិនអាចព្យាករណ៍បាន។</string>
+    <string name="tip_4_headline">ពេលអ្នកត្រូវការភាសាអង់គ្លេស</string>
+    <string name="tip_4_body">ចុច EN ដើម្បីអាចបញ្ចូលពាក្យអង់គ្លេស។ ចុច EN ម្ដងទៀតដើម្បីត្រឡប់មកភាសាខ្មែរវិញ។</string>
 
     <string name="support_heading">គាំទ្រ KhmerIME</string>
     <string name="support_body">KhmerIME ជាគម្រោងស្ម័គ្រចិត្ត។ ការគាំទ្ររបស់អ្នកជួយឲ្យក្រុមការងារយើងខ្ញុំអាចបន្តការអភិវឌ្ឍ ការរចនា និងការថែទាំជាបន្តបន្ទាប់។</string>

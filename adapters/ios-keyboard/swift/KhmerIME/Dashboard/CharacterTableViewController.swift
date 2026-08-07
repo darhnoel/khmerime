@@ -2,8 +2,9 @@ import UIKit
 
 // CharacterTableViewController — Dashboard reference tab. A romanization lookup for
 // every Khmer consonant and vowel, transcribed from data/khmer_character_table.md.
-// Two columns per row: the Khmer character(s) and how to type them in roman.
-final class CharacterTableViewController: UITableViewController {
+// One swipeable page per section (consonants / dependent vowels / independent vowels),
+// each an internally-scrolling table, with a UIPageControl — same slider style as Tips.
+final class CharacterTableViewController: UIViewController {
 
     private struct Row { let khmer: String; let roman: String }
     private struct Section { let title: String; let rows: [Row] }
@@ -62,40 +63,127 @@ final class CharacterTableViewController: UITableViewController {
         ]),
     ]
 
-    init() { super.init(style: .insetGrouped) }
+    private let pageVC = UIPageViewController(transitionStyle: .scroll, navigationOrientation: .horizontal)
+    private let pageControl = UIPageControl()
+    private var pages: [UIViewController] = []
+
+    override func viewDidLoad() {
+        super.viewDidLoad()
+        title = String(localized: "chars.tab")
+        view.backgroundColor = Brand.ink
+        pages = sections.map { section in
+            SectionPageViewController(
+                title: section.title,
+                rows: section.rows.map { ($0.khmer, $0.roman) })
+        }
+        buildLayout()
+    }
+
+    private func buildLayout() {
+        if let first = pages.first {
+            pageVC.setViewControllers([first], direction: .forward, animated: false)
+        }
+        pageVC.dataSource = self
+        pageVC.delegate = self
+        addChild(pageVC)
+        pageVC.view.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(pageVC.view)
+        pageVC.didMove(toParent: self)
+
+        pageControl.numberOfPages = pages.count
+        pageControl.currentPageIndicatorTintColor = Brand.amber
+        pageControl.pageIndicatorTintColor = UIColor.white.withAlphaComponent(0.22)
+        pageControl.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(pageControl)
+
+        let safe = view.safeAreaLayoutGuide
+        NSLayoutConstraint.activate([
+            pageVC.view.topAnchor.constraint(equalTo: safe.topAnchor),
+            pageVC.view.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            pageVC.view.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            pageVC.view.bottomAnchor.constraint(equalTo: pageControl.topAnchor, constant: -8),
+
+            pageControl.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+            pageControl.bottomAnchor.constraint(equalTo: safe.bottomAnchor, constant: -16),
+        ])
+    }
+
+    private func index(of vc: UIViewController) -> Int? { pages.firstIndex(of: vc) }
+}
+
+extension CharacterTableViewController: UIPageViewControllerDataSource, UIPageViewControllerDelegate {
+    func pageViewController(_ pvc: UIPageViewController, viewControllerBefore vc: UIViewController) -> UIViewController? {
+        guard let idx = index(of: vc), idx > 0 else { return nil }
+        return pages[idx - 1]
+    }
+
+    func pageViewController(_ pvc: UIPageViewController, viewControllerAfter vc: UIViewController) -> UIViewController? {
+        guard let idx = index(of: vc), idx < pages.count - 1 else { return nil }
+        return pages[idx + 1]
+    }
+
+    func pageViewController(
+        _ pvc: UIPageViewController,
+        didFinishAnimating finished: Bool,
+        previousViewControllers: [UIViewController],
+        transitionCompleted completed: Bool
+    ) {
+        if let current = pvc.viewControllers?.first, let idx = index(of: current) {
+            pageControl.currentPage = idx
+        }
+    }
+}
+
+// One section's rows as an internally-scrolling table with an amber title header.
+private final class SectionPageViewController: UIViewController, UITableViewDataSource, UITableViewDelegate {
+    private let sectionTitle: String
+    private let rows: [(khmer: String, roman: String)]
+    private let tableView = UITableView(frame: .zero, style: .plain)
+
+    init(title: String, rows: [(khmer: String, roman: String)]) {
+        self.sectionTitle = title
+        self.rows = rows
+        super.init(nibName: nil, bundle: nil)
+    }
 
     @available(*, unavailable)
     required init?(coder: NSCoder) { fatalError("init(coder:) is not used") }
 
     override func viewDidLoad() {
         super.viewDidLoad()
-        title = String(localized: "chars.tab")
         view.backgroundColor = Brand.ink
         tableView.backgroundColor = Brand.ink
         tableView.separatorColor = UIColor.white.withAlphaComponent(0.08)
-        tableView.register(CharacterCell.self, forCellReuseIdentifier: "cell")
+        tableView.showsVerticalScrollIndicator = false
         tableView.rowHeight = UITableView.automaticDimension
         tableView.estimatedRowHeight = 52
+        tableView.register(CharacterCell.self, forCellReuseIdentifier: "cell")
+        tableView.dataSource = self
+        tableView.delegate = self
+        tableView.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(tableView)
+        NSLayoutConstraint.activate([
+            tableView.topAnchor.constraint(equalTo: view.topAnchor),
+            tableView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            tableView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            tableView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+        ])
     }
 
-    override func numberOfSections(in tableView: UITableView) -> Int { sections.count }
+    func numberOfSections(in tableView: UITableView) -> Int { 1 }
 
-    override func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
-        sections[section].rows.count
-    }
+    func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int { rows.count }
 
-    override func tableView(_ tableView: UITableView, titleForHeaderInSection section: Int) -> String? {
-        sections[section].title
-    }
+    func tableView(_ tableView: UITableView, titleForHeaderInSection section: Int) -> String? { sectionTitle }
 
-    override func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
+    func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
         let cell = tableView.dequeueReusableCell(withIdentifier: "cell", for: indexPath) as! CharacterCell
-        let row = sections[indexPath.section].rows[indexPath.row]
+        let row = rows[indexPath.row]
         cell.configure(khmer: row.khmer, roman: row.roman)
         return cell
     }
 
-    override func tableView(_ tableView: UITableView, willDisplayHeaderView view: UIView, forSection section: Int) {
+    func tableView(_ tableView: UITableView, willDisplayHeaderView view: UIView, forSection section: Int) {
         (view as? UITableViewHeaderFooterView)?.textLabel?.textColor = Brand.amber
     }
 }
