@@ -88,6 +88,7 @@ adapters/macos-imk/swift/**/*.xcuserstate
 
 # Generated local build specification for optional private integrations.
 /adapters/ios-keyboard/swift/project-paid.yml
+/adapters/macos-imk/swift/project-paid.yml
 
 # AI Android overlay: model provider glue + bundled model assets dropped into the
 # public adapter tree by `private/tonle/ai.mk` (ai-android-glue / ai-android-assets). Never
