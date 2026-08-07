@@ -188,10 +188,11 @@ private final class SectionPageViewController: UIViewController, UITableViewData
     }
 }
 
-// One reference row: Khmer character(s) on the left, roman input on the right.
+// One reference row: Khmer character(s) on the left, one roman chip per character on
+// the right. A character's alternative spellings sit inside its own chip joined by "/".
 private final class CharacterCell: UITableViewCell {
     private let khmerLabel = UILabel()
-    private let romanLabel = UILabel()
+    private let chipStack = UIStackView()
 
     override init(style: UITableViewCell.CellStyle, reuseIdentifier: String?) {
         super.init(style: style, reuseIdentifier: reuseIdentifier)
@@ -203,17 +204,16 @@ private final class CharacterCell: UITableViewCell {
         khmerLabel.numberOfLines = 0
         khmerLabel.setContentHuggingPriority(.defaultLow, for: .horizontal)
 
-        romanLabel.font = .monospacedSystemFont(ofSize: 15, weight: .regular)
-        romanLabel.textColor = Brand.ivoryDim
-        romanLabel.numberOfLines = 0
-        romanLabel.textAlignment = .right
-        romanLabel.setContentHuggingPriority(.defaultHigh, for: .horizontal)
-        romanLabel.setContentCompressionResistancePriority(.required, for: .horizontal)
+        chipStack.axis = .horizontal
+        chipStack.spacing = 6
+        chipStack.alignment = .center
+        chipStack.setContentHuggingPriority(.defaultHigh, for: .horizontal)
+        chipStack.setContentCompressionResistancePriority(.required, for: .horizontal)
 
-        let stack = UIStackView(arrangedSubviews: [khmerLabel, romanLabel])
+        let stack = UIStackView(arrangedSubviews: [khmerLabel, chipStack])
         stack.axis = .horizontal
         stack.alignment = .center
-        stack.spacing = 16
+        stack.spacing = 12
         stack.translatesAutoresizingMaskIntoConstraints = false
         contentView.addSubview(stack)
         NSLayoutConstraint.activate([
@@ -229,6 +229,62 @@ private final class CharacterCell: UITableViewCell {
 
     func configure(khmer: String, roman: String) {
         khmerLabel.text = khmer
-        romanLabel.text = roman
+        chipStack.arrangedSubviews.forEach { $0.removeFromSuperview() }
+        for label in CharacterCell.romanChips(khmer: khmer, roman: roman) {
+            chipStack.addArrangedSubview(makeChip(label))
+        }
+    }
+
+    private func makeChip(_ text: String) -> UIView {
+        let label = UILabel()
+        label.text = text
+        label.font = .monospacedSystemFont(ofSize: 14, weight: .regular)
+        label.textColor = Brand.ivoryDim
+        label.textAlignment = .center
+        label.setContentHuggingPriority(.required, for: .horizontal)
+        label.setContentCompressionResistancePriority(.required, for: .horizontal)
+
+        let pill = UIView()
+        pill.backgroundColor = UIColor.white.withAlphaComponent(0.08)
+        pill.layer.cornerRadius = 8
+        pill.layer.borderWidth = 0.5
+        pill.layer.borderColor = UIColor.white.withAlphaComponent(0.13).cgColor
+        pill.addSubview(label)
+        label.translatesAutoresizingMaskIntoConstraints = false
+        NSLayoutConstraint.activate([
+            label.topAnchor.constraint(equalTo: pill.topAnchor, constant: 4),
+            label.bottomAnchor.constraint(equalTo: pill.bottomAnchor, constant: -4),
+            label.leadingAnchor.constraint(equalTo: pill.leadingAnchor, constant: 8),
+            label.trailingAnchor.constraint(equalTo: pill.trailingAnchor, constant: -8),
+        ])
+        return pill
+    }
+
+    // Mirror of the Android CharacterTableFragment.romanChips logic: one chip per Khmer
+    // character; a character's comma-separated alternatives join with "/". Consonant rows
+    // are space-separated positional; single-character rows treat the whole roman as that
+    // one character's alternatives. The split ignores spaces that follow a comma so
+    // "y r l v, w" → [y, r, l, v/w].
+    static func romanChips(khmer: String, roman: String) -> [String] {
+        let chars = khmer.split(whereSeparator: { $0 == " " }).filter { !$0.isEmpty }
+        func joinAlts(_ s: Substring) -> String {
+            s.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }
+                .filter { !$0.isEmpty }.joined(separator: "/")
+        }
+        if chars.count <= 1 {
+            return [joinAlts(Substring(roman))]
+        }
+        // Split on spaces NOT preceded by a comma.
+        let groups = roman.split(omittingEmptySubsequences: true) { $0 == " " }
+        // Re-merge groups where the previous one ended with a comma (comma+space alt).
+        var merged: [String] = []
+        for g in groups {
+            if let last = merged.last, last.hasSuffix(",") {
+                merged[merged.count - 1] = last + " " + String(g)
+            } else {
+                merged.append(String(g))
+            }
+        }
+        return merged.map { joinAlts(Substring($0)) }
     }
 }
