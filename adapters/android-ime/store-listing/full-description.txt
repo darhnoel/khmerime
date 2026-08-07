@@ -1,0 +1,20 @@
+KhmerIME is a Khmer keyboard built for people who already know how they want a word to sound.
+
+Type familiar roman spellings and KhmerIME presents Khmer candidates as you write. For example, type “somrak” to find “សម្រាក”. Choose the reading you want and continue typing without switching between complicated character layouts.
+
+Features
+
+• Roman-to-Khmer typing with live Khmer candidates
+• Phrase suggestions for longer input
+• Editable word segments when a phrase needs correction
+• Character mode for names, loanwords, and uncommon spellings
+• Built-in English keyboard mode
+• Optional Smart mode for additional on-device suggestions
+• Personal learning that improves candidate ordering from your typing
+• Dark interface, key previews, and typing vibration
+
+Private by design
+
+KhmerIME performs text processing on your device. The optional Smart model is included with the app and runs locally. Your typing does not need to be sent to a remote prediction service.
+
+KhmerIME is designed to make everyday Khmer typing feel direct: type the pronunciation you know, review the visible Khmer result, and commit exactly what you selected.

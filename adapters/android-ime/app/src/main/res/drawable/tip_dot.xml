@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Page-indicator dot for the tips carousel: amber when its page is selected,
+     dim ivory otherwise (TabLayout tabBackground). TabLayout stretches the drawable
+     to the tab bounds, so each dot is a layer-list item with a FIXED 8dp width/height
+     and gravity=center — the fixed size wins over the stretch, keeping a true circle.
+     The layer's left/right margins space the dots apart. -->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:state_selected="true">
+        <layer-list>
+            <item
+                android:width="8dp"
+                android:height="8dp"
+                android:gravity="center"
+                android:left="6dp"
+                android:right="6dp">
+                <shape android:shape="oval">
+                    <solid android:color="@color/brand_amber" />
+                </shape>
+            </item>
+        </layer-list>
+    </item>
+    <item>
+        <layer-list>
+            <item
+                android:width="8dp"
+                android:height="8dp"
+                android:gravity="center"
+                android:left="6dp"
+                android:right="6dp">
+                <shape android:shape="oval">
+                    <solid android:color="#4DF4ECE2" />
+                </shape>
+            </item>
+        </layer-list>
+    </item>
+</selector>

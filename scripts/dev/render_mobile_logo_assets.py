@@ -30,6 +30,8 @@ IOS_ABA_DEST = IOS_ASSETS / "ABAQR.imageset/aba.png"
 
 ANDROID_LOGO_PNG = ROOT / "adapters/android-ime/app/src/main/res/drawable-nodpi/khmerime_logo_card.png"
 ANDROID_RES = ROOT / "adapters/android-ime/app/src/main/res"
+ANDROID_PLAY_ICON = ROOT / "adapters/android-ime/store-listing/app-icon-512.png"
+ANDROID_FEATURE_GRAPHIC = ROOT / "adapters/android-ime/store-listing/feature-graphic-1024x500.png"
 ANDROID_MARK_SOURCE = ROOT / "logo/logo_design.icon/Assets/logo.png"
 ANDROID_ICON_BACKGROUND = (189, 111, 89)  # #BD6F59
 ANDROID_ICON_SIZE = 1024
@@ -104,6 +106,24 @@ def generate_android_launcher_icons(mark_source: Path) -> None:
     write_rgba_png(fg_dest, ANDROID_ICON_SIZE, ANDROID_ICON_SIZE, foreground_rows)
     print(f"generated {fg_dest.relative_to(ROOT)}")
 
+    flat_rows = composite_rgba_rows(foreground_rows, ANDROID_ICON_BACKGROUND)
+    ANDROID_PLAY_ICON.parent.mkdir(parents=True, exist_ok=True)
+    write_rgb_png(
+        ANDROID_PLAY_ICON,
+        512,
+        512,
+        downsample_rgb_rows_2x(flat_rows, ANDROID_ICON_SIZE),
+    )
+    print(f"generated {ANDROID_PLAY_ICON.relative_to(ROOT)}")
+
+    write_rgb_png(
+        ANDROID_FEATURE_GRAPHIC,
+        1024,
+        500,
+        android_feature_graphic_rows(foreground_rows),
+    )
+    print(f"generated {ANDROID_FEATURE_GRAPHIC.relative_to(ROOT)}")
+
     # Legacy raster fallback (pre-26).
     if shutil.which("sips") is None:
         print(
@@ -114,7 +134,6 @@ def generate_android_launcher_icons(mark_source: Path) -> None:
         return
     with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as tmp:
         flat_source = Path(tmp.name)
-    flat_rows = composite_rgba_rows(foreground_rows, ANDROID_ICON_BACKGROUND)
     write_rgb_png(flat_source, ANDROID_ICON_SIZE, ANDROID_ICON_SIZE, flat_rows)
     for bucket, size in ANDROID_MIPMAP_SIZES.items():
         for name in ("ic_launcher", "ic_launcher_round"):
@@ -195,6 +214,100 @@ def composite_rgba_rows(rows: list[bytes], background: tuple[int, int, int]) -> 
             rgb.extend(composite(channel, bg, alpha) for channel, bg in zip((red, green, blue), background))
         output.append(bytes(rgb))
     return output
+
+
+def downsample_rgb_rows_2x(rows: list[bytes], size: int) -> list[bytes]:
+    """Downsample a square RGB image by exactly 2× with box filtering."""
+    if size % 2 or len(rows) != size or any(len(row) != size * 3 for row in rows):
+        raise RuntimeError("expected an even square RGB image")
+    output = []
+    for y in range(0, size, 2):
+        row = bytearray()
+        for x in range(0, size, 2):
+            offset = x * 3
+            for channel in range(3):
+                total = (
+                    rows[y][offset + channel]
+                    + rows[y][offset + 3 + channel]
+                    + rows[y + 1][offset + channel]
+                    + rows[y + 1][offset + 3 + channel]
+                )
+                row.append((total + 2) // 4)
+        output.append(bytes(row))
+    return output
+
+
+def android_feature_graphic_rows(foreground_rows: list[bytes]) -> list[bytes]:
+    """Create a landscape Play graphic that extends the icon into a keyboard scene."""
+    width, height = 1024, 500
+    ink = (20, 16, 27)
+    terracotta = ANDROID_ICON_BACKGROUND
+    amber = (233, 138, 78)
+    ivory = (244, 236, 226)
+    canvas = []
+    for y in range(height):
+        mix = y / (height - 1)
+        color = tuple(round(ink[channel] * (1 - mix * 0.18) + terracotta[channel] * mix * 0.18) for channel in range(3))
+        canvas.append(bytearray(color * width))
+
+    # Soft brand planes keep the edges useful as crop space without becoming busy.
+    draw_rounded_rect(canvas, 62, 54, 900, 392, 54, (255, 255, 255), 10)
+    draw_rounded_rect(canvas, 92, 78, 352, 344, 44, terracotta, 235)
+
+    pixels = [rgba_samples(row, 8) for row in foreground_rows]
+    occupied = [(x, y) for y, row in enumerate(pixels) for x, pixel in enumerate(row) if pixel[3]]
+    box = (
+        min(x for x, _ in occupied),
+        min(y for _, y in occupied),
+        max(x for x, _ in occupied),
+        max(y for _, y in occupied),
+    )
+    mark = resize_crop_rgba(pixels, box, 300 / (box[3] - box[1] + 1))
+    paste_rgba(canvas, mark, 268 - len(mark[0]) // 8, 100)
+
+    # Abstract candidate strip and key rows: recognisably an IME without tiny text.
+    draw_rounded_rect(canvas, 506, 101, 405, 62, 24, ivory, 24)
+    for x, w in ((530, 88), (632, 116), (762, 124)):
+        draw_rounded_rect(canvas, x, 119, w, 25, 12, ivory, 150)
+    key_rows = [
+        (506, 185, 5, 70),
+        (526, 263, 4, 79),
+        (566, 341, 3, 86),
+    ]
+    for row_index, (start_x, y, count, key_width) in enumerate(key_rows):
+        for index in range(count):
+            color = amber if row_index == 1 and index == 2 else ivory
+            alpha = 235 if color == amber else 42
+            draw_rounded_rect(canvas, start_x + index * (key_width + 12), y, key_width, 60, 15, color, alpha)
+    return [bytes(row) for row in canvas]
+
+
+def paste_rgba(canvas: list[bytearray], image: list[bytes], left: int, top: int) -> None:
+    for y, source_row in enumerate(image):
+        if not 0 <= top + y < len(canvas):
+            continue
+        for x, (red, green, blue, alpha) in enumerate(rgba_samples(source_row, 8)):
+            if alpha == 0 or not 0 <= left + x < len(canvas[0]) // 3:
+                continue
+            offset = (left + x) * 3
+            destination = canvas[top + y]
+            for channel, foreground in enumerate((red, green, blue)):
+                destination[offset + channel] = composite(foreground, destination[offset + channel], alpha)
+
+
+def draw_rounded_rect(
+    rows: list[bytearray], x: int, y: int, width: int, height: int, radius: int,
+    color: tuple[int, int, int], alpha: int,
+) -> None:
+    for py in range(y, y + height):
+        for px in range(x, x + width):
+            dx = max(x + radius - px, 0, px - (x + width - radius - 1))
+            dy = max(y + radius - py, 0, py - (y + height - radius - 1))
+            if dx * dx + dy * dy > radius * radius:
+                continue
+            offset = px * 3
+            for channel, foreground in enumerate(color):
+                rows[py][offset + channel] = composite(foreground, rows[py][offset + channel], alpha)
 
 
 def write_adaptive_icon_resources(background_hex: str) -> None:

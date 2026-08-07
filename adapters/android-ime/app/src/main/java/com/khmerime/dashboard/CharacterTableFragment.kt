@@ -13,10 +13,15 @@ import android.widget.ScrollView
 import android.widget.TextView
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
+import androidx.recyclerview.widget.RecyclerView
+import androidx.viewpager2.widget.ViewPager2
+import com.google.android.material.tabs.TabLayout
+import com.google.android.material.tabs.TabLayoutMediator
 
 // CharacterTableFragment — Dashboard reference tab. A romanization lookup for every
-// Khmer consonant and vowel, transcribed from data/khmer_character_table.md. Two
-// columns per row: the Khmer character(s) and how to type them in roman.
+// Khmer consonant and vowel, transcribed from data/khmer_character_table.md. One
+// swipeable page per section (consonants / dependent vowels / independent vowels),
+// each scrollable internally, with a dot indicator — same slider style as Tips.
 class CharacterTableFragment : Fragment() {
 
     private data class Row(val khmer: String, val roman: String)
@@ -26,24 +31,91 @@ class CharacterTableFragment : Fragment() {
         val ctx = requireContext()
         fun dp(v: Int) = (v * resources.displayMetrics.density).toInt()
         val ink = ContextCompat.getColor(ctx, R.color.brand_ink)
-        val amber = ContextCompat.getColor(ctx, R.color.brand_amber)
-        val ivory = ContextCompat.getColor(ctx, R.color.brand_ivory)
-        val dim = ContextCompat.getColor(ctx, R.color.brand_ivory_dim)
 
-        val column = LinearLayout(ctx).apply {
-            orientation = LinearLayout.VERTICAL
-            setBackgroundColor(ink)
-            setPadding(dp(20), dp(28), dp(20), dp(40))
+        val pager = ViewPager2(ctx).apply {
+            id = View.generateViewId()
+            adapter = SectionAdapter(sections) { getString(it) }
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f)
         }
 
-        for (section in sections) {
-            column.addView(TextView(ctx).apply {
-                text = getString(section.titleRes)
-                setTextColor(amber)
+        val dots = TabLayout(ctx).apply {
+            tabGravity = TabLayout.GRAVITY_CENTER
+            setSelectedTabIndicatorHeight(0)
+            setBackgroundColor(android.graphics.Color.TRANSPARENT)
+        }
+
+        val root = LinearLayout(ctx).apply {
+            orientation = LinearLayout.VERTICAL
+            setBackgroundColor(ink)
+            setPadding(0, dp(16), 0, dp(20))
+            addView(pager)
+            addView(dots, LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+            ).apply { gravity = Gravity.CENTER_HORIZONTAL })
+        }
+
+        TabLayoutMediator(dots, pager) { _, _ -> }.attach()
+        for (i in 0 until dots.tabCount) {
+            dots.getTabAt(i)?.view?.let { tab ->
+                tab.isClickable = false
+                tab.setBackgroundResource(R.drawable.tip_dot)
+                tab.minimumWidth = dp(20)
+            }
+        }
+        return root
+    }
+
+    private class SectionAdapter(
+        private val sections: List<Section>,
+        private val string: (Int) -> String,
+    ) : RecyclerView.Adapter<SectionViewHolder>() {
+
+        override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): SectionViewHolder {
+            val ctx = parent.context
+            fun dp(v: Int) = (v * ctx.resources.displayMetrics.density).toInt()
+            // Fixed title on top; only the rows scroll under it.
+            val titleView = TextView(ctx).apply {
+                setTextColor(ContextCompat.getColor(ctx, R.color.brand_amber))
                 textSize = 15f
                 typeface = Typeface.DEFAULT_BOLD
-                setPadding(dp(4), dp(20), dp(4), dp(10))
-            })
+                gravity = Gravity.CENTER_HORIZONTAL
+                setPadding(dp(4), dp(8), dp(4), dp(14))
+            }
+            val column = LinearLayout(ctx).apply {
+                orientation = LinearLayout.VERTICAL
+                setPadding(dp(20), 0, dp(20), dp(24))
+            }
+            val scroll = ScrollView(ctx).apply {
+                isFillViewport = true
+                isVerticalScrollBarEnabled = false
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f)
+                addView(column)
+            }
+            val page = LinearLayout(ctx).apply {
+                orientation = LinearLayout.VERTICAL
+                layoutParams = ViewGroup.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
+                setPadding(dp(20), dp(12), dp(20), 0)
+                addView(titleView)
+                addView(scroll)
+            }
+            return SectionViewHolder(page, titleView, column)
+        }
+
+        override fun getItemCount() = sections.size
+
+        override fun onBindViewHolder(holder: SectionViewHolder, position: Int) {
+            val ctx = holder.column.context
+            fun dp(v: Int) = (v * ctx.resources.displayMetrics.density).toInt()
+            val ivory = ContextCompat.getColor(ctx, R.color.brand_ivory)
+            val dim = ContextCompat.getColor(ctx, R.color.brand_ivory_dim)
+
+            val section = sections[position]
+            holder.title.text = string(section.titleRes)
+            holder.column.removeAllViews()
             for (row in section.rows) {
                 val rowView = LinearLayout(ctx).apply {
                     orientation = LinearLayout.HORIZONTAL
@@ -63,16 +135,16 @@ class CharacterTableFragment : Fragment() {
                     typeface = Typeface.MONOSPACE
                     gravity = Gravity.END
                 })
-                column.addView(rowView)
+                holder.column.addView(rowView)
             }
         }
-
-        return ScrollView(ctx).apply {
-            setBackgroundColor(ink)
-            addView(column, LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT))
-        }
     }
+
+    private class SectionViewHolder(
+        itemView: View,
+        val title: TextView,
+        val column: LinearLayout,
+    ) : RecyclerView.ViewHolder(itemView)
 
     // Character data is the reference itself, not UI copy — kept inline (not a string resource).
     private val sections = listOf(
