@@ -190,13 +190,14 @@ fn session_nida_mode_does_not_map_backspace_or_enter_evdev_keycodes() {
 // ── Basic composition ─────────────────────────────────────────────────────────
 
 #[test]
-fn session_commits_raw_roman_when_no_candidate() {
-    // IBus: bridge_commits_raw_roman_when_no_candidate
-    // Backtick (keyval 96) has no Khmer candidate; Enter commits raw roman.
+fn session_auto_commits_backtick_as_single_keycap() {
+    // A backtick has no Khmer candidate. Since `is_single_keycap_char` widened to every
+    // non-alpha ASCII graphic, a lone backtick is a single-keycap auto-commit: it commits its
+    // raw self immediately, no Enter needed (like a digit → Khmer numeral).
     let s = session();
-    type_str(&s, "```");
-    let state = s.handle_event(0xFF0D, 0, 0); // KEY_RETURN
-    assert_eq!(state.commit_text, Some("```".to_owned()));
+    let state = s.handle_event('`' as u32, 0, 0); // keyval 96
+    assert_eq!(state.commit_text, Some("`".to_owned()));
+    assert_eq!(state.preedit, "");
 }
 
 #[test]
