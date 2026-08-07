@@ -128,13 +128,28 @@ class CharacterTableFragment : Fragment() {
                     textSize = 20f
                     layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
                 })
-                rowView.addView(TextView(ctx).apply {
-                    text = row.roman
-                    setTextColor(dim)
-                    textSize = 14f
-                    typeface = Typeface.MONOSPACE
-                    gravity = Gravity.END
-                })
+                // One chip per Khmer character; a character's alternative spellings sit
+                // inside its own chip joined by "/" (e.g. វ -> v/w), so it's clear which
+                // romans belong to which character.
+                val chips = LinearLayout(ctx).apply {
+                    orientation = LinearLayout.HORIZONTAL
+                    gravity = Gravity.END or Gravity.CENTER_VERTICAL
+                }
+                for (label in romanChips(row.khmer, row.roman)) {
+                    chips.addView(TextView(ctx).apply {
+                        text = label
+                        setTextColor(dim)
+                        textSize = 13f
+                        typeface = Typeface.MONOSPACE
+                        setBackgroundResource(R.drawable.roman_chip)
+                        setPadding(dp(8), dp(4), dp(8), dp(4))
+                        layoutParams = LinearLayout.LayoutParams(
+                            LinearLayout.LayoutParams.WRAP_CONTENT,
+                            LinearLayout.LayoutParams.WRAP_CONTENT,
+                        ).apply { marginStart = dp(6) }
+                    })
+                }
+                rowView.addView(chips)
                 holder.column.addView(rowView)
             }
         }
@@ -145,6 +160,25 @@ class CharacterTableFragment : Fragment() {
         val title: TextView,
         val column: LinearLayout,
     ) : RecyclerView.ViewHolder(itemView)
+
+    companion object {
+        // Turn a row's roman string into one label per Khmer character. Consonant rows
+        // pack several characters space-separated and positional ("y r l v,w" → y, r, l,
+        // v/w); vowel/independent rows are a single character whose whole roman string is
+        // its list of alternatives ("a, ar, ea" → one chip "a/ar/ea").
+        fun romanChips(khmer: String, roman: String): List<String> {
+            val chars = khmer.trim().split(Regex("\\s+")).filter { it.isNotEmpty() }
+            if (chars.size <= 1) {
+                // Single character: the whole roman string is its alternatives.
+                return listOf(roman.split(",").map { it.trim() }.filter { it.isNotEmpty() }.joinToString("/"))
+            }
+            // Multiple characters, positional. Split only on spaces that are NOT part of a
+            // "comma+space" alternative separator, so "y r l v, w" → [y, r, l, v/w] (4
+            // chips = 4 chars), not split at the space inside "v, w".
+            return roman.trim().split(Regex("(?<!,)\\s+"))
+                .map { group -> group.split(",").map { it.trim() }.filter { it.isNotEmpty() }.joinToString("/") }
+        }
+    }
 
     // Character data is the reference itself, not UI copy — kept inline (not a string resource).
     private val sections = listOf(
