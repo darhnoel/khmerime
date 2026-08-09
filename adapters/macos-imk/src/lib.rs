@@ -74,8 +74,8 @@ use std::time::Duration;
 
 use khmerime_core::{DecoderConfig, DecoderMode, SpanProposalMode, Transliterator};
 use khmerime_session::{
-    compute_segmented_refinement, CandidateDisplayEntry, ImeSession, ImeSessionOptions, NativeKeyEvent, SegmentPreviewEntry, SegmentedPreviewMode,
-    SessionResult, SessionSnapshot,
+    compute_segmented_refinement, CandidateDisplayEntry, ImeSession, ImeSessionOptions, NativeKeyEvent,
+    SegmentPreviewEntry, SegmentedPreviewMode, SessionResult, SessionSnapshot,
 };
 
 uniffi::setup_scaffolding!("khmerime_macos_imk");
@@ -163,14 +163,38 @@ pub struct MacosCandidateDisplayEntry {
     pub output: String,
     pub recommended: bool,
     pub roman_hints: Vec<String>,
+    /// True when a span-proposal provider contributed this candidate. Swift shows a ✦ marker
+    /// (ADR-0016 / ADR-0019). Derived by matching this output against the snapshot's phrase
+    /// candidates, since the shared CandidateDisplayEntry does not carry provenance.
+    pub from_model: bool,
+    /// True when the candidate is a real Lexicon word. A model candidate with this false is shown
+    /// with a RED ✦ (unverified — may be a valid name/loanword not yet in the Lexicon), never hidden.
+    pub lexicon_verified: bool,
 }
 
-impl From<&CandidateDisplayEntry> for MacosCandidateDisplayEntry {
-    fn from(entry: &CandidateDisplayEntry) -> Self {
+// Whitespace-stripped key for matching a display candidate to a phrase candidate. Mirrors the
+// session's normalized_suggestion_key without widening its public API.
+fn provenance_key(item: &str) -> String {
+    item.chars().filter(|ch| !ch.is_whitespace()).collect()
+}
+
+impl MacosCandidateDisplayEntry {
+    // `provenance`: from_model + lexicon_verified keyed by provenance_key of a phrase candidate's
+    // text. A plain Lexicon candidate (absent from the map) defaults to (false, true).
+    fn from_display(
+        entry: &CandidateDisplayEntry,
+        provenance: &std::collections::HashMap<String, (bool, bool)>,
+    ) -> Self {
+        let (from_model, lexicon_verified) = provenance
+            .get(&provenance_key(&entry.output))
+            .copied()
+            .unwrap_or((false, true));
         MacosCandidateDisplayEntry {
             output: entry.output.clone(),
             recommended: entry.recommended,
             roman_hints: entry.roman_hints.clone(),
+            from_model,
+            lexicon_verified,
         }
     }
 }
@@ -198,15 +222,26 @@ pub struct MacosRenderState {
     pub is_ready: bool,
     /// True when the session consumed the key event (Swift returns true from handle(_:client:)).
     pub consumed: bool,
+    /// True when `preedit` differs from the previous call's value.
+    /// Swift calls `setMarkedText` only when this is true, avoiding spurious IPC on
+    /// non-composing keys while still clearing marked text when preedit goes empty.
+    pub preedit_changed: bool,
 }
 
 fn render_state(snapshot: &SessionSnapshot, result: &SessionResult, ready: bool) -> MacosRenderState {
+    // Provenance the shared CandidateDisplayEntry drops lives on phrase_candidates (ADR-0019):
+    // key each by its whitespace-stripped text so display candidates can look up from_model.
+    let provenance: std::collections::HashMap<String, (bool, bool)> = snapshot
+        .phrase_candidates
+        .iter()
+        .map(|p| (provenance_key(&p.text), (p.from_model, p.lexicon_verified)))
+        .collect();
     MacosRenderState {
         candidates: snapshot.candidates.clone(),
         candidate_display: snapshot
             .candidate_display
             .iter()
-            .map(MacosCandidateDisplayEntry::from)
+            .map(|entry| MacosCandidateDisplayEntry::from_display(entry, &provenance))
             .collect(),
         selected_index: snapshot.selected_index.map(|i| i as u64),
         preedit: snapshot.raw_preedit.clone(),
@@ -217,6 +252,7 @@ fn render_state(snapshot: &SessionSnapshot, result: &SessionResult, ready: bool)
         segment_edit_index: snapshot.segment_edit_index.map(|i| i as u64),
         is_ready: ready,
         consumed: result.consumed,
+        preedit_changed: false, // stamped by with_session after comparing prev_preedit
     }
 }
 
@@ -236,6 +272,9 @@ pub struct MacosIMKSession {
     // Bumped on every keystroke. A lock-free refine captures it at snapshot and re-checks at
     // apply, so a refinement made stale by newer typing is dropped instead of clobbering.
     generation: AtomicU64,
+    /// Tracks the preedit from the previous call so `with_session` can set
+    /// `preedit_changed` without an extra snapshot allocation per key event.
+    prev_preedit: Mutex<String>,
 }
 
 #[uniffi::export]
@@ -251,6 +290,7 @@ impl MacosIMKSession {
             inner: Mutex::new(None),
             ready: Arc::new((Mutex::new(false), Condvar::new())),
             generation: AtomicU64::new(0),
+            prev_preedit: Mutex::new(String::new()),
         });
         let s = session.clone();
         std::thread::spawn(move || {
@@ -274,10 +314,18 @@ impl MacosIMKSession {
                     page_size: MACOS_PAGE_SIZE,
                     ..Default::default()
                 });
-            if span_provider_active() {
-                let visible_refiner =
-                    Transliterator::from_default_data_with_config(macos_visible_refiner_config())
-                        .expect("compiled-in lexicon data must be valid");
+            let provider_on = span_provider_active();
+            // Runtime breadcrumb to the sandbox-readable log (os_log is silent for a sandboxed
+            // IME). Tells us, on the actual launched app, whether the warmup thread saw the
+            // provider armed — the one fact static inspection can't confirm.
+            diag_log(&format!(
+                "[khmerime-warmup] span_provider_active={} KHMERIME_SPAN_PROPOSALS={:?}",
+                provider_on,
+                std::env::var("KHMERIME_SPAN_PROPOSALS").ok()
+            ));
+            if provider_on {
+                let visible_refiner = Transliterator::from_default_data_with_config(macos_visible_refiner_config())
+                    .expect("compiled-in lexicon data must be valid");
                 builder = builder.visible_refiner(visible_refiner);
             }
             let ime = builder.build();
@@ -294,7 +342,7 @@ impl MacosIMKSession {
 
     /// `activateServer:` — IMK controller became active for a text client.
     pub fn activate(&self) -> MacosRenderState {
-        self.with_session(|s| {
+        self.with_render(|s| {
             s.focus_in();
             render_state(&s.snapshot(), &SessionResult::default(), true)
         })
@@ -302,7 +350,7 @@ impl MacosIMKSession {
 
     /// `deactivateServer:` — IMK controller lost the text client.
     pub fn deactivate(&self) -> MacosRenderState {
-        self.with_session(|s| {
+        self.with_render(|s| {
             s.focus_out();
             render_state(&s.snapshot(), &SessionResult::default(), true)
         })
@@ -310,7 +358,7 @@ impl MacosIMKSession {
 
     /// `commitComposition:` / Escape — discard composition without committing.
     pub fn cancel_composition(&self) -> MacosRenderState {
-        self.with_session(|s| {
+        self.with_render(|s| {
             s.reset();
             render_state(&s.snapshot(), &SessionResult::default(), true)
         })
@@ -329,36 +377,32 @@ impl MacosIMKSession {
         let evdev_keycode = keycode_mac_to_evdev(mac_keycode);
         let xkb_state = modifier_flags_to_xkb_state(modifier_flags);
 
-        // Up/Down jump a whole page on macOS (ADR-0018). Translated here rather than in
-        // the shared session so IBus and TSF keep their one-step Up/Down.
+        // PageUp/PageDown jump a whole page on macOS. Translated here rather than in the
+        // shared session so IBus and TSF are unaffected. ↑/↓ are NOT page keys — they fall
+        // through to the session's one-step candidate cycling (supersedes ADR-0018, which had
+        // ↑/↓ page and left mid-list words unreachable by arrow).
         let page_direction = match keyval {
-            KEY_UP => -1,
-            KEY_DOWN => 1,
+            KEY_PAGE_UP => -1,
+            KEY_PAGE_DOWN => 1,
             _ => 0,
         };
 
-        self.with_session(|s| {
+        self.with_render(|s| {
             if page_direction != 0 {
                 let snapshot = s.snapshot();
                 let len = snapshot.candidates.len();
                 if len > 0 {
                     let selected = snapshot.selected_index.unwrap_or(0);
-                    let target =
-                        page_jump_target(selected, len, MACOS_PAGE_SIZE, page_direction);
+                    let target = page_jump_target(selected, len, MACOS_PAGE_SIZE, page_direction);
                     // Reach the target through the session's own cycling, so selection
                     // bookkeeping (selection_touched, segment sync) stays consistent.
-                    let steps = (target as isize - selected as isize)
-                        .rem_euclid(len as isize) as usize;
+                    let steps = (target as isize - selected as isize).rem_euclid(len as isize) as usize;
                     let mut result = SessionResult {
                         consumed: true,
                         ..SessionResult::default()
                     };
                     for _ in 0..steps {
-                        result = s.process_native_key_event(key_event(
-                            KEY_DOWN,
-                            keycode_mac_to_evdev(0),
-                            xkb_state,
-                        ));
+                        result = s.process_native_key_event(key_event(KEY_DOWN, keycode_mac_to_evdev(0), xkb_state));
                     }
                     return render_state(&s.snapshot(), &result, true);
                 }
@@ -370,7 +414,7 @@ impl MacosIMKSession {
 
     /// Cursor position changed — update candidate panel anchor.
     pub fn set_cursor_location(&self, x: i32, y: i32, width: i32, height: i32) -> MacosRenderState {
-        self.with_session(|s| {
+        self.with_render(|s| {
             s.set_cursor_location(x, y, width, height);
             render_state(&s.snapshot(), &SessionResult::default(), true)
         })
@@ -381,7 +425,7 @@ impl MacosIMKSession {
     /// the current composition and no candidate has been manually selected.
     /// Ignored (no-op) when a segmented session is already active.
     pub fn refine_composition(&self, raw_preedit: String) -> MacosRenderState {
-        self.with_session(|s| {
+        self.with_render(|s| {
             s.apply_refined_candidate(&raw_preedit);
             render_state(&s.snapshot(), &SessionResult::default(), true)
         })
@@ -404,7 +448,7 @@ impl MacosIMKSession {
 
     /// Input mode toggle (Roman ↔ NIDA). Clears composition.
     pub fn toggle_input_mode(&self) -> MacosRenderState {
-        self.with_session(|s| {
+        self.with_render(|s| {
             s.toggle_input_mode();
             render_state(&s.snapshot(), &SessionResult::default(), true)
         })
@@ -427,6 +471,21 @@ impl MacosIMKSession {
             Some(session) => f(session),
             None => T::default(),
         }
+    }
+
+    /// `with_session` for the render-returning entry points, stamping `preedit_changed` by
+    /// comparing against the previous call's preedit. Swift calls `setMarkedText` only when this
+    /// is true — clearing marked text when the preedit goes empty (the backspace-on-last-char fix)
+    /// without spurious IPC on non-composing keys.
+    fn with_render<F>(&self, f: F) -> MacosRenderState
+    where
+        F: FnOnce(&mut ImeSession) -> MacosRenderState,
+    {
+        let mut state = self.with_session(f);
+        let mut prev = self.prev_preedit.lock().unwrap();
+        state.preedit_changed = state.preedit != *prev;
+        *prev = state.preedit.clone();
+        state
     }
 
     /// Run the model visible refine WITHOUT holding the session lock across the model.
@@ -551,6 +610,19 @@ fn install_panic_logger() {
     });
 }
 
+/// Append one diagnostic line to the sandbox-readable log (same file as panics). os_log is
+/// silently dropped for a sandboxed input method, so this is how runtime state is surfaced.
+fn diag_log(line: &str) {
+    if let Ok(mut file) = std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(panic_log_path())
+    {
+        use std::io::Write;
+        let _ = writeln!(file, "{line}");
+    }
+}
+
 /// Where `install_panic_logger` records panics.
 ///
 /// The input method is sandboxed (required for third-party IMEs), so `$HOME` here is
@@ -569,8 +641,13 @@ fn panic_log_path() -> std::path::PathBuf {
 /// match this value.
 pub const MACOS_PAGE_SIZE: usize = 10;
 
-/// X11 keysyms for the arrow keys, as delivered by `KeyvalMapping` on the Swift side.
-const KEY_UP: u32 = 0xFF52;
+/// X11 keysyms for the page keys, as delivered by `KeyvalMapping` on the Swift side.
+/// PageUp/PageDown drive the whole-page jump (supersedes ADR-0018's ↑/↓ mapping); the
+/// arrows themselves fall through to the session's one-step candidate cycling.
+const KEY_PAGE_UP: u32 = 0xFF55;
+const KEY_PAGE_DOWN: u32 = 0xFF56;
+/// The session's one-step Down keysym — used to drive the page jump through the session's
+/// own candidate cycling (so selection bookkeeping stays consistent).
 const KEY_DOWN: u32 = 0xFF54;
 
 /// The candidate index a page jump lands on (ADR-0018).

@@ -40,6 +40,27 @@ fn would_degrade_to_roman(current: &[String], refinement: &SegmentedRefinement) 
             .is_some_and(|candidate| has_khmer(candidate))
 }
 
+/// True when applying `refinement` would drop a live multi-word segmentation. The debounced model
+/// refiner runs on a tight latency budget (250 ms); when the model overshoots it, the weighted-span
+/// decode times out and collapses to a single-word top, whose `segmented_session` is `None` or has
+/// fewer segments. Overwriting the good live segmentation with that makes the phrase strip vanish
+/// (e.g. `kalpimun` → `កាល|ពី|មុន` replaced by a lone `កើន`). Keep the richer segmentation instead.
+fn would_collapse_segmentation(current: Option<&SegmentedSession>, refinement: &SegmentedRefinement) -> bool {
+    let Some(current) = current else {
+        return false; // nothing segmented to lose
+    };
+    let current_segments = current.segments.len();
+    if current_segments < 2 {
+        return false; // a single-segment "session" carries no multi-word structure to protect
+    }
+    let refined_segments = refinement
+        .segmented_session
+        .as_ref()
+        .map(|s| s.segments.len())
+        .unwrap_or(0);
+    refined_segments < current_segments
+}
+
 /// The model compute for a segmented refinement — **pure**: reads the refiner + input + history,
 /// returns the result, mutates nothing. This is where the model time is spent, so it is the
 /// part that must run OFF the session lock. The adapter calls it between
@@ -365,7 +386,7 @@ impl ImeSession {
         if self.composition_raw.is_empty() || self.composition_raw != raw_preedit {
             return false;
         }
-        if self.segmented_session.is_some() && self.selection_touched {
+        if self.selection_touched {
             return true;
         }
         self.rebuild_segmented_session_from_observation();
@@ -385,7 +406,7 @@ impl ImeSession {
         if self.composition_raw.is_empty() || self.composition_raw != raw_preedit {
             return false;
         }
-        if self.segmented_session.is_some() && self.selection_touched {
+        if self.selection_touched {
             return true;
         }
         let Some(refiner) = self.visible_refiner.clone() else {
@@ -395,6 +416,9 @@ impl ImeSession {
         // Same compute as the lock-free path; synchronous here so the apply always matches.
         let refinement = compute_segmented_refinement(&refiner, &self.composition_raw, &self.history);
         if would_degrade_to_roman(&self.candidates, &refinement) {
+            return self.segmented_session.is_some();
+        }
+        if would_collapse_segmentation(self.segmented_session.as_ref(), &refinement) {
             return self.segmented_session.is_some();
         }
         self.segmented_session = refinement.segmented_session;
@@ -418,7 +442,7 @@ impl ImeSession {
         if self.composition_raw.is_empty() || self.composition_raw != raw {
             return None;
         }
-        if self.segmented_session.is_some() && self.selection_touched {
+        if self.selection_touched {
             return None;
         }
         let refiner = self.visible_refiner.clone()?;
@@ -439,11 +463,14 @@ impl ImeSession {
         if self.composition_raw.is_empty() || self.composition_raw != raw {
             return false; // staleness guard
         }
-        if self.segmented_session.is_some() && self.selection_touched {
+        if self.selection_touched {
             return true;
         }
         if would_degrade_to_roman(&self.candidates, &refinement) {
             return self.segmented_session.is_some();
+        }
+        if would_collapse_segmentation(self.segmented_session.as_ref(), &refinement) {
+            return true; // keep the richer live segmentation; the timed-out refine is worse
         }
         self.segmented_session = refinement.segmented_session;
         self.candidates = refinement.candidates;
@@ -502,6 +529,34 @@ mod tests {
             session.snapshot().candidates,
             before,
             "candidates must not be clobbered by a stale apply"
+        );
+    }
+
+    #[test]
+    fn delayed_refinement_cannot_collapse_a_multiword_segmentation() {
+        // Regression ("kalpimun showed កាលពីមុន then the phrase disappeared"): the live path
+        // built a 3-word segmented session (កាល|ពី|មុន), but the debounced model refiner timed
+        // out on its 250 ms budget and returned a collapsed single-word top (កើន). Applying that
+        // wiped segmented_session → the phrase strip vanished. A refinement that drops a live
+        // multi-word segmentation must be rejected, keeping the good phrase visible.
+        let mut session = session();
+        type_ascii(&mut session, "khnhomtov");
+        assert!(
+            session.snapshot().segmented_active,
+            "khnhomtov builds a segmented session"
+        );
+
+        let collapsed = super::SegmentedRefinement {
+            segmented_session: None, // model timeout → single-word top → no segmentation
+            candidates: vec!["កើន".to_string()],
+            phrase_candidates: Vec::new(),
+        };
+        let applied = session.apply_segmented_refinement("khnhomtov", collapsed);
+
+        assert!(!applied || session.snapshot().segmented_active);
+        assert!(
+            session.snapshot().segmented_active,
+            "a refinement that collapses the multi-word segmentation must not wipe the phrase strip"
         );
     }
 
@@ -657,6 +712,43 @@ mod tests {
             session.snapshot().selected_index,
             Some(1),
             "visible refine must not reset a selection the user already made"
+        );
+    }
+
+    #[test]
+    fn visible_refine_does_not_clobber_a_touched_selection_when_single_word() {
+        // Bug A (macOS Space-cycle reset): the touched-selection guard also has to hold for a
+        // SINGLE-word composition, where no segmented session exists. Space cycles the flat
+        // candidate list and sets selection_touched; the debounced pause-refine then reran and
+        // reset selected_index to 0 because the old guard also required a segmented session.
+        let live = Transliterator::from_tsv_str_with_config("jea\tជា\nchea\tជា\n", DecoderConfig::shadow_interactive())
+            .expect("live fixture");
+        let refiner = Transliterator::from_tsv_str_with_config("jea\tជា\n", DecoderConfig::shadow_interactive())
+            .expect("refiner fixture");
+        let mut session = ImeSession::builder(live, HashMap::new())
+            .visible_refiner(refiner)
+            .build();
+        session.focus_in();
+        type_ascii(&mut session, "jea");
+        assert!(
+            !session.snapshot().segmented_active,
+            "single word: no segmented session"
+        );
+        assert!(
+            session.snapshot().candidates.len() > 1,
+            "need at least two candidates to cycle"
+        );
+
+        let down = session.process_key_event(0xFF54, 0, 0); // Down -> select candidate 1
+        assert!(down.consumed);
+        assert_eq!(session.snapshot().selected_index, Some(1));
+
+        session.refine_segmented_with_visible_refiner("jea");
+
+        assert_eq!(
+            session.snapshot().selected_index,
+            Some(1),
+            "single-word visible refine must not reset the user's Space/Down selection"
         );
     }
 

@@ -24,8 +24,13 @@ class KhmerInputController: IMKInputController {
     private var handler: KhmerInputHandler!
     private let panel = CandidatePanel()
 
+    // Arm the span-proposal provider once per process (init runs per text client). A no-op in the
+    // OSS build; a provider build swaps MacosModelArming to register a model.
+    private static let armedOnce: Bool = MacosModelArming.armIfNeeded()
+
     override init!(server: IMKServer!, delegate: Any!, client inputClient: Any!) {
         super.init(server: server, delegate: delegate, client: inputClient)
+        _ = KhmerInputController.armedOnce
         let imkClient = IMKTextClientAdapter(
             client: { [weak self] in self?.client() },
             markAttributes: { [weak self] in

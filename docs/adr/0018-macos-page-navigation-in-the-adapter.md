@@ -1,6 +1,6 @@
 # ADR-0018: macOS gets Up/Down page navigation, implemented in the adapter
 
-**Status:** Accepted — supersedes ADR-0013's "no explicit page keys" decision **for the macOS IMK only**
+**Status:** Superseded by ADR-0020 (↑/↓ now step; PageUp/PageDown page). Originally: Accepted — supersedes ADR-0013's "no explicit page keys" decision **for the macOS IMK only**
 
 ## Context
 

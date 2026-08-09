@@ -420,7 +420,12 @@ impl LegacyData {
         self.suggest_with_limit(input, history, MAX_SUGGESTIONS)
     }
 
-    pub(crate) fn suggest_with_limit(&self, input: &str, history: &HashMap<String, usize>, limit: usize) -> Vec<String> {
+    pub(crate) fn suggest_with_limit(
+        &self,
+        input: &str,
+        history: &HashMap<String, usize>,
+        limit: usize,
+    ) -> Vec<String> {
         let query = input.strip_suffix(' ').unwrap_or(input);
         if query == "." {
             return vec![
