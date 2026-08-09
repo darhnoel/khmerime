@@ -37,7 +37,7 @@ The provisional inline text displayed at the cursor while the user is composing.
 _Avoid_: composition text (ambiguous with **Composition**), inline Khmer preview
 
 **Candidate List**:
-The visible Khmer choices for the active **Composition** or focused **Segmented Session** segment. In romanization mode, the Candidate List should remain visible even when there is only one obvious choice, because it tells the user what Enter will commit while the inline **Preedit** stays roman.
+The visible Khmer choices for the active **Composition** or focused **Segmented Session** segment. On mobile, its choices form a centered group when they fit and a left-aligned scroll row when they overflow; in romanization mode it remains visible even with one obvious choice because it tells the user what Enter will commit while the inline **Preedit** stays roman.
 _Avoid_: suggestions (too broad), inline candidates
 
 **Phrase Candidate**:
@@ -57,7 +57,7 @@ A transient visual above a pressed character-producing on-screen key that mirror
 _Avoid_: candidate popup, suggestion popup, key tap animation
 
 **Punctuation Suggestions**:
-The suggestion candidates produced when the user types the period key: `។`, `៕`, `.`, `?`, `!`, and `…`. On mobile these flow through **Phrase Candidate** data so the **Strip** shows the selected punctuation and the **Phrase Wheel** shows the alternatives. Distinct from the **Key Preview Popup**, which only mirrors the touched `.` key.
+A shared-engine and desktop behavior that produces `។`, `៕`, `.`, `?`, `!`, and `…` when a period enters transliteration. Mobile keyboards do not invoke it from their visible `.` key: mobile punctuation keys are **Literal Keycap**s, while Khmer punctuation is directly available from the **Quick Access Tray**.
 _Avoid_: period popup, punctuation key preview
 
 **QWERTY Character Grid**:
@@ -117,7 +117,7 @@ The per-user `HashMap<String, usize>` counting how often each Khmer **unigram** 
 _Avoid_: user dictionary, learned words (ambiguous with corpus)
 
 **English Mode**:
-An input mode in which all keystrokes (letters, symbols, numbers, space, backspace, return) are routed directly to the host text field without Khmer processing or roman-buffer accumulation. Toggled by the EN key, which occupies the globe-key slot when the system keyboard switcher is not needed. English Mode is orthogonal to the visual layer — switching between QWERTY, 123, and #+= does not exit English Mode. Pressing ✦ while in English Mode exits English Mode and enters CharPick (since no Composition is active). Pressing EN while composing abandons the active Composition silently: the Rust session resets, the roman Preedit remains in the host text field as literal text, and English Mode begins.
+An input mode in which all keystrokes (letters, symbols, numbers, space, backspace, return) are routed directly to the host text field without Khmer processing or roman-buffer accumulation. Toggled by the EN key, which occupies the globe-key slot when the system keyboard switcher is not needed. English Mode is orthogonal to the visual layer — switching between QWERTY, 123, and #+= does not exit English Mode — and is the only mobile mode in which the **Khmer Input Chrome** is absent. Pressing ✦ while in English Mode exits English Mode and enters CharPick (since no Composition is active). Pressing EN while composing abandons the active Composition silently: the Rust session resets, the roman Preedit remains in the host text field as literal text, and English Mode begins.
 _Avoid_: latin mode, passthrough mode, direct-input mode
 
 **Lexicon Pack**:
@@ -177,6 +177,30 @@ _Avoid_: onboarding (generic), welcome flow, tutorial
 **Dashboard**:
 The persistent hub of the **Companion App**, reached after the **Intro Flow** (or directly once onboarding is remembered). A tabbed surface — Settings, Tips, and Support today — that grows as companion-app features are added. Distinct from the **Intro Flow**, which is one-time.
 _Avoid_: home screen, main menu, settings (the Dashboard is more than settings)
+
+**Single Keycap**:
+A typed character that does not compose into a **Composition** — a digit, punctuation mark, or symbol (any ASCII graphic that is not a letter). It stands alone and commits immediately, either as a mapped Khmer character (e.g. `1` → `១`) or as a **Literal Keycap**, with no **Preedit** accumulation or **Candidate List**, provided no **Composition** is already in progress. A letter typed after a Single Keycap starts a fresh **Composition**. Shared-engine Single Keycaps typed mid-Composition remain part of the roman buffer; mobile **Literal Keycap**s are the explicit exception defined below.
+_Avoid_: symbol key, special key (those name the keyboard key; this names the input behavior)
+
+**Literal Keycap**:
+A mobile on-screen **Single Keycap** whose visible label is its exact **Commit Text**. Every mobile digit, punctuation, and symbol key is a Literal Keycap; none silently substitutes a Khmer digit or legacy Khmer mapping, because those characters belong in the **Quick Access Tray** instead. During a **Composition**, a Literal Keycap first commits the visible Khmer composition and then inserts its own label, rather than joining the roman buffer. This is a mobile adapter contract; shared-engine mappings remain available to desktop and physical-keyboard adapters.
+_Avoid_: passthrough key, raw symbol
+
+**Khmer Input Chrome**:
+The stable rows above the mobile key grid: romanization mode has two for the **Strip** and candidate surface (or the **Quick Access Tray** while idle), **CharPick Mode** has one for its **Candidate List**, and **English Mode** has none. Switching among the QWERTY, `123`, and `#+=` visual layers does not change the row count. Row count changes only on an explicit input-mode transition, never because composition content appears or disappears.
+_Avoid_: suggestion rows (too narrow), blank rows, header
+
+**Quick Access Tray**:
+The idle state of the mobile **Khmer Input Chrome**, offering directly insertable Khmer digits and marks that would otherwise be difficult or surprising to reach from visibly literal symbol keys. A tray tap inserts that exact Unicode character at the selection with no automatic spacing, **Composition**, or candidates, and leaves the tray available for repeated taps. Romanization mode shows its digit and mark rows, then yields both to the **Strip** and candidate surface when a **Composition** begins. Idle **CharPick Mode** reuses only the mark row, which a Roman key replaces with the CharPick **Candidate List**.
+_Avoid_: default suggestions, filler row, symbol keyboard
+
+**Yukaleapintu (យុគលពិន្ទុ)**:
+The Khmer mark `ៈ`, used for example at the end of `វចនៈ`. It is directly available from the **Quick Access Tray** and is distinct from both the literal Latin colon `:` and the Khmer mark `៖`.
+_Avoid_: សញ្ញាធ្មេញកណ្ដុរ, colon
+
+**Optimistic Insert**:
+On a composing platform (Android), showing the raw roman key in the host field the instant it is pressed, before the transliteration decode returns — so typing never lags behind the finger. When the decode lands, the raw roman is replaced by the committed Khmer. Correct for composing letters; deliberately skipped for a standalone mapped **Single Keycap**, whose committed glyph differs from the raw key and would otherwise flash the Latin form before swapping to Khmer.
+_Avoid_: speculative insert, preview text (this is real inserted text, later corrected)
 
 ## Relationships
 

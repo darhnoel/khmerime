@@ -173,9 +173,15 @@ mod tests {
     #[test]
     fn hidden_commit_refinement_does_not_override_visible_default_candidate() {
         let mut session = flat_default_session_with_commit_refiner();
-        type_ascii(&mut session, "kasanmot");
+        type_ascii(&mut session, "karsanmot");
         let snapshot = session.snapshot();
-        assert_eq!(snapshot.candidates.first().map(String::as_str), Some("ការសន្មត"));
+        // `karsanmot` is two words (ការ + សន្មត). Since the segmented preview now builds from the
+        // single Weighted Span pass (same segmentation the refine path uses), the composition shows
+        // as a segmented phrase with ការ focused first — not the old single-blob candidate. The
+        // whole phrase is still what commits.
+        assert!(snapshot.segmented_active, "kasanmot shows as a segmented phrase");
+        assert_eq!(snapshot.preedit, "ការសន្មត", "the composed phrase is ការសន្មត");
+        assert_eq!(snapshot.candidates.first().map(String::as_str), Some("ការ"));
 
         let update = session.process_key_event(0xFF0D, 0, 0);
 

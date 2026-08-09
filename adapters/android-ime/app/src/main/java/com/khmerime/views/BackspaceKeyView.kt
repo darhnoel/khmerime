@@ -36,6 +36,7 @@ class BackspaceKeyView(
     override fun onTouchEvent(event: MotionEvent): Boolean {
         when (event.actionMasked) {
             MotionEvent.ACTION_DOWN -> {
+                capturePressedBounds(event)
                 performKeyPressHaptic()
                 pressAnimator.press()
                 repeater.beginHold()
@@ -45,13 +46,15 @@ class BackspaceKeyView(
                 pressAnimator.release()
                 if (repeater.hasFired) {
                     onHoldEnd?.invoke()
-                } else if (event.x in 0f..width.toFloat() && event.y in 0f..height.toFloat()) {
+                } else if (releaseIsInsidePressedBounds(event, slop = 0f)) {
                     onTap?.invoke()
                 }
+                clearPressedBounds()
                 repeater.endHold()
                 return true
             }
             MotionEvent.ACTION_CANCEL -> {
+                clearPressedBounds()
                 pressAnimator.release()
                 if (repeater.hasFired) onHoldEnd?.invoke()
                 repeater.endHold()

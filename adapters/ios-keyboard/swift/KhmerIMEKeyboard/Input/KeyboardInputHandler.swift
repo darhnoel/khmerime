@@ -258,9 +258,24 @@ final class KeyboardInputHandler {
         }
     }
 
+    func sendLiteralKeycap(_ text: String) {
+        trailingSpace = false
+        if isEnglishMode || keyboardState == .charPick || romanBuffer.isEmpty {
+            proxy.insertText(text)
+            return
+        }
+        commitComposition(suffix: text)
+    }
+
+    func insertQuickAccess(_ text: String) {
+        guard romanBuffer.isEmpty else { return }
+        trailingSpace = false
+        proxy.insertText(text)
+    }
+
     // MARK: - Key Actions
 
-    func commitComposition() {
+    func commitComposition(suffix: String? = nil) {
         guard keyboardState != .charPick else { return }
         // Delete the roman buffer immediately — we know the count now.
         let hadRomanBuffer = !romanBuffer.isEmpty
@@ -285,6 +300,7 @@ final class KeyboardInputHandler {
                         self.pendingAutoSpaceCheck = true
                     }
                 }
+                if let suffix { self.proxy.insertText(suffix) }
                 self.onStripClear?()
             }
         }

@@ -7,19 +7,21 @@ import com.khmerime.input.SmartModePreference
 import com.khmerime.input.KhmerImeSession
 import com.khmerime.input.KhmerRenderState
 import com.khmerime.input.KeyboardState
-import com.khmerime.layout.ChromeRows
 import com.khmerime.layout.KeyboardKey
 import com.khmerime.layout.KeyboardKeyAction
 import com.khmerime.layout.KeyboardLayer
 import com.khmerime.layout.KeyboardLayerSpec
 import com.khmerime.layout.KeyboardPresentationSpec
+import com.khmerime.layout.KhmerInputChrome
+import com.khmerime.layout.KhmerInputChromePresentation
 import com.khmerime.layout.KeyViewFactory
 import com.khmerime.layout.KeyViewStyle
 import com.khmerime.layout.QwertyCharacterGridLayout
+import com.khmerime.layout.QuickAccessSpec
 import com.khmerime.views.BackspaceKeyView
 import com.khmerime.views.GlassKeyViewFactory
 import com.khmerime.views.GlassKeyView
-import com.khmerime.views.KeyPreviewOverlay
+import com.khmerime.views.KeyPreviewPopup
 import com.khmerime.views.PreeditStripView
 import com.khmerime.views.SuggestionChipView
 import com.khmerime.views.ViewPool
@@ -62,11 +64,11 @@ class KhmerInputMethodService : InputMethodService() {
 
     private var candidateStrip: LinearLayout? = null
     private var keyboardLayer: LinearLayout? = null
-    private var keyPreviewOverlay: KeyPreviewOverlay? = null
+    private var keyPreviewPopup: KeyPreviewPopup? = null
     private var preeditStrip: PreeditStripView? = null
     private var systemBottomSpacer: View? = null
     private var candidateScroll: View? = null
-    private var currentChromeRows: ChromeRows? = null
+    private var showingIdleKhmerTray = false
     private var currentLayer = KeyboardLayer.Qwerty
 
     private val candidateChipPool = ViewPool<SuggestionChipView>(
@@ -147,10 +149,6 @@ class KhmerInputMethodService : InputMethodService() {
         // the old hierarchy can be garbage-collected, and so sync() re-adds
         // chips to the new candidate strip instead of leaving them on the old.
         candidateChipPool.clear()
-        // Fresh views have their XML-default visibility, so the cached chrome state no
-        // longer reflects them — reset it or the applyChrome guard could skip the first
-        // real apply after a rebuild.
-        currentChromeRows = null
         applyWindowBlur()
         val root = layoutInflater.inflate(R.layout.keyboard, null)
         root.setBackgroundColor(Color.TRANSPARENT)
@@ -160,15 +158,19 @@ class KhmerInputMethodService : InputMethodService() {
         candidateStrip = root.findViewById(R.id.candidate_strip)
         candidateScroll = root.findViewById(R.id.candidate_scroll)
         keyboardLayer = root.findViewById(R.id.keyboard_layer)
-        keyPreviewOverlay = root.findViewById(R.id.key_preview_overlay)
+        keyPreviewPopup?.hideImmediately()
+        keyPreviewPopup = KeyPreviewPopup(this)
         systemBottomSpacer = root.findViewById(R.id.system_bottom_spacer)
         applySystemBottomSpacing(root)
-        renderKeyboardLayer(KeyboardLayer.Qwerty)
+        // The initial empty render can arrive from focusIn before this hierarchy
+        // exists. Render the complete current state now that every view is attached,
+        // otherwise the idle Khmer tray stays invisible until the first keypress.
+        renderKeyboardState(handler?.keyboardState ?: KeyboardState.Qwerty)
         return root
     }
 
     override fun onFinishInputView(finishingInput: Boolean) {
-        keyPreviewOverlay?.hideImmediately()
+        keyPreviewPopup?.hideImmediately()
         super.onFinishInputView(finishingInput)
     }
 
@@ -243,10 +245,7 @@ class KhmerInputMethodService : InputMethodService() {
                     LinearLayout.LayoutParams.MATCH_PARENT,
                     0,
                     1f,
-                ).apply {
-                    topMargin = 2.dp()
-                    bottomMargin = 2.dp()
-                }
+                )
             }
             addGridRow(row, keys, factory, isQwertyLetterRow(layer, rowIndex, keys))
             container.addView(row)
@@ -300,18 +299,20 @@ class KhmerInputMethodService : InputMethodService() {
         }
         // Keypress preview bubble on letter keys only (iOS parity — no bubble over
         // space/backspace/return/toggles).
-        if (key.action == KeyboardKeyAction.Insert && view is GlassKeyView) {
-            view.onPreviewShow = { keyPreviewOverlay?.show(it, it.previewLabel) }
-            view.onPreviewHide = { keyPreviewOverlay?.hide() }
+        if ((key.action == KeyboardKeyAction.Insert || key.action == KeyboardKeyAction.InsertLiteral) &&
+            view is GlassKeyView
+        ) {
+            view.onPreviewShow = {
+                handler?.keyTouchBegan()
+                keyPreviewPopup?.show(it, it.previewLabel)
+            }
+            view.onPreviewHide = { keyPreviewPopup?.hide() }
         }
         view.layoutParams = LinearLayout.LayoutParams(
             0,
             LinearLayout.LayoutParams.MATCH_PARENT,
             weight,
-        ).apply {
-            marginStart = 2.dp()
-            marginEnd = 2.dp()
-        }
+        )
         return view
     }
 
@@ -323,6 +324,7 @@ class KhmerInputMethodService : InputMethodService() {
     private fun handleKey(key: KeyboardKey) {
         when (key.action) {
             KeyboardKeyAction.Insert -> handler?.sendChar(key.input)
+            KeyboardKeyAction.InsertLiteral -> handler?.sendLiteralKeycap(key.input)
             KeyboardKeyAction.Backspace -> handler?.sendBackspace()
             KeyboardKeyAction.Space -> handler?.sendSpace()
             KeyboardKeyAction.Return -> handler?.sendReturn()
@@ -374,35 +376,36 @@ class KhmerInputMethodService : InputMethodService() {
 
     private fun renderKeyboardState(state: KeyboardState) {
         renderKeyboardLayer(KeyboardPresentationSpec.keyboardLayerForState(state))
-        // A bare mode transition (enter/exit Suggest Character, toggle English)
-        // has no composition to show; content-ful transitions are always
-        // followed by a render that re-applies the real chrome.
-        applyChrome(ChromeRows.None)
+        preeditStrip?.clear()
+        candidateChipPool.sync(0)
+        showingIdleKhmerTray = false
+        val presentation = KhmerInputChrome.presentation(state, "", KhmerRenderState())
+        applyChrome(presentation)
+        when (presentation) {
+            KhmerInputChromePresentation.QuickAccess -> renderIdleKhmerTray()
+            KhmerInputChromePresentation.CharPickQuickAccess -> renderQuickAccessMarks()
+            else -> Unit
+        }
     }
 
-    // Three-state input chrome (parity with iOS): collapse the rows a mode is not
-    // using so the keyboard reclaims their height. See KeyboardPresentationSpec.chromeRows.
-    private fun applyChrome(rows: ChromeRows) {
-        // Skip if the row config is unchanged (parity with iOS setChromeRows' guard).
-        // Without this, every keystroke re-applied visibility — and with GONE that is a
-        // relayout each time, so fast typing made the keyboard flicker. Only a real
-        // transition touches the layout now.
-        if (rows == currentChromeRows) return
-        currentChromeRows = rows
-        // GONE, not INVISIBLE: a collapsed row must reclaim its height, not sit there
-        // as a transparent-but-space-occupying gap (the "empty 2 rows" bug). INVISIBLE
-        // keeps the layout slot; GONE removes it so the keyboard shrinks.
-        preeditStrip?.visibility =
-            if (rows == ChromeRows.StripAndCandidate || rows == ChromeRows.StripOnly) View.VISIBLE else View.GONE
-        candidateScroll?.visibility =
-            if (rows == ChromeRows.CandidateOnly || rows == ChromeRows.StripAndCandidate) View.VISIBLE else View.GONE
+    private fun applyChrome(presentation: KhmerInputChromePresentation) {
+        preeditStrip?.visibility = when (presentation) {
+            KhmerInputChromePresentation.QuickAccess,
+            KhmerInputChromePresentation.Composition -> View.VISIBLE
+            else -> View.GONE
+        }
+        candidateScroll?.visibility = when (presentation) {
+            KhmerInputChromePresentation.Hidden -> View.GONE
+            else -> View.VISIBLE
+        }
     }
 
     private fun resetSuggestCharacterSuggestions() {
+        showingIdleKhmerTray = false
         preeditStrip?.clear()
         candidateChipPool.sync(0)
-        // A reset always means Suggest Character with no candidates yet → collapse.
-        applyChrome(ChromeRows.None)
+        applyChrome(KhmerInputChromePresentation.CharPickQuickAccess)
+        renderQuickAccessMarks()
     }
 
     // ── Render ─────────────────────────────────────────────────────────────────
@@ -411,24 +414,35 @@ class KhmerInputMethodService : InputMethodService() {
     // so keep both last-decoded suggestion rows visible. Their stale tap targets stay
     // disabled until renderState replaces them with the new composition's choices.
     private fun renderPendingDecode(roman: String) {
+        if (showingIdleKhmerTray) {
+            candidateChipPool.sync(0)
+            showingIdleKhmerTray = false
+        }
         preeditStrip?.showPendingRoman(roman)
         // Don't shrink the chrome mid-composition. The real decode alternates between
-        // StripOnly and StripAndCandidate; if the pending state forced a smaller row set
-        // on each keystroke, the height flapped between 1 and 2 rows while typing. Reserve
-        // at least what's already showing — only ever grow to StripOnly, never collapse a
-        // visible candidate row. The next real decode settles the exact rows.
-        val current = currentChromeRows
-        val pending = KeyboardPresentationSpec.pendingDecodeChromeRows()
-        val rows = if (current == ChromeRows.StripAndCandidate) current else pending
-        applyChrome(rows)
+        // StripOnly and StripAndCandidate. Reserve both rows immediately so a decode
+        // cannot add the candidate row while another fast tap is still held.
+        applyChrome(KhmerInputChromePresentation.Composition)
         setCandidateInteractionEnabled(false)
     }
 
     private fun renderState(state: KhmerRenderState) {
         val keyboardState = handler?.keyboardState
         val romanHint = KeyboardPresentationSpec.preeditText(keyboardState, state)
+        val presentation = KhmerInputChrome.presentation(keyboardState, romanHint, state)
+        applyChrome(presentation)
+
+        if (presentation == KhmerInputChromePresentation.QuickAccess) {
+            renderIdleKhmerTray()
+            return
+        }
+        if (presentation == KhmerInputChromePresentation.CharPickQuickAccess) {
+            renderQuickAccessMarks()
+            return
+        }
+        if (presentation == KhmerInputChromePresentation.Hidden) return
+
         preeditStrip?.render(state, romanHint)
-        applyChrome(KeyboardPresentationSpec.chromeRows(keyboardState, romanHint, state))
 
         if (candidateStrip == null) return
         if (KeyboardPresentationSpec.showsPhraseWheel(keyboardState, state)) {
@@ -457,6 +471,33 @@ class KhmerInputMethodService : InputMethodService() {
                     onClick = { handler?.selectCandidate(index) },
                 )
             }
+        }
+        setCandidateInteractionEnabled(true)
+        showingIdleKhmerTray = false
+    }
+
+    private fun renderIdleKhmerTray() {
+        showingIdleKhmerTray = true
+        preeditStrip?.visibility = View.VISIBLE
+        candidateScroll?.visibility = View.VISIBLE
+        preeditStrip?.showIdleShortcuts(QuickAccessSpec.digits) { item ->
+            handler?.insertQuickAccess(item.commitText)
+        }
+        renderQuickAccessMarks()
+    }
+
+    private fun renderQuickAccessMarks() {
+        showingIdleKhmerTray = true
+        candidateScroll?.visibility = View.VISIBLE
+        val marks = QuickAccessSpec.marks
+        val chips = candidateChipPool.sync(marks.size)
+        marks.forEachIndexed { index, item ->
+            chips[index].update(
+                text = item.displayText,
+                isSelected = false,
+                onClick = { handler?.insertQuickAccess(item.commitText) },
+            )
+            chips[index].contentDescription = item.accessibilityLabel ?: item.displayText
         }
         setCandidateInteractionEnabled(true)
     }

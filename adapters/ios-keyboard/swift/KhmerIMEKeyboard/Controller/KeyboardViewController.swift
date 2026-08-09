@@ -38,6 +38,8 @@ class KeyboardViewController: UIInputViewController {
     // MARK: - Handler
 
     private var handler: KeyboardInputHandler!
+    private var latestRenderState = KeyboardViewController.emptyRenderState
+    private var latestRomanHint = ""
 
     // MARK: - Layout
 
@@ -62,8 +64,7 @@ class KeyboardViewController: UIInputViewController {
     private var layerActions: KeyboardLayerActions {
         KeyboardLayerActions(
             letter: #selector(letterTapped(_:)),
-            symbol: #selector(symbolKeyTapped(_:)),
-            period: #selector(periodTapped),
+            literal: #selector(literalKeyTapped(_:)),
             backspace: #selector(backspaceTapped),
             space: #selector(spaceTapped),
             returnKey: #selector(returnTapped),
@@ -234,6 +235,8 @@ class KeyboardViewController: UIInputViewController {
         symbolsView = nil
         rootView = nil
         chromeRows = .none
+        latestRenderState = Self.emptyRenderState
+        latestRomanHint = ""
     }
 
     private func wireHandlerCallbacks() {
@@ -244,26 +247,59 @@ class KeyboardViewController: UIInputViewController {
             self.rootView?.allDescendants(ofType: GlassKeyButton.self)
                 .filter { $0.title(for: .normal) == "✦" }
                 .forEach { $0.isGlassActive = isCharPick }
+            self.renderChrome(state: self.latestRenderState, romanHint: self.latestRomanHint)
         }
         handler.onRender = { [weak self] state, romanHint in
             guard let self else { return }
-            let keyboardState = self.handler.keyboardState
-            self.rootView?.render(state, romanHint: romanHint, keyboardState: keyboardState)
-            let rows = KeyboardChrome.rows(for: keyboardState, romanHint: romanHint, state: state)
-            self.setChromeRows(rows, animated: true)
+            self.latestRenderState = state
+            self.latestRomanHint = romanHint
+            self.renderChrome(state: state, romanHint: romanHint)
         }
         handler.onStripClear = { [weak self] in
             guard let self else { return }
-            self.rootView?.clearStrip()
-            self.setChromeRows(.none, animated: true)
+            self.latestRenderState = Self.emptyRenderState
+            self.latestRomanHint = ""
+            self.renderChrome(state: Self.emptyRenderState, romanHint: "")
         }
         handler.onEnglishModeChanged = { [weak self] isEnglish in
             guard let self else { return }
             self.view.allDescendants(tag: Self.enKeyTag)
                 .compactMap { $0 as? GlassKeyButton }
                 .forEach { $0.isGlassActive = isEnglish }
+            self.renderChrome(state: Self.emptyRenderState, romanHint: "")
         }
     }
+
+    private func renderChrome(state: IosRenderState, romanHint: String) {
+        let keyboardState = handler.keyboardState
+        let presentation = KeyboardChrome.presentation(
+            isEnglish: handler.isEnglishMode,
+            keyboardState: keyboardState,
+            romanHint: romanHint,
+            state: state
+        )
+        setChromeRows(presentation.rows, animated: true)
+        switch presentation {
+        case .hidden:
+            rootView?.clearStrip()
+        case .quickAccess:
+            rootView?.showQuickAccess(charPickOnly: false) { [weak self] item in
+                self?.handler?.insertQuickAccess(item.commitText)
+            }
+        case .charPickQuickAccess:
+            rootView?.showQuickAccess(charPickOnly: true) { [weak self] item in
+                self?.handler?.insertQuickAccess(item.commitText)
+            }
+        case .composition, .charPickCandidates:
+            rootView?.render(state, romanHint: romanHint, keyboardState: keyboardState)
+        }
+    }
+
+    private static let emptyRenderState = IosRenderState(
+        candidates: [], selectedIndex: nil, preedit: "", segments: [],
+        focusedSegmentIndex: nil, commitText: nil, segmentEditActive: false,
+        segmentEditIndex: nil, phraseCandidates: [], selectedPhraseIndex: 0
+    )
 
     // MARK: - Key Actions (forward to handler)
 
@@ -274,12 +310,11 @@ class KeyboardViewController: UIInputViewController {
         handler?.sendChar(ch)
     }
 
-    @objc func symbolKeyTapped(_ sender: UIButton) {
+    @objc func literalKeyTapped(_ sender: UIButton) {
         guard let ch = sender.title(for: .normal), !ch.isEmpty else { return }
-        handler?.sendChar(ch)
+        handler?.sendLiteralKeycap(ch)
     }
 
-    @objc func periodTapped()      { handler?.sendChar(".") }
     @objc func backspaceTapped()   { handler?.backspaceTapped() }
     @objc func spaceTapped()       { handler?.spaceTapped() }
     @objc func returnTapped()      { handler?.returnTapped() }

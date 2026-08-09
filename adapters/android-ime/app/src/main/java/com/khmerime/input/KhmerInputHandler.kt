@@ -98,6 +98,35 @@ class KhmerInputHandler(
 
     // ── Key actions ───────────────────────────────────────────────────────────
 
+    // A new physical character gesture means typing has not paused yet. Cancel a
+    // decode scheduled by the previous ACTION_UP before it can render suggestion
+    // rows underneath the finger that is now held down. The accepted ACTION_UP
+    // will schedule a fresh decode for the latest Roman buffer.
+    fun keyTouchBegan() {
+        recomputer.cancel()
+        modelRefiner.cancel()
+    }
+
+    // Idle-tray characters are already final Khmer glyphs. Insert them directly;
+    // routing them through Roman transliteration would incorrectly start a composition.
+    fun insertQuickAccess(text: String) {
+        if (romanBuffer.isNotEmpty()) return
+        trailingSpace = false
+        proxy.insertText(text)
+    }
+
+    fun sendLiteralKeycap(text: String) {
+        trailingSpace = false
+        if (keyboardState == KeyboardState.English ||
+            keyboardState == KeyboardState.SuggestCharacter ||
+            romanBuffer.isEmpty()
+        ) {
+            proxy.insertText(text)
+            return
+        }
+        commitComposition(suffix = text)
+    }
+
     fun sendChar(ch: String) {
         if (keyboardState == KeyboardState.English) {
             proxy.insertText(ch)
@@ -112,8 +141,19 @@ class KhmerInputHandler(
         }
         if (keyboardState == KeyboardState.Panel) transitionTo(KeyboardState.Qwerty)
         trailingSpace = false
-        proxy.insertText(ch)
-        romanBuffer += ch
+        // A standalone single-keycap char (digit/symbol on the "123"/"#+=" layer) does not compose:
+        // it auto-commits to its own Khmer form (e.g. "1" -> "១"). Inserting the raw key
+        // optimistically would paint the Latin glyph, then the deferred call deletes it and inserts
+        // the Khmer one — a visible flicker. Skip the optimistic insert for it; the deferred commit
+        // inserts the final glyph once (deleteBackward(0) below is a no-op). Only when it is
+        // standalone (romanBuffer empty) — a digit mid-composition is part of the buffer and still
+        // inserts optimistically. `isSingleKeycap` mirrors Rust `is_single_keycap_char`; the two
+        // must change together, and `romanBuffer.isEmpty()` mirrors its `composition_raw.len()==1`
+        // auto-commit condition.
+        if (!(romanBuffer.isEmpty() && isSingleKeycap(ch))) {
+            proxy.insertText(ch)
+            romanBuffer += ch
+        }
         // Deferred path: append the roman WITHOUT the per-key candidate decode (the
         // 300–800 ms cost that made fast typing churn). Update the roman immediately and
         // let `recomputer` run the decode once typing pauses. Single-keycap auto-commit
@@ -124,7 +164,10 @@ class KhmerInputHandler(
             dispatcher.onMain {
                 val committed = state.commitText
                 if (committed != null && committed.isNotEmpty()) {
-                    proxy.deleteBackward(romanBuffer.length)
+                    // For a standalone single-keycap the raw key was never optimistically inserted,
+                    // so there is nothing to delete (romanBuffer is empty); only replace the
+                    // optimistic roman when we actually inserted one.
+                    if (romanBuffer.isNotEmpty()) proxy.deleteBackward(romanBuffer.length)
                     proxy.insertText(committed)
                     romanBuffer = ""
                     recomputer.cancel()
@@ -339,7 +382,7 @@ class KhmerInputHandler(
 
     // ── Private ───────────────────────────────────────────────────────────────
 
-    private fun commitComposition() {
+    private fun commitComposition(suffix: String? = null) {
         if (keyboardState == KeyboardState.SuggestCharacter) return
         modelRefiner.cancel()
         recomputer.cancel()
@@ -351,6 +394,7 @@ class KhmerInputHandler(
         }
         repeat(romanBuffer.length) { proxy.deleteBackward() }
         if (khmer.isNotEmpty()) proxy.insertText(khmer)
+        if (suffix != null) proxy.insertText(suffix)
         romanBuffer = ""
         trailingSpace = false
         render(state)
@@ -367,4 +411,10 @@ class KhmerInputHandler(
         keyboardState = state
         onTransition?.invoke(state)
     }
+
+    // Mirrors Rust `is_single_keycap_char`: an ASCII graphic that is not a letter — digits,
+    // punctuation, symbols. These auto-commit to a Khmer form rather than composing. Keep this in
+    // sync with the Rust rule; if it widens/narrows there, update it here too.
+    private fun isSingleKeycap(ch: String): Boolean =
+        ch.length == 1 && ch[0].code in 0x21..0x7E && !ch[0].isLetter()
 }

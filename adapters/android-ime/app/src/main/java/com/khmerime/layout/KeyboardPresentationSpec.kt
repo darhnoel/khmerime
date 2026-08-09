@@ -3,11 +3,6 @@ package com.khmerime.layout
 import com.khmerime.input.KhmerRenderState
 import com.khmerime.input.KeyboardState
 
-// Which input-chrome rows are worth their height (parity with iOS KeyboardChrome):
-// roman composition owns the preedit strip + candidate row; Suggest Character owns
-// only the candidate row, and only while candidates exist.
-enum class ChromeRows { None, CandidateOnly, StripAndCandidate, StripOnly }
-
 // One selectable card in the Phrase Wheel: the phrase text plus its index into the
 // render state's phraseCandidates (so a tap maps to selectPhrase).
 data class PhraseAlternative(
@@ -18,14 +13,6 @@ data class PhraseAlternative(
 )
 
 object KeyboardPresentationSpec {
-    // The live roman string is immediate typing feedback, so reserve the roman strip
-    // while its decode is pending — but NOT the candidate row. Hardcoding
-    // StripAndCandidate reserved two rows even on the first keystroke (no candidates
-    // yet), leaving an empty second row that never collapsed — the "2 rows of space"
-    // divergence from iOS. The real decode expands to StripAndCandidate when
-    // candidates actually exist.
-    fun pendingDecodeChromeRows(): ChromeRows = ChromeRows.StripOnly
-
     fun suggestionCandidates(state: KhmerRenderState): List<String> = state.candidates
 
     // The Phrase Wheel cards (ADR-0015): whole-phrase alternatives EXCLUDING the one the
@@ -98,30 +85,4 @@ object KeyboardPresentationSpec {
     private const val COENG_SIGN = '្'
     private const val DOTTED_CIRCLE = "◌"
 
-    // Mirrors iOS KeyboardChrome.rows: Suggest Character shows only the candidate
-    // row and only while candidates exist; roman composition keeps strip +
-    // candidate together whenever it has a hint or candidates; otherwise nothing.
-    fun chromeRows(
-        keyboardState: KeyboardState?,
-        romanHint: String,
-        state: KhmerRenderState,
-    ): ChromeRows {
-        if (keyboardState == KeyboardState.SuggestCharacter) {
-            return if (state.candidates.isEmpty()) ChromeRows.None else ChromeRows.CandidateOnly
-        }
-        // Collapse gate must match iOS KeyboardChrome.rows exactly: the strip is worth
-        // its height when the roman hint OR the segments OR the preedit have content —
-        // not romanHint alone. Checking only romanHint made Android auto-collapse the
-        // strip in states where iOS keeps it (segments/preedit present, hint empty).
-        val hasStripContent =
-            romanHint.isNotEmpty() || state.segments.isNotEmpty() || state.preedit.isNotEmpty()
-        if (!hasStripContent) return ChromeRows.None
-        // The candidate row is the Phrase Wheel (alternatives) during normal composition,
-        // or the word candidate row while editing a segment. When neither has anything to
-        // show, the strip stands alone (StripOnly) so the row collapses (ADR-0015).
-        val candidateRowVisible =
-            if (state.segmentEditActive) state.candidates.isNotEmpty()
-            else phraseAlternatives(state).isNotEmpty()
-        return if (candidateRowVisible) ChromeRows.StripAndCandidate else ChromeRows.StripOnly
-    }
 }

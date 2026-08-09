@@ -1,6 +1,7 @@
 package com.khmerime
 
 import com.khmerime.views.PopupRect
+import com.khmerime.views.absoluteKeyPreviewPopupFrame
 import com.khmerime.views.keyPreviewPopupFrame
 import org.junit.Assert.assertEquals
 import org.junit.Test
@@ -45,5 +46,18 @@ class KeyPreviewPopupFrameTest {
         val frame = keyPreviewPopupFrame(source, PopupRect(0f, 0f, 0f, 0f))
 
         assertEquals(4f, frame.left, 0.001f)
+    }
+
+    @Test
+    fun topRowPopupIsTranslatedIntoScreenSpaceAboveImeWindow() {
+        val frame = absoluteKeyPreviewPopupFrame(
+            sourceInIme = PopupRect(100f, 4f, 140f, 54f),
+            imeLeftOnScreen = 0f,
+            imeTopOnScreen = 1400f,
+            screenWidth = 1080f,
+        )
+
+        assertEquals(1330.5f, frame.top, 0.001f)
+        assertEquals(1398f, frame.bottom, 0.001f)
     }
 }

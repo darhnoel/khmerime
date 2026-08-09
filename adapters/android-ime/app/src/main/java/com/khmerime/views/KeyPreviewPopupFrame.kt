@@ -28,3 +28,20 @@ fun keyPreviewPopupFrame(source: PopupRect, bounds: PopupRect): PopupRect {
     val top = source.top - height - VERTICAL_GAP
     return PopupRect(left, top, left + width, top + height)
 }
+
+// PopupWindow.showAtLocation uses screen coordinates. Translate before doing the
+// geometry so a top-row preview can occupy the host-app area above the IME window.
+fun absoluteKeyPreviewPopupFrame(
+    sourceInIme: PopupRect,
+    imeLeftOnScreen: Float,
+    imeTopOnScreen: Float,
+    screenWidth: Float,
+): PopupRect = keyPreviewPopupFrame(
+    source = PopupRect(
+        left = sourceInIme.left + imeLeftOnScreen,
+        top = sourceInIme.top + imeTopOnScreen,
+        right = sourceInIme.right + imeLeftOnScreen,
+        bottom = sourceInIme.bottom + imeTopOnScreen,
+    ),
+    bounds = PopupRect(0f, 0f, screenWidth, Float.MAX_VALUE),
+)

@@ -46,6 +46,18 @@ class KhmerInputHandlerBehaviorTest {
         assertTrue("focusIn + focusOut must leave text empty", textField.text.isEmpty())
     }
 
+    @Test
+    fun quickAccessInsertsExactRepeatedUnicodeAndReplacesSelection() {
+        val (handler, textField) = makeHandler()
+        textField.insertText("replace me")
+        textField.setSelection("replace me")
+
+        handler.insertQuickAccess("ៈ")
+        handler.insertQuickAccess("។")
+
+        assertEquals("ៈ។", textField.text)
+    }
+
     // ── Selection delete ───────────────────────────────────────────────────────
 
     @Test
@@ -117,6 +129,18 @@ class KhmerInputHandlerBehaviorTest {
         type("nh", into = handler)
 
         assertEquals("text field must reflect roman preedit speculatively", "nh", textField.text)
+    }
+
+    @Test
+    fun literalKeycapCommitsVisibleCompositionThenInsertsItsLabel() {
+        val (handler, textField) = makeHandler()
+        type("nhom", into = handler)
+
+        handler.sendLiteralKeycap("!")
+
+        assertFalse("the Roman composition must be replaced", textField.text.contains("nhom"))
+        assertTrue("the committed Khmer must be followed by the literal label", textField.text.endsWith("!"))
+        assertEquals("only the final character is literal", 1, textField.text.count { it == '!' })
     }
 
     @Test
@@ -715,5 +739,55 @@ class KhmerInputHandlerBehaviorTest {
 
         dispatcher.runPendingDelayed()
         assertEquals("exactly one decode/render lands on pause", 1, renders)
+    }
+
+    @Test
+    fun nextKeyDownCancelsDecodeBeforeItCanMoveTheKeyboard() {
+        val dispatcher = RecordingDispatcher()
+        val (handler, _) = makeHandler(dispatcher)
+        var renders = 0
+        handler.onRender = { renders++ }
+
+        handler.sendChar("b")
+        handler.keyTouchBegan()
+        dispatcher.runPendingDelayed()
+
+        assertEquals(
+            "a decode scheduled by the previous key must not render while the next key is held",
+            0,
+            renders,
+        )
+
+        handler.sendChar("e")
+        dispatcher.runPendingDelayed()
+        assertEquals("the latest word still decodes after typing pauses", 1, renders)
+    }
+
+    // ── Single-keycap flicker ("123" layout) ───────────────────────────────────
+
+    // A standalone digit auto-commits to its Khmer numeral (1 -> ១). It must NOT be inserted
+    // optimistically as the raw key first: doing so paints the Latin "1", then deletes it and
+    // inserts "១" — a visible glyph-swap flicker. The op sequence must be a single insert(១).
+    @Test
+    fun standaloneDigitDoesNotFlickerRawKey() {
+        val (handler, textField) = makeHandler()
+
+        handler.sendChar("1")
+
+        assertEquals("standalone digit must insert its Khmer form once, no raw-key flash", listOf("insert(១)"), textField.ops)
+        assertEquals("១", textField.text)
+    }
+
+    // A digit typed mid-composition is part of the roman buffer, not a standalone auto-commit,
+    // so it must still be inserted optimistically like any composing key (unchanged behavior).
+    @Test
+    fun digitMidCompositionStillInsertsOptimistically() {
+        val (handler, textField) = makeHandler()
+
+        type("kh", into = handler)
+        textField.ops.clear()
+        handler.sendChar("1")
+
+        assertEquals("mid-composition digit is optimistically inserted", listOf("insert(1)"), textField.ops)
     }
 }

@@ -412,26 +412,22 @@ fn bridge_nida_mode_does_not_map_backspace_or_enter_evdev_keycodes() {
 }
 
 #[test]
-fn bridge_commits_raw_roman_when_no_candidate() {
+fn bridge_auto_commits_backtick_as_single_keycap() {
+    // A backtick has no Khmer candidate. Since `is_single_keycap_char` widened to every non-alpha
+    // ASCII graphic, a lone backtick is a single-keycap auto-commit: it commits its raw self
+    // immediately on the keystroke, no Enter needed and no preedit accumulated (like a digit →
+    // Khmer numeral). Mirrors the macOS `session_auto_commits_backtick_as_single_keycap` test.
     let (child, mut stdin, mut stdout) = spawn_bridge();
 
     send_command(&mut stdin, r#"{"cmd":"focus_in"}"#);
     let _ = read_response(&mut stdout);
 
-    for keyval in [96, 96, 96] {
-        send_command(
-            &mut stdin,
-            &format!(r#"{{"cmd":"process_key_event","keyval":{keyval},"keycode":0,"state":0}}"#),
-        );
-        let _ = read_response(&mut stdout);
-    }
-
     send_command(
         &mut stdin,
-        r#"{"cmd":"process_key_event","keyval":65293,"keycode":0,"state":0}"#,
+        r#"{"cmd":"process_key_event","keyval":96,"keycode":0,"state":0}"#,
     );
     let commit_response = read_response(&mut stdout);
-    assert_eq!(commit_response["commit_text"], Value::String("```".to_owned()));
+    assert_eq!(commit_response["commit_text"], Value::String("`".to_owned()));
     assert_eq!(commit_response["consumed"], Value::Bool(true));
 
     shutdown_and_assert_ok(child, &mut stdin, &mut stdout);

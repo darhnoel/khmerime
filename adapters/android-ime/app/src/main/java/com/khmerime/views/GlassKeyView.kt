@@ -4,6 +4,7 @@ import com.khmerime.layout.KeyboardKey
 import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Paint
+import android.graphics.Rect
 import android.graphics.RectF
 import android.util.TypedValue
 import android.view.HapticFeedbackConstants
@@ -28,7 +29,8 @@ open class GlassKeyView(
     private val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { textAlign = Paint.Align.CENTER }
 
     private val rect = RectF()
-    private val cornerRadius get() = height * 0.22f
+    private val visualInset = (2 * resources.displayMetrics.density).toInt()
+    private val cornerRadius get() = (height - visualInset * 2).coerceAtLeast(0) * 0.22f
 
     private val squishScale get() = 1f - squish * 0.08f
 
@@ -51,12 +53,40 @@ open class GlassKeyView(
 
     private val animator = GlassKeyPressAnimator(onUpdate = { applySquish(it) })
     private val touchSlop = ViewConfiguration.get(context).scaledTouchSlop.toFloat()
+    private var pressedBounds: PressedKeyBounds? = null
 
     // Keypress preview bubble. Set by the service for character-producing keys.
     var onPreviewShow: ((GlassKeyView) -> Unit)? = null
     var onPreviewHide: (() -> Unit)? = null
 
     val previewLabel: String get() = key.label
+
+    fun copyVisualBounds(out: Rect) {
+        out.set(
+            visualInset,
+            visualInset,
+            (width - visualInset).coerceAtLeast(visualInset),
+            (height - visualInset).coerceAtLeast(visualInset),
+        )
+    }
+
+    protected fun capturePressedBounds(event: MotionEvent) {
+        pressedBounds = PressedKeyBounds.fromDown(
+            rawX = event.rawX,
+            rawY = event.rawY,
+            localX = event.x,
+            localY = event.y,
+            width = width,
+            height = height,
+        )
+    }
+
+    protected fun releaseIsInsidePressedBounds(event: MotionEvent, slop: Float = touchSlop): Boolean =
+        pressedBounds?.contains(event.rawX, event.rawY, slop) == true
+
+    protected fun clearPressedBounds() {
+        pressedBounds = null
+    }
 
     override fun onDraw(canvas: Canvas) {
         val dark = isDark
@@ -72,7 +102,12 @@ open class GlassKeyView(
 
         val save = canvas.save()
         canvas.scale(squishScale, squishScale, width / 2f, height / 2f)
-        rect.set(0f, 0f, width.toFloat(), height.toFloat())
+        rect.set(
+            visualInset.toFloat(),
+            visualInset.toFloat(),
+            (width - visualInset).toFloat(),
+            (height - visualInset).toFloat(),
+        )
         canvas.drawRoundRect(rect, cornerRadius, cornerRadius, bgPaint)
         canvas.drawRoundRect(rect, cornerRadius, cornerRadius, borderPaint)
         canvas.drawText(key.label, width / 2f, height / 2f - (textPaint.descent() + textPaint.ascent()) / 2f, textPaint)
@@ -82,6 +117,7 @@ open class GlassKeyView(
     override fun onTouchEvent(event: MotionEvent): Boolean {
         when (event.actionMasked) {
             MotionEvent.ACTION_DOWN -> {
+                capturePressedBounds(event)
                 performKeyPressHaptic()
                 animator.press()
                 onPreviewShow?.invoke(this)
@@ -90,14 +126,15 @@ open class GlassKeyView(
             MotionEvent.ACTION_UP -> {
                 animator.release()
                 onPreviewHide?.invoke()
-                if (event.x in -touchSlop..width + touchSlop &&
-                    event.y in -touchSlop..height + touchSlop
-                ) {
+                val accepted = releaseIsInsidePressedBounds(event)
+                clearPressedBounds()
+                if (accepted) {
                     onClick()
                 }
                 return true
             }
             MotionEvent.ACTION_CANCEL -> {
+                clearPressedBounds()
                 animator.release()
                 onPreviewHide?.invoke()
                 return true

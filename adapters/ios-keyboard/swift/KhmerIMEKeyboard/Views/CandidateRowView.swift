@@ -2,7 +2,12 @@ import UIKit
 
 protocol KeyboardCandidateRowDisplaying: AnyObject {
     func render(_ state: IosRenderState, presentation: CandidateRowPresentation)
+    func showQuickAccess(_ items: [QuickAccessItem], onSelected: @escaping (QuickAccessItem) -> Void)
     func clear()
+}
+
+extension KeyboardCandidateRowDisplaying {
+    func showQuickAccess(_ items: [QuickAccessItem], onSelected: @escaping (QuickAccessItem) -> Void) {}
 }
 
 enum CandidateRowPresentation {
@@ -16,6 +21,8 @@ final class CandidateRowView: UIView, KeyboardCandidateRowDisplaying {
     private let stack = UIStackView()
     private let pool = StripLabelPool()
     private var tappableLabels: [UILabel] = []
+    private var quickAccessItems: [QuickAccessItem] = []
+    private var onQuickAccessSelected: ((QuickAccessItem) -> Void)?
 
     // Normal horizontal padding at the row edges when chips overflow and scroll.
     private static let edgeInset: CGFloat = 8
@@ -32,6 +39,9 @@ final class CandidateRowView: UIView, KeyboardCandidateRowDisplaying {
     // MARK: - Public API
 
     func render(_ state: IosRenderState, presentation: CandidateRowPresentation = .composition) {
+        quickAccessItems = []
+        onQuickAccessSelected = nil
+        pool.setQuickAccessFeedbackEnabled(false, for: [])
         let selectedIndex: Int?
         switch presentation {
         case .composition:
@@ -42,7 +52,26 @@ final class CandidateRowView: UIView, KeyboardCandidateRowDisplaying {
         rebuild(candidates: state.candidates, selectedIndex: selectedIndex, presentation: presentation)
     }
 
+    func showQuickAccess(_ items: [QuickAccessItem], onSelected: @escaping (QuickAccessItem) -> Void) {
+        quickAccessItems = items
+        onQuickAccessSelected = onSelected
+        let visible = pool.sync(count: items.count, in: stack)
+        for (index, label) in visible.enumerated() {
+            let item = items[index]
+            label.text = item.displayText
+            label.font = .systemFont(ofSize: 18, weight: .regular)
+            label.textColor = .label
+            label.accessibilityLabel = item.accessibilityLabel ?? item.displayText
+        }
+        tappableLabels = visible
+        pool.setQuickAccessFeedbackEnabled(true, for: visible)
+        setNeedsLayout()
+    }
+
     func clear() {
+        quickAccessItems = []
+        onQuickAccessSelected = nil
+        pool.setQuickAccessFeedbackEnabled(false, for: [])
         rebuild(candidates: [], selectedIndex: nil, presentation: .composition)
     }
 
@@ -57,7 +86,7 @@ final class CandidateRowView: UIView, KeyboardCandidateRowDisplaying {
         addSubview(scrollView)
 
         stack.axis = .horizontal
-        stack.spacing = 8
+        stack.spacing = 13
         stack.alignment = .center
         stack.translatesAutoresizingMaskIntoConstraints = false
         scrollView.addSubview(stack)
@@ -135,7 +164,11 @@ final class CandidateRowView: UIView, KeyboardCandidateRowDisplaying {
         let pointInStack = stack.convert(point, from: coordinateSpace)
         let frames = tappableLabels.map { $0.frame }
         if let index = StripView.segmentIndex(at: pointInStack, labelFrames: frames) {
-            onCandidateSelected?(index)
+            if quickAccessItems.indices.contains(index) {
+                onQuickAccessSelected?(quickAccessItems[index])
+            } else {
+                onCandidateSelected?(index)
+            }
         }
     }
 

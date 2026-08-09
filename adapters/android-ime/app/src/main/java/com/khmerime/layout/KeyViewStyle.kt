@@ -11,8 +11,10 @@ object KeyViewStyle {
         KeyboardKeyAction.SwitchToQwerty,
         KeyboardKeyAction.SwitchToNumeric,
         KeyboardKeyAction.SwitchToSymbols -> 1.3f
-        KeyboardKeyAction.Insert -> 1f
+        KeyboardKeyAction.Insert,
+        KeyboardKeyAction.InsertLiteral -> 1f
     }
 
-    fun isAction(key: KeyboardKey): Boolean = key.action != KeyboardKeyAction.Insert
+    fun isAction(key: KeyboardKey): Boolean =
+        key.action != KeyboardKeyAction.Insert && key.action != KeyboardKeyAction.InsertLiteral
 }

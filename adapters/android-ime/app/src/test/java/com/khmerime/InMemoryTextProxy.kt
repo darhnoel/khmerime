@@ -8,6 +8,11 @@ class InMemoryTextProxy : TextProxy {
 
     val text: String get() = buffer.toString()
 
+    // Ordered log of the edit operations the handler performed, so tests can assert not just the
+    // final text but the sequence — e.g. that a standalone digit inserts its Khmer form once
+    // rather than inserting the raw key and then deleting/reinserting it (the "123" flicker).
+    val ops = mutableListOf<String>()
+
     // Records the last Editor Action the handler performed (null if none yet).
     var lastEditorAction: Int? = null
         private set
@@ -33,13 +38,20 @@ class InMemoryTextProxy : TextProxy {
     }
 
     override fun insertText(text: String) {
+        ops.add("insert($text)")
         // Inserting over a selection replaces it (real IME behavior).
         deleteSelection()
         buffer.append(text)
     }
 
     override fun deleteBackward() {
+        ops.add("delBack")
         if (buffer.isNotEmpty()) buffer.deleteCharAt(buffer.length - 1)
+    }
+
+    override fun deleteBackward(count: Int) {
+        ops.add("delBack($count)")
+        repeat(count) { if (buffer.isNotEmpty()) buffer.deleteCharAt(buffer.length - 1) }
     }
 
     // Test-only: simulate the host clearing the field outside the keyboard

@@ -29,8 +29,7 @@ import UIKit
 
 struct KeyboardLayerActions {
     let letter: Selector
-    let symbol: Selector
-    let period: Selector
+    let literal: Selector
     let backspace: Selector
     let space: Selector
     let returnKey: Selector
@@ -121,7 +120,7 @@ struct KeyboardLayerFactory {
         row.addArrangedSubview(leftBtn)
         row.addArrangedSubview(spaceBtn)
         if includePeriod {
-            let periodBtn = makeSpecialKey(".", action: actions.period, previewLabel: ".")
+            let periodBtn = makeLiteralSpecialKey(".")
             periodBtn.widthAnchor.constraint(equalToConstant: specialKeyW).isActive = true
             row.addArrangedSubview(periodBtn)
         }
@@ -216,7 +215,18 @@ struct KeyboardLayerFactory {
         btn.previewLabel = symbol
         KeyStyle.applySymbol(btn, isIPad: isIPad)
         btn.onPress = { [weak target, weak btn] in
-            _ = target?.perform(actions.symbol, with: btn)
+            _ = target?.perform(actions.literal, with: btn)
+        }
+        return btn
+    }
+
+    private func makeLiteralSpecialKey(_ literal: String) -> UIButton {
+        let btn = GlassKeyButton(frame: .zero)
+        btn.setTitle(literal, for: .normal)
+        btn.previewLabel = literal
+        KeyStyle.applySpecial(btn, isIPad: isIPad)
+        btn.onPress = { [weak target, weak btn] in
+            _ = target?.perform(actions.literal, with: btn)
         }
         return btn
     }

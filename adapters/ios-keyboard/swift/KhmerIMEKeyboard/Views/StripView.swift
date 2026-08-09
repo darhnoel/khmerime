@@ -6,6 +6,8 @@ final class StripView: UIView, KeyboardStripDisplaying {
     private let khmerRow = UIStackView()
     private let segmentPool = StripLabelPool()
     private var tappableSegmentLabels: [UILabel] = []
+    private var quickAccessItems: [QuickAccessItem] = []
+    private var onQuickAccessSelected: ((QuickAccessItem) -> Void)?
 
     var onKhmerRowTapped: (() -> Void)?
     var onKhmerRowLongPressed: (() -> Void)?
@@ -28,11 +30,39 @@ final class StripView: UIView, KeyboardStripDisplaying {
     // MARK: - Public API
 
     func render(_ state: IosRenderState, romanBuffer: String) {
+        romanRow.isHidden = false
+        quickAccessItems = []
+        onQuickAccessSelected = nil
+        segmentPool.setQuickAccessFeedbackEnabled(false, for: [])
+        khmerRow.distribution = .equalSpacing
         romanRow.text = StripPresentationSpec.romanRowText(state: state, romanBuffer: romanBuffer)
         rebuildKhmerRow(state: state)
     }
 
+    func showQuickAccess(_ items: [QuickAccessItem], onSelected: @escaping (QuickAccessItem) -> Void) {
+        romanRow.isHidden = true
+        quickAccessItems = items
+        onQuickAccessSelected = onSelected
+        khmerRow.distribution = .fillEqually
+        let visible = segmentPool.sync(count: items.count, in: khmerRow)
+        for (index, label) in visible.enumerated() {
+            let item = items[index]
+            label.attributedText = nil
+            label.text = item.displayText
+            label.font = .systemFont(ofSize: 20, weight: .regular)
+            label.textColor = .label
+            label.textAlignment = .center
+            label.accessibilityLabel = item.accessibilityLabel ?? item.displayText
+        }
+        tappableSegmentLabels = visible
+        segmentPool.setQuickAccessFeedbackEnabled(true, for: visible)
+    }
+
     func clear() {
+        romanRow.isHidden = false
+        quickAccessItems = []
+        onQuickAccessSelected = nil
+        segmentPool.setQuickAccessFeedbackEnabled(false, for: [])
         romanRow.text = ""
         segmentPool.sync(count: 0, in: khmerRow)
     }
@@ -163,9 +193,15 @@ final class StripView: UIView, KeyboardStripDisplaying {
         let point = gr.location(in: khmerRow)
         let frames = tappableSegmentLabels.map { $0.frame }
         if let index = StripView.segmentIndex(at: point, labelFrames: frames) {
-            onSegmentFocused?(index)
-        } else {
+            if quickAccessItems.indices.contains(index) {
+                onQuickAccessSelected?(quickAccessItems[index])
+            } else {
+                onSegmentFocused?(index)
+            }
+        } else if quickAccessItems.isEmpty {
             onKhmerRowTapped?()
+        } else {
+            return
         }
     }
 

@@ -4,6 +4,18 @@ import UIKit
 
 final class StripViewTests: XCTestCase {
 
+    func test_showQuickAccess_displaysAllKhmerDigitsWithUniformRegularTypography() {
+        let strip = StripView()
+
+        strip.showQuickAccess(QuickAccessSpec.digits) { _ in }
+
+        let digitLabels = visibleLabels(in: strip).filter { QuickAccessSpec.digits.map(\.displayText).contains($0.text ?? "") }
+        let regularFontName = UIFont.systemFont(ofSize: 20, weight: .regular).fontName
+        XCTAssertEqual(digitLabels.map(\.text), QuickAccessSpec.digits.map(\.displayText))
+        XCTAssertEqual(digitLabels.map { $0.font.fontName }, Array(repeating: regularFontName, count: 10))
+        XCTAssertEqual(digitLabels.map { $0.font.pointSize }, Array(repeating: 20, count: 10))
+    }
+
     // MARK: - segmentIndex(at:labelFrames:)
 
     func test_segmentIndex_pointInsideALabelFrame_returnsThatIndex() {

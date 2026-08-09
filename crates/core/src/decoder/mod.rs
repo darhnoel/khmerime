@@ -22,6 +22,9 @@ pub use self::span_proposal::{
 };
 pub use self::types::{DecodeCandidate, DecodeFailure, DecodeRequest, DecodeResult, DecodeSegment, DecoderMode};
 pub(crate) use self::weighted_span::WeightedSpanDecoder;
+// Test-only Weighted Span decode counter (see `weighted_span.rs`). Re-exported up to the crate root
+// so dependent crates' tests can assert the per-keystroke decode budget.
+pub use self::weighted_span::{reset_weighted_span_decode_calls, weighted_span_decode_calls};
 
 pub(crate) trait Decoder: Send + Sync {
     fn name(&self) -> &'static str;
