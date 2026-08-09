@@ -40,6 +40,28 @@ final class KeyboardLayerFactoryTests: XCTestCase {
         XCTAssertEqual(buttonTitles(in: symbolsRows[3]), ["", "EN", "ABC", "space", "⏎"])
     }
 
+    func test_visiblePunctuationAndSymbolsRouteThroughLiteralAction() {
+        let numericRows = standardRows(in: factory.buildNumericView())
+        let symbolButtons = numericRows[0].subviews.compactMap { $0 as? UIButton }
+        let literalButtons: [GlassKeyButton] = symbolButtons.compactMap { $0 as? GlassKeyButton }
+        let qwertyPeriod = standardRows(in: factory.buildQwertyView())[3]
+            .subviews.compactMap { $0 as? UIButton }
+            .first { $0.title(for: .normal) == "." }
+
+        literalButtons.forEach { button in
+            button.configureForTesting(runner: { _, to, _, onUpdate in onUpdate(to) })
+            button.touchesBegan(Set(), with: nil)
+        }
+        if let period = qwertyPeriod as? GlassKeyButton {
+            period.configureForTesting(runner: { _, to, _, onUpdate in onUpdate(to) })
+            period.touchesBegan(Set(), with: nil)
+        }
+
+        XCTAssertEqual(target.literalInputs, ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0", "."])
+        XCTAssertEqual(qwertyPeriod.map { actionNames(on: $0) } ?? [], [],
+            "period must use the rapid text-key touch-down path, not touchUpInside")
+    }
+
     func test_numericLayerSwappedModeButtonsKeepTheirActions() {
         let rows = standardRows(in: factory.buildNumericView())
         let row3Buttons = (rows[2] as? UIStackView)?.arrangedSubviews.compactMap { $0 as? UIButton } ?? []
@@ -63,7 +85,7 @@ final class KeyboardLayerFactoryTests: XCTestCase {
         XCTAssertEqual(actionNames(on: buttons[1]), ["toggleEnglishTapped"])
         XCTAssertEqual(actionNames(on: buttons[2]), ["numericTapped"])
         XCTAssertEqual(actionNames(on: buttons[3]), ["spaceTapped"])
-        XCTAssertEqual(actionNames(on: buttons[4]), ["periodTapped"])
+        XCTAssertEqual(actionNames(on: buttons[4]), [], "period commits through GlassKeyButton.onPress")
         XCTAssertEqual(actionNames(on: buttons[5]), ["returnTapped"])
     }
 
@@ -174,10 +196,11 @@ final class KeyboardLayerFactoryTests: XCTestCase {
 }
 
 private final class ActionTarget: NSObject {
+    var literalInputs: [String] = []
+
     static let actions = KeyboardLayerActions(
         letter: #selector(letterTapped(_:)),
-        symbol: #selector(symbolKeyTapped(_:)),
-        period: #selector(periodTapped),
+        literal: #selector(literalKeyTapped(_:)),
         backspace: #selector(backspaceTapped),
         space: #selector(spaceTapped),
         returnKey: #selector(returnTapped),
@@ -189,8 +212,9 @@ private final class ActionTarget: NSObject {
     )
 
     @objc func letterTapped(_ sender: UIButton) {}
-    @objc func symbolKeyTapped(_ sender: UIButton) {}
-    @objc func periodTapped() {}
+    @objc func literalKeyTapped(_ sender: UIButton) {
+        literalInputs.append(sender.title(for: .normal) ?? "")
+    }
     @objc func backspaceTapped() {}
     @objc func spaceTapped() {}
     @objc func returnTapped() {}

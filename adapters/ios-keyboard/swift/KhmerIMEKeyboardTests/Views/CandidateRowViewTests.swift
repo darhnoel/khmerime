@@ -4,6 +4,43 @@ import UIKit
 
 final class CandidateRowViewTests: XCTestCase {
 
+    func test_showQuickAccess_displaysAppleShapedMarkButSelectsRawUnicode() {
+        let row = CandidateRowView()
+        row.frame = CGRect(x: 0, y: 0, width: 390, height: 44)
+        var selected: String?
+
+        row.showQuickAccess(QuickAccessSpec.marks) { selected = $0.commitText }
+        row.layoutIfNeeded()
+
+        XCTAssertEqual(visibleLabelTexts(in: row), QuickAccessSpec.marks.map(\.displayText))
+        let combiningLabel = visibleLabels(in: row)[9]
+        row.handleTap(at: combiningLabel.frame.center, in: combiningLabel.superview!)
+        XCTAssertEqual(selected, "៊", "Apple's placeholder circle is display-only")
+    }
+
+    func test_quickAccessAndCandidatesUseReadableUnboxedLabelSpacing() {
+        let row = CandidateRowView()
+
+        row.showQuickAccess(QuickAccessSpec.marks) { _ in }
+        XCTAssertEqual(horizontalStack(in: row).spacing, 13)
+
+        row.render(makeState(candidates: ["ខ្ញុំ", "ញុំ"], selectedIndex: 0))
+        XCTAssertEqual(horizontalStack(in: row).spacing, 13)
+    }
+
+    func test_quickAccessTouch_usesTextKeyPressedAnimation() {
+        let row = CandidateRowView()
+        row.showQuickAccess(QuickAccessSpec.marks) { _ in }
+        let label = visibleLabels(in: row)[0]
+        UIView.setAnimationsEnabled(false)
+        defer { UIView.setAnimationsEnabled(true) }
+
+        label.touchesBegan(Set(), with: nil)
+        XCTAssertEqual(label.transform.a, 0.92, accuracy: 0.01)
+        label.touchesEnded(Set(), with: nil)
+        XCTAssertEqual(label.transform.a, 1, accuracy: 0.01)
+    }
+
     func test_render_showsOneLabelPerCandidateInOrder() {
         let row = CandidateRowView()
 
@@ -127,6 +164,21 @@ final class CandidateRowViewTests: XCTestCase {
             if let scroll = sv as? UIScrollView { return scroll }
         }
         fatalError("CandidateRowView must contain a UIScrollView")
+    }
+
+    private func horizontalStack(in view: UIView) -> UIStackView {
+        guard let stack = findHorizontalStack(in: view) else {
+            fatalError("CandidateRowView must contain a horizontal UIStackView")
+        }
+        return stack
+    }
+
+    private func findHorizontalStack(in view: UIView) -> UIStackView? {
+        for subview in view.subviews {
+            if let stack = subview as? UIStackView, stack.axis == .horizontal { return stack }
+            if let stack = findHorizontalStack(in: subview) { return stack }
+        }
+        return nil
     }
 
     private func visibleLabels(in view: UIView) -> [UILabel] {

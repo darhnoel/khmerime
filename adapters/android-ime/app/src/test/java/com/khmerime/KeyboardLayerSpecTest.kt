@@ -45,6 +45,23 @@ class KeyboardLayerSpecTest {
     }
 
     @Test
+    fun visibleDigitsPunctuationAndSymbolsAreLiteralKeycaps() {
+        val numericLiterals = allKeys(KeyboardLayer.Numeric).filter { it.action == KeyboardKeyAction.InsertLiteral }
+        val symbolLiterals = allKeys(KeyboardLayer.Symbols).filter { it.action == KeyboardKeyAction.InsertLiteral }
+
+        assertEquals("all 25 numeric-layer text keys must be literal", 25, numericLiterals.size)
+        assertEquals("all 25 symbol-layer text keys must be literal", 25, symbolLiterals.size)
+        assertEquals(
+            KeyboardKeyAction.InsertLiteral,
+            allKeys(KeyboardLayer.Qwerty).single { it.label == "." }.action,
+        )
+        assertEquals(
+            KeyboardKeyAction.Insert,
+            allKeys(KeyboardLayer.Qwerty).single { it.label == "O" }.action,
+        )
+    }
+
+    @Test
     fun charPickKeyUsesSparkle() {
         val key = allKeys(KeyboardLayer.Qwerty).find { it.action == KeyboardKeyAction.TogglePanel }
         assertEquals("CharPick toggle must use ✦", "✦", key?.label)

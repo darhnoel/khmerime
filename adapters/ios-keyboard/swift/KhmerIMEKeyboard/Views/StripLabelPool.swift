@@ -5,6 +5,8 @@ import UIKit
 // box and clips those marks even when its parent row has spare height.
 private final class KhmerGlyphLabel: UILabel {
     private static let verticalGlyphClearance: CGFloat = 12
+    private static let haptic = UIImpactFeedbackGenerator(style: .light)
+    var quickAccessFeedbackEnabled = false
 
     override var intrinsicContentSize: CGSize {
         var size = super.intrinsicContentSize
@@ -12,6 +14,33 @@ private final class KhmerGlyphLabel: UILabel {
             size.height += Self.verticalGlyphClearance
         }
         return size
+    }
+
+    override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
+        if quickAccessFeedbackEnabled {
+            UIDevice.current.playInputClick()
+            Self.haptic.impactOccurred(intensity: 0.5)
+            Self.haptic.prepare()
+            UIView.animate(withDuration: 0.08) {
+                self.transform = CGAffineTransform(scaleX: 0.92, y: 0.92)
+            }
+        }
+        super.touchesBegan(touches, with: event)
+    }
+
+    override func touchesEnded(_ touches: Set<UITouch>, with event: UIEvent?) {
+        releaseQuickAccessPress()
+        super.touchesEnded(touches, with: event)
+    }
+
+    override func touchesCancelled(_ touches: Set<UITouch>, with event: UIEvent?) {
+        releaseQuickAccessPress()
+        super.touchesCancelled(touches, with: event)
+    }
+
+    private func releaseQuickAccessPress() {
+        guard quickAccessFeedbackEnabled else { return }
+        UIView.animate(withDuration: 0.22) { self.transform = .identity }
     }
 }
 
@@ -42,5 +71,13 @@ final class StripLabelPool {
             label.isHidden = i >= count
         }
         return Array(labels.prefix(count))
+    }
+
+    func setQuickAccessFeedbackEnabled(_ enabled: Bool, for visibleLabels: [UILabel]) {
+        labels.forEach {
+            guard let label = $0 as? KhmerGlyphLabel else { return }
+            label.quickAccessFeedbackEnabled = enabled && visibleLabels.contains { $0 === label }
+            if !label.quickAccessFeedbackEnabled { label.transform = .identity }
+        }
     }
 }

@@ -2,12 +2,15 @@ package com.khmerime.views
 
 import com.khmerime.input.KhmerRenderState
 import com.khmerime.layout.KeyboardPresentationSpec
+import com.khmerime.layout.QuickAccessItem
 import android.content.Context
 import android.graphics.Paint
 import android.graphics.Typeface
 import android.util.AttributeSet
 import android.util.TypedValue
 import android.view.Gravity
+import android.view.HapticFeedbackConstants
+import android.view.MotionEvent
 import android.view.View
 import android.widget.LinearLayout
 import android.widget.TextView
@@ -54,6 +57,7 @@ class PreeditStripView @JvmOverloads constructor(
     }
 
     fun render(state: KhmerRenderState, romanHint: String) {
+        showCompositionLayout()
         romanRow.text = KeyboardPresentationSpec.romanRowText(state, romanHint)
         renderKhmerRow(state)
     }
@@ -67,10 +71,58 @@ class PreeditStripView @JvmOverloads constructor(
     // Khmer row visible while the next decode is pending, but remove its stale tap
     // targets until render() replaces it with choices for the new composition.
     fun showPendingRoman(romanHint: String) {
+        showCompositionLayout()
         romanRow.text = romanHint
         for (index in 0 until khmerRow.childCount) {
             khmerRow.getChildAt(index).setOnClickListener(null)
         }
+    }
+
+    fun showIdleShortcuts(items: List<QuickAccessItem>, onSelected: (QuickAccessItem) -> Unit) {
+        romanRow.visibility = GONE
+        val labels = khmerRowPool.sync(items.size)
+        labels.forEachIndexed { index, label ->
+            val item = items[index]
+            label.text = item.displayText
+            label.contentDescription = item.accessibilityLabel ?: item.displayText
+            label.gravity = Gravity.CENTER
+            label.setPadding(0, 0, 0, 0)
+            label.setTextSize(TypedValue.COMPLEX_UNIT_SP, 20f)
+            label.setTextColor(primaryTextColor())
+            label.typeface = Typeface.create("sans-serif", Typeface.NORMAL)
+            label.paintFlags = label.paintFlags and Paint.UNDERLINE_TEXT_FLAG.inv()
+            label.layoutParams = LinearLayout.LayoutParams(
+                0,
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                1f,
+            )
+            label.setOnTouchListener { view, event ->
+                when (event.actionMasked) {
+                    MotionEvent.ACTION_DOWN -> {
+                        view.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
+                        view.animate().alpha(0.65f).setDuration(80).start()
+                    }
+                    MotionEvent.ACTION_UP,
+                    MotionEvent.ACTION_CANCEL ->
+                        view.animate().alpha(1f).setDuration(220).start()
+                }
+                false
+            }
+            label.setOnClickListener { onSelected(item) }
+        }
+        khmerRow.layoutParams = LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT,
+            0,
+            1f,
+        )
+    }
+
+    private fun showCompositionLayout() {
+        romanRow.visibility = VISIBLE
+        khmerRow.layoutParams = LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT,
+            LinearLayout.LayoutParams.WRAP_CONTENT,
+        ).also { it.bottomMargin = 4.dp }
     }
 
     private fun renderKhmerRow(state: KhmerRenderState) {
@@ -93,6 +145,7 @@ class PreeditStripView @JvmOverloads constructor(
     }
 
     private fun styleSegmentLabel(label: TextView, text: String, index: Int, focused: Boolean) {
+        restoreCompositionLabelLayout(label)
         label.text = text
         label.setTextSize(TypedValue.COMPLEX_UNIT_SP, 18f)
         label.setTextColor(if (focused) primaryTextColor() else secondaryTextColor())
@@ -106,6 +159,7 @@ class PreeditStripView @JvmOverloads constructor(
     }
 
     private fun styleCandidateLabel(label: TextView, text: String) {
+        restoreCompositionLabelLayout(label)
         label.text = text
         label.setTextSize(TypedValue.COMPLEX_UNIT_SP, 18f)
         label.setTextColor(primaryTextColor())
@@ -114,6 +168,18 @@ class PreeditStripView @JvmOverloads constructor(
         // A single word has no segments, so tapping it commits the shown candidate
         // directly (the handler's focusSegment treats no-segments as commit).
         label.setOnClickListener { onSegmentFocused?.invoke(0) }
+    }
+
+    private fun restoreCompositionLabelLayout(label: TextView) {
+        label.animate().cancel()
+        label.alpha = 1f
+        label.setOnTouchListener(null)
+        label.gravity = Gravity.NO_GRAVITY
+        label.setPadding(8.dp, 0, 8.dp, 0)
+        label.layoutParams = LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.WRAP_CONTENT,
+            LinearLayout.LayoutParams.WRAP_CONTENT,
+        )
     }
 
     private fun isDark(): Boolean =

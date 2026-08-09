@@ -2,7 +2,12 @@ import UIKit
 
 protocol KeyboardStripDisplaying: AnyObject {
     func render(_ state: IosRenderState, romanBuffer: String)
+    func showQuickAccess(_ items: [QuickAccessItem], onSelected: @escaping (QuickAccessItem) -> Void)
     func clear()
+}
+
+extension KeyboardStripDisplaying {
+    func showQuickAccess(_ items: [QuickAccessItem], onSelected: @escaping (QuickAccessItem) -> Void) {}
 }
 
 // NOTE: input-click feedback is NOT wired here. KeyboardRootView is a plain UIView
@@ -132,6 +137,18 @@ final class KeyboardRootView: UIView {
         }
         let presentation: CandidateRowPresentation = keyboardState == .charPick ? .charPick : .composition
         candidateRowDisplay.render(state, presentation: presentation)
+    }
+
+    func showQuickAccess(
+        charPickOnly: Bool,
+        onSelected: @escaping (QuickAccessItem) -> Void
+    ) {
+        if charPickOnly {
+            stripDisplay.clear()
+        } else {
+            stripDisplay.showQuickAccess(QuickAccessSpec.digits, onSelected: onSelected)
+        }
+        candidateRowDisplay.showQuickAccess(QuickAccessSpec.marks, onSelected: onSelected)
     }
 
     func clearStrip() {

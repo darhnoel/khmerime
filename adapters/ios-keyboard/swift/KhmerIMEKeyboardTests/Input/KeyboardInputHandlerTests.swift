@@ -47,6 +47,26 @@ final class KeyboardInputHandlerTests: XCTestCase {
             "committed text must contain only Khmer characters, got: \(proxy.text.debugDescription)")
     }
 
+    func test_literalKeycap_commitsVisibleCompositionThenInsertsItsLabel() {
+        let (handler, proxy) = makeHandler()
+        type("nhom", into: handler)
+
+        handler.sendLiteralKeycap("!")
+
+        XCTAssertFalse(proxy.text.contains("nhom"), "the Roman composition must be replaced")
+        XCTAssertTrue(proxy.text.hasSuffix("!"), "the committed Khmer must be followed by the literal label")
+        XCTAssertEqual(proxy.text.filter { $0 == "!" }.count, 1, "only the final character is literal")
+    }
+
+    func test_quickAccess_insertsExactUnicodeOnRepeatedTaps() {
+        let (handler, proxy) = makeHandler()
+
+        handler.insertQuickAccess("ៈ")
+        handler.insertQuickAccess("។")
+
+        XCTAssertEqual(proxy.text, "ៈ។")
+    }
+
     func test_returnTwice_firstCommitsSecondInsertsNewline() {
         let (handler, proxy) = makeHandler()
         type("nhom", into: handler)

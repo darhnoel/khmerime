@@ -46,6 +46,18 @@ class KhmerInputHandlerBehaviorTest {
         assertTrue("focusIn + focusOut must leave text empty", textField.text.isEmpty())
     }
 
+    @Test
+    fun quickAccessInsertsExactRepeatedUnicodeAndReplacesSelection() {
+        val (handler, textField) = makeHandler()
+        textField.insertText("replace me")
+        textField.setSelection("replace me")
+
+        handler.insertQuickAccess("ៈ")
+        handler.insertQuickAccess("។")
+
+        assertEquals("ៈ។", textField.text)
+    }
+
     // ── Selection delete ───────────────────────────────────────────────────────
 
     @Test
@@ -117,6 +129,18 @@ class KhmerInputHandlerBehaviorTest {
         type("nh", into = handler)
 
         assertEquals("text field must reflect roman preedit speculatively", "nh", textField.text)
+    }
+
+    @Test
+    fun literalKeycapCommitsVisibleCompositionThenInsertsItsLabel() {
+        val (handler, textField) = makeHandler()
+        type("nhom", into = handler)
+
+        handler.sendLiteralKeycap("!")
+
+        assertFalse("the Roman composition must be replaced", textField.text.contains("nhom"))
+        assertTrue("the committed Khmer must be followed by the literal label", textField.text.endsWith("!"))
+        assertEquals("only the final character is literal", 1, textField.text.count { it == '!' })
     }
 
     @Test
@@ -715,6 +739,28 @@ class KhmerInputHandlerBehaviorTest {
 
         dispatcher.runPendingDelayed()
         assertEquals("exactly one decode/render lands on pause", 1, renders)
+    }
+
+    @Test
+    fun nextKeyDownCancelsDecodeBeforeItCanMoveTheKeyboard() {
+        val dispatcher = RecordingDispatcher()
+        val (handler, _) = makeHandler(dispatcher)
+        var renders = 0
+        handler.onRender = { renders++ }
+
+        handler.sendChar("b")
+        handler.keyTouchBegan()
+        dispatcher.runPendingDelayed()
+
+        assertEquals(
+            "a decode scheduled by the previous key must not render while the next key is held",
+            0,
+            renders,
+        )
+
+        handler.sendChar("e")
+        dispatcher.runPendingDelayed()
+        assertEquals("the latest word still decodes after typing pauses", 1, renders)
     }
 
     // ── Single-keycap flicker ("123" layout) ───────────────────────────────────

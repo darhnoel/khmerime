@@ -98,6 +98,35 @@ class KhmerInputHandler(
 
     // ── Key actions ───────────────────────────────────────────────────────────
 
+    // A new physical character gesture means typing has not paused yet. Cancel a
+    // decode scheduled by the previous ACTION_UP before it can render suggestion
+    // rows underneath the finger that is now held down. The accepted ACTION_UP
+    // will schedule a fresh decode for the latest Roman buffer.
+    fun keyTouchBegan() {
+        recomputer.cancel()
+        modelRefiner.cancel()
+    }
+
+    // Idle-tray characters are already final Khmer glyphs. Insert them directly;
+    // routing them through Roman transliteration would incorrectly start a composition.
+    fun insertQuickAccess(text: String) {
+        if (romanBuffer.isNotEmpty()) return
+        trailingSpace = false
+        proxy.insertText(text)
+    }
+
+    fun sendLiteralKeycap(text: String) {
+        trailingSpace = false
+        if (keyboardState == KeyboardState.English ||
+            keyboardState == KeyboardState.SuggestCharacter ||
+            romanBuffer.isEmpty()
+        ) {
+            proxy.insertText(text)
+            return
+        }
+        commitComposition(suffix = text)
+    }
+
     fun sendChar(ch: String) {
         if (keyboardState == KeyboardState.English) {
             proxy.insertText(ch)
@@ -353,7 +382,7 @@ class KhmerInputHandler(
 
     // ── Private ───────────────────────────────────────────────────────────────
 
-    private fun commitComposition() {
+    private fun commitComposition(suffix: String? = null) {
         if (keyboardState == KeyboardState.SuggestCharacter) return
         modelRefiner.cancel()
         recomputer.cancel()
@@ -365,6 +394,7 @@ class KhmerInputHandler(
         }
         repeat(romanBuffer.length) { proxy.deleteBackward() }
         if (khmer.isNotEmpty()) proxy.insertText(khmer)
+        if (suffix != null) proxy.insertText(suffix)
         romanBuffer = ""
         trailingSpace = false
         render(state)

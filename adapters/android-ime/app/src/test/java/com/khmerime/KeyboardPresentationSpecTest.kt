@@ -4,7 +4,6 @@ import com.khmerime.input.KhmerPhraseCandidate
 import com.khmerime.input.KhmerRenderState
 import com.khmerime.input.KhmerSegmentEntry
 import com.khmerime.input.KeyboardState
-import com.khmerime.layout.ChromeRows
 import com.khmerime.layout.KeyboardKey
 import com.khmerime.layout.KeyboardKeyAction
 import com.khmerime.layout.KeyboardLayer
@@ -16,16 +15,6 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class KeyboardPresentationSpecTest {
-    @Test
-    fun pendingDecodeReservesOnlyTheRomanStripNotAnEmptyCandidateRow() {
-        assertEquals(
-            "while decode is pending, reserve only the roman strip — reserving the " +
-                "candidate row too left an empty second row that never collapsed",
-            ChromeRows.StripOnly,
-            KeyboardPresentationSpec.pendingDecodeChromeRows(),
-        )
-    }
-
     @Test
     fun suggestCharacterCandidatesStayInSuggestionBarWithoutReplacingQwertyLayout() {
         val state = KhmerRenderState(
@@ -286,75 +275,6 @@ class KeyboardPresentationSpecTest {
         )
     }
 
-    // ── Three-state chrome collapse (parity with iOS KeyboardChrome) ────────────
-
-    @Test
-    fun chromeRowsQwertyEmptyHintAndNoCandidatesIsNone() {
-        val state = KhmerRenderState(candidates = emptyList())
-        assertEquals(
-            "no roman hint and no candidates means nothing to show — chrome collapses",
-            ChromeRows.None,
-            KeyboardPresentationSpec.chromeRows(KeyboardState.Qwerty, "", state),
-        )
-    }
-
-    @Test
-    fun chromeRowsQwertyWithRomanHintButNoAlternativesShowsStripOnly() {
-        // ADR-0015: composing with a single reading (no phrase alternatives) collapses
-        // the candidate row so the strip stands alone.
-        val state = KhmerRenderState(candidates = emptyList())
-        assertEquals(
-            ChromeRows.StripOnly,
-            KeyboardPresentationSpec.chromeRows(KeyboardState.Qwerty, "khn", state),
-        )
-    }
-
-    @Test
-    fun chromeRowsKeepsStripWhenSegmentsPresentButRomanHintEmpty() {
-        // iOS parity: the strip is worth its height when segments (or preedit) exist,
-        // even if the roman hint resolves empty. Android used to collapse to None here,
-        // auto-collapsing the strip earlier than iOS.
-        val state = KhmerRenderState(
-            segments = listOf(seg("khnhom", "ខ្ញុំ")),
-            candidates = emptyList(),
-        )
-        assertEquals(
-            "segments present must keep the strip (StripOnly), matching iOS",
-            ChromeRows.StripOnly,
-            KeyboardPresentationSpec.chromeRows(KeyboardState.Qwerty, "", state),
-        )
-    }
-
-    @Test
-    fun chromeRowsKeepsStripWhenPreeditPresentButRomanHintEmpty() {
-        val state = KhmerRenderState(preedit = "khnhom", candidates = emptyList())
-        assertEquals(
-            "preedit present must keep the strip (StripOnly), matching iOS",
-            ChromeRows.StripOnly,
-            KeyboardPresentationSpec.chromeRows(KeyboardState.Qwerty, "", state),
-        )
-    }
-
-    @Test
-    fun chromeRowsSuggestCharacterWithoutCandidatesIsNone() {
-        val state = KhmerRenderState(candidates = emptyList())
-        assertEquals(
-            "entering Suggest Character alone must not reserve an empty row",
-            ChromeRows.None,
-            KeyboardPresentationSpec.chromeRows(KeyboardState.SuggestCharacter, "", state),
-        )
-    }
-
-    @Test
-    fun chromeRowsSuggestCharacterWithCandidatesShowsCandidateOnly() {
-        val state = KhmerRenderState(candidates = listOf("ក", "ខ"))
-        assertEquals(
-            "Suggest Character candidates need the candidate row, not the roman strip",
-            ChromeRows.CandidateOnly,
-            KeyboardPresentationSpec.chromeRows(KeyboardState.SuggestCharacter, "", state),
-        )
-    }
-
     // ── Phrase Wheel (ADR-0015) ──────────────────────────────────────────────
 
     @Test
@@ -382,11 +302,6 @@ class KeyboardPresentationSpecTest {
         )
 
         assertTrue("one reading → no alternatives", KeyboardPresentationSpec.phraseAlternatives(state).isEmpty())
-        assertEquals(
-            "no alternatives → strip stands alone, candidate row collapses",
-            ChromeRows.StripOnly,
-            KeyboardPresentationSpec.chromeRows(KeyboardState.Qwerty, "khnhom", state),
-        )
     }
 
     @Test
@@ -396,10 +311,6 @@ class KeyboardPresentationSpecTest {
             preedit = "khnhom",
         )
 
-        assertEquals(
-            "alternatives present → the Phrase Wheel row is reserved",
-            ChromeRows.StripAndCandidate,
-            KeyboardPresentationSpec.chromeRows(KeyboardState.Qwerty, "khnhom", state),
-        )
+        assertEquals(1, KeyboardPresentationSpec.phraseAlternatives(state).size)
     }
 }

@@ -60,6 +60,12 @@ final class CandidateSurfaceView: UIView, KeyboardCandidateRowDisplaying {
         }
     }
 
+    func showQuickAccess(_ items: [QuickAccessItem], onSelected: @escaping (QuickAccessItem) -> Void) {
+        wheel.isHidden = true
+        candidateRow.isHidden = false
+        candidateRow.showQuickAccess(items, onSelected: onSelected)
+    }
+
     func clear() {
         wheel.clear()
         candidateRow.clear()

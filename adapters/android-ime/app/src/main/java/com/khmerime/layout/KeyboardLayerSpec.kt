@@ -8,6 +8,7 @@ enum class KeyboardLayer {
 
 enum class KeyboardKeyAction {
     Insert,
+    InsertLiteral,
     NextKeyboard,
     TogglePanel,
     ToggleEnglish,
@@ -37,7 +38,7 @@ object KeyboardLayerSpec {
                 special("En", KeyboardKeyAction.ToggleEnglish),
                 special("123", KeyboardKeyAction.SwitchToNumeric),
                 special("space", KeyboardKeyAction.Space),
-                KeyboardKey(".", KeyboardKeyAction.Insert),
+                KeyboardKey(".", KeyboardKeyAction.InsertLiteral),
                 special("↵", KeyboardKeyAction.Return),
             ),
         )
@@ -75,7 +76,7 @@ object KeyboardLayerSpec {
         keys.map { KeyboardKey(it.uppercase(), KeyboardKeyAction.Insert, it.toString()) }
 
     private fun inserts(keys: List<String>): List<KeyboardKey> =
-        keys.map { KeyboardKey(it, KeyboardKeyAction.Insert) }
+        keys.map { KeyboardKey(it, KeyboardKeyAction.InsertLiteral) }
 
     private fun special(label: String, action: KeyboardKeyAction): KeyboardKey =
         KeyboardKey(label, action)

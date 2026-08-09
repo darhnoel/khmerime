@@ -1,5 +1,6 @@
 package com.khmerime.views
 
+import android.graphics.Rect
 import android.os.SystemClock
 import android.view.MotionEvent
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -12,6 +13,28 @@ import org.junit.runner.RunWith
 
 @RunWith(AndroidJUnit4::class)
 class GlassKeyViewTouchTest {
+    @Test
+    fun visualSpacingDoesNotShrinkTheTouchCell() {
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+
+        instrumentation.runOnMainSync {
+            val view = GlassKeyView(
+                context = instrumentation.targetContext,
+                key = KeyboardKey("A", KeyboardKeyAction.Insert, "a"),
+                onClick = {},
+            ).apply {
+                layout(0, 0, 100, 100)
+            }
+            val visualBounds = Rect()
+
+            view.copyVisualBounds(visualBounds)
+
+            val inset = (2 * view.resources.displayMetrics.density).toInt()
+            assertEquals(Rect(inset, inset, 100 - inset, 100 - inset), visualBounds)
+            assertEquals("touch cell still reaches its neighbour", 100, view.width)
+        }
+    }
+
     @Test
     fun touchDownPerformsOneKeyboardHaptic() {
         val instrumentation = InstrumentationRegistry.getInstrumentation()

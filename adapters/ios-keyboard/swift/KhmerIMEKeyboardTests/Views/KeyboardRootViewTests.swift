@@ -74,6 +74,18 @@ final class KeyboardRootViewTests: XCTestCase {
             "CharPick rendering must clear any previously rendered Strip preview")
     }
 
+    func test_showQuickAccess_usesTwoRowsNormallyAndMarksOnlyInCharPick() {
+        let fixture = makeRootView()
+
+        fixture.rootView.showQuickAccess(charPickOnly: false) { _ in }
+        XCTAssertEqual(fixture.stripView.quickAccessItems, QuickAccessSpec.digits)
+        XCTAssertEqual(fixture.candidateRowView.quickAccessItems, QuickAccessSpec.marks)
+
+        fixture.rootView.showQuickAccess(charPickOnly: true) { _ in }
+        XCTAssertEqual(fixture.stripView.clearCount, 1)
+        XCTAssertEqual(fixture.candidateRowView.quickAccessItems, QuickAccessSpec.marks)
+    }
+
     func test_clearStrip_alsoClearsCandidateRow() {
         let fixture = makeRootView()
         fixture.rootView.clearStrip()
@@ -309,6 +321,7 @@ private final class SpyStripView: UIView, KeyboardStripDisplaying {
     var renderedState: IosRenderState?
     var renderedRomanHint: String?
     var clearCount = 0
+    var quickAccessItems: [QuickAccessItem] = []
 
     func render(_ state: IosRenderState, romanBuffer: String) {
         renderedState = state
@@ -318,16 +331,25 @@ private final class SpyStripView: UIView, KeyboardStripDisplaying {
     func clear() {
         clearCount += 1
     }
+
+    func showQuickAccess(_ items: [QuickAccessItem], onSelected: @escaping (QuickAccessItem) -> Void) {
+        quickAccessItems = items
+    }
 }
 
 private final class SpyCandidateRowView: UIView, KeyboardCandidateRowDisplaying {
     var renderedState: IosRenderState?
     var renderedPresentation: CandidateRowPresentation?
     var clearCount = 0
+    var quickAccessItems: [QuickAccessItem] = []
 
     func render(_ state: IosRenderState, presentation: CandidateRowPresentation) {
         renderedState = state
         renderedPresentation = presentation
+    }
+
+    func showQuickAccess(_ items: [QuickAccessItem], onSelected: @escaping (QuickAccessItem) -> Void) {
+        quickAccessItems = items
     }
 
     func clear() {

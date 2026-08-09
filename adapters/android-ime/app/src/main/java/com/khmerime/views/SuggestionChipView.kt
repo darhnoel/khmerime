@@ -5,6 +5,7 @@ import android.graphics.Canvas
 import android.graphics.Paint
 import android.graphics.RectF
 import android.util.TypedValue
+import android.view.HapticFeedbackConstants
 import android.view.MotionEvent
 import android.view.View
 
@@ -15,6 +16,11 @@ class SuggestionChipView(context: Context) : View(context) {
     private var fromModel: Boolean = false
     private var lexiconVerified: Boolean = true
     private var onClick: () -> Unit = {}
+    private var squish = 0f
+    private val pressAnimator = GlassKeyPressAnimator(onUpdate = { amount ->
+        squish = amount
+        invalidate()
+    })
 
     // Re-styles a pooled chip for its new candidate/selection state instead of allocating a new
     // view. ADR-0016: a model phrase (`fromModel`) shows a ✦; it's drawn RED only when the phrase
@@ -88,6 +94,9 @@ class SuggestionChipView(context: Context) : View(context) {
     private val cornerRadius get() = height * 0.28f
 
     override fun onDraw(canvas: Canvas) {
+        val save = canvas.save()
+        val scale = 1f - squish * 0.08f
+        canvas.scale(scale, scale, width / 2f, height / 2f)
         val dark = isDark
         bgPaint.color = if (isSelected) GlassColorSpec.selectedCandidateBackground(dark)
                         else GlassColorSpec.backgroundColor(dark)
@@ -112,16 +121,26 @@ class SuggestionChipView(context: Context) : View(context) {
         } else {
             canvas.drawText(text, width / 2f, baseline, textPaint)
         }
+        canvas.restoreToCount(save)
     }
 
     override fun onTouchEvent(event: MotionEvent): Boolean {
         if (!isEnabled) return false
         when (event.actionMasked) {
             MotionEvent.ACTION_UP -> {
+                pressAnimator.release()
                 if (event.x in 0f..width.toFloat() && event.y in 0f..height.toFloat()) onClick()
                 return true
             }
-            MotionEvent.ACTION_DOWN -> return true
+            MotionEvent.ACTION_DOWN -> {
+                performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
+                pressAnimator.press()
+                return true
+            }
+            MotionEvent.ACTION_CANCEL -> {
+                pressAnimator.release()
+                return true
+            }
         }
         return super.onTouchEvent(event)
     }
