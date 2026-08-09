@@ -178,6 +178,14 @@ _Avoid_: onboarding (generic), welcome flow, tutorial
 The persistent hub of the **Companion App**, reached after the **Intro Flow** (or directly once onboarding is remembered). A tabbed surface — Settings, Tips, and Support today — that grows as companion-app features are added. Distinct from the **Intro Flow**, which is one-time.
 _Avoid_: home screen, main menu, settings (the Dashboard is more than settings)
 
+**Single Keycap**:
+A typed character that does not compose into a **Composition** — a digit, punctuation mark, or symbol (any ASCII graphic that is not a letter). It stands alone and commits immediately to its Khmer form (e.g. `1` → `១`), with no **Preedit** accumulation or **Candidate List**, provided no **Composition** is already in progress. A letter typed after a Single Keycap starts a fresh **Composition**; a Single Keycap typed mid-**Composition** is treated as part of the roman buffer, not a standalone commit.
+_Avoid_: symbol key, special key (those name the keyboard key; this names the input behavior)
+
+**Optimistic Insert**:
+On a composing platform (Android), showing the raw roman key in the host field the instant it is pressed, before the transliteration decode returns — so typing never lags behind the finger. When the decode lands, the raw roman is replaced by the committed Khmer. Correct for composing letters; deliberately skipped for a standalone **Single Keycap**, whose committed glyph differs from the raw key and would otherwise flash the Latin form before swapping to Khmer.
+_Avoid_: speculative insert, preview text (this is real inserted text, later corrected)
+
 ## Relationships
 
 - A **Lexicon** is built into one **SharedTransliteratorData** at startup

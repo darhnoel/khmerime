@@ -716,4 +716,32 @@ class KhmerInputHandlerBehaviorTest {
         dispatcher.runPendingDelayed()
         assertEquals("exactly one decode/render lands on pause", 1, renders)
     }
+
+    // ── Single-keycap flicker ("123" layout) ───────────────────────────────────
+
+    // A standalone digit auto-commits to its Khmer numeral (1 -> ១). It must NOT be inserted
+    // optimistically as the raw key first: doing so paints the Latin "1", then deletes it and
+    // inserts "១" — a visible glyph-swap flicker. The op sequence must be a single insert(១).
+    @Test
+    fun standaloneDigitDoesNotFlickerRawKey() {
+        val (handler, textField) = makeHandler()
+
+        handler.sendChar("1")
+
+        assertEquals("standalone digit must insert its Khmer form once, no raw-key flash", listOf("insert(១)"), textField.ops)
+        assertEquals("១", textField.text)
+    }
+
+    // A digit typed mid-composition is part of the roman buffer, not a standalone auto-commit,
+    // so it must still be inserted optimistically like any composing key (unchanged behavior).
+    @Test
+    fun digitMidCompositionStillInsertsOptimistically() {
+        val (handler, textField) = makeHandler()
+
+        type("kh", into = handler)
+        textField.ops.clear()
+        handler.sendChar("1")
+
+        assertEquals("mid-composition digit is optimistically inserted", listOf("insert(1)"), textField.ops)
+    }
 }
