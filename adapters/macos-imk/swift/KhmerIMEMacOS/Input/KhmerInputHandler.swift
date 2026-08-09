@@ -74,15 +74,18 @@ final class KhmerInputHandler {
     }
 
     /// After a keystroke with a live composition, run the model refine on a debounced pause (off the
-    /// keystroke path). No Smart gate: with no provider the session built no visible refiner, so
-    /// refineComposition is a cheap no-op. The Rust generation guard drops results made stale by
-    /// newer typing. Smart is implicit on macOS — on whenever a provider is armed (CONTEXT.md).
+    /// keystroke path). Uses refreshSegmentedPreview → refine_off_lock, the macOS segmented path
+    /// that runs the model off-lock and merges its provenance-marked words into the candidate list.
+    /// (refineComposition/apply_refined_candidate is a no-op here — it bails when a segmented session
+    /// exists, which the macOS live path always builds.) No Smart gate: with no provider the session
+    /// built no visible refiner, so it's a cheap no-op. The Rust generation guard drops results made
+    /// stale by newer typing. Smart is implicit on macOS — on whenever a provider is armed (CONTEXT).
     private func scheduleModelRefine(for preedit: String) {
         pendingRefine?.cancel()
         guard !preedit.isEmpty else { return }
         pendingRefine = refineScheduler.schedule(after: Self.refineDelay) { [weak self] in
             guard let self else { return }
-            self.render(self.session.refineComposition(rawPreedit: preedit))
+            self.render(self.session.refreshSegmentedPreview(rawPreedit: preedit))
         }
     }
 
@@ -125,8 +128,19 @@ final class KhmerInputHandler {
 
         let state = session.handleEvent(keyval: keyval, macKeycode: macKeycode, modifierFlags: modifierFlags)
         render(state)
-        // Debounced model refine of the live composition (no-op without a provider).
-        scheduleModelRefine(for: state.preedit)
+        // Debounced model refine — only when the composition text actually changed. Navigation
+        // and selection keys (Left/Right segment focus, Up/Down, digits, Tab) leave the preedit
+        // unchanged; refining on those rebuilds the preview and resets the segment focus the user
+        // just moved (arrows "always got refreshed" instead of editing). Gating on preeditChanged
+        // keeps the model on real typing and lets focus/selection stand.
+        if state.preeditChanged {
+            scheduleModelRefine(for: state.preedit)
+        } else {
+            // The composition text didn't change — this was navigation/selection (Space cycle,
+            // arrows, digits). Kill any refine still pending from the last typed letter, so it
+            // can't fire mid-selection and rebuild the candidate list back to the top word.
+            cancelPendingRefine()
+        }
         return state.consumed
     }
 

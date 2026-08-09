@@ -20,6 +20,36 @@ final class KhmerInputHandlerTests: XCTestCase {
         return (handler, client)
     }
 
+    // A refine scheduler that captures the pending block (and its cancellation) instead of
+    // running it on a timer, so a test can fire — or prove the cancellation of — a debounced
+    // refine deterministically.
+    private final class ManualRefineScheduler: MacosRefineScheduler {
+        final class Task: MacosRefineTask {
+            var block: (() -> Void)?
+            var cancelled = false
+            func cancel() { cancelled = true; block = nil }
+        }
+        private(set) var latest: Task?
+        func schedule(after delay: TimeInterval, block: @escaping () -> Void) -> MacosRefineTask {
+            let task = Task()
+            task.block = block
+            latest = task
+            return task
+        }
+        /// Fire the most recently scheduled block if it wasn't cancelled.
+        func fireLatest() { latest?.block?() }
+    }
+
+    private func makeHandler(scheduler: MacosRefineScheduler) -> (KhmerInputHandler, MockTextClient) {
+        let client = MockTextClient()
+        let handler = KhmerInputHandler(client: client, session: MacosImkSession(), refineScheduler: scheduler)
+        for _ in 0..<100 {
+            if handler.activate().isReady { break }
+            Thread.sleep(forTimeInterval: 0.1)
+        }
+        return (handler, client)
+    }
+
     private func type(_ word: String, into handler: KhmerInputHandler) {
         for ch in word.unicodeScalars {
             _ = handler.handleKey(keyval: ch.value, macKeycode: 0, modifierFlags: 0)
@@ -152,6 +182,28 @@ final class KhmerInputHandlerTests: XCTestCase {
 
         XCTAssertEqual(client.text, selected,
             "Enter must commit the visible candidate selected by Space")
+    }
+
+    func test_spaceCyclingCancelsPendingRefineSoSelectionSurvives() {
+        // Regression ("space space space then refresh to the top word"): typing schedules a
+        // debounced refine; pressing Space to cycle must CANCEL that pending refine, otherwise
+        // it fires mid-selection, rebuilds the candidate list, and snaps selection back to 0.
+        let scheduler = ManualRefineScheduler()
+        let (handler, _) = makeHandler(scheduler: scheduler)
+        var updated: MacosRenderState?
+        handler.onPanelUpdate = { updated = $0 }
+
+        type("jea", into: handler) // last letter schedules a refine (still pending)
+        XCTAssertNotNil(scheduler.latest, "typing must schedule a debounced refine")
+
+        // Cycle three times with Space.
+        for _ in 0..<3 { _ = handler.handleKey(keyval: 0x20, macKeycode: 0, modifierFlags: 0) }
+        XCTAssertEqual(updated?.selectedIndex, 3, "three Spaces select candidate 3")
+        XCTAssertEqual(scheduler.latest?.cancelled, true, "Space must cancel the pending refine")
+
+        // Even if that stale refine somehow fires, it's a no-op (cancelled → block cleared).
+        scheduler.fireLatest()
+        XCTAssertEqual(updated?.selectedIndex, 3, "selection must survive; no reset to the top word")
     }
 
     func test_commit_insertsTextBeforeClearingMarkedText() {
