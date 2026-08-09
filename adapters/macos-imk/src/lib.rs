@@ -74,8 +74,8 @@ use std::time::Duration;
 
 use khmerime_core::{DecoderConfig, DecoderMode, SpanProposalMode, Transliterator};
 use khmerime_session::{
-    compute_segmented_refinement, CandidateDisplayEntry, ImeSession, ImeSessionOptions, NativeKeyEvent, SegmentPreviewEntry, SegmentedPreviewMode,
-    SessionResult, SessionSnapshot,
+    compute_segmented_refinement, CandidateDisplayEntry, ImeSession, ImeSessionOptions, NativeKeyEvent,
+    SegmentPreviewEntry, SegmentedPreviewMode, SessionResult, SessionSnapshot,
 };
 
 uniffi::setup_scaffolding!("khmerime_macos_imk");
@@ -314,10 +314,18 @@ impl MacosIMKSession {
                     page_size: MACOS_PAGE_SIZE,
                     ..Default::default()
                 });
-            if span_provider_active() {
-                let visible_refiner =
-                    Transliterator::from_default_data_with_config(macos_visible_refiner_config())
-                        .expect("compiled-in lexicon data must be valid");
+            let provider_on = span_provider_active();
+            // Runtime breadcrumb to the sandbox-readable log (os_log is silent for a sandboxed
+            // IME). Tells us, on the actual launched app, whether the warmup thread saw the
+            // provider armed — the one fact static inspection can't confirm.
+            diag_log(&format!(
+                "[khmerime-warmup] span_provider_active={} KHMERIME_SPAN_PROPOSALS={:?}",
+                provider_on,
+                std::env::var("KHMERIME_SPAN_PROPOSALS").ok()
+            ));
+            if provider_on {
+                let visible_refiner = Transliterator::from_default_data_with_config(macos_visible_refiner_config())
+                    .expect("compiled-in lexicon data must be valid");
                 builder = builder.visible_refiner(visible_refiner);
             }
             let ime = builder.build();
@@ -369,11 +377,13 @@ impl MacosIMKSession {
         let evdev_keycode = keycode_mac_to_evdev(mac_keycode);
         let xkb_state = modifier_flags_to_xkb_state(modifier_flags);
 
-        // Up/Down jump a whole page on macOS (ADR-0018). Translated here rather than in
-        // the shared session so IBus and TSF keep their one-step Up/Down.
+        // PageUp/PageDown jump a whole page on macOS. Translated here rather than in the
+        // shared session so IBus and TSF are unaffected. ↑/↓ are NOT page keys — they fall
+        // through to the session's one-step candidate cycling (supersedes ADR-0018, which had
+        // ↑/↓ page and left mid-list words unreachable by arrow).
         let page_direction = match keyval {
-            KEY_UP => -1,
-            KEY_DOWN => 1,
+            KEY_PAGE_UP => -1,
+            KEY_PAGE_DOWN => 1,
             _ => 0,
         };
 
@@ -383,22 +393,16 @@ impl MacosIMKSession {
                 let len = snapshot.candidates.len();
                 if len > 0 {
                     let selected = snapshot.selected_index.unwrap_or(0);
-                    let target =
-                        page_jump_target(selected, len, MACOS_PAGE_SIZE, page_direction);
+                    let target = page_jump_target(selected, len, MACOS_PAGE_SIZE, page_direction);
                     // Reach the target through the session's own cycling, so selection
                     // bookkeeping (selection_touched, segment sync) stays consistent.
-                    let steps = (target as isize - selected as isize)
-                        .rem_euclid(len as isize) as usize;
+                    let steps = (target as isize - selected as isize).rem_euclid(len as isize) as usize;
                     let mut result = SessionResult {
                         consumed: true,
                         ..SessionResult::default()
                     };
                     for _ in 0..steps {
-                        result = s.process_native_key_event(key_event(
-                            KEY_DOWN,
-                            keycode_mac_to_evdev(0),
-                            xkb_state,
-                        ));
+                        result = s.process_native_key_event(key_event(KEY_DOWN, keycode_mac_to_evdev(0), xkb_state));
                     }
                     return render_state(&s.snapshot(), &result, true);
                 }
@@ -606,6 +610,19 @@ fn install_panic_logger() {
     });
 }
 
+/// Append one diagnostic line to the sandbox-readable log (same file as panics). os_log is
+/// silently dropped for a sandboxed input method, so this is how runtime state is surfaced.
+fn diag_log(line: &str) {
+    if let Ok(mut file) = std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(panic_log_path())
+    {
+        use std::io::Write;
+        let _ = writeln!(file, "{line}");
+    }
+}
+
 /// Where `install_panic_logger` records panics.
 ///
 /// The input method is sandboxed (required for third-party IMEs), so `$HOME` here is
@@ -624,8 +641,13 @@ fn panic_log_path() -> std::path::PathBuf {
 /// match this value.
 pub const MACOS_PAGE_SIZE: usize = 10;
 
-/// X11 keysyms for the arrow keys, as delivered by `KeyvalMapping` on the Swift side.
-const KEY_UP: u32 = 0xFF52;
+/// X11 keysyms for the page keys, as delivered by `KeyvalMapping` on the Swift side.
+/// PageUp/PageDown drive the whole-page jump (supersedes ADR-0018's ↑/↓ mapping); the
+/// arrows themselves fall through to the session's one-step candidate cycling.
+const KEY_PAGE_UP: u32 = 0xFF55;
+const KEY_PAGE_DOWN: u32 = 0xFF56;
+/// The session's one-step Down keysym — used to drive the page jump through the session's
+/// own candidate cycling (so selection bookkeeping stays consistent).
 const KEY_DOWN: u32 = 0xFF54;
 
 /// The candidate index a page jump lands on (ADR-0018).

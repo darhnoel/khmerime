@@ -19,6 +19,8 @@ final class KeyvalMappingTests: XCTestCase {
         XCTAssertEqual(keyval(forMacKeyCode: UInt16(kVK_RightArrow), characters: nil), 0xFF53)
         XCTAssertEqual(keyval(forMacKeyCode: UInt16(kVK_UpArrow), characters: nil), 0xFF52)
         XCTAssertEqual(keyval(forMacKeyCode: UInt16(kVK_DownArrow), characters: nil), 0xFF54)
+        XCTAssertEqual(keyval(forMacKeyCode: UInt16(kVK_PageUp), characters: nil), 0xFF55)
+        XCTAssertEqual(keyval(forMacKeyCode: UInt16(kVK_PageDown), characters: nil), 0xFF56)
     }
 
     func test_printableKeys_useUnicodeScalar() {

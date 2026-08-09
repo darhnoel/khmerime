@@ -342,7 +342,9 @@ fn session_marks_model_rescued_candidate_from_model() {
     std::env::set_var("KHMERIME_SPAN_PROPOSALS", "static-test");
     let s = MacosIMKSession::new();
     loop {
-        if s.activate().is_ready { break; }
+        if s.activate().is_ready {
+            break;
+        }
         std::thread::sleep(std::time::Duration::from_millis(100));
     }
     std::env::remove_var("KHMERIME_SPAN_PROPOSALS");
@@ -356,7 +358,10 @@ fn session_marks_model_rescued_candidate_from_model() {
         .find(|c| c.output == "សាលារៀន")
         .expect("the model-rescued word must appear in the candidate list");
     assert!(rescued.from_model, "rescued candidate must be marked from_model");
-    assert!(rescued.lexicon_verified, "សាលារៀន is a real Lexicon word → verified (white ✦)");
+    assert!(
+        rescued.lexicon_verified,
+        "សាលារៀន is a real Lexicon word → verified (white ✦)"
+    );
 }
 
 #[test]
@@ -532,8 +537,9 @@ fn session_segment_entries_populate_render_state() {
 }
 
 // ── Page navigation (ADR-0018) ────────────────────────────────────────────────
-// Up/Down jump a whole page on macOS. The math lives in the adapter so the shared
-// session — and therefore IBus and TSF — keep their one-step Up/Down behavior.
+// PageUp/PageDown jump a whole page on macOS; ↑/↓ step one candidate (ADR-0020, superseding
+// ADR-0018). The page math lives in the adapter so the shared session — and therefore IBus and
+// TSF — are unaffected.
 
 #[test]
 fn page_jump_moves_a_whole_page_keeping_the_row() {
@@ -549,6 +555,40 @@ fn page_jump_clamps_to_a_short_final_page() {
     // Page 3 holds only index 20 (the raw roman fallback). Jumping down from row 5
     // of page 2 clamps to that page's single row rather than overshooting the list.
     assert_eq!(page_jump_target(15, 21, 10, 1), 20);
+}
+
+#[test]
+fn up_down_step_one_candidate_and_pageupdown_jump_a_page() {
+    // Supersedes the original ADR-0018 mapping: ↑/↓ now STEP one candidate (so a word in
+    // the middle of the list is reachable), and PageUp/PageDown do the whole-page jump.
+    // "jea" yields a flat multi-candidate list (no segmented session).
+    let s = session();
+    let typed = type_str(&s, "jea");
+    assert!(typed.segments.is_empty(), "jea is a single word: flat candidate list");
+    assert!(
+        typed.candidates.len() > 3,
+        "need several candidates to tell stepping from paging"
+    );
+    assert_eq!(typed.selected_index, Some(0));
+
+    // ↓ steps to the very next candidate, not +10.
+    let d1 = s.handle_event(0xFF54, 0, 0); // KEY_DOWN
+    assert_eq!(d1.selected_index, Some(1), "Down must step exactly one candidate");
+    let d2 = s.handle_event(0xFF54, 0, 0);
+    assert_eq!(d2.selected_index, Some(2), "Down again steps to the next");
+    // ↑ steps back one.
+    let u1 = s.handle_event(0xFF52, 0, 0); // KEY_UP
+    assert_eq!(u1.selected_index, Some(1), "Up must step back exactly one candidate");
+
+    // PageDown jumps a whole page (keeping the row), matching the old ADR-0018 ↓.
+    let pd = s.handle_event(0xFF56, 0, 0); // KEY_PAGE_DOWN
+    let len = typed.candidates.len();
+    let expected = page_jump_target(1, len, 10, 1);
+    assert_eq!(
+        pd.selected_index,
+        Some(expected as u64),
+        "PageDown must jump a page from row 1"
+    );
 }
 
 #[test]
@@ -587,8 +627,6 @@ fn page_jump_survives_a_stale_selection_past_the_end() {
     assert_eq!(page_jump_target(0, 1, 0, 1), 0);
 }
 
-
-
 #[test]
 fn live_keystroke_path_carries_a_latency_budget() {
     // ADR-0005: the keystroke path must degrade rather than block. Without an explicit
@@ -600,4 +638,29 @@ fn live_keystroke_path_carries_a_latency_budget() {
         75,
         "the live keystroke decoder must keep the 75 ms interactive budget"
     );
+}
+
+#[test]
+fn refresh_segmented_preview_surfaces_model_marker() {
+    // Part 2 debounces refreshSegmentedPreview (not refine_composition). Verify THAT method
+    // surfaces the model-rescued word with from_model — the macOS segmented refine path.
+    std::env::set_var("KHMERIME_SPAN_PROPOSALS", "static-test");
+    let s = MacosIMKSession::new();
+    loop {
+        if s.activate().is_ready {
+            break;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(100));
+    }
+    std::env::remove_var("KHMERIME_SPAN_PROPOSALS");
+
+    type_str(&s, "salarien");
+    let refined = s.refresh_segmented_preview("salarien".to_owned());
+
+    let marked = refined.candidate_display.iter().find(|c| c.from_model);
+    assert!(
+        marked.is_some(),
+        "refresh_segmented_preview must surface a from_model candidate"
+    );
+    assert_eq!(marked.unwrap().output, "សាលារៀន");
 }

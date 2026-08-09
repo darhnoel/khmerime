@@ -25,6 +25,8 @@ func keyval(forMacKeyCode keyCode: UInt16, characters: String?) -> UInt32 {
     case kVK_RightArrow:                    return 0xFF53
     case kVK_UpArrow:                       return 0xFF52
     case kVK_DownArrow:                     return 0xFF54
+    case kVK_PageUp:                        return 0xFF55
+    case kVK_PageDown:                      return 0xFF56
     default:
         return characters?.unicodeScalars.first?.value ?? 0
     }
