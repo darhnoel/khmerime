@@ -735,7 +735,10 @@ mod tests {
             vec!["ម្ដងម្កាល".to_owned()]
         );
         assert_eq!(
-            transliterator.suggest("mdongmkal", &HashMap::new()).first().map(String::as_str),
+            transliterator
+                .suggest("mdongmkal", &HashMap::new())
+                .first()
+                .map(String::as_str),
             Some("ម្ដងម្កាល")
         );
     }

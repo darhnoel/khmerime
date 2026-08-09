@@ -4,8 +4,8 @@ use std::sync::Arc;
 use crate::roman_lookup::{char_ngrams, roman_search_variants, LegacyData, RankedEntryView};
 
 use super::{
-    elapsed_decode_us, start_decode_timer, DecodeCandidate, DecodeFailure, DecodeRequest, DecodeResult, DecodeSegment,
-    provider_for_mode, Decoder, DecoderConfig, SpanProposal, SpanProposalProvider, SpanProposalRequest,
+    elapsed_decode_us, provider_for_mode, start_decode_timer, DecodeCandidate, DecodeFailure, DecodeRequest,
+    DecodeResult, DecodeSegment, Decoder, DecoderConfig, SpanProposal, SpanProposalProvider, SpanProposalRequest,
 };
 
 const MIN_SPAN_LEN: usize = 3;
@@ -89,7 +89,6 @@ impl BeamItem {
     }
 }
 
-
 const WHOLE_DICTIONARY_TARGET_MIN_SPAN_LEN: usize = 5;
 const WHOLE_DICTIONARY_TARGET_MIN_EDIT: f64 = 0.72;
 
@@ -102,7 +101,11 @@ pub(crate) struct WeightedSpanDecoder {
 impl WeightedSpanDecoder {
     pub(crate) fn new(data: Arc<LegacyData>, config: DecoderConfig) -> Self {
         let span_proposer = provider_for_mode(config.span_proposal_mode);
-        Self { data, config, span_proposer }
+        Self {
+            data,
+            config,
+            span_proposer,
+        }
     }
 
     fn decode_with_beam(&self, request: &DecodeRequest<'_>, started_at: super::DecodeTimer) -> Vec<BeamItem> {
@@ -923,8 +926,6 @@ impl WeightedSpanDecoder {
             lexicon_verified,
         })
     }
-
-
 }
 
 impl Decoder for WeightedSpanDecoder {

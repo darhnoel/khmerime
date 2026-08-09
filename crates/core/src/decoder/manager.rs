@@ -4,8 +4,8 @@ use std::sync::Arc;
 use crate::composer::ComposerTable;
 
 use super::{
-    build_shadow_observation, DecodeCandidate, DecodeFailure, DecodeRequest, DecodeResult, Decoder, DecoderConfig,
-    DecodeSegment, DecoderMode, LegacyDecoder, ShadowObservation, ShadowReport, WeightedSpanDecoder,
+    build_shadow_observation, DecodeCandidate, DecodeFailure, DecodeRequest, DecodeResult, DecodeSegment, Decoder,
+    DecoderConfig, DecoderMode, LegacyDecoder, ShadowObservation, ShadowReport, WeightedSpanDecoder,
 };
 
 pub(crate) struct DecoderManager {

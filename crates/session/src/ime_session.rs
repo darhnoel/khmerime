@@ -548,8 +548,7 @@ impl ImeSession {
         self.composition_raw.push(normalized);
         // Skip the decode when deferring, unless this could be a single-keycap
         // auto-commit (needs candidates now, and a 1-char decode is cheap).
-        let eager = !deferred
-            || (self.composition_raw.chars().count() == 1 && is_single_keycap_char(normalized));
+        let eager = !deferred || (self.composition_raw.chars().count() == 1 && is_single_keycap_char(normalized));
         if eager {
             self.recompute_composition_state();
         }
