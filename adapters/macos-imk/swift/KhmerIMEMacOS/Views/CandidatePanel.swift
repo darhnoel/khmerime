@@ -237,7 +237,23 @@ final class CandidatePanel: NSPanel {
 
         let textLabel = makeLabel(CandidateDisplayFormatter.displayText(for: entry))
         textLabel.font = .systemFont(ofSize: 15, weight: selected ? .semibold : .regular)
-        textLabel.textColor = selected ? .white : .labelColor
+        // Base colour: white on the selected row, label colour otherwise. A red ✦ (unverified
+        // model word, ADR-0016) must survive selection, so overlay it on top of the base colour.
+        let baseColor: NSColor = selected ? .white : .labelColor
+        if entry.fromModel {
+            let attr = NSMutableAttributedString(
+                string: CandidateDisplayFormatter.displayText(for: entry),
+                attributes: [.foregroundColor: baseColor,
+                             .font: NSFont.systemFont(ofSize: 15, weight: selected ? .semibold : .regular)]
+            )
+            if !entry.lexiconVerified {
+                attr.addAttribute(.foregroundColor, value: NSColor.systemRed,
+                                  range: NSRange(location: 0, length: 1)) // the leading ✦
+            }
+            textLabel.attributedStringValue = attr
+        } else {
+            textLabel.textColor = baseColor
+        }
         textLabel.lineBreakMode = .byTruncatingTail
         textLabel.cell?.usesSingleLineMode = true
 

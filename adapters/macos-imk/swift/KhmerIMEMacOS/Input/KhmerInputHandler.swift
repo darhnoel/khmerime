@@ -1,5 +1,30 @@
 import Foundation
 
+// Debounced model-refine scheduling. A protocol so tests can inject a synchronous fake;
+// the production scheduler runs the block on the main queue after a pause. Mirrors the
+// iOS DispatchModelRefineScheduler.
+protocol MacosRefineTask: AnyObject {
+    func cancel()
+}
+
+protocol MacosRefineScheduler {
+    func schedule(after delay: TimeInterval, block: @escaping () -> Void) -> MacosRefineTask
+}
+
+final class DispatchMacosRefineScheduler: MacosRefineScheduler {
+    func schedule(after delay: TimeInterval, block: @escaping () -> Void) -> MacosRefineTask {
+        let task = DispatchMacosRefineTask(block: block)
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: task.workItem)
+        return task
+    }
+}
+
+private final class DispatchMacosRefineTask: MacosRefineTask {
+    let workItem: DispatchWorkItem
+    init(block: @escaping () -> Void) { workItem = DispatchWorkItem(block: block) }
+    func cancel() { workItem.cancel() }
+}
+
 // KhmerInputHandler
 // =================
 // Pure-Swift input logic extracted from KhmerInputController so it can be
@@ -31,11 +56,39 @@ final class KhmerInputHandler {
     /// sent once on the marked → unmarked transition rather than on every render.
     private var hasMarkedText = false
 
+    // MARK: - Model refine (debounced)
+
+    private let refineScheduler: MacosRefineScheduler
+    private var pendingRefine: MacosRefineTask?
+    // The pause after a keystroke before the model runs; matches iOS's 0.18 s.
+    private static let refineDelay: TimeInterval = 0.18
+
     // MARK: - Init
 
-    init(client: TextClient, session: MacosImkSession) {
+    init(client: TextClient,
+         session: MacosImkSession,
+         refineScheduler: MacosRefineScheduler = DispatchMacosRefineScheduler()) {
         self.client = client
         self.session = session
+        self.refineScheduler = refineScheduler
+    }
+
+    /// After a keystroke with a live composition, run the model refine on a debounced pause (off the
+    /// keystroke path). No Smart gate: with no provider the session built no visible refiner, so
+    /// refineComposition is a cheap no-op. The Rust generation guard drops results made stale by
+    /// newer typing. Smart is implicit on macOS — on whenever a provider is armed (CONTEXT.md).
+    private func scheduleModelRefine(for preedit: String) {
+        pendingRefine?.cancel()
+        guard !preedit.isEmpty else { return }
+        pendingRefine = refineScheduler.schedule(after: Self.refineDelay) { [weak self] in
+            guard let self else { return }
+            self.render(self.session.refineComposition(rawPreedit: preedit))
+        }
+    }
+
+    private func cancelPendingRefine() {
+        pendingRefine?.cancel()
+        pendingRefine = nil
     }
 
     // MARK: - Lifecycle
@@ -46,12 +99,14 @@ final class KhmerInputHandler {
     }
 
     func deactivate() {
+        cancelPendingRefine()
         _ = session.deactivate()
         onPanelHide?()
     }
 
     /// Host app forces a commit (focus moves, mouse click in the document, …).
     func cancelComposition() {
+        cancelPendingRefine()
         render(session.cancelComposition())
     }
 
@@ -70,6 +125,8 @@ final class KhmerInputHandler {
 
         let state = session.handleEvent(keyval: keyval, macKeycode: macKeycode, modifierFlags: modifierFlags)
         render(state)
+        // Debounced model refine of the live composition (no-op without a provider).
+        scheduleModelRefine(for: state.preedit)
         return state.consumed
     }
 
@@ -92,6 +149,8 @@ final class KhmerInputHandler {
     private func render(_ state: MacosRenderState) {
         if let text = state.commitText, !text.isEmpty {
             client.insertText(text)
+            // The composition is gone; drop any pending refine so it can't fire post-commit.
+            cancelPendingRefine()
         }
         // Mirror the preedit, and clear it exactly once when the composition ends.
         // Both halves matter: skipping the empty call strands the last character in
