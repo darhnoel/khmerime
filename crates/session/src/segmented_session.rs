@@ -372,7 +372,43 @@ impl ImeSession {
             return;
         }
 
-        self.rebuild_segmented_session_from_observation();
+        self.rebuild_segmented_session_from_phrase_candidates();
+    }
+
+    /// Build the Segmented Session from the top Phrase Candidate's segments, which
+    /// `recompute_composition_state` already decoded into `self.phrase_candidates`. This reuses the
+    /// single Weighted Span pass instead of running `shadow_observation` a second time on the same
+    /// composition — the deterministic recompute happens on every keystroke, so the extra decode
+    /// dominated the per-key latency. Mirrors the debounced refine path
+    /// ([`compute_segmented_refinement`]), which was already single-decode. When no phrase candidate
+    /// is available (empty/failed decode), there are no segment pairs and no Segmented Session is
+    /// built — the same outcome the observation path gave for that case.
+    fn rebuild_segmented_session_from_phrase_candidates(&mut self) {
+        let top_segments: Vec<(String, String)> = self
+            .phrase_candidates
+            .first()
+            .map(|candidate| {
+                candidate
+                    .segments
+                    .iter()
+                    .map(|segment| (segment.input.clone(), segment.output.clone()))
+                    .collect()
+            })
+            .unwrap_or_default();
+        let transliterator = &self.transliterator;
+        self.segmented_session = build_segmented_session_from_pairs(
+            &self.composition_raw,
+            top_segments,
+            &self.history,
+            0,
+            &|input, history| {
+                exact_matches_first(
+                    transliterator,
+                    input,
+                    normalize_visible_suggestions(transliterator.suggest(input, history)),
+                )
+            },
+        );
     }
 
     pub fn refresh_segmented_preview(&mut self, raw_preedit: &str) -> bool {
@@ -762,5 +798,29 @@ mod tests {
         let changed = session.refine_segmented_with_visible_refiner(&raw);
         assert!(changed, "refine should build a segmented preview when untouched");
         assert!(session.snapshot().segmented_active);
+    }
+
+    // Perf characterization (Android per-keystroke latency): one recompute of a segmenting
+    // composition must run the Weighted Span decoder exactly once. It currently runs twice —
+    // once in `phrase_candidates` and again in `shadow_observation` while building the segmented
+    // session — even though the top phrase candidate already carries the segments the session
+    // needs. This is the duplicate decode that roughly doubles the deterministic recompute cost.
+    #[test]
+    fn recompute_of_a_segmented_composition_runs_weighted_span_once() {
+        let mut session = segmented_default_session_like_ibus_bridge();
+        type_ascii(&mut session, "khnhomtov");
+        assert!(
+            session.snapshot().segmented_active,
+            "khnhomtov must build a segmented session"
+        );
+
+        khmerime_core::reset_weighted_span_decode_calls();
+        session.recompute_now();
+        let calls = khmerime_core::weighted_span_decode_calls();
+
+        assert_eq!(
+            calls, 1,
+            "one recompute must run Weighted Span once, not {calls} times (duplicate decode)"
+        );
     }
 }

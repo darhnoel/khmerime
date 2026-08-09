@@ -8,6 +8,21 @@ use super::{
     DecodeResult, DecodeSegment, Decoder, DecoderConfig, SpanProposal, SpanProposalProvider, SpanProposalRequest,
 };
 
+/// Test-only counter of how many times the Weighted Span decoder has run. Lets tests assert the
+/// per-keystroke decode budget (e.g. one recompute must not run Weighted Span twice). Compiled in
+/// all builds — one relaxed atomic increment per decode is negligible — but only read from tests.
+pub static WEIGHTED_SPAN_DECODE_CALLS: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+
+/// Reset the decode counter to zero. Test-only helper.
+pub fn reset_weighted_span_decode_calls() {
+    WEIGHTED_SPAN_DECODE_CALLS.store(0, std::sync::atomic::Ordering::Relaxed);
+}
+
+/// Read the decode counter. Test-only helper.
+pub fn weighted_span_decode_calls() -> usize {
+    WEIGHTED_SPAN_DECODE_CALLS.load(std::sync::atomic::Ordering::Relaxed)
+}
+
 const MIN_SPAN_LEN: usize = 3;
 const MIN_EXACT_ANCHOR_LEN: usize = 2;
 const CHUNK_EDIT_FLOOR: f64 = 0.46;
@@ -934,6 +949,7 @@ impl Decoder for WeightedSpanDecoder {
     }
 
     fn decode(&self, request: &DecodeRequest<'_>) -> DecodeResult {
+        WEIGHTED_SPAN_DECODE_CALLS.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
         let started_at = start_decode_timer();
         if request.composer.normalized.is_empty() {
             return DecodeResult::failed(self.name(), DecodeFailure::EmptyResult, elapsed_decode_us(started_at));

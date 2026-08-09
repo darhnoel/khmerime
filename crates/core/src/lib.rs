@@ -17,6 +17,10 @@ pub use crate::decoder::{
     DecoderConfig, DecoderMode, ManualComposeCandidate, ManualComposeKind, ShadowMismatch, ShadowObservation,
     ShadowSummary, SpanProposal, SpanProposalMode, SpanProposalProvider, SpanProposalRequest,
 };
+// Test-only instrumentation: a counter of how many times the Weighted Span decoder ran. Exported so
+// tests in dependent crates (e.g. `khmerime_session`) can assert the per-keystroke decode budget —
+// one recompute must not decode twice. Not part of the engine's real API; do not call from adapters.
+pub use crate::decoder::{reset_weighted_span_decode_calls, weighted_span_decode_calls};
 pub use crate::roman_lookup::{
     AppliedSuggestion, Entry, LexiconError, Result, SharedTransliteratorData, Transliterator,
 };
