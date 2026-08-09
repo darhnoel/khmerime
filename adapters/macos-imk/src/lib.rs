@@ -163,14 +163,38 @@ pub struct MacosCandidateDisplayEntry {
     pub output: String,
     pub recommended: bool,
     pub roman_hints: Vec<String>,
+    /// True when a span-proposal provider contributed this candidate. Swift shows a ✦ marker
+    /// (ADR-0016 / ADR-0019). Derived by matching this output against the snapshot's phrase
+    /// candidates, since the shared CandidateDisplayEntry does not carry provenance.
+    pub from_model: bool,
+    /// True when the candidate is a real Lexicon word. A model candidate with this false is shown
+    /// with a RED ✦ (unverified — may be a valid name/loanword not yet in the Lexicon), never hidden.
+    pub lexicon_verified: bool,
 }
 
-impl From<&CandidateDisplayEntry> for MacosCandidateDisplayEntry {
-    fn from(entry: &CandidateDisplayEntry) -> Self {
+// Whitespace-stripped key for matching a display candidate to a phrase candidate. Mirrors the
+// session's normalized_suggestion_key without widening its public API.
+fn provenance_key(item: &str) -> String {
+    item.chars().filter(|ch| !ch.is_whitespace()).collect()
+}
+
+impl MacosCandidateDisplayEntry {
+    // `provenance`: from_model + lexicon_verified keyed by provenance_key of a phrase candidate's
+    // text. A plain Lexicon candidate (absent from the map) defaults to (false, true).
+    fn from_display(
+        entry: &CandidateDisplayEntry,
+        provenance: &std::collections::HashMap<String, (bool, bool)>,
+    ) -> Self {
+        let (from_model, lexicon_verified) = provenance
+            .get(&provenance_key(&entry.output))
+            .copied()
+            .unwrap_or((false, true));
         MacosCandidateDisplayEntry {
             output: entry.output.clone(),
             recommended: entry.recommended,
             roman_hints: entry.roman_hints.clone(),
+            from_model,
+            lexicon_verified,
         }
     }
 }
@@ -205,12 +229,19 @@ pub struct MacosRenderState {
 }
 
 fn render_state(snapshot: &SessionSnapshot, result: &SessionResult, ready: bool) -> MacosRenderState {
+    // Provenance the shared CandidateDisplayEntry drops lives on phrase_candidates (ADR-0019):
+    // key each by its whitespace-stripped text so display candidates can look up from_model.
+    let provenance: std::collections::HashMap<String, (bool, bool)> = snapshot
+        .phrase_candidates
+        .iter()
+        .map(|p| (provenance_key(&p.text), (p.from_model, p.lexicon_verified)))
+        .collect();
     MacosRenderState {
         candidates: snapshot.candidates.clone(),
         candidate_display: snapshot
             .candidate_display
             .iter()
-            .map(MacosCandidateDisplayEntry::from)
+            .map(|entry| MacosCandidateDisplayEntry::from_display(entry, &provenance))
             .collect(),
         selected_index: snapshot.selected_index.map(|i| i as u64),
         preedit: snapshot.raw_preedit.clone(),

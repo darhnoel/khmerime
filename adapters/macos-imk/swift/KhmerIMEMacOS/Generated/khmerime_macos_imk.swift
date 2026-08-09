@@ -871,13 +871,35 @@ public struct MacosCandidateDisplayEntry: Equatable, Hashable {
     public var output: String
     public var recommended: Bool
     public var romanHints: [String]
+    /**
+     * True when a span-proposal provider contributed this candidate. Swift shows a ✦ marker
+     * (ADR-0016 / ADR-0019). Derived by matching this output against the snapshot's phrase
+     * candidates, since the shared CandidateDisplayEntry does not carry provenance.
+     */
+    public var fromModel: Bool
+    /**
+     * True when the candidate is a real Lexicon word. A model candidate with this false is shown
+     * with a RED ✦ (unverified — may be a valid name/loanword not yet in the Lexicon), never hidden.
+     */
+    public var lexiconVerified: Bool
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
-    public init(output: String, recommended: Bool, romanHints: [String]) {
+    public init(output: String, recommended: Bool, romanHints: [String], 
+        /**
+         * True when a span-proposal provider contributed this candidate. Swift shows a ✦ marker
+         * (ADR-0016 / ADR-0019). Derived by matching this output against the snapshot's phrase
+         * candidates, since the shared CandidateDisplayEntry does not carry provenance.
+         */fromModel: Bool, 
+        /**
+         * True when the candidate is a real Lexicon word. A model candidate with this false is shown
+         * with a RED ✦ (unverified — may be a valid name/loanword not yet in the Lexicon), never hidden.
+         */lexiconVerified: Bool) {
         self.output = output
         self.recommended = recommended
         self.romanHints = romanHints
+        self.fromModel = fromModel
+        self.lexiconVerified = lexiconVerified
     }
 
     
@@ -898,7 +920,9 @@ public struct FfiConverterTypeMacosCandidateDisplayEntry: FfiConverterRustBuffer
             try MacosCandidateDisplayEntry(
                 output: FfiConverterString.read(from: &buf), 
                 recommended: FfiConverterBool.read(from: &buf), 
-                romanHints: FfiConverterSequenceString.read(from: &buf)
+                romanHints: FfiConverterSequenceString.read(from: &buf), 
+                fromModel: FfiConverterBool.read(from: &buf), 
+                lexiconVerified: FfiConverterBool.read(from: &buf)
         )
     }
 
@@ -906,6 +930,8 @@ public struct FfiConverterTypeMacosCandidateDisplayEntry: FfiConverterRustBuffer
         FfiConverterString.write(value.output, into: &buf)
         FfiConverterBool.write(value.recommended, into: &buf)
         FfiConverterSequenceString.write(value.romanHints, into: &buf)
+        FfiConverterBool.write(value.fromModel, into: &buf)
+        FfiConverterBool.write(value.lexiconVerified, into: &buf)
     }
 }
 

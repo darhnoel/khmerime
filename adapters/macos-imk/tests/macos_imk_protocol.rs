@@ -335,6 +335,44 @@ fn session_enter_commits_visible_default_when_hidden_refinement_disagrees() {
 }
 
 #[test]
+fn session_marks_model_rescued_candidate_from_model() {
+    // The visible refiner reads KHMERIME_SPAN_PROPOSALS at warmup. static-test maps
+    // "salarien" -> "សាលារៀន" (a real Lexicon word), so the rescued candidate must be marked
+    // from_model=true, lexicon_verified=true (a WHITE ✦). ADR-0019.
+    std::env::set_var("KHMERIME_SPAN_PROPOSALS", "static-test");
+    let s = MacosIMKSession::new();
+    loop {
+        if s.activate().is_ready { break; }
+        std::thread::sleep(std::time::Duration::from_millis(100));
+    }
+    std::env::remove_var("KHMERIME_SPAN_PROPOSALS");
+
+    type_str(&s, "salarien");
+    let refined = s.refine_composition("salarien".to_owned());
+
+    let rescued = refined
+        .candidate_display
+        .iter()
+        .find(|c| c.output == "សាលារៀន")
+        .expect("the model-rescued word must appear in the candidate list");
+    assert!(rescued.from_model, "rescued candidate must be marked from_model");
+    assert!(rescued.lexicon_verified, "សាលារៀន is a real Lexicon word → verified (white ✦)");
+}
+
+#[test]
+fn session_leaves_plain_lexicon_candidate_unmarked() {
+    // Without any provider, an ordinary lexicon candidate must carry NO ✦: from_model=false
+    // (so the marker only ever appears on model-assisted words).
+    let s = session();
+    let state = type_str(&s, "jea");
+    assert!(!state.candidate_display.is_empty(), "jea must produce candidates");
+    assert!(
+        state.candidate_display.iter().all(|c| !c.from_model),
+        "plain lexicon candidates must not be marked from_model",
+    );
+}
+
+#[test]
 fn session_deferred_visible_refinement_updates_long_phrase_candidate() {
     // IBus: bridge_deferred_visible_refinement_updates_long_phrase_candidate
     // IBus deferred mode: refine_composition pushes the refined phrase to
