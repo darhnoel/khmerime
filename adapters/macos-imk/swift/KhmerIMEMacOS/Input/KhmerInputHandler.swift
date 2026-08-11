@@ -25,6 +25,25 @@ private final class DispatchMacosRefineTask: MacosRefineTask {
     func cancel() { workItem.cancel() }
 }
 
+// Runs the model refine OFF the main thread, then delivers the result back ON the main thread for
+// rendering. The model inference (refreshSegmentedPreview → refine_off_lock) can take up to ~1.3 s;
+// running it inline on the main queue froze the keyboard UI for that whole time on every refine.
+// The Rust side is already lock-free and generation-guarded, so it is safe to run off-thread.
+// Mirrors the iOS QueuedDispatcher's onSession/onMain split. Tests inject a synchronous executor.
+protocol MacosRefineExecutor {
+    func run(work: @escaping () -> MacosRenderState, render: @escaping (MacosRenderState) -> Void)
+}
+
+final class DispatchMacosRefineExecutor: MacosRefineExecutor {
+    private let queue = DispatchQueue(label: "com.khmerime.macos.refine", qos: .userInitiated)
+    func run(work: @escaping () -> MacosRenderState, render: @escaping (MacosRenderState) -> Void) {
+        queue.async {
+            let state = work()
+            DispatchQueue.main.async { render(state) }
+        }
+    }
+}
+
 // KhmerInputHandler
 // =================
 // Pure-Swift input logic extracted from KhmerInputController so it can be
@@ -59,6 +78,7 @@ final class KhmerInputHandler {
     // MARK: - Model refine (debounced)
 
     private let refineScheduler: MacosRefineScheduler
+    private let refineExecutor: MacosRefineExecutor
     private var pendingRefine: MacosRefineTask?
     // The pause after a keystroke before the model runs; matches iOS's 0.18 s.
     private static let refineDelay: TimeInterval = 0.18
@@ -67,10 +87,12 @@ final class KhmerInputHandler {
 
     init(client: TextClient,
          session: MacosImkSession,
-         refineScheduler: MacosRefineScheduler = DispatchMacosRefineScheduler()) {
+         refineScheduler: MacosRefineScheduler = DispatchMacosRefineScheduler(),
+         refineExecutor: MacosRefineExecutor = DispatchMacosRefineExecutor()) {
         self.client = client
         self.session = session
         self.refineScheduler = refineScheduler
+        self.refineExecutor = refineExecutor
     }
 
     /// After a keystroke with a live composition, run the model refine on a debounced pause (off the
@@ -85,7 +107,13 @@ final class KhmerInputHandler {
         guard !preedit.isEmpty else { return }
         pendingRefine = refineScheduler.schedule(after: Self.refineDelay) { [weak self] in
             guard let self else { return }
-            self.render(self.session.refreshSegmentedPreview(rawPreedit: preedit))
+            // Run the model inference OFF the main thread (it can take up to ~1.3 s), then render its
+            // result back ON the main thread. Running it inline here froze the keyboard for the whole
+            // inference on every refine.
+            self.refineExecutor.run(
+                work: { self.session.refreshSegmentedPreview(rawPreedit: preedit) },
+                render: { [weak self] state in self?.render(state) }
+            )
         }
     }
 
