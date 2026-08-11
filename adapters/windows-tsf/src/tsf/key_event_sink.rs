@@ -1,6 +1,6 @@
 //! `ITfKeyEventSink` implementation.
 
-use std::sync::{mpsc::TryRecvError, Arc, Mutex};
+use std::sync::{Arc, Mutex};
 
 use windows::core::{implement, Error, Result, GUID};
 use windows::Win32::Foundation::{BOOL, E_FAIL, FALSE, LPARAM, TRUE, WPARAM};
@@ -68,11 +68,23 @@ impl ITfKeyEventSink_Impl for KhmerImeKeyEventSink_Impl {
 
         let (client_id, current_preedit, has_active_composition, render_state) = {
             let mut state = lock_state(&self.state)?;
-            poll_pending_driver(&mut state);
-            let Some(driver) = state.driver.as_mut() else {
-                log("KeyEventSink::OnKeyDown driver still warming; passthrough");
+            if state.driver.is_none() {
+                // Phase A is built synchronously in Activate, so this is no longer the
+                // warmup path — reaching here means the Phase A build itself failed and
+                // roman is leaking into the document. See ADR-0001.
+                state.warmup_passthrough_count += 1;
+                let leaked = state.warmup_passthrough_count;
+                let since_activate_ms = state
+                    .warmup_started_at
+                    .map(|started| started.elapsed().as_secs_f64() * 1000.0)
+                    .unwrap_or(f64::NAN);
+                log(format!(
+                    "[warmup-trace] passthrough n={leaked} since_activate_ms={since_activate_ms:.2} keyval={}",
+                    event.keyval
+                ));
                 return Ok(FALSE);
-            };
+            }
+            let driver = state.driver.as_mut().expect("driver present");
             if !event_would_be_consumed(event, &driver.session().snapshot()) {
                 return Ok(FALSE);
             }
@@ -119,8 +131,7 @@ fn lock_state(state: &Arc<Mutex<TextServiceState>>) -> Result<std::sync::MutexGu
 }
 
 fn driver_would_handle_key(state: &Arc<Mutex<TextServiceState>>, input: WindowsKeyInput) -> Result<bool> {
-    let mut state = lock_state(state)?;
-    poll_pending_driver(&mut state);
+    let state = lock_state(state)?;
     let Some(driver) = state.driver.as_ref() else {
         return Ok(false);
     };
@@ -128,28 +139,6 @@ fn driver_would_handle_key(state: &Arc<Mutex<TextServiceState>>, input: WindowsK
         return Ok(false);
     };
     Ok(event_would_be_consumed(event, &driver.session().snapshot()))
-}
-
-fn poll_pending_driver(state: &mut TextServiceState) {
-    let Some(receiver) = state.pending_driver.take() else {
-        return;
-    };
-
-    match receiver.try_recv() {
-        Ok(Ok(driver)) => {
-            state.driver = Some(driver);
-            log("KeyEventSink::driver warmup completed");
-        }
-        Ok(Err(err)) => {
-            log(format!("KeyEventSink::driver warmup failed: {err}"));
-        }
-        Err(TryRecvError::Empty) => {
-            state.pending_driver = Some(receiver);
-        }
-        Err(TryRecvError::Disconnected) => {
-            log("KeyEventSink::driver warmup disconnected");
-        }
-    }
 }
 
 fn bool_to_win32(value: bool) -> BOOL {
