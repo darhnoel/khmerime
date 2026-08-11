@@ -112,7 +112,7 @@ impl ITfTextInputProcessor_Impl for KhmerImeTextService_Impl {
             // search-index stages, so this is a short block, not the full engine
             // build. The full engine swaps in from a background thread. See ADR-0001.
             state.driver = match crate::session_driver::WindowsSessionDriver::from_phase_a_data_traced() {
-                Ok(driver) => Some(driver),
+                Ok(driver) => Some(activate_driver(driver)),
                 Err(error) => {
                     log(format!("TextService::Activate phase A build failed: {error}"));
                     None
@@ -175,4 +175,33 @@ impl ITfTextInputProcessor_Impl for KhmerImeTextService_Impl {
 
 fn lock_state(state: &Arc<Mutex<TextServiceState>>) -> Result<std::sync::MutexGuard<'_, TextServiceState>> {
     state.lock().map_err(|_| Error::from(E_FAIL))
+}
+
+fn activate_driver(mut driver: WindowsSessionDriver) -> WindowsSessionDriver {
+    driver.process_callback(crate::WindowsTsfCallback::Activate);
+    driver
+}
+
+#[cfg(test)]
+mod tests {
+    use std::collections::HashMap;
+
+    use khmerime_core::{DecoderConfig, Transliterator};
+    use khmerime_session::ImeSession;
+
+    use super::*;
+
+    #[test]
+    fn activating_text_service_activates_phase_a_session() {
+        let transliterator =
+            Transliterator::from_tsv_str_with_config("jea\tcandidate\n", DecoderConfig::shadow_interactive())
+                .expect("fixture must parse");
+        let driver = WindowsSessionDriver::new(ImeSession::new(transliterator, HashMap::new()));
+
+        let driver = activate_driver(driver);
+        let snapshot = driver.session().snapshot();
+
+        assert!(snapshot.enabled);
+        assert!(snapshot.focused);
+    }
 }
