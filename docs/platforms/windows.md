@@ -195,6 +195,10 @@ adapters/windows-tsf/src/
       Convert Windows virtual-key and character data into `NativeKeyEvent`.
 
   render/
+    candidate_surface.rs
+      Deep module selecting Flat, Phrase, or Segment candidate presentation and
+      keeping visible rows aligned with their keyboard selection commands.
+
     render_state.rs
       Convert `SessionSnapshot` + `SessionResult` into Windows render actions.
 
@@ -308,6 +312,8 @@ For v1, keep key conversion conservative:
 
 - pass printable ASCII only when it is clearly text input,
 - pass Enter, Backspace, Escape, Space, Left, Right, Up, Down using the session's expected key semantics,
+- pass Tab to Segment Edit Mode while a segmented composition is active, and
+  otherwise leave Tab to the host application,
 - pass Ctrl/Alt/Windows shortcuts through to the application,
 - ignore key-up events unless a future feature needs them.
 
@@ -378,7 +384,16 @@ Initial v1 rendering target:
 2. Show `snapshot.candidates` in TSF candidate UI.
 3. Highlight `snapshot.selected_index` if present.
 4. Commit `result.commit_text` once and then clear composition if the session reset.
-5. If segmented mode is active, first show the composed phrase as preedit and the focused segment candidates in the candidate list.
+5. In a Segmented Session, show complete Phrase Candidates by default. Up/Down,
+   Space, and number keys act on those visible phrases.
+6. Tab enters Segment Edit Mode and changes the same popup to the focused
+   segment's Candidate List; Tab again returns to phrase candidates.
+
+The native popup consumes `render::candidate_surface::CandidateSurface`, not raw
+snapshot fields. This deep module owns the Windows presentation and selection
+policy so `session_driver.rs`, `tsf/candidates.rs`, and `tsf/edit_session.rs` do
+not each repeat mode checks. See
+[`adapters/windows-tsf/docs/adr/0002-show-phrase-candidates-before-segment-candidates.md`](../../adapters/windows-tsf/docs/adr/0002-show-phrase-candidates-before-segment-candidates.md).
 
 Do not block v1 on a beautiful segment preview. A correct preedit + candidate list + commit path is more important.
 
@@ -556,7 +571,10 @@ Verify selected candidate changes
 Press Enter
 Verify Khmer text commits once
 Type khnhomttov
-Verify segmented phrase behavior is usable
+Verify rows are complete phrase alternatives
+Press Down and verify the complete phrase preview changes
+Press Tab and verify rows change to alternatives for the focused segment
+Press Tab again and verify complete phrase alternatives return
 Press Escape during composition
 Verify preedit clears and host app does not receive garbage text
 Switch away from KhmerIME

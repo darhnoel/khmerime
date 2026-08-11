@@ -13,8 +13,8 @@ use crate::com::text_service::TextServiceState;
 use crate::diagnostics::log;
 use crate::input::key_convert::{
     convert_windows_key, ConvertedKey, WindowsKeyInput, SESSION_KEY_BACKSPACE, SESSION_KEY_DOWN, SESSION_KEY_ESCAPE,
-    SESSION_KEY_LEFT, SESSION_KEY_RETURN, SESSION_KEY_RIGHT, SESSION_KEY_SPACE, SESSION_KEY_UP, STATE_ALT_MASK,
-    STATE_CONTROL_MASK, STATE_RELEASE_MASK, STATE_SUPER_MASK,
+    SESSION_KEY_LEFT, SESSION_KEY_RETURN, SESSION_KEY_RIGHT, SESSION_KEY_SPACE, SESSION_KEY_TAB, SESSION_KEY_UP,
+    STATE_ALT_MASK, STATE_CONTROL_MASK, STATE_RELEASE_MASK, STATE_SUPER_MASK,
 };
 
 const VK_SHIFT: i32 = 0x10;
@@ -225,6 +225,7 @@ fn event_would_be_consumed(event: NativeKeyEvent, snapshot: &SessionSnapshot) ->
             !snapshot.raw_preedit.is_empty()
         }
         SESSION_KEY_LEFT | SESSION_KEY_RIGHT => snapshot.segmented_active,
+        SESSION_KEY_TAB => snapshot.segmented_active,
         SESSION_KEY_UP | SESSION_KEY_DOWN => snapshot.segmented_active || !snapshot.candidates.is_empty(),
         _ => char::from_u32(event.keyval)
             .map(|ch| ch.is_ascii_graphic())
@@ -276,6 +277,7 @@ mod tests {
             SESSION_KEY_ESCAPE,
             SESSION_KEY_RETURN,
             SESSION_KEY_SPACE,
+            SESSION_KEY_TAB,
             SESSION_KEY_LEFT,
             SESSION_KEY_RIGHT,
             SESSION_KEY_UP,
@@ -304,6 +306,18 @@ mod tests {
         }
         assert!(event_would_be_consumed(event(SESSION_KEY_UP), &snapshot));
         assert!(event_would_be_consumed(event(SESSION_KEY_DOWN), &snapshot));
+        assert!(!event_would_be_consumed(event(SESSION_KEY_TAB), &snapshot));
+    }
+
+    #[test]
+    fn tab_is_consumed_only_for_segmented_composition() {
+        let snapshot = SessionSnapshot {
+            raw_preedit: "khnhomttov".to_owned(),
+            segmented_active: true,
+            ..SessionSnapshot::default()
+        };
+
+        assert!(event_would_be_consumed(event(SESSION_KEY_TAB), &snapshot));
     }
 
     #[test]

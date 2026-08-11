@@ -22,6 +22,7 @@ use khmerime_session::{CandidateDisplayEntry, CursorLocation, SegmentPreviewEntr
 
 use crate::com::dll_module::module_instance;
 use crate::diagnostics::log;
+use crate::render::candidate_surface::{CandidateSurface, CandidateSurfaceMode};
 use crate::WindowsRenderState;
 
 pub const CANDIDATE_SOURCE_FIELDS: &[&str] = &[
@@ -103,31 +104,25 @@ impl CandidateWindow {
 
     /// Refresh the candidate list and show the window next to `location`.
     /// Hides the window if `candidates` is empty.
-    pub fn update(
-        &self,
-        candidates: &[String],
-        candidate_display: &[CandidateDisplayEntry],
-        segment_preview: &[SegmentPreviewEntry],
-        selected: usize,
-        location: &CursorLocation,
-    ) {
-        if candidates.is_empty() {
+    pub fn update(&self, surface: &CandidateSurface, location: &CursorLocation) {
+        if surface.rows().is_empty() {
             self.hide();
             return;
         }
 
-        let display = display_candidate_rows(candidates, candidate_display);
+        let display = display_candidate_rows(surface.rows(), surface.display());
         let mut rows: Vec<(String, bool)> = Vec::new();
-        if let Some(preview) = segment_preview_text(segment_preview) {
+        if let Some(preview) = segment_preview_text(surface.context()) {
             rows.push((preview, false));
         }
         rows.extend(
-            candidates
+            surface
+                .rows()
                 .iter()
                 .zip(display.iter())
                 .take(MAX_ROWS)
                 .enumerate()
-                .map(|(i, (_candidate, label))| (format!("{}  {}", i + 1, label), i == selected)),
+                .map(|(i, (_candidate, label))| (format!("{}  {}", i + 1, label), Some(i) == surface.selected_index())),
         );
 
         let work_area = monitor_work_area_for_location(location);
@@ -438,21 +433,24 @@ pub fn inline_preview_text(render_state: &WindowsRenderState) -> Option<String> 
         return None;
     }
     let mut preview = render_state.preedit.clone();
-    if render_state.segmented_active {
-        if let Some(segment_preview) = segment_preview_text(&render_state.segment_preview) {
+    if render_state.candidate_surface.mode() != CandidateSurfaceMode::Flat {
+        if let Some(segment_preview) = segment_preview_text(render_state.candidate_surface.context()) {
             preview.push_str("  {");
             preview.push_str(&segment_preview);
             preview.push('}');
         }
     }
-    if !render_state.candidates.is_empty() {
-        let display = display_candidate_rows(&render_state.candidates, &render_state.candidate_display);
+    if !render_state.candidate_surface.rows().is_empty() {
+        let display = display_candidate_rows(
+            render_state.candidate_surface.rows(),
+            render_state.candidate_surface.display(),
+        );
         let candidates = display
             .iter()
             .take(5)
             .enumerate()
             .map(|(index, candidate)| {
-                if Some(index) == render_state.selected_index {
+                if Some(index) == render_state.candidate_surface.selected_index() {
                     format!("{}. *{}", index + 1, candidate)
                 } else {
                     format!("{}. {}", index + 1, candidate)
@@ -543,39 +541,53 @@ fn display_candidate_rows(candidates: &[String], candidate_display: &[CandidateD
 #[cfg(test)]
 mod tests {
     use super::*;
+    use khmerime_session::SessionSnapshot;
+
+    fn render_state(snapshot: SessionSnapshot, preedit: &str) -> WindowsRenderState {
+        WindowsRenderState {
+            preedit: preedit.to_owned(),
+            candidate_surface: CandidateSurface::from_snapshot(&snapshot),
+            ..WindowsRenderState::default()
+        }
+    }
 
     #[test]
     fn inline_preview_marks_selected_candidate() {
-        let preview = inline_preview_text(&WindowsRenderState {
-            preedit: "jea".to_owned(),
-            candidates: vec!["candidate".to_owned(), "other".to_owned()],
-            selected_index: Some(1),
-            ..WindowsRenderState::default()
-        });
+        let preview = inline_preview_text(&render_state(
+            SessionSnapshot {
+                candidates: vec!["candidate".to_owned(), "other".to_owned()],
+                selected_index: Some(1),
+                ..SessionSnapshot::default()
+            },
+            "jea",
+        ));
         assert_eq!(preview.as_deref(), Some("jea  [1. candidate  2. *other]"));
     }
 
     #[test]
     fn inline_preview_includes_segment_preview_when_active() {
-        let preview = inline_preview_text(&WindowsRenderState {
-            preedit: "firstsecond".to_owned(),
-            candidates: vec!["first".to_owned()],
-            selected_index: Some(0),
-            segmented_active: true,
-            segment_preview: vec![
-                SegmentPreviewEntry {
-                    output: "first".to_owned(),
-                    input: "foo".to_owned(),
-                    focused: true,
-                },
-                SegmentPreviewEntry {
-                    output: "second".to_owned(),
-                    input: "bar".to_owned(),
-                    focused: false,
-                },
-            ],
-            ..WindowsRenderState::default()
-        });
+        let preview = inline_preview_text(&render_state(
+            SessionSnapshot {
+                candidates: vec!["first".to_owned()],
+                selected_index: Some(0),
+                segmented_active: true,
+                segment_edit_active: true,
+                segment_preview: vec![
+                    SegmentPreviewEntry {
+                        output: "first".to_owned(),
+                        input: "foo".to_owned(),
+                        focused: true,
+                    },
+                    SegmentPreviewEntry {
+                        output: "second".to_owned(),
+                        input: "bar".to_owned(),
+                        focused: false,
+                    },
+                ],
+                ..SessionSnapshot::default()
+            },
+            "firstsecond",
+        ));
 
         assert_eq!(
             preview.as_deref(),

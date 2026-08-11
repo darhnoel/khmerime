@@ -140,6 +140,9 @@ impl WindowsSessionDriver {
     }
 
     pub fn process_callback(&mut self, callback: WindowsTsfCallback) -> WindowsRenderState {
+        if let WindowsTsfCallback::KeyDown(event) = callback {
+            return self.process_key_event(event);
+        }
         self.poll_full_warmup();
         let mut last_result = Default::default();
         for command in map_callback_to_session_commands(&callback) {
@@ -158,7 +161,16 @@ impl WindowsSessionDriver {
     }
 
     pub fn process_key_event(&mut self, event: NativeKeyEvent) -> WindowsRenderState {
-        self.process_callback(WindowsTsfCallback::KeyDown(event))
+        self.poll_full_warmup();
+        let snapshot = self.session.snapshot();
+        let surface = crate::render::candidate_surface::CandidateSurface::from_snapshot(&snapshot);
+        let result = if let Some(command) = surface.command_for_key(event.keyval) {
+            self.session.process_command(command)
+        } else {
+            self.session.process_command(SessionCommand::ProcessKeyEvent(event))
+        };
+        self.maybe_complete_full_upgrade();
+        derive_render_state(&self.session.snapshot(), &result)
     }
 
     pub fn snapshot_render_state(&self) -> WindowsRenderState {
@@ -222,8 +234,9 @@ mod tests {
 
     use super::*;
     use crate::input::key_convert::{
-        convert_windows_key, ConvertedKey, WindowsKeyInput, SESSION_KEY_BACKSPACE, SESSION_KEY_ESCAPE,
-        SESSION_KEY_RETURN, SESSION_KEY_SPACE, STATE_CONTROL_MASK, VK_BACK, VK_ESCAPE, VK_RETURN, VK_SPACE,
+        convert_windows_key, ConvertedKey, WindowsKeyInput, SESSION_KEY_BACKSPACE, SESSION_KEY_DOWN,
+        SESSION_KEY_ESCAPE, SESSION_KEY_RETURN, SESSION_KEY_SPACE, SESSION_KEY_TAB, STATE_CONTROL_MASK, VK_BACK,
+        VK_ESCAPE, VK_RETURN, VK_SPACE,
     };
 
     fn driver() -> WindowsSessionDriver {
@@ -359,7 +372,28 @@ mod tests {
         let render = driver.process_key_event(key(SESSION_KEY_SPACE));
 
         assert!(render.consumed);
-        assert_eq!(render.selected_index, Some(1));
+        assert_eq!(render.candidate_surface.selected_index(), Some(1));
+    }
+
+    #[test]
+    fn windows_cycles_whole_phrases_until_tab_enters_segment_edit() {
+        let mut driver = WindowsSessionDriver::from_default_data().expect("default data");
+        driver.process_callback(WindowsTsfCallback::Activate);
+        let initial = type_ascii(&mut driver, "khnhomttov");
+        assert_eq!(
+            initial.candidate_surface.mode(),
+            crate::render::candidate_surface::CandidateSurfaceMode::Phrase
+        );
+        assert!(initial.candidate_surface.rows().len() > 1);
+
+        let phrase = driver.process_key_event(key(SESSION_KEY_DOWN));
+        assert_eq!(phrase.candidate_surface.selected_index(), Some(1));
+
+        let segment = driver.process_key_event(key(SESSION_KEY_TAB));
+        assert_eq!(
+            segment.candidate_surface.mode(),
+            crate::render::candidate_surface::CandidateSurfaceMode::Segment
+        );
     }
 
     #[test]
@@ -371,7 +405,7 @@ mod tests {
         let render = driver.process_key_event(key('2' as u32));
 
         assert!(render.consumed);
-        assert_eq!(render.selected_index, Some(1));
+        assert_eq!(render.candidate_surface.selected_index(), Some(1));
         assert!(render.commit_text.is_none());
     }
 

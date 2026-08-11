@@ -4,10 +4,8 @@
 //! Windows Text Services Framework boundary: COM registration/lifecycle, key
 //! conversion, render-state derivation, and TSF document mutation.
 
-use khmerime_session::{
-    CandidateDisplayEntry, CursorLocation, NativeKeyEvent, SegmentPreviewEntry, SessionCommand, SessionResult,
-    SessionSnapshot,
-};
+use khmerime_session::{CursorLocation, NativeKeyEvent, SessionCommand, SessionResult, SessionSnapshot};
+use render::candidate_surface::CandidateSurface;
 
 #[cfg(windows)]
 pub mod com;
@@ -70,18 +68,8 @@ const CALLBACK_MAP: &[CallbackMapping] = &[
 pub struct WindowsRenderState {
     /// Whether TSF should eat the original key.
     pub consumed: bool,
-    /// Candidate list for TSF candidate UI.
-    pub candidates: Vec<String>,
-    /// Display metadata for candidate labels, including recommendation markers and roman hints.
-    pub candidate_display: Vec<CandidateDisplayEntry>,
-    /// Active candidate index for TSF candidate UI highlighting.
-    pub selected_index: Option<usize>,
-    /// Whether the shared session is showing segmented phrase refinement.
-    pub segmented_active: bool,
-    /// Segment preview rows used by IBus auxiliary text and TSF popup header.
-    pub segment_preview: Vec<SegmentPreviewEntry>,
-    /// Focused segment index when segmented phrase refinement is active.
-    pub focused_segment_index: Option<usize>,
+    /// Complete candidate presentation policy for the native popup.
+    pub candidate_surface: CandidateSurface,
     /// Composition string for marked/preedit text.
     pub preedit: String,
     /// Optional commit text to finalize in host document.
@@ -134,7 +122,8 @@ pub fn derive_render_state(snapshot: &SessionSnapshot, result: &SessionResult) -
     } else {
         actions.push(render::RenderAction::UpdateComposition);
     }
-    if snapshot.candidates.is_empty() {
+    let candidate_surface = CandidateSurface::from_snapshot(snapshot);
+    if candidate_surface.rows().is_empty() {
         actions.push(render::RenderAction::ClearCandidates);
     } else {
         actions.push(render::RenderAction::UpdateCandidates);
@@ -142,12 +131,7 @@ pub fn derive_render_state(snapshot: &SessionSnapshot, result: &SessionResult) -
 
     WindowsRenderState {
         consumed: result.consumed,
-        candidates: snapshot.candidates.clone(),
-        candidate_display: snapshot.candidate_display.clone(),
-        selected_index: snapshot.selected_index,
-        segmented_active: snapshot.segmented_active,
-        segment_preview: snapshot.segment_preview.clone(),
-        focused_segment_index: snapshot.focused_segment_index,
+        candidate_surface,
         preedit: render_preedit,
         commit_text: result.commit_text.clone(),
         cursor_location: snapshot.cursor_location,
@@ -158,6 +142,7 @@ pub fn derive_render_state(snapshot: &SessionSnapshot, result: &SessionResult) -
 #[cfg(test)]
 mod tests {
     use super::*;
+    use khmerime_session::{CandidateDisplayEntry, SegmentPreviewEntry};
 
     #[test]
     fn callback_map_keeps_tsf_boundaries_visible() {
@@ -205,6 +190,7 @@ mod tests {
             ],
             selected_index: Some(0),
             segmented_active: true,
+            segment_edit_active: true,
             segment_preview: vec![SegmentPreviewEntry {
                 output: "candidate".to_owned(),
                 input: "chea".to_owned(),
@@ -229,12 +215,10 @@ mod tests {
 
         assert!(render_state.consumed);
         assert_eq!(render_state.preedit, "chea");
-        assert_eq!(render_state.candidates, vec!["candidate", "chea"]);
-        assert_eq!(render_state.candidate_display.len(), 2);
-        assert_eq!(render_state.selected_index, Some(0));
-        assert!(render_state.segmented_active);
-        assert_eq!(render_state.segment_preview.len(), 1);
-        assert_eq!(render_state.focused_segment_index, Some(0));
+        assert_eq!(render_state.candidate_surface.rows(), ["candidate", "chea"]);
+        assert_eq!(render_state.candidate_surface.display().len(), 2);
+        assert_eq!(render_state.candidate_surface.selected_index(), Some(0));
+        assert_eq!(render_state.candidate_surface.context().len(), 1);
         assert_eq!(render_state.commit_text.as_deref(), Some("candidate"));
         assert_eq!(render_state.cursor_location.x, 10);
         assert!(render_state.actions.contains(&render::RenderAction::CommitText));
@@ -254,6 +238,7 @@ mod tests {
             }],
             selected_index: Some(0),
             segmented_active: true,
+            segment_edit_active: true,
             segment_preview: vec![SegmentPreviewEntry {
                 output: "នេះ".to_owned(),
                 input: "nih".to_owned(),
@@ -265,8 +250,8 @@ mod tests {
         let render_state = derive_render_state(&snapshot, &SessionResult::default());
 
         assert_eq!(render_state.preedit, "nihjeasnadaiborkbrae");
-        assert_eq!(render_state.candidates, vec!["នេះជាស្នាដៃបកប្រែ"]);
-        assert_eq!(render_state.segment_preview[0].output, "នេះ");
+        assert_eq!(render_state.candidate_surface.rows(), ["នេះជាស្នាដៃបកប្រែ"]);
+        assert_eq!(render_state.candidate_surface.context()[0].output, "នេះ");
         assert!(render_state.actions.contains(&render::RenderAction::UpdateComposition));
     }
 

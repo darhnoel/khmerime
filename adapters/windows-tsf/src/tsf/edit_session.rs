@@ -108,7 +108,7 @@ pub fn refresh_candidates(state: &Arc<Mutex<TextServiceState>>, render_state: &W
         .or_else(|| usable_cursor_location(render_state.cursor_location));
 
     if let Ok(mut guard) = state.lock() {
-        if render_state.candidates.is_empty() {
+        if render_state.candidate_surface.rows().is_empty() {
             if let Some(window) = &guard.candidate_window {
                 window.hide();
             }
@@ -121,13 +121,7 @@ pub fn refresh_candidates(state: &Arc<Mutex<TextServiceState>>, render_state: &W
         }
         if let Some(window) = &guard.candidate_window {
             match &anchor {
-                Some(a) => window.update(
-                    &render_state.candidates,
-                    &render_state.candidate_display,
-                    &render_state.segment_preview,
-                    render_state.selected_index.unwrap_or(0),
-                    a,
-                ),
+                Some(a) => window.update(&render_state.candidate_surface, a),
                 None => window.hide(),
             }
         }
@@ -245,13 +239,7 @@ impl KhmerImeEditSession_Impl {
             }
             if let Some(window) = &state.candidate_window {
                 if let Some(anchor) = anchor {
-                    window.update(
-                        &self.render_state.candidates,
-                        &self.render_state.candidate_display,
-                        &self.render_state.segment_preview,
-                        self.render_state.selected_index.unwrap_or(0),
-                        anchor,
-                    );
+                    window.update(&self.render_state.candidate_surface, anchor);
                 } else {
                     log("edit_session::candidate anchor unavailable; hiding candidates");
                     window.hide();

@@ -16,6 +16,7 @@ pub const VK_RIGHT: u32 = 0x27;
 pub const VK_DOWN: u32 = 0x28;
 
 pub const SESSION_KEY_BACKSPACE: u32 = 0xFF08;
+pub const SESSION_KEY_TAB: u32 = 0xFF09;
 pub const SESSION_KEY_ESCAPE: u32 = 0xFF1B;
 pub const SESSION_KEY_LEFT: u32 = 0xFF51;
 pub const SESSION_KEY_UP: u32 = 0xFF52;
@@ -64,7 +65,7 @@ pub fn convert_windows_key(input: WindowsKeyInput) -> ConvertedKey {
         VK_UP => SESSION_KEY_UP,
         VK_RIGHT => SESSION_KEY_RIGHT,
         VK_DOWN => SESSION_KEY_DOWN,
-        VK_TAB => return ConvertedKey::PassThrough,
+        VK_TAB => SESSION_KEY_TAB,
         _ => match input.translated_char {
             Some(ch) if ch.is_ascii_graphic() => ch as u32,
             _ => return ConvertedKey::PassThrough,
@@ -112,6 +113,22 @@ mod tests {
                 state: 0,
             })
         );
+    }
+
+    #[test]
+    fn tab_is_available_for_segment_edit_mode_routing() {
+        let converted = convert_windows_key(WindowsKeyInput {
+            virtual_key: VK_TAB,
+            ..WindowsKeyInput::default()
+        });
+
+        assert!(matches!(
+            converted,
+            ConvertedKey::Event(NativeKeyEvent {
+                keyval: SESSION_KEY_TAB,
+                ..
+            })
+        ));
     }
 
     #[test]
