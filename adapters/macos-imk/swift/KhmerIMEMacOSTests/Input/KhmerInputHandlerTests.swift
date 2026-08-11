@@ -12,7 +12,9 @@ final class KhmerInputHandlerTests: XCTestCase {
     // protocol tests — activate() reports isReady).
     private func makeHandler() -> (KhmerInputHandler, MockTextClient) {
         let client = MockTextClient()
-        let handler = KhmerInputHandler(client: client, session: MacosImkSession())
+        let handler = KhmerInputHandler(
+            client: client, session: MacosImkSession(), refineExecutor: SynchronousRefineExecutor(),
+        )
         for _ in 0..<100 {
             if handler.activate().isReady { break }
             Thread.sleep(forTimeInterval: 0.1)
@@ -40,9 +42,24 @@ final class KhmerInputHandlerTests: XCTestCase {
         func fireLatest() { latest?.block?() }
     }
 
-    private func makeHandler(scheduler: MacosRefineScheduler) -> (KhmerInputHandler, MockTextClient) {
+    // A refine executor that runs work + render inline on the calling thread (so tests stay
+    // synchronous) while recording that the off-main path was taken.
+    private final class SynchronousRefineExecutor: MacosRefineExecutor {
+        private(set) var runCount = 0
+        func run(work: @escaping () -> MacosRenderState, render: @escaping (MacosRenderState) -> Void) {
+            runCount += 1
+            render(work())
+        }
+    }
+
+    private func makeHandler(
+        scheduler: MacosRefineScheduler,
+        executor: MacosRefineExecutor = SynchronousRefineExecutor(),
+    ) -> (KhmerInputHandler, MockTextClient) {
         let client = MockTextClient()
-        let handler = KhmerInputHandler(client: client, session: MacosImkSession(), refineScheduler: scheduler)
+        let handler = KhmerInputHandler(
+            client: client, session: MacosImkSession(), refineScheduler: scheduler, refineExecutor: executor,
+        )
         for _ in 0..<100 {
             if handler.activate().isReady { break }
             Thread.sleep(forTimeInterval: 0.1)
@@ -204,6 +221,22 @@ final class KhmerInputHandlerTests: XCTestCase {
         // Even if that stale refine somehow fires, it's a no-op (cancelled → block cleared).
         scheduler.fireLatest()
         XCTAssertEqual(updated?.selectedIndex, 3, "selection must survive; no reset to the top word")
+    }
+
+    func test_modelRefineRunsThroughTheOffMainExecutor() {
+        // The model inference must go through the refine executor (off the main thread in
+        // production), not run inline on the scheduler's thread — otherwise a ~1.3 s inference
+        // freezes the keyboard UI on every refine.
+        let scheduler = ManualRefineScheduler()
+        let executor = SynchronousRefineExecutor()
+        let (handler, _) = makeHandler(scheduler: scheduler, executor: executor)
+
+        type("jea", into: handler) // schedules a refine
+        XCTAssertNotNil(scheduler.latest, "typing must schedule a refine")
+        XCTAssertEqual(executor.runCount, 0, "the model must not run until the debounce fires")
+
+        scheduler.fireLatest()
+        XCTAssertEqual(executor.runCount, 1, "the fired refine must run the model via the off-main executor")
     }
 
     func test_commit_insertsTextBeforeClearingMarkedText() {

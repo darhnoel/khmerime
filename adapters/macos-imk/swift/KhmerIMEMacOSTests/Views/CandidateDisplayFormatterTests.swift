@@ -5,7 +5,9 @@ final class CandidateDisplayFormatterTests: XCTestCase {
         let entry = MacosCandidateDisplayEntry(
             output: "ជា",
             recommended: true,
-            romanHints: ["jea"]
+            romanHints: ["jea"],
+            fromModel: false,
+            lexiconVerified: true
         )
 
         let text = CandidateDisplayFormatter.displayText(for: entry)
@@ -18,7 +20,9 @@ final class CandidateDisplayFormatterTests: XCTestCase {
         let entry = MacosCandidateDisplayEntry(
             output: "ទៅ",
             recommended: false,
-            romanHints: ["tov", "to"]
+            romanHints: ["tov", "to"],
+            fromModel: false,
+            lexiconVerified: true
         )
 
         XCTAssertEqual(CandidateDisplayFormatter.displayText(for: entry), "ទៅ  tov, to")
@@ -28,7 +32,9 @@ final class CandidateDisplayFormatterTests: XCTestCase {
         let entry = MacosCandidateDisplayEntry(
             output: "ខ្មែរ",
             recommended: false,
-            romanHints: []
+            romanHints: [],
+            fromModel: false,
+            lexiconVerified: true
         )
 
         XCTAssertEqual(CandidateDisplayFormatter.displayText(for: entry), "ខ្មែរ  ≈")
@@ -41,7 +47,7 @@ final class CandidateDisplayFormatterTests: XCTestCase {
         )
 
         XCTAssertEqual(entries, [
-            MacosCandidateDisplayEntry(output: "ទៅ", recommended: false, romanHints: [])
+            MacosCandidateDisplayEntry(output: "ទៅ", recommended: false, romanHints: [], fromModel: false, lexiconVerified: true)
         ])
     }
 }
