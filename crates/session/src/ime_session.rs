@@ -576,9 +576,6 @@ impl ImeSession {
     }
 
     fn handle_space(&mut self) -> SessionResult {
-        if self.segment_edit_state.is_some() {
-            return self.commit_selected_or_raw();
-        }
         self.cycle_candidates(1)
     }
 
