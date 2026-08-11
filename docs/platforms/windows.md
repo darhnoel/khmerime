@@ -590,7 +590,68 @@ Candidates wrong but key flow works
 
 Candidate window in wrong place
   -> context/cursor rectangle mapping issue.
+
+Roman text lands in the document during the first seconds after switching
+to KhmerIME
+  -> warmup passthrough. See the cold-start trace below and ADR-0001.
 ```
+
+## Cold-Start Trace
+
+TSF loads this DLL into every host application process, so warmup is paid again
+in each app the user types in. That makes cold start a different problem here
+than on Linux (one long-lived bridge) or macOS (one resident IMK process).
+
+Warmup timings are written to `C:\Temp\khmerime-tsf.log` with a `[warmup-trace]`
+prefix. `eprintln!`-based tracing from `crates/core` is useless on Windows: a text
+service hosted by Notepad has no stderr, so the adapter routes core's stage logger
+into the file log instead.
+
+Before trusting any number, confirm which DLL is actually registered and whether it
+was optimized. `make platform-reinstall-windows` builds **without** `--release` and
+registers a copy under `target/windows-tsf-deploy/<stamp>/`, which is not the MSI
+build. A debug DLL is roughly 44 MB against roughly 17 MB for release.
+
+```powershell
+Get-ItemProperty 'HKLM:\SOFTWARE\Classes\CLSID\{79F0A9C7-FEC5-4637-9D9D-4DFC54C8B5C2}\InprocServer32'
+```
+
+The workspace sets `opt-level = 3` for `khmerime_core` and all dependencies in the dev
+profile, so the dev loop no longer reports a ~3.5x inflated engine build. Adapter crates
+stay unoptimized and debuggable.
+
+Collect a measurement:
+
+```powershell
+Remove-Item C:\Temp\khmerime-tsf.log -ErrorAction SilentlyContinue
+# Open Notepad, switch to KhmerIME, immediately type "jea"
+# Then repeat in a second host app (browser address bar, WordPad)
+Select-String -Path C:\Temp\khmerime-tsf.log -Pattern 'warmup-trace'
+```
+
+What the lines mean:
+
+```text
+phase_a.start / phase_a.end  Synchronous Phase A build in Activate (~15 ms).
+full.start host=<exe>/<pid>  Background full build, per host process.
+stage=parse_lexicon          Prefix Phase A also pays (~49 ms).
+stage=parse_dictionary_image Prefix Phase A also pays (~0.1 ms).
+stage=ranked_lexicon.*       Skipped by Phase A. Dominates the full build.
+stage=search_index           Skipped by Phase A. Second largest.
+full.end total_ms=           Full engine build, wall clock (~1160 ms optimized).
+full_upgrade.applied         Engine swapped in while composition was idle.
+full_upgrade.deferred        Swap held back; a Composition was active.
+full_upgrade.applied_after_idle  Deferred swap landed once composing ended.
+passthrough n=               A key leaked into the document. Should never appear.
+```
+
+`passthrough` lines are now a defect signal, not a normal warmup artifact. Phase A
+is built synchronously before the key sink can receive anything, so a passthrough
+means the Phase A build itself failed — check the preceding `Activate phase A build
+failed` line.
+
+Compare first-run against warm runs, and compare two different host processes;
+per-process cost is the part that has no analogue on the other platforms.
 
 ## What Not To Do
 

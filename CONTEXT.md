@@ -137,7 +137,11 @@ An input mode (`InputMode::CharPick`) for typing Khmer text that is not in the *
 _Avoid_: name mode, character picker, direct character input
 
 **Phase A / Phase B startup**:
-A two-stage warmup. Phase A builds a minimal **SharedTransliteratorData** fast enough to accept keystrokes (~100 ms). Phase B builds the full version in a background thread (~800 ms ngram, ~1300 ms SymSpell). Phase B is swapped in transparently when ready.
+A two-stage warmup. Phase A builds a minimal **SharedTransliteratorData** fast enough to accept keystrokes (~100 ms). Phase B builds the full version in a background thread (~800 ms ngram, ~1300 ms SymSpell). Phase B is swapped in transparently when ready. The staging exists to satisfy **Warmup Keystroke Capture** on hosts where the adapter is not already resident.
+
+**Warmup Keystroke Capture**:
+The rule that a keystroke arriving before the engine is ready is still the IME's to handle. It must become part of a **Composition**, never reach the host application as raw roman. An adapter may satisfy this by composing on a Phase A engine or by briefly waiting for the full engine, but declining the key is a defect: text the user believed was being composed is already committed and can no longer be converted.
+_Avoid_: warmup passthrough, cold-start fallback
 
 **Visible Refiner / Commit Refiner**:
 Two distinct `Transliterator` views built from the same **SharedTransliteratorData** but with different decoder configurations. The visible refiner has a 75 ms latency budget for in-flight preview refinement; the commit refiner has a larger budget and produces the final **Commit Text** on Enter. Both budgets are wall-clock deadlines; when the commit refiner's trips, the commit degrades to the visible result rather than waiting (see ADR-0005).
@@ -217,6 +221,7 @@ _Avoid_: speculative insert, preview text (this is real inserted text, later cor
 - A **Visible Candidate Commit** makes the visible selected candidate authoritative over hidden commit refinement
 - A **Hidden Commit Fallback** only applies when visible state is not useful Khmer **Commit Text**
 - A **Bridge** owns exactly one **SharedTransliteratorData** for its lifetime
+- **Warmup Keystroke Capture** binds every adapter, but the cost of satisfying it is not shared: a **Bridge** or a resident macOS process pays warmup once per login, while a TSF adapter pays it again in every host application process it is loaded into
 - The **Download Landing Page** and the **Online Beta** share the **Silk Veil** visual identity
 - The **Download Landing Page** links to the **Online Beta** as its secondary trial path
 - A **Config Store** holds zero or more **Lexicon Pack**s plus the next-word suggestion settings

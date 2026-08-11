@@ -4,24 +4,128 @@
 //! and let this driver own the shared IME session.
 
 use std::collections::HashMap;
-use std::sync::mpsc::{self, Receiver};
+use std::sync::mpsc::{self, Receiver, TryRecvError};
 use std::thread;
+use std::time::Instant;
 
 use khmerime_core::{DecoderConfig, Result as KhmerResult, Transliterator};
-use khmerime_session::{HistoryStore, ImeSession, NativeKeyEvent, SessionCommand};
+use khmerime_session::{HistoryStore, ImeSession, NativeKeyEvent, SegmentedPreviewMode, SessionCommand};
 
+use crate::diagnostics::log;
 use crate::{derive_render_state, map_callback_to_session_commands, WindowsRenderState, WindowsTsfCallback};
 
 /// The first post-skeleton milestone for Windows adapter implementation.
 pub const FIRST_IMPLEMENTATION_MILESTONE: &str = "pure Rust Windows session driver around ImeSession";
 
+/// How far along the two-stage warmup this driver is.
+///
+/// Mirrors the IBus bridge's readiness states. `FullPending` exists because the
+/// engine swap is deferred while a **Composition** is active — swapping the
+/// transliterator mid-composition would re-decode the user's in-flight input
+/// under a different engine.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DriverReadiness {
+    PhaseA,
+    FullPending,
+    Full,
+    Failed,
+}
+
 pub struct WindowsSessionDriver {
     session: ImeSession,
+    full_warmup: Option<Receiver<Result<Transliterator, String>>>,
+    pending_engine: Option<Transliterator>,
+    readiness: DriverReadiness,
 }
 
 impl WindowsSessionDriver {
     pub fn new(session: ImeSession) -> Self {
-        Self { session }
+        Self {
+            session,
+            full_warmup: None,
+            pending_engine: None,
+            readiness: DriverReadiness::Full,
+        }
+    }
+
+    pub fn readiness(&self) -> DriverReadiness {
+        self.readiness
+    }
+
+    /// Builds the Phase A engine on the calling thread and starts the full build.
+    ///
+    /// Phase A skips the stages that dominate cold start (`ranked_lexicon` and
+    /// `search_index`), paying only the ~50 ms `parse_lexicon` +
+    /// `parse_dictionary_image` prefix, so the driver exists before the first
+    /// keystroke can arrive. That is what satisfies **Warmup Keystroke Capture**:
+    /// there is no window in which `OnKeyDown` has no session to hand the key to.
+    pub fn from_phase_a_data_traced() -> KhmerResult<Self> {
+        let host = host_process_label();
+        log(format!("[warmup-trace] phase_a.start host={host}"));
+
+        let started = Instant::now();
+        let transliterator = Transliterator::from_default_phase_a_data(DecoderConfig::shadow_interactive())?;
+        let phase_a_ms = started.elapsed().as_secs_f64() * 1000.0;
+
+        log(format!(
+            "[warmup-trace] phase_a.end host={host} elapsed_ms={phase_a_ms:.2}"
+        ));
+
+        Ok(Self {
+            session: ImeSession::new(transliterator, HashMap::new()),
+            full_warmup: Some(spawn_full_engine_warmup()),
+            pending_engine: None,
+            readiness: DriverReadiness::PhaseA,
+        })
+    }
+
+    /// Adopts the full engine when it lands, deferring while a composition is active.
+    fn poll_full_warmup(&mut self) {
+        let Some(receiver) = self.full_warmup.take() else {
+            return;
+        };
+        match receiver.try_recv() {
+            Ok(Ok(engine)) => self.install_full_engine(engine),
+            Ok(Err(error)) => {
+                self.readiness = DriverReadiness::Failed;
+                log(format!("[warmup-trace] full_warmup.failed error={error}"));
+            }
+            Err(TryRecvError::Empty) => {
+                self.full_warmup = Some(receiver);
+            }
+            Err(TryRecvError::Disconnected) => {
+                self.readiness = DriverReadiness::Failed;
+                log("[warmup-trace] full_warmup.disconnected");
+            }
+        }
+    }
+
+    fn install_full_engine(&mut self, engine: Transliterator) {
+        if self.session.composition_is_empty() {
+            self.session
+                .replace_engines(engine, None, SegmentedPreviewMode::Enabled);
+            self.readiness = DriverReadiness::Full;
+            log("[warmup-trace] full_upgrade.applied");
+            return;
+        }
+
+        self.pending_engine = Some(engine);
+        self.readiness = DriverReadiness::FullPending;
+        log("[warmup-trace] full_upgrade.deferred active_composition=true");
+    }
+
+    /// Applies a deferred upgrade once the composition goes idle.
+    fn maybe_complete_full_upgrade(&mut self) {
+        if self.readiness != DriverReadiness::FullPending || !self.session.composition_is_empty() {
+            return;
+        }
+        let Some(engine) = self.pending_engine.take() else {
+            return;
+        };
+        self.session
+            .replace_engines(engine, None, SegmentedPreviewMode::Enabled);
+        self.readiness = DriverReadiness::Full;
+        log("[warmup-trace] full_upgrade.applied_after_idle");
     }
 
     pub fn from_default_data() -> KhmerResult<Self> {
@@ -36,15 +140,20 @@ impl WindowsSessionDriver {
     }
 
     pub fn process_callback(&mut self, callback: WindowsTsfCallback) -> WindowsRenderState {
+        self.poll_full_warmup();
         let mut last_result = Default::default();
         for command in map_callback_to_session_commands(&callback) {
             last_result = self.session.process_command(command);
         }
+        // A commit may have just emptied the composition, releasing a deferred swap.
+        self.maybe_complete_full_upgrade();
         derive_render_state(&self.session.snapshot(), &last_result)
     }
 
     pub fn process_command(&mut self, command: SessionCommand) -> WindowsRenderState {
+        self.poll_full_warmup();
         let result = self.session.process_command(command);
+        self.maybe_complete_full_upgrade();
         derive_render_state(&self.session.snapshot(), &result)
     }
 
@@ -61,15 +170,44 @@ impl WindowsSessionDriver {
     }
 }
 
-pub fn spawn_default_driver_warmup() -> Receiver<Result<WindowsSessionDriver, String>> {
+/// Identifies which host application process is paying this warmup.
+///
+/// TSF loads the text service into each client app, so the same trace line
+/// appears once per process. Without the exe name the log cannot distinguish
+/// "slow once" from "slow in every app the user opens".
+fn host_process_label() -> String {
+    let exe = std::env::current_exe()
+        .ok()
+        .and_then(|path| path.file_name().map(|name| name.to_string_lossy().into_owned()))
+        .unwrap_or_else(|| "unknown".to_owned());
+    format!("{exe}/{}", std::process::id())
+}
+
+/// Builds the full engine off-thread while recording per-stage cold-start timings.
+///
+/// TSF loads this DLL into every host application process, so this cost is paid
+/// again in each app the user types in. The stage breakdown distinguishes the
+/// `parse_lexicon` + `parse_dictionary_image` prefix that Phase A also pays from
+/// the `ranked_lexicon` and `search_index` stages that Phase A skips. See
+/// `docs/adr/0001-warmup-must-not-leak-roman-into-the-document.md`.
+fn spawn_full_engine_warmup() -> Receiver<Result<Transliterator, String>> {
     let (sender, receiver) = mpsc::channel();
     thread::spawn(move || {
-        let result = WindowsSessionDriver::from_default_data()
-            .map(|mut driver| {
-                driver.process_callback(WindowsTsfCallback::Activate);
-                driver
-            })
-            .map_err(|err| err.to_string());
+        let host = host_process_label();
+        log(format!("[warmup-trace] full.start host={host}"));
+
+        let started = Instant::now();
+        let result = Transliterator::from_default_shared_data_with_stage_logger(|stage, elapsed_ms| {
+            log(format!("[warmup-trace] stage={stage} elapsed_ms={elapsed_ms:.2}"));
+        })
+        .map(|shared| Transliterator::from_shared_data_with_config(&shared, DecoderConfig::shadow_interactive()))
+        .map_err(|err| err.to_string());
+        let total_ms = started.elapsed().as_secs_f64() * 1000.0;
+
+        log(format!(
+            "[warmup-trace] full.end host={host} total_ms={total_ms:.2} ok={}",
+            result.is_ok()
+        ));
         let _ = sender.send(result);
     });
     receiver
@@ -102,6 +240,69 @@ mod tests {
             keycode: keyval,
             state: 0,
         }
+    }
+
+    fn fixture_engine(tsv: &str) -> Transliterator {
+        Transliterator::from_tsv_str_with_config(tsv, DecoderConfig::shadow_interactive()).expect("fixture must parse")
+    }
+
+    /// A driver that behaves as if Phase A is live and the full build is in flight.
+    fn phase_a_driver() -> WindowsSessionDriver {
+        let mut driver = driver();
+        driver.readiness = DriverReadiness::PhaseA;
+        driver
+    }
+
+    #[test]
+    fn full_engine_swaps_in_immediately_when_composition_is_idle() {
+        let mut driver = phase_a_driver();
+        driver.process_callback(WindowsTsfCallback::Activate);
+
+        driver.install_full_engine(fixture_engine("jea\tswapped\n"));
+
+        assert_eq!(driver.readiness(), DriverReadiness::Full);
+    }
+
+    #[test]
+    fn full_engine_swap_defers_while_a_composition_is_active() {
+        let mut driver = phase_a_driver();
+        driver.process_callback(WindowsTsfCallback::Activate);
+        type_ascii(&mut driver, "jea");
+        assert!(!driver.session().composition_is_empty());
+
+        driver.install_full_engine(fixture_engine("jea\tswapped\n"));
+
+        // Swapping mid-composition would re-decode the user's in-flight input
+        // under a different engine, so the upgrade must wait.
+        assert_eq!(driver.readiness(), DriverReadiness::FullPending);
+        assert!(driver.pending_engine.is_some());
+    }
+
+    #[test]
+    fn deferred_full_engine_swap_applies_once_the_composition_clears() {
+        let mut driver = phase_a_driver();
+        driver.process_callback(WindowsTsfCallback::Activate);
+        type_ascii(&mut driver, "jea");
+        driver.install_full_engine(fixture_engine("jea\tswapped\n"));
+        assert_eq!(driver.readiness(), DriverReadiness::FullPending);
+
+        driver.process_key_event(key(SESSION_KEY_ESCAPE));
+
+        assert_eq!(driver.readiness(), DriverReadiness::Full);
+        assert!(driver.pending_engine.is_none());
+    }
+
+    #[test]
+    fn deferred_full_engine_swap_applies_after_a_commit() {
+        let mut driver = phase_a_driver();
+        driver.process_callback(WindowsTsfCallback::Activate);
+        type_ascii(&mut driver, "jea");
+        driver.install_full_engine(fixture_engine("jea\tswapped\n"));
+
+        let render = driver.process_key_event(key(SESSION_KEY_RETURN));
+
+        assert!(render.commit_text.is_some());
+        assert_eq!(driver.readiness(), DriverReadiness::Full);
     }
 
     fn type_ascii(driver: &mut WindowsSessionDriver, text: &str) -> WindowsRenderState {

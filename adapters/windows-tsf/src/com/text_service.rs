@@ -1,6 +1,7 @@
 //! `ITfTextInputProcessor` shell for the KhmerIME TSF service.
 
-use std::sync::{mpsc::Receiver, Arc, Mutex};
+use std::sync::{Arc, Mutex};
+use std::time::Instant;
 
 use windows::core::{implement, Error, Interface, Result};
 use windows::Win32::Foundation::{E_FAIL, TRUE};
@@ -21,7 +22,6 @@ pub const TEXT_SERVICE_LIFECYCLE: &[&str] = &["Activate", "Deactivate"];
 
 pub struct TextServiceState {
     pub driver: Option<WindowsSessionDriver>,
-    pub pending_driver: Option<Receiver<std::result::Result<WindowsSessionDriver, String>>>,
     pub thread_mgr: Option<ITfThreadMgr>,
     pub client_id: u32,
     pub key_sink: Option<ITfKeyEventSink>,
@@ -35,13 +35,20 @@ pub struct TextServiceState {
     /// Last candidate popup anchor resolved from a composition range.
     /// Reused for candidate-only updates that don't need a TSF edit session.
     pub last_candidate_anchor: Option<CursorLocation>,
+    /// When the current warmup began, for measuring the leak window.
+    ///
+    /// Keys arriving before the driver lands are passed through to the host as
+    /// raw roman today (see ADR-0001). These two fields record how wide that
+    /// window is and how many keys actually fall into it, per host process.
+    pub warmup_started_at: Option<Instant>,
+    /// Keys passed through to the host because the driver was still warming.
+    pub warmup_passthrough_count: u32,
 }
 
 impl Default for TextServiceState {
     fn default() -> Self {
         Self {
             driver: None,
-            pending_driver: None,
             thread_mgr: None,
             client_id: 0,
             key_sink: None,
@@ -49,6 +56,8 @@ impl Default for TextServiceState {
             candidate_window: None,
             current_preedit: String::new(),
             last_candidate_anchor: None,
+            warmup_started_at: None,
+            warmup_passthrough_count: 0,
         }
     }
 }
@@ -98,8 +107,19 @@ impl ITfTextInputProcessor_Impl for KhmerImeTextService_Impl {
 
         {
             let mut state = lock_state(&self.state)?;
-            state.driver = None;
-            state.pending_driver = Some(crate::session_driver::spawn_default_driver_warmup());
+            // Build Phase A on this thread so the driver exists before the first
+            // keystroke can arrive. Phase A skips the expensive ranked-lexicon and
+            // search-index stages, so this is a short block, not the full engine
+            // build. The full engine swaps in from a background thread. See ADR-0001.
+            state.driver = match crate::session_driver::WindowsSessionDriver::from_phase_a_data_traced() {
+                Ok(driver) => Some(driver),
+                Err(error) => {
+                    log(format!("TextService::Activate phase A build failed: {error}"));
+                    None
+                }
+            };
+            state.warmup_started_at = Some(Instant::now());
+            state.warmup_passthrough_count = 0;
             state.composition = None;
             state.client_id = tid;
             state.thread_mgr = ptim.cloned();
@@ -132,7 +152,6 @@ impl ITfTextInputProcessor_Impl for KhmerImeTextService_Impl {
             state.composition = None;
             state.client_id = 0;
             state.driver = None;
-            state.pending_driver = None;
             state.current_preedit.clear();
             (thread_mgr, client_id, key_sink)
         };
