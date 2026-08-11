@@ -365,16 +365,23 @@ mod tests {
     }
 
     #[test]
-    fn space_in_segment_edit_mode_commits_whole_composition() {
+    fn space_in_segment_edit_mode_cycles_word_candidate_without_committing() {
         let mut session = session();
         type_ascii(&mut session, "khnhomtov");
         session.process_key_event(0xFF09, 0, 0);
+        let before = session.snapshot();
+        assert!(before.candidates.len() >= 2);
+        let first_word = before.segment_preview[0].output.clone();
 
         let space = session.process_key_event(0x20, 0, 0);
 
         assert!(space.consumed);
-        assert_eq!(space.commit_text.as_deref(), Some("ខ្ញុំទៅ"));
-        assert!(session.snapshot().preedit.is_empty());
+        assert_eq!(space.commit_text, None);
+        let after = session.snapshot();
+        assert!(after.segment_edit_active);
+        assert_eq!(after.selected_index, Some(1));
+        assert_ne!(after.segment_preview[0].output, first_word);
+        assert!(!after.preedit.is_empty());
     }
 
     #[test]

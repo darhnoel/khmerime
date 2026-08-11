@@ -389,11 +389,21 @@ mod tests {
         let phrase = driver.process_key_event(key(SESSION_KEY_DOWN));
         assert_eq!(phrase.candidate_surface.selected_index(), Some(1));
 
+        let best_phrase = driver.process_key_event(key(crate::input::key_convert::SESSION_KEY_UP));
+        assert_eq!(best_phrase.candidate_surface.selected_index(), Some(0));
+
         let segment = driver.process_key_event(key(SESSION_KEY_TAB));
         assert_eq!(
             segment.candidate_surface.mode(),
             crate::render::candidate_surface::CandidateSurfaceMode::Segment
         );
+        let cycled_word = driver.process_key_event(key(SESSION_KEY_SPACE));
+        assert_eq!(cycled_word.commit_text, None);
+        assert_eq!(
+            cycled_word.candidate_surface.mode(),
+            crate::render::candidate_surface::CandidateSurfaceMode::Segment
+        );
+        assert!(!cycled_word.preedit.is_empty());
     }
 
     #[test]

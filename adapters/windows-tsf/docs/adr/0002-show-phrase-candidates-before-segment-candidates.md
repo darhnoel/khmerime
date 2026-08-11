@@ -14,9 +14,13 @@ Windows now uses a two-level **Candidate Surface**:
 Segmented Session              Tab: Segment Edit Mode
 -----------------              ----------------------
 complete Phrase Candidates  -> focused-segment Candidate List
-Up/Down/Space cycle phrases     Up/Down cycle words
+Up/Down/Space cycle phrases     Up/Down/Space cycle words
 1..9 select a phrase            1..9 select a word
 ```
+
+Space also cycles the focused word while Segment Edit Mode is active. It never
+commits from that mode; Enter is the explicit whole-phrase commit key. Direct
+number selection likewise changes the word without committing.
 
 Flat, single-segment composition keeps the existing Candidate List. Tab is eaten
 only while a Segmented Session exists; otherwise Windows receives it normally.
