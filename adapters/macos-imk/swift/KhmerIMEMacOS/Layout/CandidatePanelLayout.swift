@@ -59,6 +59,15 @@ enum CandidatePanelLayout {
         return (Array(candidates[start..<end]), index - start)
     }
 
+    /// Panel width for the current page: fit the widest painted row, clamped to
+    /// [minWidth, maxWidth]. Below the floor a one-char candidate would give too small a
+    /// box; above the ceiling a long phrase would grow the panel past the caret anchor
+    /// (it truncates instead). `widestRow` is the measured pixel width of the widest row's
+    /// content including its own insets.
+    static func contentWidth(widestRow: CGFloat, minWidth: CGFloat, maxWidth: CGFloat) -> CGFloat {
+        max(minWidth, min(maxWidth, widestRow))
+    }
+
     /// The marked-text character index to ask the IMK client for via
     /// attributes(forCharacterIndex:lineHeightRectangle:). Targets the LAST glyph
     /// of the preedit so the line rect tracks the end of the composition (the

@@ -68,6 +68,9 @@
 //! by name (prefixed `session_` instead of `bridge_`), plus macOS-specific tests for
 //! the keycode translation table.
 
+mod candidate_surface;
+
+use candidate_surface::CandidateSurface;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Condvar, Mutex};
 use std::time::Duration;
@@ -226,6 +229,19 @@ pub struct MacosRenderState {
     /// Swift calls `setMarkedText` only when this is true, avoiding spurious IPC on
     /// non-composing keys while still clearing marked text when preedit goes empty.
     pub preedit_changed: bool,
+    /// Which Candidate Surface level the panel should paint (ADR-0004). In `Phrase`, `candidates`
+    /// are whole Phrase Candidates and `segments` is a dim context header; in `Segment`, `candidates`
+    /// are the focused segment's words; in `Flat`, the ordinary candidate list with no context.
+    pub surface_mode: MacosSurfaceMode,
+}
+
+/// The Candidate Surface level for the Swift panel (ADR-0004). Mirrors `CandidateSurfaceMode`.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, uniffi::Enum)]
+pub enum MacosSurfaceMode {
+    #[default]
+    Flat,
+    Phrase,
+    Segment,
 }
 
 fn render_state(snapshot: &SessionSnapshot, result: &SessionResult, ready: bool) -> MacosRenderState {
@@ -236,14 +252,23 @@ fn render_state(snapshot: &SessionSnapshot, result: &SessionResult, ready: bool)
         .iter()
         .map(|p| (provenance_key(&p.text), (p.from_model, p.lexicon_verified)))
         .collect();
+    // Project the two-level Candidate Surface (ADR-0004): in Phrase mode the visible rows are the
+    // whole Phrase Candidates (not the focused segment's words), and the panel paints `segments` as
+    // a dim context header. The surface owns which level is visible so render and interaction agree.
+    let surface = CandidateSurface::from_snapshot(snapshot);
+    let surface_mode = match surface.mode() {
+        candidate_surface::CandidateSurfaceMode::Flat => MacosSurfaceMode::Flat,
+        candidate_surface::CandidateSurfaceMode::Phrase => MacosSurfaceMode::Phrase,
+        candidate_surface::CandidateSurfaceMode::Segment => MacosSurfaceMode::Segment,
+    };
     MacosRenderState {
-        candidates: snapshot.candidates.clone(),
-        candidate_display: snapshot
-            .candidate_display
+        candidates: surface.rows().to_vec(),
+        candidate_display: surface
+            .display()
             .iter()
             .map(|entry| MacosCandidateDisplayEntry::from_display(entry, &provenance))
             .collect(),
-        selected_index: snapshot.selected_index.map(|i| i as u64),
+        selected_index: surface.selected_index().map(|i| i as u64),
         preedit: snapshot.raw_preedit.clone(),
         segments: snapshot.segment_preview.iter().map(MacosSegmentEntry::from).collect(),
         focused_segment_index: snapshot.focused_segment_index.map(|i| i as u64),
@@ -253,6 +278,7 @@ fn render_state(snapshot: &SessionSnapshot, result: &SessionResult, ready: bool)
         is_ready: ready,
         consumed: result.consumed,
         preedit_changed: false, // stamped by with_session after comparing prev_preedit
+        surface_mode,
     }
 }
 
@@ -406,6 +432,13 @@ impl MacosIMKSession {
                     }
                     return render_state(&s.snapshot(), &result, true);
                 }
+            }
+            // Candidate Surface phrase-level override (ADR-0004): when a Segmented Session shows
+            // whole Phrase Candidates, Space/↑/↓/digits cycle+select phrases instead of the focused
+            // segment's words. `None` (Flat/Segment levels, non-cycle keys) delegates to the session.
+            if let Some(command) = CandidateSurface::from_snapshot(&s.snapshot()).command_for_key(keyval) {
+                let result = s.process_command(command);
+                return render_state(&s.snapshot(), &result, true);
             }
             let result = s.process_native_key_event(key_event(keyval, evdev_keycode, xkb_state));
             render_state(&s.snapshot(), &result, true)

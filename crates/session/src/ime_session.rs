@@ -576,6 +576,9 @@ impl ImeSession {
     }
 
     fn handle_space(&mut self) -> SessionResult {
+        // In Segment Edit Mode, Space cycles the focused segment's word (same as Up/Down) and never
+        // commits — Enter is the explicit commit key (windows-tsf ADR-0002 / macos-imk ADR-0004).
+        // Elsewhere Space cycles the active candidate list.
         self.cycle_candidates(1)
     }
 

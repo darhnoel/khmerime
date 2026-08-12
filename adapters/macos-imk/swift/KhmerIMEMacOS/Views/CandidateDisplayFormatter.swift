@@ -9,11 +9,15 @@ struct CandidateDisplayFormatter {
     // says whether the word is Lexicon-verified.
     static let modelMarker = "✦"
 
-    static func displayText(for entry: MacosCandidateDisplayEntry) -> String {
+    static func displayText(for entry: MacosCandidateDisplayEntry,
+                            mode: MacosSurfaceMode = .flat) -> String {
+        let prefix = entry.fromModel ? "\(modelMarker) " : ""
+        // In Phrase/Segment mode the roman lives in the header row, so candidate rows are
+        // Khmer-only (ADR-0004). Only Flat mode — which has no header — keeps the per-row roman.
+        guard mode == .flat else { return "\(prefix)\(entry.output)" }
         let hintText = entry.romanHints.isEmpty
             ? derivedMarker
             : entry.romanHints.joined(separator: ", ")
-        let prefix = entry.fromModel ? "\(modelMarker) " : ""
         return "\(prefix)\(entry.output)  \(hintText)"
     }
 

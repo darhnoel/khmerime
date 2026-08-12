@@ -257,7 +257,9 @@ fn session_supports_segment_focus_and_full_phrase_commit() {
     let state = type_str(&s, "khnhomtov");
     assert!(state.segments.len() >= 2, "khnhomtov must produce >= 2 segments");
     assert_eq!(state.focused_segment_index, Some(0), "focus starts at segment 0");
-    // Right arrow moves focus to segment 1
+    // Tab enters Segment Edit Mode on segment 0; only THEN does Right move focus (ADR 0004 —
+    // pre-Tab arrows are inert so the first Tab always lands on segment 0).
+    s.handle_event(0xFF09, 0, 0); // KEY_TAB
     let moved = s.handle_event(0xFF53, 0, 0); // KEY_RIGHT
     assert_eq!(moved.focused_segment_index, Some(1));
     // Enter commits the full Khmer phrase
@@ -267,6 +269,29 @@ fn session_supports_segment_focus_and_full_phrase_commit() {
         committed.commit_text.as_deref(),
         Some("khnhomtov"),
         "commit must be Khmer, not roman"
+    );
+}
+
+#[test]
+fn space_at_phrase_level_cycles_the_whole_phrase_not_a_word() {
+    // ADR-0004 Candidate Surface: while a Segmented Session shows whole Phrase Candidates,
+    // Space selects the next PHRASE (SelectPhrase), swapping the whole segmentation — not just
+    // cycling the focused segment's word. Observable via the segmentation changing.
+    let s = session();
+    let typed = type_str(&s, "khnhomtov");
+    assert!(typed.segments.len() >= 2, "khnhomtov must be segmented");
+    let phrase0 = typed.segments.iter().map(|seg| seg.output.clone()).collect::<Vec<_>>();
+
+    let after_space = s.handle_event(0x20, 0, 0); // Space
+    let phrase1 = after_space
+        .segments
+        .iter()
+        .map(|seg| seg.output.clone())
+        .collect::<Vec<_>>();
+
+    assert_ne!(
+        phrase1, phrase0,
+        "Space at the phrase level must select a different whole phrase, changing the segmentation"
     );
 }
 
@@ -467,10 +492,11 @@ fn session_refinement_keeps_live_segmented_long_phrase_state() {
 #[test]
 fn session_refinement_preserves_segment_focus() {
     // IBus: bridge_refinement_preserves_segment_focus
-    // Right arrow moves focus to segment 1; a subsequent refine_composition
-    // (no-op in live mode) must leave focus at segment 1.
+    // Tab enters edit on segment 0, Right moves focus to segment 1 (pre-Tab arrows are inert,
+    // ADR 0004); a subsequent refine_composition (no-op in live mode) must leave focus at segment 1.
     let s = session();
     type_str(&s, "nihjeasnadaiborkbrae");
+    s.handle_event(0xFF09, 0, 0); // KEY_TAB → edit segment 0
     let moved = s.handle_event(0xFF53, 0, 0); // KEY_RIGHT → segment 1
     assert_eq!(moved.focused_segment_index, Some(1));
     let after_refine = s.refine_composition("nihjeasnadaiborkbrae".to_owned());

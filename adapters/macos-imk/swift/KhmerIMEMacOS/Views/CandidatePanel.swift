@@ -31,14 +31,21 @@ import os
 
 final class CandidatePanel: NSPanel {
 
-    // Fixed width, dynamic height (grows with the candidate list).
-    private let panelWidth: CGFloat = 360
+    // Dynamic width (fits the widest row, clamped to [minPanelWidth, maxPanelWidth]) and
+    // dynamic height (grows with the candidate list).
+    private let minPanelWidth: CGFloat = 180
+    private let maxPanelWidth: CGFloat = 360
+    private var panelWidth: CGFloat = 360
     private let rowHeight: CGFloat = 30
     private let candidateSpacing: CGFloat = 2
     private let topInset: CGFloat = 8
     private let bottomInset: CGFloat = 8
 
     private var rowContentWidth: CGFloat { panelWidth - 16 }
+
+    /// The separator's width tracks the dynamic panel width; kept so `update` can retune it
+    /// (the constant is baked at setup, unlike the rows which are rebuilt every update).
+    private var separatorWidthConstraint: NSLayoutConstraint?
 
     // Frosted-glass backdrop
     private let effectView = NSVisualEffectView()
@@ -110,19 +117,21 @@ final class CandidatePanel: NSPanel {
         rootStack.addArrangedSubview(candidateStack)
 
         effectView.addSubview(rootStack)
+        let sepWidth = separator.widthAnchor.constraint(equalToConstant: rowContentWidth)
+        separatorWidthConstraint = sepWidth
         NSLayoutConstraint.activate([
             rootStack.topAnchor.constraint(equalTo: effectView.topAnchor, constant: topInset),
             rootStack.leadingAnchor.constraint(equalTo: effectView.leadingAnchor, constant: 4),
             rootStack.trailingAnchor.constraint(equalTo: effectView.trailingAnchor, constant: -4),
             rootStack.bottomAnchor.constraint(equalTo: effectView.bottomAnchor, constant: -bottomInset),
-            separator.widthAnchor.constraint(equalToConstant: rowContentWidth),
+            sepWidth,
         ])
     }
 
     // MARK: - Public API
 
     func update(_ state: MacosRenderState) {
-        rebuildSegments(state.segments)
+        rebuildSegments(state.segments, mode: state.surfaceMode)
         let selectedIdx = state.selectedIndex.map { Int($0) } ?? 0
 
         // Paint one page, not the whole list (ADR-0013 — macOS opts in at page size 10).
@@ -143,7 +152,12 @@ final class CandidatePanel: NSPanel {
             candidates: page.rows,
             metadata: pageMetadata
         )
-        rebuildCandidates(entries, selectedIndex: page.selectedRow)
+        // Size the panel to its widest painted content before laying rows out, so the row
+        // width constraints (rebuilt below) pick up the clamped width.
+        panelWidth = measuredPanelWidth(entries: entries, segments: state.segments, mode: state.surfaceMode)
+        separatorWidthConstraint?.constant = rowContentWidth
+
+        rebuildCandidates(entries, selectedIndex: page.selectedRow, mode: state.surfaceMode)
 
         let hasSegments = !state.segments.isEmpty
         segmentStack.isHidden = !hasSegments
@@ -179,8 +193,43 @@ final class CandidatePanel: NSPanel {
 
     // MARK: - Sizing
 
+    /// Extra height for the roman sub-row under each Khmer header chip (ADR-0004).
+    private let romanRowHeight: CGFloat = 15
+
+    /// Panel width for the current content: the widest painted row (candidate rows and the
+    /// two-row segment header), clamped to [minPanelWidth, maxPanelWidth]. Below the floor a
+    /// short candidate would give too small a box; at the ceiling a long phrase truncates.
+    private func measuredPanelWidth(entries: [MacosCandidateDisplayEntry],
+                                    segments: [MacosSegmentEntry],
+                                    mode: MacosSurfaceMode) -> CGFloat {
+        let rowFont = NSFont.systemFont(ofSize: 15, weight: .regular)
+        // Candidate row inner width: index column (16) + stack spacing (8) + text, inside the
+        // row's own 8+8 insets. panelWidth = rowContentWidth + 16, so fold that back in below.
+        let rowExtras: CGFloat = 16 + 8 + 8 + 8
+        var widest: CGFloat = 0
+        for entry in entries {
+            let text = CandidateDisplayFormatter.displayText(for: entry, mode: mode)
+            widest = max(widest, textWidth(text, font: rowFont) + rowExtras)
+        }
+        // Header: Khmer chips (15pt) laid out horizontally with 6pt gaps + 8+8 edge insets.
+        // The roman sub-row is smaller, so the Khmer row bounds the header width.
+        if !segments.isEmpty {
+            let gaps = CGFloat(max(0, segments.count - 1)) * 6
+            let chips = segments.reduce(CGFloat(0)) { $0 + textWidth($1.output, font: rowFont) }
+            widest = max(widest, chips + gaps + 8 + 8 + 8)
+        }
+        // widest is content-width (rowContentWidth-scale); the panel adds 16 of chrome.
+        return CandidatePanelLayout.contentWidth(
+            widestRow: widest + 16, minWidth: minPanelWidth, maxWidth: maxPanelWidth
+        )
+    }
+
+    private func textWidth(_ text: String, font: NSFont) -> CGFloat {
+        (text as NSString).size(withAttributes: [.font: font]).width.rounded(.up)
+    }
+
     private func resizeToFit(hasSegments: Bool, candidateCount: Int) {
-        let segH: CGFloat = hasSegments ? rowHeight : 0
+        let segH: CGFloat = hasSegments ? rowHeight + romanRowHeight : 0
         let sepH: CGFloat = hasSegments ? (rootStack.spacing * 2 + 1) : 0
         let rows = max(candidateCount, 1)
         let listH = CGFloat(rows) * rowHeight + CGFloat(rows - 1) * candidateSpacing
@@ -190,38 +239,60 @@ final class CandidatePanel: NSPanel {
 
     // MARK: - Segment chips
 
-    private func rebuildSegments(_ segments: [MacosSegmentEntry]) {
+    private func rebuildSegments(_ segments: [MacosSegmentEntry], mode: MacosSurfaceMode) {
         segmentStack.arrangedSubviews.forEach { $0.removeFromSuperview() }
+        // In Phrase mode the rows below ARE the whole-phrase candidates; the segmentation is only a
+        // context header, so dim the chips (ADR-0004) — they must not read as a competing selection.
+        // In Segment mode the chips show which word is being edited, so keep them prominent.
+        let asContext = (mode == .phrase)
         for seg in segments {
-            segmentStack.addArrangedSubview(makeChip(seg))
+            segmentStack.addArrangedSubview(makeChip(seg, asContext: asContext))
         }
     }
 
-    private func makeChip(_ seg: MacosSegmentEntry) -> NSView {
+    private func makeChip(_ seg: MacosSegmentEntry, asContext: Bool) -> NSView {
         let label = makeLabel(seg.output)
         label.font = .systemFont(ofSize: 15, weight: seg.focused ? .semibold : .regular)
-        label.textColor = seg.focused ? .controlAccentColor : .labelColor
+        // As a context header (Phrase mode), chips are secondary (dimmer than the selectable phrase
+        // rows below, but still readable) and never accent-highlighted. Otherwise the focused segment
+        // reads as accent.
+        label.textColor = asContext ? .secondaryLabelColor : (seg.focused ? .controlAccentColor : .labelColor)
         label.drawsBackground = true
-        label.backgroundColor = seg.focused
+        label.backgroundColor = (!asContext && seg.focused)
             ? NSColor.controlAccentColor.withAlphaComponent(0.15)
             : .clear
         label.wantsLayer = true
         label.layer?.cornerRadius = 6
-        return label
+        label.lineBreakMode = .byTruncatingTail
+
+        // Roman sub-row: the segment's roman (seg.input) sits directly under its Khmer, one column
+        // per segment (ADR-0004). Dimmer than the Khmer above it. Empty roman → no sub-label so the
+        // column just shows the Khmer.
+        guard !seg.input.isEmpty else { return label }
+        let roman = makeLabel(seg.input)
+        roman.font = .systemFont(ofSize: 11, weight: .regular)
+        roman.textColor = .tertiaryLabelColor
+        roman.lineBreakMode = .byTruncatingTail
+
+        let column = NSStackView(views: [label, roman])
+        column.orientation = .vertical
+        column.spacing = 1
+        column.alignment = .leading
+        return column
     }
 
     // MARK: - Candidate rows
 
-    private func rebuildCandidates(_ candidates: [MacosCandidateDisplayEntry], selectedIndex: Int) {
+    private func rebuildCandidates(_ candidates: [MacosCandidateDisplayEntry], selectedIndex: Int, mode: MacosSurfaceMode) {
         candidateStack.arrangedSubviews.forEach { $0.removeFromSuperview() }
         for (i, entry) in candidates.enumerated() {
             candidateStack.addArrangedSubview(
-                makeCandidateRow(index: i + 1, entry: entry, selected: i == selectedIndex)
+                makeCandidateRow(index: i + 1, entry: entry, selected: i == selectedIndex, mode: mode)
             )
         }
     }
 
-    private func makeCandidateRow(index: Int, entry: MacosCandidateDisplayEntry, selected: Bool) -> NSView {
+    private func makeCandidateRow(index: Int, entry: MacosCandidateDisplayEntry, selected: Bool, mode: MacosSurfaceMode) -> NSView {
         let row = NSView()
         row.wantsLayer = true
         row.translatesAutoresizingMaskIntoConstraints = false
@@ -235,14 +306,15 @@ final class CandidatePanel: NSPanel {
         idxLabel.font = .monospacedDigitSystemFont(ofSize: 12, weight: .regular)
         idxLabel.textColor = selected ? .white : .secondaryLabelColor
 
-        let textLabel = makeLabel(CandidateDisplayFormatter.displayText(for: entry))
+        let displayText = CandidateDisplayFormatter.displayText(for: entry, mode: mode)
+        let textLabel = makeLabel(displayText)
         textLabel.font = .systemFont(ofSize: 15, weight: selected ? .semibold : .regular)
         // Base colour: white on the selected row, label colour otherwise. A red ✦ (unverified
         // model word, ADR-0016) must survive selection, so overlay it on top of the base colour.
         let baseColor: NSColor = selected ? .white : .labelColor
         if entry.fromModel {
             let attr = NSMutableAttributedString(
-                string: CandidateDisplayFormatter.displayText(for: entry),
+                string: displayText,
                 attributes: [.foregroundColor: baseColor,
                              .font: NSFont.systemFont(ofSize: 15, weight: selected ? .semibold : .regular)]
             )

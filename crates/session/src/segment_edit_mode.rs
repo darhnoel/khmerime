@@ -255,6 +255,103 @@ mod tests {
     }
 
     #[test]
+    fn left_right_in_segment_edit_move_and_stay_editing_the_adjacent_segment() {
+        // ADR (macos-imk 0004): in Segment Edit Mode, Left/Right move focus to the adjacent segment
+        // and REMAIN in Segment Edit Mode on it (so you can cycle each segment's words in turn),
+        // rather than exiting to the phrase level.
+        let mut session = session();
+        type_ascii(&mut session, "khnhomtovkhnhom"); // 3 segments
+        session.process_key_event(0xFF09, 0, 0); // Tab -> edit segment 0
+        assert!(session.snapshot().segment_edit_active);
+        assert_eq!(session.snapshot().segment_edit_index, Some(0));
+
+        let right = session.process_key_event(0xFF53, 0, 0); // Right
+        assert!(right.consumed);
+        assert!(
+            session.snapshot().segment_edit_active,
+            "must STAY in segment edit after Right"
+        );
+        assert_eq!(
+            session.snapshot().segment_edit_index,
+            Some(1),
+            "edit moved to segment 1"
+        );
+
+        let left = session.process_key_event(0xFF51, 0, 0); // Left
+        assert!(left.consumed);
+        assert!(
+            session.snapshot().segment_edit_active,
+            "must STAY in segment edit after Left"
+        );
+        assert_eq!(
+            session.snapshot().segment_edit_index,
+            Some(0),
+            "edit moved back to segment 0"
+        );
+    }
+
+    #[test]
+    fn left_right_before_tab_are_consumed_but_do_not_move_focus() {
+        // ADR (macos-imk 0004): before Tab (not in Segment Edit Mode), Left/Right are CONSUMED so
+        // they never leak to the document and disturb the marked composition, but they are INERT —
+        // they must not advance segment focus. Letting a pre-Tab arrow move `focused` made the first
+        // Tab land on the second segment instead of the first (the reported bug). This matches the
+        // Windows TSF rule: consumed while segmented, but navigation only happens inside edit mode.
+        let mut session = session();
+        type_ascii(&mut session, "khnhomtov"); // >= 2 segments
+        assert!(!session.snapshot().segment_edit_active);
+        assert_eq!(session.snapshot().focused_segment_index, Some(0));
+
+        let right = session.process_key_event(0xFF53, 0, 0); // Right, pre-Tab
+        assert!(right.consumed, "arrow must be consumed while segmented");
+        assert!(
+            !session.snapshot().segment_edit_active,
+            "Right must not enter edit mode on its own"
+        );
+        assert_eq!(
+            session.snapshot().focused_segment_index,
+            Some(0),
+            "pre-Tab Right must NOT move focus"
+        );
+
+        // First Tab therefore edits segment 0, not the segment a stray arrow drifted to.
+        session.process_key_event(0xFF09, 0, 0);
+        assert_eq!(session.snapshot().segment_edit_index, Some(0));
+    }
+
+    #[test]
+    fn space_in_segment_edit_mode_cycles_the_word_and_does_not_commit() {
+        // ADR (windows-tsf 0002 / macos-imk 0004): in Segment Edit Mode, Space cycles the focused
+        // segment's word candidate (like Up/Down) and NEVER commits — Enter is the explicit commit.
+        let mut session = session();
+        type_ascii(&mut session, "khnhomtov");
+        let tab = session.process_key_event(0xFF09, 0, 0);
+        assert!(tab.consumed && session.snapshot().segment_edit_active);
+        let word0 = session.snapshot().segment_preview[0].output.clone();
+
+        let space = session.process_key_event(0x20, 0, 0);
+
+        assert!(
+            space.commit_text.is_none(),
+            "Space must not commit in Segment Edit Mode"
+        );
+        assert!(
+            session.snapshot().segment_edit_active,
+            "Space must stay in Segment Edit Mode"
+        );
+        assert_eq!(
+            session.snapshot().selected_index,
+            Some(1),
+            "Space advances the focused segment's selection like Down"
+        );
+        assert_ne!(
+            session.snapshot().segment_preview[0].output,
+            word0,
+            "Space must cycle to a different word for the focused segment"
+        );
+    }
+
+    #[test]
     fn backspace_in_segment_edit_mode_deletes_one_char_at_a_time() {
         let mut session = session();
         type_ascii(&mut session, "khnhomtov");
@@ -279,10 +376,11 @@ mod tests {
         let mut transfer = session();
         type_ascii(&mut transfer, "khnhomtovkhnhom");
         assert_eq!(transfer.snapshot().segment_preview.len(), 3);
-        transfer.process_key_event(0xFF53, 0, 0);
-        transfer.process_key_event(0xFF53, 0, 0);
+        transfer.process_key_event(0xFF09, 0, 0); // Tab -> edit segment 0
+        transfer.process_key_event(0xFF53, 0, 0); // Right (in edit) -> segment 1
+        transfer.process_key_event(0xFF53, 0, 0); // Right (in edit) -> segment 2
         assert_eq!(transfer.snapshot().focused_segment_index, Some(2));
-        transfer.process_key_event(0xFF09, 0, 0);
+        assert!(transfer.snapshot().segment_edit_active);
 
         for _ in 0.."khnhom".len() {
             let backspace = transfer.process_key_event(0xFF08, 0, 0);
@@ -314,8 +412,9 @@ mod tests {
 
         let mut dissolving = session();
         type_ascii(&mut dissolving, "khnhomtov");
-        dissolving.process_key_event(0xFF53, 0, 0);
-        dissolving.process_key_event(0xFF09, 0, 0);
+        dissolving.process_key_event(0xFF09, 0, 0); // Tab -> edit segment 0
+        dissolving.process_key_event(0xFF53, 0, 0); // Right (in edit) -> edit segment 1
+        assert_eq!(dissolving.snapshot().segment_edit_index, Some(1));
         for _ in 0.."tov".len() {
             dissolving.process_key_event(0xFF08, 0, 0);
         }
@@ -328,7 +427,10 @@ mod tests {
     }
 
     #[test]
-    fn left_right_auto_exit_segment_edit_mode_and_navigate() {
+    fn left_right_in_segment_edit_move_focus_and_keep_editing() {
+        // Superseded (macos-imk ADR-0004): Left/Right used to auto-EXIT Segment Edit Mode; they now
+        // move focus to the adjacent segment and STAY in edit on it. See
+        // `left_right_in_segment_edit_move_and_stay_editing_the_adjacent_segment`.
         let mut session = session();
         type_ascii(&mut session, "khnhomtov");
         session.process_key_event(0xFF09, 0, 0);
@@ -338,8 +440,8 @@ mod tests {
 
         assert!(right.consumed);
         let snapshot = session.snapshot();
-        assert!(!snapshot.segment_edit_active);
-        assert_eq!(snapshot.segment_edit_index, None);
+        assert!(snapshot.segment_edit_active, "stays in segment edit after Right");
+        assert_eq!(snapshot.segment_edit_index, Some(1));
         assert_eq!(snapshot.focused_segment_index, Some(1));
     }
 
@@ -362,26 +464,6 @@ mod tests {
 
         let enter = session.process_key_event(0xFF0D, 0, 0);
         assert_eq!(enter.commit_text.as_deref(), Some("ខ្ញំទៅ"));
-    }
-
-    #[test]
-    fn space_in_segment_edit_mode_cycles_word_candidate_without_committing() {
-        let mut session = session();
-        type_ascii(&mut session, "khnhomtov");
-        session.process_key_event(0xFF09, 0, 0);
-        let before = session.snapshot();
-        assert!(before.candidates.len() >= 2);
-        let first_word = before.segment_preview[0].output.clone();
-
-        let space = session.process_key_event(0x20, 0, 0);
-
-        assert!(space.consumed);
-        assert_eq!(space.commit_text, None);
-        let after = session.snapshot();
-        assert!(after.segment_edit_active);
-        assert_eq!(after.selected_index, Some(1));
-        assert_ne!(after.segment_preview[0].output, first_word);
-        assert!(!after.preedit.is_empty());
     }
 
     #[test]
