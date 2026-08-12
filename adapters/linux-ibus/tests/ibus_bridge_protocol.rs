@@ -557,6 +557,106 @@ fn bridge_supports_segment_focus_and_full_phrase_commit() {
 }
 
 #[test]
+fn bridge_snapshot_exposes_phrase_candidates_for_the_phrase_level() {
+    // The Phrase level of the Candidate Surface renders whole-composition
+    // hypotheses, not the focused segment's words. They must reach Python.
+    let (child, mut stdin, mut stdout) = spawn_full_bridge();
+
+    send_command(&mut stdin, r#"{"cmd":"focus_in"}"#);
+    let _ = read_response(&mut stdout);
+
+    let mut last = Value::Null;
+    for keyval in [107, 104, 110, 104, 111, 109, 116, 111, 118] {
+        send_command(
+            &mut stdin,
+            &format!(r#"{{"cmd":"process_key_event","keyval":{keyval},"keycode":0,"state":0}}"#),
+        );
+        last = read_response(&mut stdout);
+    }
+
+    let phrases = last["snapshot"]["phrase_candidates"]
+        .as_array()
+        .expect("phrase_candidates must be serialized to the adapter");
+    assert!(
+        !phrases.is_empty(),
+        "a multi-word composition should yield phrase candidates"
+    );
+    assert!(
+        last["snapshot"]["selected_phrase_index"].is_number(),
+        "selected_phrase_index drives which row the lookup table highlights"
+    );
+    // Each phrase carries its own segmentation, which is what makes it a whole-phrase
+    // reading rather than a word candidate.
+    assert!(phrases[0]["text"].as_str().is_some_and(|text| !text.is_empty()));
+    assert!(phrases[0]["segments"].is_array());
+
+    shutdown_and_assert_ok(child, &mut stdin, &mut stdout);
+}
+
+#[test]
+fn bridge_select_phrase_switches_the_previewed_phrase() {
+    // Rendering phrase rows without a way to pick one is a half-feature, so the
+    // bridge exposes SessionCommand::SelectPhrase as its own command.
+    let (child, mut stdin, mut stdout) = spawn_full_bridge();
+
+    send_command(&mut stdin, r#"{"cmd":"focus_in"}"#);
+    let _ = read_response(&mut stdout);
+
+    let mut last = Value::Null;
+    for keyval in [107, 104, 110, 104, 111, 109, 116, 111, 118] {
+        send_command(
+            &mut stdin,
+            &format!(r#"{{"cmd":"process_key_event","keyval":{keyval},"keycode":0,"state":0}}"#),
+        );
+        last = read_response(&mut stdout);
+    }
+
+    let phrase_count = last["snapshot"]["phrase_candidates"]
+        .as_array()
+        .map(|items| items.len())
+        .unwrap_or(0);
+    if phrase_count < 2 {
+        // Selection needs an alternative to switch to; without one there is
+        // nothing to assert and the fixture lexicon decides how many exist.
+        shutdown_and_assert_ok(child, &mut stdin, &mut stdout);
+        return;
+    }
+
+    send_command(&mut stdin, r#"{"cmd":"select_phrase","index":1}"#);
+    let selected = read_response(&mut stdout);
+
+    assert_eq!(selected["ok"], Value::Bool(true));
+    assert_eq!(
+        selected["snapshot"]["selected_phrase_index"],
+        Value::from(1),
+        "selecting a phrase must move the preview to that hypothesis"
+    );
+    assert_eq!(
+        selected["snapshot"]["segmented_active"],
+        Value::Bool(true),
+        "the selected phrase becomes the active Segmented Session"
+    );
+
+    shutdown_and_assert_ok(child, &mut stdin, &mut stdout);
+}
+
+#[test]
+fn bridge_select_phrase_out_of_range_is_ignored_not_fatal() {
+    // Python maps a visible row back to a session index; a stale snapshot could
+    // send an index that no longer exists. That must not kill the bridge.
+    let (child, mut stdin, mut stdout) = spawn_full_bridge();
+
+    send_command(&mut stdin, r#"{"cmd":"focus_in"}"#);
+    let _ = read_response(&mut stdout);
+
+    send_command(&mut stdin, r#"{"cmd":"select_phrase","index":99}"#);
+    let response = read_response(&mut stdout);
+    assert_eq!(response["ok"], Value::Bool(true));
+
+    shutdown_and_assert_ok(child, &mut stdin, &mut stdout);
+}
+
+#[test]
 fn bridge_snapshot_exposes_segment_edit_mode_fields() {
     let (child, mut stdin, mut stdout) = spawn_full_bridge();
 

@@ -14,17 +14,38 @@ pub use history_store::{desktop_history_path, load_desktop_history, save_desktop
 #[derive(Debug, Deserialize)]
 #[serde(tag = "cmd", rename_all = "snake_case")]
 pub enum BridgeCommand {
-    ProcessKeyEvent { keyval: u32, keycode: u32, state: u32 },
-    RefineComposition { raw_preedit: String },
-    RefreshSegmentedPreview { raw_preedit: String },
-    SetInputMode { input_mode: InputMode },
+    ProcessKeyEvent {
+        keyval: u32,
+        keycode: u32,
+        state: u32,
+    },
+    RefineComposition {
+        raw_preedit: String,
+    },
+    RefreshSegmentedPreview {
+        raw_preedit: String,
+    },
+    SetInputMode {
+        input_mode: InputMode,
+    },
     ToggleInputMode,
     FocusIn,
     FocusOut,
     Reset,
     Enable,
     Disable,
-    SetCursorLocation { x: i32, y: i32, width: i32, height: i32 },
+    SetCursorLocation {
+        x: i32,
+        y: i32,
+        width: i32,
+        height: i32,
+    },
+    /// Select Phrase Candidate `index` as the previewed whole-phrase reading. Sent by the
+    /// Python adapter when the user picks a row at the Phrase level of the Candidate
+    /// Surface; `index` is a `phrase_candidates` index, not a visible row position.
+    SelectPhrase {
+        index: usize,
+    },
     Snapshot,
     Shutdown,
 }
