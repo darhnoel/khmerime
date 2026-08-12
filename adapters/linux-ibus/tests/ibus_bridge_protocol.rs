@@ -527,6 +527,13 @@ fn bridge_supports_segment_focus_and_full_phrase_commit() {
         .map(|items| !items.is_empty())
         .unwrap_or(false));
 
+    // Tab (65289) enters Segment Edit Mode on segment 0; only then does Right move focus
+    // (ADR macos-imk 0004 — pre-Tab arrows are inert so the first Tab lands on segment 0).
+    send_command(
+        &mut stdin,
+        r#"{"cmd":"process_key_event","keyval":65289,"keycode":0,"state":0}"#,
+    );
+    let _ = read_response(&mut stdout);
     send_command(
         &mut stdin,
         r#"{"cmd":"process_key_event","keyval":65363,"keycode":0,"state":0}"#,
@@ -799,6 +806,13 @@ fn bridge_refinement_preserves_segment_focus() {
     let _ = read_response(&mut stdout);
     send_ascii_text(&mut stdin, &mut stdout, "nihjeasnadaiborkbrae");
 
+    // Tab (65289) enters edit on segment 0, then Right moves focus to segment 1 (pre-Tab arrows
+    // are inert, ADR macos-imk 0004).
+    send_command(
+        &mut stdin,
+        r#"{"cmd":"process_key_event","keyval":65289,"keycode":0,"state":0}"#,
+    );
+    let _ = read_response(&mut stdout);
     send_command(
         &mut stdin,
         r#"{"cmd":"process_key_event","keyval":65363,"keycode":0,"state":0}"#,

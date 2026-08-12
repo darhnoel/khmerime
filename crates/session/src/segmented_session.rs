@@ -142,25 +142,44 @@ fn merge_phrase_outputs_first(phrases: &[PhraseCandidate], fallback: Vec<String>
 
 impl ImeSession {
     pub(crate) fn handle_left(&mut self) -> SessionResult {
-        let Some(mut session) = self.segmented_session.clone() else {
-            return SessionResult::default();
-        };
-        move_session_focus(&mut session, -1);
-        self.segmented_session = Some(session);
-        self.segment_edit_state = None;
-        SessionResult {
-            consumed: true,
-            ..SessionResult::default()
-        }
+        self.move_segment_focus(-1)
     }
 
     pub(crate) fn handle_right(&mut self) -> SessionResult {
+        self.move_segment_focus(1)
+    }
+
+    // Move segment focus by `delta`, but ONLY while in Segment Edit Mode (after Tab): re-enter edit
+    // on the new focused segment (macos-imk ADR-0004) so the user can cycle each segment's words in
+    // turn. Before Tab the arrows are consumed (they never leak to the document) but INERT — moving
+    // `focused` pre-Tab made the first Tab land on the wrong segment. Matches the Windows TSF rule.
+    fn move_segment_focus(&mut self, delta: isize) -> SessionResult {
         let Some(mut session) = self.segmented_session.clone() else {
             return SessionResult::default();
         };
-        move_session_focus(&mut session, 1);
+        let was_editing = self.segment_edit_state.is_some();
+        if !was_editing {
+            // Consumed but inert: keep the marked composition put, don't advance focus.
+            return SessionResult {
+                consumed: true,
+                ..SessionResult::default()
+            };
+        }
+        // Past the guard we are always editing: move focus and re-enter edit on the new segment.
+        move_session_focus(&mut session, delta);
+        let focused = session.focused;
+        let new_edit =
+            session
+                .segments
+                .get(focused)
+                .cloned()
+                .map(|original_segment| crate::segment_edit_mode::SegmentEditState {
+                    index: focused,
+                    original_segment,
+                    replace_next_printable: true,
+                });
         self.segmented_session = Some(session);
-        self.segment_edit_state = None;
+        self.segment_edit_state = new_edit;
         SessionResult {
             consumed: true,
             ..SessionResult::default()
@@ -677,13 +696,18 @@ mod tests {
     }
 
     #[test]
-    fn segment_focus_moves_with_left_right() {
+    fn segment_focus_moves_with_left_right_after_tab() {
+        // Left/Right move focus only once Segment Edit Mode is active (ADR macos-imk 0004); pre-Tab
+        // they are inert (see left_right_before_tab_are_consumed_but_do_not_move_focus).
         let mut session = session();
         type_ascii(&mut session, "khnhomtov");
         let snapshot = session.snapshot();
         assert!(snapshot.segmented_active);
         assert_eq!(snapshot.focused_segment_index, Some(0));
         assert!(!snapshot.segment_preview.is_empty());
+
+        session.process_key_event(0xFF09, 0, 0); // Tab -> edit segment 0
+        assert!(session.snapshot().segment_edit_active);
 
         let right = session.process_key_event(0xFF53, 0, 0);
         assert!(right.consumed);
