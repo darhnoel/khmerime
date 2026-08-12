@@ -11,6 +11,23 @@ final class CandidatePanelLayoutTests: XCTestCase {
     private let screen = CGRect(x: 0, y: 0, width: 1440, height: 900)
     private let panel = CGSize(width: 480, height: 120)
 
+    // Dynamic width: the panel fits its widest row but is clamped to [min, max] so a
+    // one-char candidate still gives a tappable box and a long phrase stops at the cap.
+    func test_contentWidth_clampsToMinFloor() {
+        let w = CandidatePanelLayout.contentWidth(widestRow: 40, minWidth: 180, maxWidth: 360)
+        XCTAssertEqual(w, 180)
+    }
+
+    func test_contentWidth_clampsToMaxCeiling() {
+        let w = CandidatePanelLayout.contentWidth(widestRow: 900, minWidth: 180, maxWidth: 360)
+        XCTAssertEqual(w, 360)
+    }
+
+    func test_contentWidth_fitsContentBetweenBounds() {
+        let w = CandidatePanelLayout.contentWidth(widestRow: 250, minWidth: 180, maxWidth: 360)
+        XCTAssertEqual(w, 250)
+    }
+
     // ADR-0013 paging, macOS opting in at page_size 10. Painting every candidate made
     // the panel tall enough that it could not fit below the caret, so the screen clamp
     // overrode the caret anchor and parked it mid-screen.

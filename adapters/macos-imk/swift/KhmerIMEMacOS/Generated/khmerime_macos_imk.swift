@@ -989,6 +989,12 @@ public struct MacosRenderState: Equatable, Hashable {
      * non-composing keys while still clearing marked text when preedit goes empty.
      */
     public var preeditChanged: Bool
+    /**
+     * Which Candidate Surface level the panel should paint (ADR-0004). In `Phrase`, `candidates`
+     * are whole Phrase Candidates and `segments` is a dim context header; in `Segment`, `candidates`
+     * are the focused segment's words; in `Flat`, the ordinary candidate list with no context.
+     */
+    public var surfaceMode: MacosSurfaceMode
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
@@ -1010,7 +1016,12 @@ public struct MacosRenderState: Equatable, Hashable {
          * True when `preedit` differs from the previous call's value.
          * Swift calls `setMarkedText` only when this is true, avoiding spurious IPC on
          * non-composing keys while still clearing marked text when preedit goes empty.
-         */preeditChanged: Bool) {
+         */preeditChanged: Bool, 
+        /**
+         * Which Candidate Surface level the panel should paint (ADR-0004). In `Phrase`, `candidates`
+         * are whole Phrase Candidates and `segments` is a dim context header; in `Segment`, `candidates`
+         * are the focused segment's words; in `Flat`, the ordinary candidate list with no context.
+         */surfaceMode: MacosSurfaceMode) {
         self.candidates = candidates
         self.candidateDisplay = candidateDisplay
         self.selectedIndex = selectedIndex
@@ -1023,6 +1034,7 @@ public struct MacosRenderState: Equatable, Hashable {
         self.isReady = isReady
         self.consumed = consumed
         self.preeditChanged = preeditChanged
+        self.surfaceMode = surfaceMode
     }
 
     
@@ -1052,7 +1064,8 @@ public struct FfiConverterTypeMacosRenderState: FfiConverterRustBuffer {
                 segmentEditIndex: FfiConverterOptionUInt64.read(from: &buf), 
                 isReady: FfiConverterBool.read(from: &buf), 
                 consumed: FfiConverterBool.read(from: &buf), 
-                preeditChanged: FfiConverterBool.read(from: &buf)
+                preeditChanged: FfiConverterBool.read(from: &buf), 
+                surfaceMode: FfiConverterTypeMacosSurfaceMode.read(from: &buf)
         )
     }
 
@@ -1069,6 +1082,7 @@ public struct FfiConverterTypeMacosRenderState: FfiConverterRustBuffer {
         FfiConverterBool.write(value.isReady, into: &buf)
         FfiConverterBool.write(value.consumed, into: &buf)
         FfiConverterBool.write(value.preeditChanged, into: &buf)
+        FfiConverterTypeMacosSurfaceMode.write(value.surfaceMode, into: &buf)
     }
 }
 
@@ -1148,6 +1162,83 @@ public func FfiConverterTypeMacosSegmentEntry_lift(_ buf: RustBuffer) throws -> 
 public func FfiConverterTypeMacosSegmentEntry_lower(_ value: MacosSegmentEntry) -> RustBuffer {
     return FfiConverterTypeMacosSegmentEntry.lower(value)
 }
+
+// Note that we don't yet support `indirect` for enums.
+// See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
+/**
+ * The Candidate Surface level for the Swift panel (ADR-0004). Mirrors `CandidateSurfaceMode`.
+ */
+
+public enum MacosSurfaceMode: Equatable, Hashable {
+    
+    case flat
+    case phrase
+    case segment
+
+
+
+
+
+}
+
+#if compiler(>=6)
+extension MacosSurfaceMode: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeMacosSurfaceMode: FfiConverterRustBuffer {
+    typealias SwiftType = MacosSurfaceMode
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> MacosSurfaceMode {
+        let variant: Int32 = try readInt(&buf)
+        switch variant {
+        
+        case 1: return .flat
+        
+        case 2: return .phrase
+        
+        case 3: return .segment
+        
+        default: throw UniffiInternalError.unexpectedEnumCase
+        }
+    }
+
+    public static func write(_ value: MacosSurfaceMode, into buf: inout [UInt8]) {
+        switch value {
+        
+        
+        case .flat:
+            writeInt(&buf, Int32(1))
+        
+        
+        case .phrase:
+            writeInt(&buf, Int32(2))
+        
+        
+        case .segment:
+            writeInt(&buf, Int32(3))
+        
+        }
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeMacosSurfaceMode_lift(_ buf: RustBuffer) throws -> MacosSurfaceMode {
+    return try FfiConverterTypeMacosSurfaceMode.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeMacosSurfaceMode_lower(_ value: MacosSurfaceMode) -> RustBuffer {
+    return FfiConverterTypeMacosSurfaceMode.lower(value)
+}
+
 
 #if swift(>=5.8)
 @_documentation(visibility: private)
