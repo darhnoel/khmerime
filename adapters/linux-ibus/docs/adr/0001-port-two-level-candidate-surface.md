@@ -1,6 +1,6 @@
 # Porting the two-level Candidate Surface + roman-header layout to Linux IBus
 
-Status: proposed (handoff — not yet implemented)
+Status: accepted — implemented (renderer port only; the AI `✦` marker remains a later iteration)
 
 Windows TSF (`windows-tsf` ADR-0002) and then macOS IMK (`macos-imk` ADR-0004) reworked how a
 **Segmented Session** presents candidates. Linux IBus has not yet adopted it. This document records
@@ -50,7 +50,20 @@ change is required for this port. Relevant fields (`fallback_empty_snapshot_json
 - `candidates` + `candidate_display`: the rows, each display entry has `output`, `recommended`,
   `roman_hints`, `is_raw_fallback`
 
-So this is a **Python-renderer-only** change on the IBus side.
+So the *rendering* half is Python-only.
+
+**Correction (found during implementation).** This section originally claimed the whole port was
+Python-renderer-only. That is true for stripping roman off the rows, but **not** for the phrase
+level itself. Two gaps:
+
+- `phrase_candidates` / `selected_phrase_index` are missing from the field list above. They *are*
+  serialized (`SessionSnapshot` derives `Serialize`), so rows render with no Rust change — but the
+  list above reads as exhaustive and is not.
+- **Selecting** a Phrase Candidate needs `SessionCommand::SelectPhrase`, and `BridgeCommand` had no
+  such variant. That is a Rust/protocol change this document did not anticipate.
+
+Rendering phrase rows without a way to select one is a half-feature, so the port includes the new
+bridge command.
 
 ## What IBus does today (the gap)
 
@@ -120,13 +133,28 @@ The IBus renderers are pure Python with existing unit tests — ideal for red-gr
 
 Keep the existing markers (`✓`, `≈`) and the raw-fallback escape hatch untouched.
 
+## What was implemented
+
+`surface_mode(snapshot)` and a `mode` parameter on `candidate_rows` (both in
+`ibus_candidate_renderer.py`), wired at the single `candidate_rows` call site in
+`khmerime_ibus_engine.py`. No Rust, bridge, or protocol change — the snapshot already carried
+`segmented_active` and `segment_edit_active`.
+
+Taken deliberately as the ADR's **minimum**: the aux text keeps its existing ` | `-separated
+`output(input)` shape. The floated alternative — dropping the inline gluing to show roman only for
+the *focused* segment — was **not** done; it is a second, independent behavior change that touches
+`ibus_segmented_preview_renderer` and its tests. Worth revisiting after living with this change,
+since the roman is now unique to the aux text and its density matters more than it did.
+
 ## Cross-adapter parity table (for reviewers)
 
 | Behavior                                  | TSF | macOS | IBus (target) |
 | ----------------------------------------- | --- | ----- | ------------- |
-| Two-level surface (mode switch)           | ✅  | ✅    | ⬜ this port  |
-| Roman off candidate rows in Phrase/Segment| ✅  | ✅    | ⬜ this port  |
-| Roman kept on rows in Flat mode           | ✅  | ✅    | ⬜ this port  |
+| Two-level surface (mode switch)           | ✅  | ✅    | ✅ `surface_mode` |
+| Phrase rows from `phrase_candidates`      | ✅  | ✅    | ✅ this port  |
+| Phrase selection (Space/arrows/digits)    | ✅  | ✅    | ✅ `select_phrase` |
+| Roman off candidate rows in Phrase/Segment| ✅  | ✅    | ✅ this port  |
+| Roman kept on rows in Flat mode           | ✅  | ✅    | ✅ this port  |
 | Space cycles word (never commits)         | ✅  | ✅    | ✅ (session)  |
 | Left/Right inert before Tab               | ✅  | ✅    | ✅ (session)  |
 | Two-row aligned chip header               | —   | ✅    | ➖ IBus aux text is single-line |

@@ -9,6 +9,7 @@ use khmerime_linux_ibus::{
 };
 use khmerime_session::{
     HistoryStore, ImeSession, ImeSessionOptions, ImeSessionSnapshot, ImeSessionUpdate, InputMode, SegmentedPreviewMode,
+    SessionCommand,
 };
 
 // Short grace, not a wait: full warmup measured at ~2.8s in release builds, so
@@ -420,6 +421,12 @@ fn apply_command(runtime: &mut BridgeRuntime, command: BridgeCommand) -> (Bridge
                     },
                     false,
                 )
+            }
+            BridgeCommand::SelectPhrase { index } => {
+                let started = Instant::now();
+                let update = session.process_command(SessionCommand::SelectPhrase(index));
+                t_proc = started.elapsed().as_secs_f64() * 1000.0;
+                (update, false)
             }
             BridgeCommand::Snapshot => (
                 ImeSessionUpdate {
