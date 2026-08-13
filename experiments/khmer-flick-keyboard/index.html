@@ -1,0 +1,388 @@
+<!doctype html>
+<html lang="km">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+<meta name="theme-color" content="#f6f7f9" />
+<title>Khmer Flick Keyboard</title>
+<style>
+  :root {
+    color-scheme: light;
+    --ink: #111318;
+    --muted: #70747c;
+    --accent: #1677ff;
+    --keyboard: #d4d7dc;
+    --key: #fbfbfc;
+    --key-special: #aeb3bb;
+    --key-shadow: #858a92;
+    --pressed: #c5c9cf;
+    --gap: clamp(5px, 1.7vw, 8px);
+  }
+
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+  html, body {
+    margin: 0;
+    height: 100%;
+    overflow: hidden;
+    font-family: "Noto Sans Khmer", "Khmer OS Battambang", system-ui, sans-serif;
+    color: var(--ink);
+    background: #f6f7f9;
+    touch-action: manipulation;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+
+  body { display: flex; justify-content: center; }
+
+  .phone {
+    width: 100%;
+    max-width: 520px;
+    min-width: 0;
+    min-height: 100%;
+    display: flex;
+    flex-direction: column;
+    background: #fff;
+    box-shadow: 0 0 36px rgb(18 25 38 / 8%);
+  }
+
+  .app-bar {
+    min-height: 54px;
+    padding: max(10px, env(safe-area-inset-top)) 16px 9px;
+    display: grid;
+    grid-template-columns: 72px 1fr 72px;
+    align-items: end;
+    border-bottom: 1px solid #eceef1;
+    font-family: system-ui, sans-serif;
+  }
+
+  .app-bar button {
+    appearance: none;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--accent);
+    font: 500 16px/28px system-ui, sans-serif;
+  }
+
+  .app-bar .back { text-align: left; font-size: 25px; line-height: 28px; }
+  .app-bar .done { text-align: right; }
+  .app-title { text-align: center; }
+  .app-title strong { display: block; font: 600 15px/18px system-ui, sans-serif; }
+  .app-title span { display: block; color: var(--muted); font: 12px/15px system-ui, sans-serif; }
+
+  .composer {
+    flex: 1 1 auto;
+    min-height: 0;
+    padding: 20px 18px;
+    overflow-y: auto;
+    background: linear-gradient(#fff, #fbfbfc);
+  }
+
+  .recipient {
+    padding-bottom: 12px;
+    border-bottom: 1px solid #eceef1;
+    color: var(--muted);
+    font: 15px/22px system-ui, sans-serif;
+  }
+
+  .recipient b { color: var(--ink); font-weight: 500; }
+
+  #output {
+    min-height: 92px;
+    padding-top: 16px;
+    font-size: clamp(23px, 6.3vw, 30px);
+    line-height: 1.65;
+    word-break: break-word;
+    white-space: pre-wrap;
+  }
+
+  #output::after {
+    content: "";
+    display: inline-block;
+    width: 2px;
+    height: 1.25em;
+    margin-left: 2px;
+    vertical-align: -.24em;
+    border-radius: 1px;
+    background: var(--accent);
+    animation: blink 1.05s step-end infinite;
+  }
+
+  @keyframes blink { 50% { opacity: 0; } }
+
+  /* Composing preedit: underlined, not yet committed to the document. */
+  #preedit {
+    text-decoration: underline;
+    text-decoration-color: var(--accent);
+    text-underline-offset: 3px;
+    color: var(--accent);
+  }
+
+  .keyboard-shell {
+    flex: 0 0 auto;
+    background: var(--keyboard);
+    border-top: 1px solid #c4c7cc;
+    padding-bottom: env(safe-area-inset-bottom);
+    font-family: "Noto Sans Khmer", "Khmer OS Battambang", system-ui, sans-serif;
+  }
+
+  #suggestions {
+    height: 45px;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    align-items: center;
+    padding: 4px 6px 3px;
+    border-bottom: 1px solid rgb(100 105 113 / 24%);
+    overflow: hidden;
+  }
+
+  #suggestions .sug {
+    appearance: none;
+    min-width: 0;
+    height: 32px;
+    padding: 2px 10px;
+    overflow: hidden;
+    border: 0;
+    border-right: 1px solid rgb(100 105 113 / 25%);
+    background: transparent;
+    color: #202329;
+    font-family: inherit;
+    font-size: 19px;
+    line-height: 28px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  #suggestions .sug:last-child { border-right: 0; }
+  #suggestions .sug:active { color: var(--accent); background: rgb(255 255 255 / 36%); }
+  #suggestions .sug.placeholder { color: #696d74; font-size: 16px; }
+
+  #quick-access {
+    height: 43px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 6px 5px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    border-bottom: 1px solid rgb(100 105 113 / 24%);
+    scrollbar-width: none;
+    touch-action: pan-x;
+    overscroll-behavior-x: contain;
+  }
+
+  #quick-access::-webkit-scrollbar { display: none; }
+
+  #quick-access .quick-key {
+    appearance: none;
+    flex: 0 0 48px;
+    min-width: 48px;
+    height: 32px;
+    padding: 1px 4px;
+    border: 0;
+    border-right: 1px solid rgb(100 105 113 / 24%);
+    background: transparent;
+    color: #25282e;
+    font-family: inherit;
+    font-size: 19px;
+    line-height: 30px;
+    text-align: center;
+  }
+
+  #quick-access .quick-key:active {
+    border-radius: 5px;
+    background: rgb(255 255 255 / 48%);
+    color: var(--accent);
+  }
+
+  .kb {
+    padding: 7px 5px 5px;
+    display: flex;
+    flex-direction: column;
+    gap: var(--gap);
+  }
+
+  .kb-row { display: flex; gap: var(--gap); }
+  .kb-row:nth-child(2) { padding-inline: clamp(7px, 2.2vw, 12px); }
+
+  .key,
+  .action {
+    position: relative;
+    min-width: 0;
+    appearance: none;
+    border: 0;
+    color: var(--ink);
+    cursor: pointer;
+    outline: none;
+    -webkit-touch-callout: none;
+  }
+
+  .key {
+    flex: 1 1 0;
+    height: clamp(68px, 19vw, 78px);
+    min-width: 0;
+    overflow: hidden;
+    border-radius: 6px;
+    background: var(--key);
+    box-shadow: 0 1px 0 1px var(--key-shadow), 0 2px 1px rgb(33 38 45 / 18%);
+    font-family: inherit;
+    font-size: 25px;
+    line-height: 1;
+    transition: transform 50ms ease, background 50ms ease, box-shadow 50ms ease;
+    touch-action: none;
+  }
+
+  .key.is-pressed {
+    z-index: 2;
+    background: var(--pressed);
+    box-shadow: 0 1px 0 var(--key-shadow);
+    transform: translateY(1px);
+  }
+
+  .key .center { pointer-events: none; }
+  .key .hint {
+    position: absolute;
+    color: #666a71;
+    font-family: inherit;
+    font-size: 13px;
+    line-height: 1.25;
+    white-space: nowrap;
+    pointer-events: none;
+  }
+
+  .hint.u,
+  .hint.d {
+    left: 25%;
+    width: 50%;
+    text-align: center;
+  }
+
+  .hint.l,
+  .hint.r {
+    top: 50%;
+    width: 27%;
+    overflow: hidden;
+    transform: translateY(-50%);
+  }
+
+  .hint.u { top: 5px; }
+  .hint.d { bottom: 5px; }
+  .hint.l { left: 5px; text-align: left; }
+  .hint.r { right: 5px; text-align: right; }
+
+  .actions { align-items: stretch; }
+  .action {
+    height: clamp(44px, 12.5vw, 54px);
+    border-radius: 6px;
+    background: var(--key-special);
+    box-shadow: 0 1px 0 1px #7e838b, 0 2px 1px rgb(33 38 45 / 14%);
+    font: 500 15px/1 system-ui, sans-serif;
+  }
+
+  .action:active { background: #989da5; transform: translateY(1px); box-shadow: 0 1px 0 #757a82; }
+  .action.icon { flex: 0 0 clamp(46px, 13vw, 60px); font-size: 22px; }
+  .action.mode { flex: 0 0 clamp(54px, 15vw, 68px); }
+  .action.space { flex: 1 1 auto; background: var(--key); }
+  .action.return { flex: 0 0 clamp(66px, 19vw, 88px); font-size: 14px; }
+
+  .home-indicator {
+    width: 120px;
+    height: 5px;
+    margin: 5px auto 3px;
+    border-radius: 99px;
+    background: #17191d;
+  }
+
+  #popup {
+    position: fixed;
+    z-index: 50;
+    display: none;
+    width: 174px;
+    height: 174px;
+    pointer-events: none;
+    filter: drop-shadow(0 4px 8px rgb(18 25 38 / 22%));
+  }
+
+  #popup .cell {
+    position: absolute;
+    width: 56px;
+    height: 56px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid #a6aab0;
+    border-radius: 8px;
+    background: #fff;
+    color: var(--ink);
+    font-size: 26px;
+  }
+
+  #popup .cell.empty { display: none; }
+  #popup .cell.active { border-color: var(--accent); background: var(--accent); color: #fff; }
+  .cell.c { left: 59px; top: 59px; }
+  .cell.u { left: 59px; top: 0; }
+  .cell.d { left: 59px; top: 118px; }
+  .cell.l { left: 0; top: 59px; }
+  .cell.r { left: 118px; top: 59px; }
+
+  @media (min-width: 521px) {
+    body { padding-block: 18px; background: #e8eaee; }
+    .phone { min-height: calc(100% - 36px); border-radius: 20px; overflow: hidden; }
+    .home-indicator { display: none; }
+  }
+
+  @media (max-height: 620px) {
+    .app-bar { display: none; }
+    .composer { padding-block: 10px; }
+    #output { min-height: 48px; padding-top: 10px; }
+    #suggestions { height: 39px; }
+    #quick-access { height: 37px; padding-block: 2px 3px; }
+    .kb { padding-top: 5px; }
+    .key { height: 58px; }
+    .action { height: 41px; }
+    .home-indicator { display: none; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    #output::after { animation: none; }
+  }
+</style>
+</head>
+<body>
+  <main class="phone">
+    <header class="app-bar">
+      <button class="back" type="button" aria-label="Back">‹</button>
+      <div class="app-title">
+        <strong>សារថ្មី</strong>
+        <span>Khmer Flick</span>
+      </div>
+      <button class="done" type="button">រួចរាល់</button>
+    </header>
+
+    <section class="composer" aria-label="Message composer">
+      <div class="recipient">ទៅ៖ <b>សាកល្បងក្តារចុច</b></div>
+      <div id="output" role="textbox" aria-multiline="true" aria-label="Typed text"><span id="committed"></span><span id="preedit"></span></div>
+    </section>
+
+    <section class="keyboard-shell" aria-label="Khmer flick keyboard">
+      <div id="suggestions" aria-label="Word suggestions"></div>
+      <div id="quick-access" aria-label="Frequently used Khmer signs"></div>
+      <div class="kb" id="kb"></div>
+      <div class="home-indicator" aria-hidden="true"></div>
+    </section>
+  </main>
+
+  <div id="popup" aria-hidden="true">
+    <div class="cell u"></div>
+    <div class="cell l"></div>
+    <div class="cell c"></div>
+    <div class="cell r"></div>
+    <div class="cell d"></div>
+  </div>
+
+  <script src="keymap.js"></script>
+  <script src="words.js"></script>
+  <script src="keyboard.js"></script>
+</body>
+</html>
