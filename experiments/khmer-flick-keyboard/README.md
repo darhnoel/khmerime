@@ -8,6 +8,27 @@ the production mobile Quick Access sign tray, staggered sculpted keycaps,
 familiar globe/number/space/return/delete controls, safe-area padding, and a
 compact layout that adapts to short phone screens.
 
+## N-gram heatmap (next-key prediction)
+
+After each character, the keys hint at what is statistically likely to come next,
+from a Khmer trigram back-off model measured on a 31.4M-character corpus.
+
+- **Context:** P(next | last two glyphs) with back-off — trigram, then bigram (last
+  glyph), then unigram (overall frequency) when there is no context.
+- **Granularity (hybrid):** on the resting board each key is scored by its *most
+  likely* glyph (`max`, not sum — so a key with one hot flick still lights); when a
+  key is touched, the flick popup scores each direction by that glyph's own
+  probability, guiding the drag.
+- **Visual:** a glowing border ring on the **top ~6** likely keys, ring brightness
+  proportional to probability; the popup uses the same per-direction ring. Key fills
+  are left unchanged, so the heat is non-destructive.
+- **Data:** `ngram.js` — pruned `TRIGRAM` / `BIGRAM` / `UNIGRAM` tables
+  (`{context: {next: prob}}`), about 195 KB. Regenerate from the corpus as needed.
+
+Why trigram and not just frequency: after COENG ្, for example, the next character
+is 100% a consonant, and `រ` alone accounts for ~30% — context sharpens the hint far
+beyond static letter frequency.
+
 ## Run it
 
 Open `index.html` in a browser, or serve the folder:

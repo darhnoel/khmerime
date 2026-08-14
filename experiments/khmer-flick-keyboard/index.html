@@ -219,8 +219,10 @@
   }
 
   .key {
+    --heat: 0;   /* 0..1 next-key probability, set by the bigram heatmap */
+    position: relative;
     flex: 1 1 0;
-    height: clamp(68px, 19vw, 78px);
+    height: clamp(56px, 15.5vw, 64px);
     min-width: 0;
     overflow: hidden;
     border-radius: 6px;
@@ -231,6 +233,20 @@
     line-height: 1;
     transition: transform 50ms ease, background 50ms ease, box-shadow 50ms ease;
     touch-action: none;
+  }
+
+  /* Bigram heat: a colored ring on likely-next keys, blue (cold) → red (hot).
+     --heat-color is set per key in JS; --heat is 0..1 for the glow strength.
+     Inset so it stays within the key's clipped, rounded bounds. */
+  .key::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    pointer-events: none;
+    box-shadow: inset 0 0 0 3px var(--heat-color, transparent);
+    opacity: var(--heat, 0);
+    transition: opacity 120ms ease;
   }
 
   .key.is-pressed {
@@ -305,6 +321,7 @@
   }
 
   #popup .cell {
+    --heat: 0;   /* bigram heat for this flick direction */
     position: absolute;
     width: 56px;
     height: 56px;
@@ -318,8 +335,22 @@
     font-size: 26px;
   }
 
+  /* Per-direction heat ring in the popup, matching the resting keys. */
+  #popup .cell::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    pointer-events: none;
+    box-shadow: inset 0 0 0 3px var(--heat-color, transparent);
+    opacity: var(--heat, 0);
+    transition: opacity 120ms ease;
+  }
+
   #popup .cell.empty { display: none; }
+  /* The active (drag-target) cell fills accent and hides its heat ring. */
   #popup .cell.active { border-color: var(--accent); background: var(--accent); color: #fff; }
+  #popup .cell.active::after { opacity: 0; }
   .cell.c { left: 59px; top: 59px; }
   .cell.u { left: 59px; top: 0; }
   .cell.d { left: 59px; top: 118px; }
@@ -339,7 +370,7 @@
     #suggestions { height: 39px; }
     #quick-access { height: 37px; padding-block: 2px 3px; }
     .kb { padding-top: 5px; }
-    .key { height: 58px; }
+    .key { height: 48px; }
     .action { height: 41px; }
     .home-indicator { display: none; }
   }
@@ -381,8 +412,9 @@
     <div class="cell d"></div>
   </div>
 
-  <script src="keymap.js"></script>
-  <script src="words.js"></script>
-  <script src="keyboard.js"></script>
+  <script src="keymap.js?v=12"></script>
+  <script src="ngram.js?v=12"></script>
+  <script src="words.js?v=12"></script>
+  <script src="keyboard.js?v=12"></script>
 </body>
 </html>

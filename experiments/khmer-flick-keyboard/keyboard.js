@@ -22,32 +22,49 @@ let active = null; // { key, startX, startY, dir }
 
 // Matches the Android/iOS QuickAccessSpec ordering. Dotted circles are
 // display-only in the browser; insertion always uses the raw Khmer mark.
+// Ordered by corpus frequency (most-used first), measured on the kmwiki corpus.
 const QUICK_ACCESS_ITEMS = [
-  { display: '។', commit: '។', label: 'Khmer full stop' },
-  { display: '៕', commit: '៕', label: 'Khmer final period' },
-  { display: '៖', commit: '៖', label: 'Khmer sign camnuc pii kuuh' },
-  { display: 'ៈ', commit: 'ៈ', label: 'Yukaleapintu' },
-  { display: 'ៗ', commit: 'ៗ', label: 'Khmer repetition sign' },
-  { display: '៘', commit: '៘' },
-  { display: '៙', commit: '៙' },
-  { display: '៚', commit: '៚' },
-  { display: '៛', commit: '៛', label: 'Khmer currency symbol riel' },
-  { display: '◌៉', commit: '៉', label: 'Muusikatoan (sanhya thmenh kandol)' },
-  { display: '◌់', commit: '់', label: 'Bantak' },
-  { display: '◌៊', commit: '៊', label: 'Triisap' },
-  { display: '◌័', commit: '័', label: 'Samyok sannya' },
-  { display: '◌៌', commit: '៌' },
-  { display: '◌៍', commit: '៍' },
-  { display: '◌៏', commit: '៏' },
-  { display: '◌៎', commit: '៎' },
-  { display: '◌៑', commit: '៑' },
+  { display: 'ឲ្យ', commit: 'ឲ្យ', label: 'Aoy (to give / let)' },                 // common word
+  { display: '់', commit: '់', label: 'Bantak' },                                // 1.91%
+  { display: '។', commit: '។', label: 'Khmer full stop' },                        // 0.71%
+  { display: '៏', commit: '៏', label: 'Ahsda' },                                  // 0.33%
+  { display: '៉', commit: '៉', label: 'Muusikatoan (sanhya thmenh kandol)' },     // 0.30%
+  { display: '័', commit: '័', label: 'Samyok sannya' },                          // 0.27%
+  { display: 'ៈ', commit: 'ៈ', label: 'Yukaleapintu' },                           // 0.23%
+  { display: '៍', commit: '៍', label: 'Toandakhiat' },                            // 0.14%
+  { display: '៌', commit: '៌', label: 'Robat' },                                  // 0.14%
+  { display: '៊', commit: '៊', label: 'Triisap' },                               // 0.08%
+  { display: 'ៗ', commit: 'ៗ', label: 'Khmer repetition sign' },                  // 0.07%
+  { display: '៎', commit: '៎', label: 'Kakabat' },                               // 0.02%
+  { display: '៖', commit: '៖', label: 'Khmer sign camnuc pii kuuh' },             // 0.015%
+  { display: '៑', commit: '៑', label: 'Viriam' },                                // rare
+  { display: '៕', commit: '៕', label: 'Khmer final period' },                     // rare
+  { display: '៛', commit: '៛', label: 'Khmer currency symbol riel' },             // rare
+  { display: '៚', commit: '៚', label: 'Koomuut' },                                // rare
+  { display: '៙', commit: '៙', label: 'Phnaek muan' },                            // rare
+  { display: '៘', commit: '៘', label: 'Beyyal' },                                 // rare
+  // Rare independent vowels (freq-ordered) — reachable here rather than on the grid.
+  { display: 'ឮ', commit: 'ឮ', label: 'Independent vowel LYY' },
+  { display: 'ឫ', commit: 'ឫ', label: 'Independent vowel RY' },
+  { display: 'ឪ', commit: 'ឪ', label: 'Independent vowel QUUV' },
+  { display: 'ឭ', commit: 'ឭ', label: 'Independent vowel LY' },
+  { display: 'ឰ', commit: 'ឰ', label: 'Independent vowel QAI' },
+  { display: 'ឦ', commit: 'ឦ', label: 'Independent vowel QII' },
+  { display: 'ឳ', commit: 'ឳ', label: 'Independent vowel QAU' },
+  { display: 'ឩ', commit: 'ឩ', label: 'Independent vowel QUU' },
+  { display: 'ឨ', commit: 'ឨ', label: 'Independent vowel QUK' },
 ];
 
 // --- Build the keyboard from KEYMAP ------------------------------------------
+const keyEls = []; // all character-key elements, for the bigram heatmap
 KEYMAP.forEach(row => {
   const rowEl = document.createElement('div');
   rowEl.className = 'kb-row';
-  row.forEach(def => rowEl.appendChild(makeKey(def)));
+  row.forEach(def => {
+    const el = makeKey(def);
+    keyEls.push(el);
+    rowEl.appendChild(el);
+  });
   kb.appendChild(rowEl);
 });
 
@@ -57,11 +74,10 @@ QUICK_ACCESS_ITEMS.forEach(item => quickAccess.appendChild(makeQuickAccessKey(it
 // this layout prototype, but retain pressed feedback so the keyboard feels real.
 const actions = document.createElement('div');
 actions.className = 'kb-row actions';
-actions.appendChild(makeAction('🌐', () => {}, 'icon', 'Switch keyboard'));
 actions.appendChild(makeAction('123', () => {}, 'mode', 'Numbers'));
 actions.appendChild(makeAction('ដកឃ្លា', space, 'space', 'Space'));
 actions.appendChild(makeAction('⏎', commitComposition, 'return', 'Return'));
-actions.appendChild(makeAction('⌫', backspace, 'icon', 'Delete'));
+actions.appendChild(makeBackspace());
 kb.appendChild(actions);
 
 function makeKey(def) {
@@ -90,6 +106,27 @@ function makeAction(label, fn, className = '', ariaLabel = label) {
   el.setAttribute('aria-label', ariaLabel);
   el.textContent = label;
   el.addEventListener('pointerdown', e => { e.preventDefault(); fn(); });
+  return el;
+}
+
+// Backspace with hold-to-repeat: one delete on press, then accelerating repeats
+// while held (500 ms initial delay, then every 60 ms), stopping on release.
+function makeBackspace() {
+  const el = document.createElement('button');
+  el.type = 'button';
+  el.className = 'action icon';
+  el.setAttribute('aria-label', 'Delete');
+  el.textContent = '⌫';
+  let repeatTimer = null, delayTimer = null;
+  const stop = () => { clearTimeout(delayTimer); clearInterval(repeatTimer); delayTimer = repeatTimer = null; };
+  el.addEventListener('pointerdown', e => {
+    e.preventDefault();
+    backspace();                                   // immediate first delete
+    delayTimer = setTimeout(() => {
+      repeatTimer = setInterval(backspace, 60);    // then repeat while held
+    }, 500);
+  });
+  for (const ev of ['pointerup', 'pointerleave', 'pointercancel']) el.addEventListener(ev, stop);
   return el;
 }
 
@@ -166,6 +203,7 @@ function showPopup(def, key) {
     cell.classList.remove('active');
   }
   cells.c.classList.add('active');
+  updatePopupHeat(def);
   // Center the cross on the key and clamp it inside the viewport. Keeping the
   // choices visible is especially important for the edge keys on narrow phones.
   const rect = key.getBoundingClientRect();
@@ -185,6 +223,109 @@ function highlight(dir) {
 
 function hidePopup() { popup.style.display = 'none'; }
 
+// --- Bigram heatmap -----------------------------------------------------------
+// After each character, hint at the likely next key from a Khmer bigram model
+// (BIGRAM[prev][next] = P(next|prev); UNIGRAM as the no-context fallback). Keys
+// carry a glowing ring whose brightness tracks probability; only the top few glow.
+const HEAT_TOP = 6;          // how many keys/glyphs may glow
+const HEAT_FLOOR = 0.02;     // ignore anything below 2% — not worth a hint
+
+// Probability distribution over next characters, given the current composing state.
+// Back-off: trigram (last 2 glyphs) → bigram (last glyph). Returns null when there
+// is no real context, so the heatmap shows nothing rather than lighting up the
+// globally-common keys (unigram) on every fresh word — that would be noise.
+function nextDist() {
+  const g = Array.from(preedit);
+  const prev1 = g[g.length - 1];
+  const prev2 = g[g.length - 2];
+  if (prev2 && prev1 && TRIGRAM[prev2 + prev1]) return TRIGRAM[prev2 + prev1];
+  if (prev1 && BIGRAM[prev1]) return BIGRAM[prev1];
+  return null;
+}
+
+// Map a probability to a ring intensity in [0,1], scaled so the current max = full.
+function heatScale(p, max) {
+  if (!max || p < HEAT_FLOOR) return 0;
+  return Math.min(1, p / max);
+}
+
+// Blue (cold, t=0) → red (hot, t=1) heat ramp: blue → cyan → green → yellow → red.
+function heatColor(t) {
+  const stops = [
+    [0.0, [40, 90, 220]],   // blue
+    [0.25, [30, 180, 200]], // cyan
+    [0.5, [70, 190, 90]],   // green
+    [0.75, [240, 190, 40]], // yellow
+    [1.0, [225, 50, 45]],   // red
+  ];
+  for (let i = 1; i < stops.length; i++) {
+    if (t <= stops[i][0]) {
+      const [t0, c0] = stops[i - 1], [t1, c1] = stops[i];
+      const f = (t - t0) / (t1 - t0);
+      const c = c0.map((v, k) => Math.round(v + f * (c1[k] - v)));
+      return `rgb(${c[0]},${c[1]},${c[2]})`;
+    }
+  }
+  return 'rgb(225,50,45)';
+}
+
+// Apply heat to a key/cell: `t` (0..1) picks the ramp color, `opacity` the glow.
+// t<0 clears the ring.
+function paintHeat(el, t, opacity) {
+  if (t < 0) {
+    el.style.setProperty('--heat', '0');
+    el.style.setProperty('--heat-color', 'transparent');
+    return;
+  }
+  el.style.setProperty('--heat', opacity.toFixed(2));
+  el.style.setProperty('--heat-color', heatColor(t));
+}
+
+// Paint the resting board: each key glows by its MOST LIKELY glyph (max, not sum).
+function updateHeat() {
+  const dist = nextDist();
+  if (!dist) { keyEls.forEach(el => paintHeat(el, -1)); return; }  // no context → no heat
+  // score every key by its hottest glyph
+  const scored = keyEls.map(el => {
+    const def = el.__def;
+    let best = 0;
+    for (const d of ['c', 'u', 'l', 'r', 'd']) {
+      const g = def[d];
+      if (g && dist[g] > best) best = dist[g];
+    }
+    return { el, p: best };
+  });
+  const max = Math.max(...scored.map(s => s.p), 0);
+  // only the top HEAT_TOP above the floor glow
+  const glowing = new Set(
+    scored.filter(s => s.p >= HEAT_FLOOR).sort((a, b) => b.p - a.p).slice(0, HEAT_TOP).map(s => s.el)
+  );
+  for (const { el, p } of scored) {
+    if (glowing.has(el)) {
+      const t = heatScale(p, max);           // 0..1 → blue..red
+      paintHeat(el, t, 0.6 + 0.4 * t);       // opacity floor so even blue keys show
+    } else {
+      paintHeat(el, -1);
+    }
+  }
+}
+
+// Paint the flick popup: each direction glows by its own glyph's probability.
+function updatePopupHeat(def) {
+  const dist = nextDist();
+  if (!dist) { ['c', 'u', 'l', 'r', 'd'].forEach(d => paintHeat(cells[d], -1)); return; }
+  const vals = ['c', 'u', 'l', 'r', 'd'].map(d => (def[d] && dist[def[d]]) || 0);
+  const max = Math.max(...vals, 0);
+  ['c', 'u', 'l', 'r', 'd'].forEach((d, i) => {
+    if (vals[i] >= HEAT_FLOOR && max) {
+      const t = heatScale(vals[i], max);
+      paintHeat(cells[d], t, 0.6 + 0.4 * t);
+    } else {
+      paintHeat(cells[d], -1);
+    }
+  });
+}
+
 // --- Composition: preedit + commit (IME model) --------------------------------
 // Flicks/marks build an underlined PREEDIT (the word being composed) that is not
 // yet in the document. Suggestions rank against the preedit. Enter or a
@@ -202,6 +343,7 @@ function render() {
   preeditEl.textContent = preedit;
   scrollOut();
   refreshSuggestions();
+  updateHeat();
 }
 function scrollOut() { output.scrollTop = output.scrollHeight; }
 
