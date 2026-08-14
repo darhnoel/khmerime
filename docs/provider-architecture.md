@@ -143,8 +143,14 @@ Only *how the provider binary links* and *where the model file sits* differ.
 | Platform | Adapter | Link the provider | Model file lives |
 |---|---|---|---|
 | macOS | `macos-imk` | provider static lib in the IMK `.app` | loose in the app bundle (like iOS) |
-| Linux | `linux-ibus` | link or `dlopen` the provider `.so` | `/usr/lib/khmerime/` or an XDG data dir |
-| Windows | `windows-tsf` | link or `LoadLibrary` the provider `.dll` | alongside the TSF `.dll` in the install dir |
+| Linux | `linux-ibus` | fused replacement bridge binary (link anchor: `khmerime_ibus_link_anchor`) | `/usr/lib/khmerime/` or an XDG data dir |
+| Windows | `windows-tsf` | fused replacement DLL (link anchor: `khmerime_tsf_link_anchor`) | alongside the TSF `.dll` in the install dir |
+
+The Windows and Linux adapters now carry public no-op link anchors
+(`khmerime_tsf_link_anchor`, `khmerime_ibus_link_anchor`) so an out-of-tree provider
+build can fuse into their link graph, exactly like Android's public `nativeCreate`.
+The leak-safe readiness plan (deferred native builds) is in
+[handoff/ai-windows-linux-readiness.md](handoff/ai-windows-linux-readiness.md).
 
 Hard constraint: **some model runtimes load weights by real filesystem path** and cannot read
 from inside an archive. Where that applies, the weights must be a loose file on disk at install

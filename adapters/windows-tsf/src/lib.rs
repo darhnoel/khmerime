@@ -7,6 +7,18 @@
 use khmerime_session::{CursorLocation, NativeKeyEvent, SessionCommand, SessionResult, SessionSnapshot};
 use render::candidate_surface::CandidateSurface;
 
+/// Link anchor for an out-of-tree provider build. A separate, private build may fuse
+/// its own `SpanProposalProvider` into this adapter's link graph so both share one
+/// `khmerime_core` provider registry (the mechanism iOS/macOS/Android already use).
+/// That build references this symbol so the linker keeps this adapter's object code.
+///
+/// This is a no-op that carries no model information — the same disclosure level as
+/// the Android adapter's public `nativeCreate`. The public build never calls it, and
+/// the default engine remains model-free. See
+/// `docs/handoff/ai-windows-linux-readiness.md`.
+#[no_mangle]
+pub extern "C" fn khmerime_tsf_link_anchor() {}
+
 #[cfg(windows)]
 pub mod com;
 pub mod diagnostics;

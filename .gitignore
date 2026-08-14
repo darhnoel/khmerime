@@ -96,3 +96,10 @@ adapters/macos-imk/swift/**/*.xcuserstate
 /adapters/android-ime/app/src/main/java/com/khmerime/input/AiModelProvider.kt
 /adapters/android-ime/app/src/main/assets/tonle/
 /adapters/android-ime/app/src/debug/AndroidManifest.xml
+
+# AI Windows/Linux overlay (reserved): fused AI artifacts + model assets the private
+# `ai.mk` will drop into the public tree. Never committed here. Final names are set when
+# the lab `ai-windows-*` / `ai-linux-*` targets are written; see
+# docs/handoff/ai-windows-linux-readiness.md.
+/adapters/windows-tsf/dist-ai/
+/adapters/linux-ibus/dist-ai/

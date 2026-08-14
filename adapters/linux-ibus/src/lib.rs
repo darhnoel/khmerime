@@ -11,6 +11,19 @@ pub mod history_store;
 
 pub use history_store::{desktop_history_path, load_desktop_history, save_desktop_history, DesktopHistoryStore};
 
+/// Link anchor for an out-of-tree provider build. A separate, private build may fuse
+/// its own `SpanProposalProvider` into a replacement `khmerime_ibus_bridge` binary so
+/// both share one `khmerime_core` provider registry (the mechanism iOS/macOS/Android
+/// already use). That fused binary calls this symbol so the linker keeps the provider's
+/// object code in the binary's link graph.
+///
+/// This is a no-op that carries no model information — the same disclosure level as
+/// the Android adapter's public `nativeCreate`. The public bridge never calls it, and
+/// the default engine remains model-free. See
+/// `docs/handoff/ai-windows-linux-readiness.md`.
+#[no_mangle]
+pub extern "C" fn khmerime_ibus_link_anchor() {}
+
 #[derive(Debug, Deserialize)]
 #[serde(tag = "cmd", rename_all = "snake_case")]
 pub enum BridgeCommand {
