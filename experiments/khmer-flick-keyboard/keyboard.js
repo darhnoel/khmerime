@@ -5,6 +5,7 @@
 // the center. Works with both touch and mouse (mouse = desktop testing).
 
 const output = document.getElementById('output');
+const copyOutputButton = document.getElementById('copy-output');
 const popup = document.getElementById('popup');
 const kb = document.getElementById('kb');
 const quickAccess = document.getElementById('quick-access');
@@ -19,6 +20,26 @@ const cells = {
 const FLICK_THRESHOLD = 22; // px before a drag counts as a direction, not a tap
 
 let active = null; // { key, startX, startY, dir }
+
+copyOutputButton.addEventListener('click', copyOutputText);
+
+async function copyOutputText() {
+  const text = committed + preedit;
+  if (!text) return;
+  try {
+    await navigator.clipboard.writeText(text);
+  } catch {
+    const selection = window.getSelection();
+    const range = document.createRange();
+    range.selectNodeContents(output);
+    selection.removeAllRanges();
+    selection.addRange(range);
+    document.execCommand('copy');
+    selection.removeAllRanges();
+  }
+  copyOutputButton.textContent = 'បានចម្លង';
+  setTimeout(() => { copyOutputButton.textContent = 'ចម្លង'; }, 1200);
+}
 
 // Matches the Android/iOS QuickAccessSpec ordering. Dotted circles are
 // display-only in the browser; insertion always uses the raw Khmer mark.
@@ -223,24 +244,34 @@ function highlight(dir) {
 
 function hidePopup() { popup.style.display = 'none'; }
 
-// --- Bigram heatmap -----------------------------------------------------------
-// After each character, hint at the likely next key from a Khmer bigram model
-// (BIGRAM[prev][next] = P(next|prev); UNIGRAM as the no-context fallback). Keys
-// carry a glowing ring whose brightness tracks probability; only the top few glow.
+// --- Predictive heatmap -------------------------------------------------------
+// At rest, filtered unigram heat points to characters that can start a word.
+// During composition, trigram/bigram heat points to the statistically likely
+// next character. Only the top few keys carry a probability-scaled ring.
 const HEAT_TOP = 6;          // how many keys/glyphs may glow
 const HEAT_FLOOR = 0.02;     // ignore anything below 2% — not worth a hint
 
-// Probability distribution over next characters, given the current composing state.
-// Back-off: trigram (last 2 glyphs) → bigram (last glyph). Returns null when there
-// is no real context, so the heatmap shows nothing rather than lighting up the
-// globally-common keys (unigram) on every fresh word — that would be noise.
-function nextDist() {
+// Raw unigram frequency is misleading at word start because coeng and dependent
+// vowels are globally common but cannot start a Khmer word. Keep only consonants
+// (U+1780–U+17A2) and independent vowels (U+17A3–U+17B3).
+const START_UNIGRAM = Object.fromEntries(
+  Object.entries(UNIGRAM).filter(([glyph]) => {
+    if (Array.from(glyph).length !== 1) return false;
+    const codepoint = glyph.codePointAt(0);
+    return codepoint >= 0x1780 && codepoint <= 0x17b3;
+  })
+);
+
+// Probability distribution for the current state. Back-off while composing is
+// trigram (last 2 glyphs) → bigram (last glyph); idle uses filtered unigram heat.
+function heatContext() {
   const g = Array.from(preedit);
   const prev1 = g[g.length - 1];
   const prev2 = g[g.length - 2];
-  if (prev2 && prev1 && TRIGRAM[prev2 + prev1]) return TRIGRAM[prev2 + prev1];
-  if (prev1 && BIGRAM[prev1]) return BIGRAM[prev1];
-  return null;
+  if (prev2 && prev1 && TRIGRAM[prev2 + prev1]) return { dist: TRIGRAM[prev2 + prev1], isStart: false };
+  if (prev1 && BIGRAM[prev1]) return { dist: BIGRAM[prev1], isStart: false };
+  if (!prev1) return { dist: START_UNIGRAM, isStart: true };
+  return { dist: {}, isStart: false };
 }
 
 // Map a probability to a ring intensity in [0,1], scaled so the current max = full.
@@ -283,8 +314,7 @@ function paintHeat(el, t, opacity) {
 
 // Paint the resting board: each key glows by its MOST LIKELY glyph (max, not sum).
 function updateHeat() {
-  const dist = nextDist();
-  if (!dist) { keyEls.forEach(el => paintHeat(el, -1)); return; }  // no context → no heat
+  const { dist, isStart } = heatContext();
   // score every key by its hottest glyph
   const scored = keyEls.map(el => {
     const def = el.__def;
@@ -303,7 +333,8 @@ function updateHeat() {
   for (const { el, p } of scored) {
     if (glowing.has(el)) {
       const t = heatScale(p, max);           // 0..1 → blue..red
-      paintHeat(el, t, 0.6 + 0.4 * t);       // opacity floor so even blue keys show
+      const opacity = isStart ? 0.28 + 0.32 * t : 0.6 + 0.4 * t;
+      paintHeat(el, t, opacity);              // idle guidance is softer than prediction
     } else {
       paintHeat(el, -1);
     }
@@ -312,14 +343,14 @@ function updateHeat() {
 
 // Paint the flick popup: each direction glows by its own glyph's probability.
 function updatePopupHeat(def) {
-  const dist = nextDist();
-  if (!dist) { ['c', 'u', 'l', 'r', 'd'].forEach(d => paintHeat(cells[d], -1)); return; }
+  const { dist, isStart } = heatContext();
   const vals = ['c', 'u', 'l', 'r', 'd'].map(d => (def[d] && dist[def[d]]) || 0);
   const max = Math.max(...vals, 0);
   ['c', 'u', 'l', 'r', 'd'].forEach((d, i) => {
     if (vals[i] >= HEAT_FLOOR && max) {
       const t = heatScale(vals[i], max);
-      paintHeat(cells[d], t, 0.6 + 0.4 * t);
+      const opacity = isStart ? 0.28 + 0.32 * t : 0.6 + 0.4 * t;
+      paintHeat(cells[d], t, opacity);
     } else {
       paintHeat(cells[d], -1);
     }

@@ -95,6 +95,10 @@
     line-height: 1.65;
     word-break: break-word;
     white-space: pre-wrap;
+    cursor: text;
+    touch-action: auto;
+    user-select: text;
+    -webkit-user-select: text;
   }
 
   #output::after {
@@ -204,7 +208,6 @@
   }
 
   .kb-row { display: flex; gap: var(--gap); }
-  .kb-row:nth-child(2) { padding-inline: clamp(7px, 2.2vw, 12px); }
 
   .key,
   .action {
@@ -388,12 +391,12 @@
         <strong>សារថ្មី</strong>
         <span>Khmer Flick</span>
       </div>
-      <button class="done" type="button">រួចរាល់</button>
+      <button class="done" id="copy-output" type="button">ចម្លង</button>
     </header>
 
     <section class="composer" aria-label="Message composer">
       <div class="recipient">ទៅ៖ <b>សាកល្បងក្តារចុច</b></div>
-      <div id="output" role="textbox" aria-multiline="true" aria-label="Typed text"><span id="committed"></span><span id="preedit"></span></div>
+      <div id="output" role="textbox" aria-multiline="true" aria-readonly="true" aria-label="Typed text" tabindex="0"><span id="committed"></span><span id="preedit"></span></div>
     </section>
 
     <section class="keyboard-shell" aria-label="Khmer flick keyboard">
@@ -412,9 +415,9 @@
     <div class="cell d"></div>
   </div>
 
-  <script src="keymap.js?v=12"></script>
-  <script src="ngram.js?v=12"></script>
-  <script src="words.js?v=12"></script>
-  <script src="keyboard.js?v=12"></script>
+  <script src="keymap.js?v=15"></script>
+  <script src="ngram.js?v=15"></script>
+  <script src="words.js?v=15"></script>
+  <script src="keyboard.js?v=15"></script>
 </body>
 </html>
