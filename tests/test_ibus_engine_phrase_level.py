@@ -167,6 +167,47 @@ def test_space_in_segment_edit_mode_still_cycles_words():
     assert _sent_commands(engine)[-1]["cmd"] == "process_key_event"
 
 
+def test_unverified_model_row_is_painted_with_a_red_marker():
+    # ADR-0016: the ✦ must survive the snapshot → adapter path, and red must be
+    # distinguishable from white, or unverified output passes as reviewed data.
+    from ibus_candidate_renderer import MODEL_MARK, UNVERIFIED_FG
+
+    snapshot = _phrase_snapshot()
+    snapshot["phrase_candidates"] = [
+        _phrase("ខ្ញុំទៅ", 2),
+        _phrase("សំបុក", 1, from_model=True),
+    ]
+    snapshot["phrase_candidates"][1]["lexicon_verified"] = False
+    engine = _recording_engine([_response(snapshot)])
+
+    engine.do_process_key_event(ord("v"), 0, 0)
+
+    rows = _painted_rows(engine)
+    assert rows == ["ខ្ញុំទៅ", f"{MODEL_MARK} សំបុក"]
+
+    # The plain Lexicon row carries no attributes; the unverified row colours
+    # only its leading marker glyph.
+    plain, marked = engine._table.candidates  # noqa: SLF001
+    assert not plain.attributes
+    assert marked.attributes == [("foreground", UNVERIFIED_FG, 0, len(MODEL_MARK))]
+
+
+def test_verified_model_row_is_marked_but_not_coloured():
+    from ibus_candidate_renderer import MODEL_MARK
+
+    snapshot = _phrase_snapshot()
+    snapshot["phrase_candidates"] = [
+        _phrase("ខ្ញុំទៅ", 2),
+        _phrase("សុខភាព", 1, from_model=True),
+    ]
+    engine = _recording_engine([_response(snapshot)])
+
+    engine.do_process_key_event(ord("v"), 0, 0)
+
+    assert _painted_rows(engine) == ["ខ្ញុំទៅ", f"{MODEL_MARK} សុខភាព"]
+    assert not engine._table.candidates[1].attributes  # noqa: SLF001
+
+
 def test_space_in_a_flat_composition_still_cycles_candidates():
     snapshot = _phrase_snapshot()
     snapshot["segmented_active"] = False

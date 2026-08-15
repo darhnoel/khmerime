@@ -58,7 +58,9 @@ def test_single_word_model_rescue_is_kept():
 
     rows, indices, _ = phrase_rows(snapshot)
 
-    assert rows == ["ខ្ញុំទៅ", "សុខ"]
+    # The rescue is kept, and carries the ✦ provenance marker (ADR-0016) so it
+    # cannot pass as a human-reviewed Lexicon reading.
+    assert rows == ["ខ្ញុំទៅ", "✦ សុខ"]
     assert indices == [0, 1]
 
 

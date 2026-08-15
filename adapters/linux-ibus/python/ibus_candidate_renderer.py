@@ -7,6 +7,15 @@ from typing import Any
 RECOMMENDED_MARK = "✓"
 DERIVED_MARK = "≈"
 
+# Model-provenance marker (ADR-0016 / ADR-0019). Load-bearing UI, not
+# decoration: without it, unverified model output would be indistinguishable
+# from human-reviewed Lexicon data. White ✦ = model-assisted but Lexicon
+# verified; red ✦ = the model produced Khmer that is not in the Lexicon. Red
+# rows stay visible and selectable on purpose — the Lexicon gate is a marker,
+# not a filter, and an out-of-Lexicon word may be a name or loanword.
+MODEL_MARK = "✦"
+UNVERIFIED_FG = 0xCC0000
+
 # The Candidate Surface levels. A Segmented Session shows one level at a time:
 # whole Phrase Candidates by default, the focused segment's words after Tab.
 # A flat Composition has no second level.
@@ -55,9 +64,12 @@ def phrase_rows(snapshot: Any) -> tuple[list[str], list[int], Any]:
             continue
         segments = entry.get("segments")
         segment_count = len(segments) if isinstance(segments, list) else 0
-        if segment_count < 2 and not bool(entry.get("from_model", False)):
+        from_model = bool(entry.get("from_model", False))
+        if segment_count < 2 and not from_model:
             continue
-        rows.append(text)
+        # A model-assisted reading is marked so it can never pass as
+        # human-reviewed Lexicon data (ADR-0016).
+        rows.append(f"{MODEL_MARK} {text}" if from_model else text)
         indices.append(index)
 
     selected_session_index = snapshot.get("selected_phrase_index", 0)
@@ -65,6 +77,55 @@ def phrase_rows(snapshot: Any) -> tuple[list[str], list[int], Any]:
     if isinstance(selected_session_index, int) and selected_session_index in indices:
         selected_row = indices.index(selected_session_index)
     return rows, indices, selected_row
+
+
+def phrase_provenance(snapshot: Any, indices: list[int]) -> list[tuple[bool, bool]]:
+    """`(from_model, lexicon_verified)` per visible row, in row order.
+
+    Read from the same `phrase_candidates` entries the rows came from, so the
+    flags cannot drift from the text. A missing entry defaults to a plain
+    Lexicon candidate.
+    """
+    if not isinstance(snapshot, dict):
+        return []
+    entries = snapshot.get("phrase_candidates")
+    if not isinstance(entries, list):
+        return []
+
+    flags: list[tuple[bool, bool]] = []
+    for index in indices:
+        entry = entries[index] if 0 <= index < len(entries) else None
+        if not isinstance(entry, dict):
+            flags.append((False, True))
+            continue
+        flags.append(
+            (
+                bool(entry.get("from_model", False)),
+                bool(entry.get("lexicon_verified", True)),
+            )
+        )
+    return flags
+
+
+def marker_spans(rows: list[str], flags: list[tuple[bool, bool]]) -> list[tuple[int, int, int, int]]:
+    """Foreground colour spans for unverified model markers.
+
+    Returns `(row, colour, start, end)` per row needing colour. Only the leading
+    ✦ glyph is coloured; the Khmer text keeps the default label colour. A
+    verified model marker needs no span — white is the default — so the list is
+    empty in the common case and no attributes are attached at all.
+    """
+    spans: list[tuple[int, int, int, int]] = []
+    for row, text in enumerate(rows):
+        if row >= len(flags):
+            break
+        from_model, lexicon_verified = flags[row]
+        if not from_model or lexicon_verified:
+            continue
+        if not text.startswith(MODEL_MARK):
+            continue
+        spans.append((row, UNVERIFIED_FG, 0, len(MODEL_MARK)))
+    return spans
 
 
 def candidate_rows(candidates: Any, candidate_display: Any, mode: str = FLAT) -> list[str]:

@@ -3,7 +3,7 @@ use std::sync::mpsc::{self, Receiver, RecvTimeoutError, TryRecvError};
 use std::thread;
 use std::time::{Duration, Instant};
 
-use khmerime_core::{DecoderConfig, DecoderMode, Result as KhmerResult, Transliterator};
+use khmerime_core::{DecoderConfig, DecoderMode, Result as KhmerResult, SpanProposalMode, Transliterator};
 use khmerime_linux_ibus::{
     fallback_empty_snapshot_json, BridgeCommand, BridgeReadiness, BridgeResponse, BridgeTimings, DesktopHistoryStore,
 };
@@ -231,7 +231,15 @@ fn build_full_engines() -> KhmerResult<FullEngines> {
     log_startup_stage_end("full_live_engine", started);
 
     let started = Instant::now();
-    eprintln!("[ibus-startup] full_visible_refiner.start");
+    // Log the armed state: whether a provider is actually registered is the one fact
+    // static inspection of the public build cannot confirm.
+    let span_env = span_proposals_env();
+    eprintln!(
+        "[ibus-startup] full_visible_refiner.start span_provider_active={} {}={:?}",
+        span_provider_active(span_env.as_deref()),
+        SPAN_PROPOSALS_ENV,
+        span_env
+    );
     let visible_refiner =
         Transliterator::from_shared_data_with_config(&shared, visible_refiner_config().with_mode(DecoderMode::Hybrid));
     log_startup_stage_end("full_visible_refiner", started);
@@ -248,8 +256,35 @@ fn build_full_engines() -> KhmerResult<FullEngines> {
     })
 }
 
+/// Arming switch for the span-proposal seam, matching the macOS IMK adapter's contract.
+/// `model` resolves to a provider registered by a separate, private build; `static-test`
+/// is the deterministic in-tree provider used by tests. Anything else — including unset —
+/// leaves the seam inert, so the public build is the pure lookup + fuzzy engine (ADR-0016).
+const SPAN_PROPOSALS_ENV: &str = "KHMERIME_SPAN_PROPOSALS";
+
+fn span_proposal_mode_for(value: Option<&str>) -> SpanProposalMode {
+    match value {
+        Some("model") => SpanProposalMode::Model,
+        Some("static-test") => SpanProposalMode::StaticTest,
+        _ => SpanProposalMode::Disabled,
+    }
+}
+
+/// Whether a provider is armed at all. When false the model never runs, so the debounced
+/// refinement path does no provider work.
+fn span_provider_active(value: Option<&str>) -> bool {
+    !matches!(span_proposal_mode_for(value), SpanProposalMode::Disabled)
+}
+
+fn span_proposals_env() -> Option<String> {
+    std::env::var(SPAN_PROPOSALS_ENV).ok()
+}
+
 fn visible_refiner_config() -> DecoderConfig {
-    let mut config = DecoderConfig::shadow_interactive();
+    // The model runs only on the debounced Visible Refiner, never on the keystroke hot
+    // path (ADR-0016). The live engine's config is deliberately left untouched.
+    let mut config = DecoderConfig::shadow_interactive()
+        .with_span_proposal_mode(span_proposal_mode_for(span_proposals_env().as_deref()));
     config.wfst_max_latency_ms = 75;
     config
 }
@@ -589,7 +624,35 @@ fn main() {
 
 #[cfg(test)]
 mod tests {
-    use super::{enter_refiner_grace, LONG_ENTER_REFINER_GRACE};
+    use super::{enter_refiner_grace, span_proposal_mode_for, span_provider_active, LONG_ENTER_REFINER_GRACE};
+    use khmerime_core::SpanProposalMode;
+
+    #[test]
+    fn span_proposals_are_disabled_by_default() {
+        // The seam is inert unless explicitly armed: the free build must behave
+        // exactly as the pure lookup + fuzzy engine (ADR-0016).
+        assert_eq!(span_proposal_mode_for(None), SpanProposalMode::Disabled);
+        assert_eq!(span_proposal_mode_for(Some("")), SpanProposalMode::Disabled);
+        assert_eq!(span_proposal_mode_for(Some("off")), SpanProposalMode::Disabled);
+        assert!(!span_provider_active(None));
+    }
+
+    #[test]
+    fn model_and_static_test_arm_the_provider() {
+        assert_eq!(span_proposal_mode_for(Some("model")), SpanProposalMode::Model);
+        assert_eq!(
+            span_proposal_mode_for(Some("static-test")),
+            SpanProposalMode::StaticTest
+        );
+        assert!(span_provider_active(Some("model")));
+        assert!(span_provider_active(Some("static-test")));
+    }
+
+    #[test]
+    fn an_unknown_value_stays_disabled_rather_than_guessing() {
+        assert_eq!(span_proposal_mode_for(Some("yes")), SpanProposalMode::Disabled);
+        assert!(!span_provider_active(Some("yes")));
+    }
 
     #[test]
     fn short_enter_commits_do_not_wait_for_full_refiner() {
