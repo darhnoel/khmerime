@@ -16,15 +16,24 @@ transitions, with the proposed vowel row fixed:
 ```text
 ើ   េ   ុ   ា   ះ
 ដ   ក   រ   ន   ច
-ឱ   ស   ្   ប   ុះ
+ឯ   ស   ្   ប   ោះ
 ```
 
 The full inputs, assumptions, transition tables, coeng traffic, and objective
 score are recorded in [`LAYOUT_ANALYSIS.md`](LAYOUT_ANALYSIS.md).
 
-The two left groups use a hand-neutral member arrangement: their most-used
-flicks are vertical, so the same map works unchanged for either hand. `ៀ` flicks
-down from `ើ`; `ោ / ែ` flick up/down from `េ`, while `ៃ / ៅ` use left/right.
+Recompute the documented score—or test a two-family swap—without editing the
+app:
+
+```sh
+node analyze-layout.mjs
+node analyze-layout.mjs --swap រ ្
+```
+
+Within each family, the most frequent member is the center tap. Flick members
+are then assigned by frequency and gravity toward the geometric center key `រ`.
+The same map works unchanged for either hand. The exact percentages and complete
+direction table are recorded in the analysis.
 
 ## N-gram heatmap (next-key prediction)
 
@@ -76,8 +85,9 @@ Works on a phone (touch) or desktop (mouse drag).
   that start with the current word (prefix match). Tap one to complete it. The
   accepted suggestion creates an invisible boundary so the following joined
   Khmer word gets its own suggestions without inserting a space.
-- **Quick Access signs**: the scrollable row mirrors the Android/iOS sign order.
-  Combining marks use a display-only dotted circle and insert the raw mark.
+- **Quick Access signs**: `់`, `៉`, and `។` moved to flicks on the coeng key
+  without duplication. The scrollable row starts `ឲ្យ ៏ ័ ៈ ៍ ៌ ៊ ៗ …`.
+  Combining marks insert the raw mark.
 
 ## Suggestions
 
@@ -106,8 +116,11 @@ input, no engine integration. This bar is a layout/UX sketch, not the real IME.
 2. **Composed sras kept as-is.** `ុះ / េះ / ោះ` remain one-gesture entries—no
    need to type them in two steps, and no >5-glyph keys.
 3. **Flick-commit gesture** (not tap-cycle) — the whole point of the design.
-4. **Transition placement, frequency within keys.** Corpus transitions determine
-   key position; frequency still determines the center tap within each family.
+4. **Transition placement, inward gravity within keys.** Corpus transitions
+   determine key position. Frequency determines the center tap and flick rank;
+   higher-ranked flicks point toward `រ` before lower-ranked flicks point out.
+5. **Fast marks join coeng.** `់`, `៉`, and `។` are direct flicks from `្` and
+   are removed from Quick Access, so there are no duplicate inputs.
 
 ## Editing the layout
 
@@ -116,7 +129,7 @@ moving whole keys, update `LAYOUT_ANALYSIS.md` with the new statistical rational
 instead of describing the result as frequency-optimized.
 
 ```js
-{ c: 'ក', u: 'គ', l: 'ខ', r: 'ឃ', d: 'ង' }   // center, up, left, right, down
+{ c: 'ក', u: 'ង', l: 'ឃ', r: 'ខ', d: 'គ' }   // center, up, left, right, down
 ```
 
 ## Not in the MVP (later)

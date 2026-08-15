@@ -6,33 +6,33 @@
 // Structure (backed by bigram transitions from 31.4M Khmer chars):
 //   - VOWEL / ENDING families occupy row 1: ើ េ ុ ា ះ.
 //   - High-traffic consonant families occupy row 2: ដ ក រ ន ច.
-//   - COENG ្ bridges ស and ប at the thumb's lower centre.
+//   - COENG ្ bridges ស and ប at the thumb's lower centre, with three former Quick Access marks.
 //   - Rare independent/composed groups occupy the two lower corners.
 //   - Within every group the MOST FREQUENT glyph is the center tap; rarer ones are flicks.
-//   - Combining diacritics (៉ ់ ៊ ័ ...) live in the Quick Access tray, not the grid.
+//   - Bantoc ់, muusikatoan ៉, and khan ។ are coeng flicks; rarer marks stay in Quick Access.
 
 const ROW1 = [
   { c: 'ើ', u: '', l: '', r: '', d: 'ៀ' },
-  { c: 'េ', u: 'ោ', l: 'ៃ', r: 'ៅ', d: 'ែ' },
-  { c: 'ុ', u: 'ូ', l: 'ួ', r: 'ឿ', d: '' },
-  { c: 'ា', u: 'ិ', l: 'ី', r: 'ឹ', d: 'ឺ' },
-  { c: 'ះ', u: 'ំ', l: '', r: '', d: '' }
+  { c: 'េ', u: 'ៅ', l: 'ៃ', r: 'ែ', d: 'ោ' },
+  { c: 'ុ', u: '', l: 'ឿ', r: 'ួ', d: 'ូ' },
+  { c: 'ា', u: 'ឹ', l: 'ី', r: 'ឺ', d: 'ិ' },
+  { c: 'ះ', u: '', l: 'ំ', r: '', d: '' }
 ];
 
 const ROW2 = [
-  { c: 'ដ', u: 'ណ', l: 'ឋ', r: 'ឌ', d: 'ឍ' },
-  { c: 'ក', u: 'ង', l: 'គ', r: 'ខ', d: 'ឃ' },
+  { c: 'ដ', u: 'ណ', l: 'ឍ', r: 'ឌ', d: 'ឋ' },
+  { c: 'ក', u: 'ង', l: 'ឃ', r: 'ខ', d: 'គ' },
   { c: 'រ', u: 'ល', l: 'យ', r: 'វ', d: '' },
-  { c: 'ន', u: 'ត', l: 'ទ', r: 'ធ', d: 'ថ' },
-  { c: 'ច', u: 'ជ', l: 'ញ', r: 'ឆ', d: 'ឈ' }
+  { c: 'ន', u: 'ត', l: 'ធ', r: 'ថ', d: 'ទ' },
+  { c: 'ច', u: 'ជ', l: 'ឆ', r: 'ឈ', d: 'ញ' }
 ];
 
 const ROW3 = [
-  { c: 'ឱ', u: 'ឯ', l: 'ឧ', r: 'ឬ', d: 'ឥ' },
-  { c: 'ស', u: 'អ', l: 'ហ', r: 'ឡ', d: '' },
-  { c: '្', u: '', l: '', r: '', d: '' },
-  { c: 'ប', u: 'ម', l: 'ព', r: 'ភ', d: 'ផ' },
-  { c: 'ុះ', u: 'េះ', l: 'ោះ', r: '', d: '' }
+  { c: 'ឯ', u: 'ឧ', l: 'ឱ', r: 'ឬ', d: 'ឥ' },
+  { c: 'ស', u: 'អ', l: 'ឡ', r: 'ហ', d: '' },
+  { c: '្', u: '់', l: '៉', r: '។', d: '' },
+  { c: 'ប', u: 'ម', l: 'ព', r: 'ផ', d: 'ភ' },
+  { c: 'ោះ', u: 'េះ', l: 'ុះ', r: '', d: '' }
 ];
 
 const KEYMAP = [ROW1, ROW2, ROW3];
@@ -41,5 +41,5 @@ const KEYMAP = [ROW1, ROW2, ROW3];
 const LEGEND = [
   ['ើ', 'េ', 'ុ', 'ា', 'ះ'],
   ['ដ', 'ក', 'រ', 'ន', 'ច'],
-  ['ឱ', 'ស', '្', 'ប', 'ុះ'],
+  ['ឯ', 'ស', '្', 'ប', 'ោះ'],
 ];

@@ -46,10 +46,7 @@ async function copyOutputText() {
 // Ordered by corpus frequency (most-used first), measured on the kmwiki corpus.
 const QUICK_ACCESS_ITEMS = [
   { display: 'ឲ្យ', commit: 'ឲ្យ', label: 'Aoy (to give / let)' },                 // common word
-  { display: '់', commit: '់', label: 'Bantak' },                                // 1.91%
-  { display: '។', commit: '។', label: 'Khmer full stop' },                        // 0.71%
   { display: '៏', commit: '៏', label: 'Ahsda' },                                  // 0.33%
-  { display: '៉', commit: '៉', label: 'Muusikatoan (sanhya thmenh kandol)' },     // 0.30%
   { display: '័', commit: '័', label: 'Samyok sannya' },                          // 0.27%
   { display: 'ៈ', commit: 'ៈ', label: 'Yukaleapintu' },                           // 0.23%
   { display: '៍', commit: '៍', label: 'Toandakhiat' },                            // 0.14%
