@@ -1,11 +1,11 @@
 # Khmer Directional Lean Keyboard — MVP
 
 A throwaway prototype of a compact **Directional Lean keyboard** for Khmer.
-It has 15 keys in a 3×5 grid; each key holds a center member and up to four
+It has 20 keys in a 4×5 grid; each key holds a center member and up to four
 direction members.
 
 The prototype uses mobile keyboard conventions: a three-slot candidate strip,
-the production mobile Quick Access sign tray, sculpted keycaps,
+sculpted keycaps,
 number/space/return/delete controls, safe-area padding, and a compact layout that
 adapts to short phone screens.
 
@@ -13,7 +13,8 @@ The header includes independent, persistent display switches. **Night**
 changes the full interface palette; **Heat** controls whether prediction rings
 are visible without changing the underlying n-gram calculations; **Centre only**
 hides direction hints so each key displays only its large centre character and
-compacts the key rows to use less screen space; **`យត`** switches to Layout B,
+compacts the key rows to use less screen space; **`↕`** switches between the
+default one-third-height keys and the earlier full-height keys; **`យត`** switches to Layout B,
 where `យ` replaces `រ` and `ត` replaces `ន` as their family centres.
 
 Khmer text uses **Kantumruy Pro** from Google Fonts so Android browsers render
@@ -30,6 +31,7 @@ transitions, with the proposed vowel row fixed:
 ើ   េ   ុ   ា   ះ
 ដ   ក   រ   ន   ច
 ឯ   ស   ្   ប   ោះ
+៕   ឲ្យ   ៏   ៈ   ឮ
 ```
 
 The full inputs, assumptions, transition tables, coeng traffic, and objective
@@ -41,6 +43,7 @@ app:
 ```sh
 node analyze-layout.mjs
 node analyze-layout.mjs --swap រ ្
+node analyze-auxiliary-layout.mjs
 ```
 
 Within each family, the most frequent member is the center tap. Direction members
@@ -64,15 +67,17 @@ back-off model measured on a 31.4M-character corpus.
   glyph (`max`, not sum — so a key with one likely direction member still lights).
 - **Visual:** a glowing border ring on the **top ~6** likely keys, ring brightness
   proportional to probability; start guidance is softer than contextual heat.
-  Across those keys, only the **top 8 individual characters** receive a tight
-  compact circular radial glow. Those eight are re-ranked onto the full heat scale: rank
+  Across those keys, only the **top 8 individual characters** receive a compact
+  circular radial glow. Those eight are re-ranked onto the full heat scale: rank
   1 is red, the middle ranks cross yellow/green/cyan, and rank 8 is blue. Opacity
   also fades by rank, keeping the exact character guidance informative without
   marking every member. Key fills remain unchanged, and heat ranking does not
   carry into the Lean Preview.
-- **Narrow screens:** at 380 CSS px and below, direction members become smaller
-  and quieter while key height increases slightly. At 340 px and below, idle
-  direction members are hidden and remain discoverable in the Lean Preview.
+- **Compact height budget:** the suggestion strip, four character rows, and
+  action row target roughly one third of the dynamic viewport. Character keys
+  scale between 38–44 CSS px, with proportional centre and direction labels.
+  At 340 px width and below, idle direction members are hidden and remain
+  discoverable in the Lean Preview.
 - **Lean Preview:** touching a key expands its complete family above the finger;
   the selected member follows the lean direction and receives the solid accent.
 - **Data:** `ngram.js` — pruned `TRIGRAM` / `BIGRAM` / `UNIGRAM` tables
@@ -95,14 +100,16 @@ Works on a phone (touch) or desktop (mouse movement while pressed).
 
 ## How it works
 
-- **Press a key** → a one-character Lean Preview immediately shows its center.
+- **Press a key** → the Lean Preview immediately shows its complete family and
+  highlights the centre.
 - **Lean while holding** toward up / left / right / down → the preview follows
   the finger and shows the provisional target.
 - The first 10px around contact is the **Neutral Zone**. Returning there restores
   the center. A missing direction also keeps the center selected.
 - Movement never cancels the gesture. The final release vector chooses and
   commits the character, regardless of whether release occurs inside the key.
-- Khmer-labelled space, return, and `⌫` backspace (deletes one code point).
+- Khmer-labelled space, return, and `⌫` backspace. During preedit, one Backspace
+  removes one Entry Unit, so a multi-code-point selection is undone together.
 - `123` is a visual mode-switch placeholder in this layout prototype.
 - **Copyable output**: typed text supports normal selection; the top-right
   `ចម្លង` button copies committed text and the active preedit together.
@@ -110,9 +117,9 @@ Works on a phone (touch) or desktop (mouse movement while pressed).
   that start with the current word (prefix match). Tap one to complete it. The
   accepted suggestion creates an invisible boundary so the following joined
   Khmer word gets its own suggestions without inserting a space.
-- **Quick Access signs**: `់`, `៉`, and `។` moved to direction members on the coeng key
-  without duplication. The scrollable row starts `ឲ្យ ៏ ័ ៈ ៍ ៌ ៊ ៗ …`.
-  Combining marks insert the raw mark.
+- **Auxiliary Family Row:** the former scrolling Quick Access items now occupy
+  five permanent Directional Lean families below the core grid. They remain
+  visible during composition and participate in the shared prediction heatmap.
 
 ## Suggestions
 
@@ -141,12 +148,15 @@ input, no engine integration. This bar is a layout/UX sketch, not the real IME.
 2. **Composed sras kept as-is.** `ុះ / េះ / ោះ` remain one-gesture entries—no
    need to type them in two steps, and no >5-glyph keys.
 3. **Directional Lean gesture** (not tap-cycle): subtle movement selects a
-   direction while a single-character preview confirms the pending result.
+   direction while the family preview confirms the pending result.
 4. **Transition placement, inward gravity within keys.** Corpus transitions
    determine key position. Frequency determines the center tap and direction rank;
    higher-ranked members point toward `រ` before lower-ranked members point out.
 5. **Fast marks join coeng.** `់`, `៉`, and `។` are direct direction members of `្` and
    are removed from Quick Access, so there are no duplicate inputs.
+6. **Quick Access becomes families.** Its remaining 25 entries form five fixed
+   families on a permanent, equal-height bottom row. Membership follows function;
+   corpus effort determines family order and Inward Gravity determines directions.
 
 ## Editing the layout
 

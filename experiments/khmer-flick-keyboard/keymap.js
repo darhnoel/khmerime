@@ -1,15 +1,16 @@
-// Khmer flick keyboard — transition-optimized one-thumb layout
+// Khmer Directional Lean keyboard — transition-optimized one-thumb layout
 // ============================================================
-// 15 keys in a 3x5 grid. Each key holds up to 5 glyphs reached by a flick:
+// 20 keys in a 4x5 grid. Each key holds up to 5 entries reached by a lean:
 //   c = center (quick tap), u = up, l = left, r = right, d = down.
 //
 // Structure (backed by bigram transitions from 31.4M Khmer chars):
 //   - VOWEL / ENDING families occupy row 1: ើ េ ុ ា ះ.
 //   - High-traffic consonant families occupy row 2: ដ ក រ ន ច.
 //   - COENG ្ bridges ស and ប at the thumb's lower centre, with three former Quick Access marks.
-//   - Rare independent/composed groups occupy the two lower corners.
-//   - Within every group the MOST FREQUENT glyph is the center tap; rarer ones are flicks.
-//   - Bantoc ់, muusikatoan ៉, and khan ។ are coeng flicks; rarer marks stay in Quick Access.
+//   - Rare independent/composed groups occupy the two lower core corners.
+//   - Within every group the MOST FREQUENT entry is the center tap; rarer ones are leans.
+//   - Bantoc ់, muusikatoan ៉, and khan ។ are coeng direction members.
+//   - The bottom Auxiliary Family Row replaces Quick Access with five fixed families.
 
 const ROW1 = [
   { c: 'ើ', u: '', l: '', r: '', d: 'ៀ' },
@@ -35,11 +36,20 @@ const ROW3 = [
   { c: 'ោះ', u: 'េះ', l: 'ុះ', r: '', d: '' }
 ];
 
-const KEYMAP = [ROW1, ROW2, ROW3];
+const AUXILIARY_ROW = [
+  { c: '៕', u: '៚', l: '៘', r: '៛', d: '៙' },
+  { c: 'ឲ្យ', u: 'ឦ', l: 'ឩ', r: 'ឳ', d: 'ឨ' },
+  { c: '៏', u: '័', l: '៍', r: '៌', d: '៊' },
+  { c: 'ៈ', u: 'ៗ', l: '៎', r: '៖', d: '៑' },
+  { c: 'ឮ', u: 'ឪ', l: 'ឫ', r: 'ឰ', d: 'ឭ' }
+];
 
-// Legend grid (top-right): the 15 centre glyphs, row-major.
+const KEYMAP = [ROW1, ROW2, ROW3, AUXILIARY_ROW];
+
+// Legend grid: the 20 centre entries, row-major.
 const LEGEND = [
   ['ើ', 'េ', 'ុ', 'ា', 'ះ'],
   ['ដ', 'ក', 'រ', 'ន', 'ច'],
   ['ឯ', 'ស', '្', 'ប', 'ោះ'],
+  ['៕', 'ឲ្យ', '៏', 'ៈ', 'ឮ'],
 ];

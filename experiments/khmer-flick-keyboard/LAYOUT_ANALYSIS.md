@@ -1,12 +1,13 @@
 # Transition layout analysis
 
-The selected layout combines corpus transition statistics with an inward-gravity
-rule for the member flicks. It remains unchanged when used by either hand.
+The selected layout combines corpus transition statistics with Inward Gravity
+for direction members. It remains unchanged when used by either hand.
 
 ```text
 ើ   េ   ុ   ា   ះ
 ដ   ក   រ   ន   ច
 ឯ   ស   ្   ប   ោះ
+៕   ឲ្យ   ៏   ៈ   ឮ
 ```
 
 The five row-1 families are fixed by the design discussion and live thumb
@@ -104,7 +105,7 @@ Family membership stays fixed. Within each family:
 
 1. The highest-frequency member is the center tap.
 2. The geometric target is the `រ` key at row 2, column 3.
-3. Higher-ranked flick members take directions that point toward that target.
+3. Higher-ranked direction members take directions that point toward that target.
    Inward vertical/horizontal directions are filled before outward directions.
 4. Incomplete families populate only center-facing directions where possible.
 5. The `ើ` family keeps the experience-tested exception `ៀ` on down.
@@ -152,7 +153,7 @@ The resulting directions are the implementation contract:
 | `ប` | `ម` | `ព` | `ផ` | `ភ` |
 | `ោះ` | `េះ` | `ុះ` | — | — |
 
-For example, the `ប` family points its two highest-frequency flicks toward the
+For example, the `ប` family points its two highest-frequency direction members toward the
 center: `ម` upward and `ព` left. The rarer `ផ` and `ភ` occupy the outward right
 and down directions. Likewise, `ិ` is more frequent than `ី`, but on the top-row
 `ា` key the down direction points more strongly toward the center, so `ិ` goes
@@ -162,12 +163,77 @@ down and `ី` goes left.
 
 `់` (bantoc, 1.908%), `។` (khan, 0.707%), and `៉` (muusikatoan, 0.296%) moved
 from Quick Access into the coeng family without duplication. This puts frequent
-marks on the main grid while keeping coeng at the lower center. Quick Access now
-begins:
+marks on the main grid while keeping coeng at the lower center. Before the
+remaining items moved into the Auxiliary Family Row, the tray began:
 
 ```text
 ឲ្យ  ៏  ័  ៈ  ៍  ៌  ៊  ៗ  …
 ```
+
+### Auxiliary Family Row
+
+The remaining 25 browser-experiment Quick Access items will replace the
+scrolling tray with five fixed Key Families in an **Auxiliary Family Row** below
+the 3×5 core. Membership follows linguistic/function relationship before
+frequency or geometry is considered:
+
+| Family | Fixed members |
+|---|---|
+| Independent vowels A | `ឮ`, `ឫ`, `ឪ`, `ឭ`, `ឰ` |
+| Independent vowels B | `ឲ្យ`, `ឦ`, `ឳ`, `ឩ`, `ឨ` |
+| Orthographic modifiers | `៏`, `័`, `៍`, `៌`, `៊` |
+| Reading/phrase signs | `ៈ`, `ៗ`, `៎`, `៖`, `៑` |
+| Rare terminal symbols | `៕`, `៛`, `៚`, `៙`, `៘` |
+
+Family membership is fixed before position optimization; it does not change to
+improve the effort score.
+
+`ឲ្យ` remains an atomic multi-character shortcut rather than being replaced by
+raw `ឲ`. It is the centre of Independent Vowels B: the character-level corpus
+uses `P(ឲ)` as an explicit frequency proxy, which is much larger than the
+frequencies of the other four members. This proxy is provisional until
+phrase-level shortcut usage is measured.
+
+Exhaustive search over all `5! = 120` horizontal family orders fixes the bottom
+row, left to right, as:
+
+```text
+Rare terminal symbols | Independent vowels B | Orthographic modifiers | Reading/phrase signs | Independent vowels A
+```
+
+Using full `char-frequency.txt` unigram mass, the pruned bigram table, auxiliary
+row `y = 3`, and the same assumed model constants gives `E = 1.92765975`. With
+the illustrative within-key scale `k = 0.25`, `E + kS = 2.05573273`. These are
+the best scores among the 120 fixed-membership orders, not experimentally
+validated ergonomic measurements.
+
+Accepted Auxiliary Family Row directions:
+
+| Position | Family | Center | Up | Left | Right | Down |
+|---:|---|---|---|---|---|---|
+| 0 | Rare terminal symbols | `៕` | `៚` | `៘` | `៛` | `៙` |
+| 1 | Independent vowels B | `ឲ្យ` | `ឦ` | `ឩ` | `ឳ` | `ឨ` |
+| 2 | Orthographic modifiers | `៏` | `័` | `៍` | `៌` | `៊` |
+| 3 | Reading/phrase signs | `ៈ` | `ៗ` | `៎` | `៖` | `៑` |
+| 4 | Independent vowels A | `ឮ` | `ឪ` | `ឫ` | `ឰ` | `ឭ` |
+
+The core and auxiliary families share one predictive heatmap. All 20 families
+compete for the same top-six family rings, and all members compete for the same
+global top-eight radial glows. `ឲ្យ` uses raw `ឲ` as its prediction proxy; no
+auxiliary family receives permanent emphasis merely because of its row.
+
+The Auxiliary Family Row remains visible before, during, and after composition.
+Several of its modifiers are needed after a base character, so hiding the row
+when preedit begins would make valid direct-entry sequences unreachable.
+
+Auxiliary keys use the same height and Directional Lean geometry as core keys.
+The row sits immediately below the three core rows and above the action row;
+shrinking it would save height at the cost of smaller Khmer labels and a less
+consistent motor target.
+
+One Backspace removes one Entry Unit while composing. Consequently, a single
+selection of `ឲ្យ`, `ោះ`, `េះ`, or `ុះ` is also undone by a single Backspace;
+committed-text deletion remains separate from this experimental preedit rule.
 
 ## Vowel-family transition profile
 

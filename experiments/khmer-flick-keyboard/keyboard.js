@@ -8,16 +8,16 @@ const output = document.getElementById('output');
 const copyOutputButton = document.getElementById('copy-output');
 const popup = document.getElementById('popup');
 const kb = document.getElementById('kb');
-const quickAccess = document.getElementById('quick-access');
 const previewMembers = Object.fromEntries(
   ['c', 'u', 'l', 'r', 'd'].map(dir => [dir, popup.querySelector(`.preview-member.${dir}`)])
 );
 const nightToggle = document.getElementById('night-toggle');
 const heatToggle = document.getElementById('heat-toggle');
 const centerToggle = document.getElementById('center-toggle');
+const heightToggle = document.getElementById('height-toggle');
 const layoutToggle = document.getElementById('layout-toggle');
 
-const LEAN_THRESHOLD = 10; // px around initial contact that keeps the center selected
+const LEAN_THRESHOLD = 7;  // px around initial contact that keeps the center selected
 const PREVIEW_GAP = 18;    // px between the finger and preview bubble
 
 let active = null; // { def, key, pointerId, startX, startY, dir }
@@ -26,6 +26,7 @@ copyOutputButton.addEventListener('click', copyOutputText);
 nightToggle.addEventListener('click', () => setDisplayOption('night', !document.body.classList.contains('night')));
 heatToggle.addEventListener('click', () => setDisplayOption('heat', document.body.classList.contains('heat-off')));
 centerToggle.addEventListener('click', () => setDisplayOption('center', !document.body.classList.contains('center-only')));
+heightToggle.addEventListener('click', () => setDisplayOption('height', !document.body.classList.contains('full-height')));
 layoutToggle.addEventListener('click', () => {
   const enabled = !document.body.classList.contains('layout-b');
   setDisplayOption('layout', enabled);
@@ -54,6 +55,9 @@ function setDisplayOption(name, enabled, persist = true) {
   } else if (name === 'center') {
     document.body.classList.toggle('center-only', enabled);
     centerToggle.setAttribute('aria-checked', String(enabled));
+  } else if (name === 'height') {
+    document.body.classList.toggle('full-height', enabled);
+    heightToggle.setAttribute('aria-checked', String(enabled));
   } else {
     document.body.classList.toggle('layout-b', enabled);
     layoutToggle.setAttribute('aria-checked', String(enabled));
@@ -66,6 +70,7 @@ function setDisplayOption(name, enabled, persist = true) {
 setDisplayOption('night', savedDisplayOption('night', false), false);
 setDisplayOption('heat', savedDisplayOption('heat', true), false);
 setDisplayOption('center', savedDisplayOption('center', false), false);
+setDisplayOption('height', savedDisplayOption('height', false), false);
 setDisplayOption('layout', savedDisplayOption('layout', false), false);
 
 async function copyOutputText() {
@@ -86,38 +91,6 @@ async function copyOutputText() {
   setTimeout(() => { copyOutputButton.textContent = 'ចម្លង'; }, 1200);
 }
 
-// Matches the Android/iOS QuickAccessSpec ordering. Dotted circles are
-// display-only in the browser; insertion always uses the raw Khmer mark.
-// Ordered by corpus frequency (most-used first), measured on the kmwiki corpus.
-const QUICK_ACCESS_ITEMS = [
-  { display: 'ឲ្យ', commit: 'ឲ្យ', label: 'Aoy (to give / let)' },                 // common word
-  { display: '៏', commit: '៏', label: 'Ahsda' },                                  // 0.33%
-  { display: '័', commit: '័', label: 'Samyok sannya' },                          // 0.27%
-  { display: 'ៈ', commit: 'ៈ', label: 'Yukaleapintu' },                           // 0.23%
-  { display: '៍', commit: '៍', label: 'Toandakhiat' },                            // 0.14%
-  { display: '៌', commit: '៌', label: 'Robat' },                                  // 0.14%
-  { display: '៊', commit: '៊', label: 'Triisap' },                               // 0.08%
-  { display: 'ៗ', commit: 'ៗ', label: 'Khmer repetition sign' },                  // 0.07%
-  { display: '៎', commit: '៎', label: 'Kakabat' },                               // 0.02%
-  { display: '៖', commit: '៖', label: 'Khmer sign camnuc pii kuuh' },             // 0.015%
-  { display: '៑', commit: '៑', label: 'Viriam' },                                // rare
-  { display: '៕', commit: '៕', label: 'Khmer final period' },                     // rare
-  { display: '៛', commit: '៛', label: 'Khmer currency symbol riel' },             // rare
-  { display: '៚', commit: '៚', label: 'Koomuut' },                                // rare
-  { display: '៙', commit: '៙', label: 'Phnaek muan' },                            // rare
-  { display: '៘', commit: '៘', label: 'Beyyal' },                                 // rare
-  // Rare independent vowels (freq-ordered) — reachable here rather than on the grid.
-  { display: 'ឮ', commit: 'ឮ', label: 'Independent vowel LYY' },
-  { display: 'ឫ', commit: 'ឫ', label: 'Independent vowel RY' },
-  { display: 'ឪ', commit: 'ឪ', label: 'Independent vowel QUUV' },
-  { display: 'ឭ', commit: 'ឭ', label: 'Independent vowel LY' },
-  { display: 'ឰ', commit: 'ឰ', label: 'Independent vowel QAI' },
-  { display: 'ឦ', commit: 'ឦ', label: 'Independent vowel QII' },
-  { display: 'ឳ', commit: 'ឳ', label: 'Independent vowel QAU' },
-  { display: 'ឩ', commit: 'ឩ', label: 'Independent vowel QUU' },
-  { display: 'ឨ', commit: 'ឨ', label: 'Independent vowel QUK' },
-];
-
 // --- Build the keyboard from KEYMAP ------------------------------------------
 const keyEls = []; // all character-key elements, for the bigram heatmap
 const keyRowEls = KEYMAP.map(() => {
@@ -127,8 +100,6 @@ const keyRowEls = KEYMAP.map(() => {
   return rowEl;
 });
 renderKeymap();
-
-QUICK_ACCESS_ITEMS.forEach(item => quickAccess.appendChild(makeQuickAccessKey(item)));
 
 // Familiar mobile action row. Non-character controls are deliberately inert in
 // this layout prototype, but retain pressed feedback so the keyboard feels real.
@@ -217,18 +188,6 @@ function makeBackspace() {
     }, 500);
   });
   for (const ev of ['pointerup', 'pointerleave', 'pointercancel']) el.addEventListener(ev, stop);
-  return el;
-}
-
-function makeQuickAccessKey(item) {
-  const el = document.createElement('button');
-  el.type = 'button';
-  el.className = 'quick-key';
-  el.textContent = item.display;
-  el.setAttribute('aria-label', item.label || item.commit);
-  // Click, rather than pointerdown, lets a horizontal swipe scroll the tray
-  // without accidentally inserting the sign under the initial touch point.
-  el.addEventListener('click', () => insert(item.commit));
   return el;
 }
 
@@ -389,6 +348,10 @@ function heatColor(t) {
   return 'rgb(225,50,45)';
 }
 
+function predictionGlyph(glyph) {
+  return glyph === 'ឲ្យ' ? 'ឲ' : glyph;
+}
+
 // Apply heat to a key/cell: `t` (0..1) picks the ramp color, `opacity` the glow.
 // t<0 clears the ring.
 function paintHeat(el, t, opacity) {
@@ -421,7 +384,8 @@ function updateHeat() {
     let best = 0;
     for (const d of ['c', 'u', 'l', 'r', 'd']) {
       const g = def[d];
-      if (g && dist[g] > best) best = dist[g];
+      const p = g ? (dist[predictionGlyph(g)] || 0) : 0;
+      if (p > best) best = p;
     }
     return { el, p: best };
   });
@@ -434,7 +398,10 @@ function updateHeat() {
   // the glowing families, then outline only the eight strongest candidates.
   const rankedMembers = keyEls
     .filter(el => glowing.has(el))
-    .flatMap(el => ['c', 'u', 'l', 'r', 'd'].map(d => ({ el: el.__members[d], p: dist[el.__def[d]] || 0 })))
+    .flatMap(el => ['c', 'u', 'l', 'r', 'd'].map(d => ({
+      el: el.__members[d],
+      p: dist[predictionGlyph(el.__def[d])] || 0,
+    })))
     .filter(item => item.el && item.p > 0)
     .sort((a, b) => b.p - a.p)
     .slice(0, MEMBER_TOP);
@@ -469,6 +436,7 @@ const committedEl = document.getElementById('committed');
 const preeditEl = document.getElementById('preedit');
 let committed = '';
 let preedit = '';
+let preeditUnits = [];
 
 function render() {
   committedEl.textContent = committed;
@@ -479,14 +447,20 @@ function render() {
 }
 function scrollOut() { output.scrollTop = output.scrollHeight; }
 
-// A lean selection / quick-access mark appends to the composing preedit.
-function insert(s) { preedit += s; render(); }
+// One Directional Lean appends one Entry Unit, even when it contains multiple
+// Unicode code points. Preedit Backspace can therefore undo the same selection.
+function insert(s) {
+  preedit += s;
+  preeditUnits.push(s);
+  render();
+}
 
 // Commit the current preedit (raw) into the document, then clear it.
 function commitPreedit() {
   if (!preedit) return;
   committed += preedit;
   preedit = '';
+  preeditUnits = [];
 }
 
 // Enter: commit the preedit (no newline in this single-field prototype).
@@ -497,9 +471,13 @@ function space() { commitPreedit(); committed += ' '; render(); }
 
 function backspace() {
   // Backspace edits the preedit first; once it is empty it trims committed text.
-  // One Unicode code point at a time (grapheme clusters are a later concern).
   if (preedit) {
-    const arr = Array.from(preedit); arr.pop(); preedit = arr.join('');
+    const unit = preeditUnits.pop();
+    if (unit && preedit.endsWith(unit)) preedit = preedit.slice(0, -unit.length);
+    else {
+      const arr = Array.from(preedit); arr.pop(); preedit = arr.join('');
+      preeditUnits = [];
+    }
   } else {
     const arr = Array.from(committed); arr.pop(); committed = arr.join('');
   }
@@ -558,6 +536,7 @@ function addSuggestion(word, isRaw = false) {
     // Tapping a suggestion commits that word and clears the preedit.
     committed += word;
     preedit = '';
+    preeditUnits = [];
     render();
   });
   sugBar.appendChild(el);
