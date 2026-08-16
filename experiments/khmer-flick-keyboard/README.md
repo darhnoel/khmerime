@@ -65,11 +65,16 @@ back-off model measured on a 31.4M-character corpus.
 - **Visual:** a glowing border ring on the **top ~6** likely keys, ring brightness
   proportional to probability; start guidance is softer than contextual heat.
   Across those keys, only the **top 8 individual characters** receive a tight
-  rectangular outline. Those eight are re-ranked onto the full heat scale: rank
+  compact translucent background glow. Those eight are re-ranked onto the full heat scale: rank
   1 is red, the middle ranks cross yellow/green/cyan, and rank 8 is blue. Opacity
   also fades by rank, keeping the exact character guidance informative without
-  marking every member. Key
-  fills remain unchanged, and the Lean Preview stays a plain selection signal.
+  marking every member. Key fills remain unchanged, and heat ranking does not
+  carry into the Lean Preview.
+- **Narrow screens:** at 380 CSS px and below, direction members become smaller
+  and quieter while key height increases slightly. At 340 px and below, idle
+  direction members are hidden and remain discoverable in the Lean Preview.
+- **Lean Preview:** touching a key expands its complete family above the finger;
+  the selected member follows the lean direction and receives the solid accent.
 - **Data:** `ngram.js` — pruned `TRIGRAM` / `BIGRAM` / `UNIGRAM` tables
   (`{context: {next: prob}}`), about 195 KB. Regenerate from the corpus as needed.
 

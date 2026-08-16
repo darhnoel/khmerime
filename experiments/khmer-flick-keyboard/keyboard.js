@@ -9,7 +9,9 @@ const copyOutputButton = document.getElementById('copy-output');
 const popup = document.getElementById('popup');
 const kb = document.getElementById('kb');
 const quickAccess = document.getElementById('quick-access');
-const previewGlyph = popup.querySelector('.preview-glyph');
+const previewMembers = Object.fromEntries(
+  ['c', 'u', 'l', 'r', 'd'].map(dir => [dir, popup.querySelector(`.preview-member.${dir}`)])
+);
 const nightToggle = document.getElementById('night-toggle');
 const heatToggle = document.getElementById('heat-toggle');
 const centerToggle = document.getElementById('center-toggle');
@@ -245,7 +247,7 @@ function onPress(e) {
     dir: 'c',
   };
   active.key.classList.add('is-pressed');
-  showPreview(def.c, e.clientX, e.clientY);
+  showPreview(def, 'c', e.clientX, e.clientY);
   window.addEventListener('pointermove', onMove);
   window.addEventListener('pointerup', onRelease, { once: true });
   window.addEventListener('pointercancel', onCancel, { once: true });
@@ -255,7 +257,7 @@ function onMove(e) {
   if (!active || e.pointerId !== active.pointerId) return;
   const dir = directionOf(e.clientX - active.startX, e.clientY - active.startY, active.def);
   active.dir = dir;
-  updatePreview(active.def[dir], e.clientX, e.clientY);
+  updatePreview(dir, e.clientX, e.clientY);
 }
 
 function onRelease(e) {
@@ -301,20 +303,26 @@ function directionOf(dx, dy, def) {
 }
 
 // --- Lean Preview -------------------------------------------------------------
-function showPreview(glyph, x, y) {
-  previewGlyph.textContent = glyph;
-  positionPreview(x, y);
+function showPreview(def, dir, x, y) {
+  for (const candidate of ['c', 'u', 'l', 'r', 'd']) {
+    const member = previewMembers[candidate];
+    member.textContent = def[candidate] || '';
+    member.hidden = !def[candidate];
+  }
+  updatePreview(dir, x, y);
   popup.style.display = 'flex';
 }
 
-function updatePreview(glyph, x, y) {
-  previewGlyph.textContent = glyph;
+function updatePreview(dir, x, y) {
+  for (const candidate of ['c', 'u', 'l', 'r', 'd']) {
+    previewMembers[candidate].classList.toggle('is-selected', candidate === dir);
+  }
   positionPreview(x, y);
 }
 
 function positionPreview(x, y) {
-  const width = 64;
-  const height = 64;
+  const width = 132;
+  const height = 108;
   const safe = 4;
   const idealLeft = x - width / 2;
   const idealTop = y - height - PREVIEW_GAP;

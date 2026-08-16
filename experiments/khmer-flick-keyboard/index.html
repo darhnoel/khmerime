@@ -313,17 +313,21 @@
 
   .key .member {
     position: relative;
+    z-index: 0;
+    isolation: isolate;
   }
 
   .key .member::after {
     content: "";
     position: absolute;
-    inset: -2px -4px;
-    border: 1.5px solid var(--member-heat-color, transparent);
-    border-radius: 4px;
-    opacity: var(--member-heat, 0);
+    z-index: -1;
+    inset: -3px -5px;
+    border-radius: 7px;
+    background: var(--member-heat-color, transparent);
+    box-shadow: 0 0 7px var(--member-heat-color, transparent);
+    opacity: calc(var(--member-heat, 0) * .28);
     pointer-events: none;
-    transition: border-color 120ms ease, opacity 120ms ease;
+    transition: background-color 120ms ease, box-shadow 120ms ease, opacity 120ms ease;
   }
 
   .key.is-pressed {
@@ -426,28 +430,75 @@
     position: fixed;
     z-index: 50;
     display: none;
-    width: 64px;
-    height: 64px;
+    width: 132px;
+    height: 108px;
     align-items: center;
     justify-content: center;
     pointer-events: none;
     filter: drop-shadow(0 4px 8px rgb(18 25 38 / 22%));
   }
 
-  #popup .preview-glyph {
-    width: 64px;
-    height: 64px;
+  #popup .preview-family {
+    position: relative;
+    width: 132px;
+    height: 108px;
+    border: 1px solid rgb(90 96 106 / 45%);
+    border-radius: 12px;
+    background: var(--surface);
+    color: var(--ink);
+    font-family: "Kantumruy Pro", "Noto Sans Khmer", system-ui, sans-serif;
+    font-weight: 500;
+    line-height: 1;
+  }
+
+  #popup .preview-member {
+    position: absolute;
+    min-width: 34px;
+    height: 34px;
     display: flex;
     align-items: center;
     justify-content: center;
-    border: 1px solid #0f61ca;
-    border-radius: 12px;
+    border-radius: 8px;
+    font-size: 21px;
+  }
+
+  #popup .preview-member[hidden] { display: none; }
+
+  #popup .preview-member.c { left: 49px; top: 37px; font-size: 28px; }
+  #popup .preview-member.u { left: 49px; top: 2px; }
+  #popup .preview-member.d { left: 49px; bottom: 2px; }
+  #popup .preview-member.l { left: 7px; top: 37px; }
+  #popup .preview-member.r { right: 7px; top: 37px; }
+  #popup .preview-member.is-selected {
     background: var(--accent);
     color: #fff;
-    font-family: "Kantumruy Pro", "Noto Sans Khmer", system-ui, sans-serif;
-    font-size: 32px;
-    font-weight: 500;
-    line-height: 1;
+    box-shadow: 0 0 0 1px #0f61ca;
+  }
+
+  @media (max-width: 430px) {
+    .app-bar {
+      padding-inline: 8px;
+      grid-template-columns: 28px minmax(0, 1fr) max-content;
+      gap: 4px;
+    }
+    .header-actions { min-width: max-content; gap: 3px; }
+    .header-actions > * { flex: 0 0 auto; }
+    .app-bar .display-toggle { width: 28px; height: 28px; min-height: 28px; font-size: 15px; line-height: 26px; }
+    .app-bar .done { min-width: 40px; font-size: 14px; }
+  }
+
+  @media (max-width: 380px) {
+    .app-title span { display: none; }
+    .key { height: 72px; font-size: 25px; }
+    .key .hint { font-size: 13px; font-weight: 400; opacity: .62; }
+    .hint.u { top: 4px; }
+    .hint.d { bottom: 4px; }
+    .hint.l { left: 3px; }
+    .hint.r { right: 3px; }
+  }
+
+  @media (max-width: 340px) {
+    .key .hint { opacity: 0; }
   }
 
   @media (min-width: 521px) {
@@ -507,12 +558,18 @@
   </main>
 
   <div id="popup" aria-hidden="true">
-    <div class="preview-glyph"></div>
+    <div class="preview-family">
+      <span class="preview-member c"></span>
+      <span class="preview-member u"></span>
+      <span class="preview-member l"></span>
+      <span class="preview-member r"></span>
+      <span class="preview-member d"></span>
+    </div>
   </div>
 
   <script src="keymap.js?v=16"></script>
   <script src="ngram.js?v=16"></script>
   <script src="words.js?v=16"></script>
-  <script src="keyboard.js?v=30"></script>
+  <script src="keyboard.js?v=32"></script>
 </body>
 </html>

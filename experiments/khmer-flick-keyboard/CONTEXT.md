@@ -13,7 +13,10 @@ A compact key gesture in which the thumb remains in contact and shifts subtly to
 _Avoid_: flick, button leaning
 
 **Lean Preview**:
-A transient popup above the current touch point that appears immediately and shows the single **Key Family** member currently targeted by a **Directional Lean**. It is selection feedback, not a list of all available directions.
+A transient popup above the current touch point that appears immediately and
+shows the complete **Key Family**, with the member currently targeted by a
+**Directional Lean** highlighted. It combines family discovery with selection
+feedback, especially when narrow-screen presentation hides or softens members.
 _Avoid_: flick popup, candidate popup, five-way popup
 
 **Neutral Zone**:
