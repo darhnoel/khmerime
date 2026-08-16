@@ -311,6 +311,21 @@
     transition: opacity 120ms ease;
   }
 
+  .key .member {
+    position: relative;
+  }
+
+  .key .member::after {
+    content: "";
+    position: absolute;
+    inset: -2px -4px;
+    border: 1.5px solid var(--member-heat-color, transparent);
+    border-radius: 4px;
+    opacity: var(--member-heat, 0);
+    pointer-events: none;
+    transition: border-color 120ms ease, opacity 120ms ease;
+  }
+
   .key.is-pressed {
     z-index: 2;
     background: var(--pressed);
@@ -319,6 +334,7 @@
   }
 
   body.heat-off .key::after { opacity: 0 !important; }
+  body.heat-off .key .member::after { opacity: 0 !important; }
   body.center-only { --gap: clamp(4px, 1.2vw, 6px); }
   body.center-only .kb { padding-top: 5px; }
   body.center-only .key { height: clamp(48px, 13vw, 56px); }
@@ -362,6 +378,7 @@
     pointer-events: none;
   }
 
+
   .hint.u,
   .hint.d {
     left: 25%;
@@ -373,7 +390,7 @@
   .hint.r {
     top: 50%;
     width: 27%;
-    overflow: hidden;
+    overflow: visible;
     transform: translateY(-50%);
   }
 
@@ -471,6 +488,7 @@
         <button class="display-toggle" id="night-toggle" type="button" role="switch" aria-checked="false" aria-label="Night mode" title="Night mode">☾</button>
         <button class="display-toggle" id="heat-toggle" type="button" role="switch" aria-checked="true" aria-label="Heatmap" title="Heatmap">◉</button>
         <button class="display-toggle" id="center-toggle" type="button" role="switch" aria-checked="false" aria-label="Centre characters only" title="Centre characters only">ក</button>
+        <button class="display-toggle" id="layout-toggle" type="button" role="switch" aria-checked="false" aria-label="Use យ and ត as family centres" title="Layout B: យ and ត centres">យត</button>
         <button class="done" id="copy-output" type="button">ចម្លង</button>
       </div>
     </header>
@@ -495,6 +513,6 @@
   <script src="keymap.js?v=16"></script>
   <script src="ngram.js?v=16"></script>
   <script src="words.js?v=16"></script>
-  <script src="keyboard.js?v=22"></script>
+  <script src="keyboard.js?v=30"></script>
 </body>
 </html>

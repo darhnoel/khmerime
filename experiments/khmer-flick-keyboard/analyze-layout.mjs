@@ -69,18 +69,58 @@ function resolveFamily(value) {
   return family.id;
 }
 
-function applySwap(positions, args) {
-  if (args.length === 0) return null;
-  if (args.length !== 3 || args[0] !== '--swap') {
-    throw new Error('Usage: node analyze-layout.mjs [--swap FAMILY_OR_GLYPH FAMILY_OR_GLYPH]');
+function parseArgs(args) {
+  const options = { swap: null, centers: 'frequency', leanScale: 0 };
+  for (let i = 0; i < args.length; i++) {
+    if (args[i] === '--swap' && args[i + 1] && args[i + 2]) {
+      options.swap = [args[++i], args[++i]];
+    } else if (args[i] === '--centers' && ['frequency', 'yt'].includes(args[i + 1])) {
+      options.centers = args[++i];
+    } else if (args[i] === '--lean-scale' && Number.isFinite(Number(args[i + 1])) && Number(args[i + 1]) >= 0) {
+      options.leanScale = Number(args[++i]);
+    } else {
+      throw new Error('Usage: node analyze-layout.mjs [--swap A B] [--centers frequency|yt] [--lean-scale NUMBER]');
+    }
   }
+  return options;
+}
 
-  const first = resolveFamily(args[1]);
-  const second = resolveFamily(args[2]);
+function applySwap(positions, pair) {
+  if (!pair) return null;
+  const first = resolveFamily(pair[0]);
+  const second = resolveFamily(pair[1]);
   const firstPosition = positions.get(first);
   positions.set(first, positions.get(second));
   positions.set(second, firstPosition);
   return [first, second];
+}
+
+function applyCenterVariant(keymap, variant) {
+  if (variant === 'frequency') return keymap;
+  return keymap.map(row => row.map(original => {
+    const key = { ...original };
+    if (key.c === 'រ') [key.c, key.l] = [key.l, key.c];
+    if (key.c === 'ន') [key.c, key.u] = [key.u, key.c];
+    return key;
+  }));
+}
+
+function analyzeSelection(unigram, keymap) {
+  const modeled = new Set(FAMILIES.flatMap(family => family.glyphs));
+  const directionCost = { c: 0, u: 1.05, d: 1.05, l: 1.12, r: 1.12 };
+  let mass = 0;
+  let cost = 0;
+  for (const row of keymap) {
+    for (const key of row) {
+      for (const [direction, glyph] of Object.entries(key)) {
+        if (!glyph || !modeled.has(glyph)) continue;
+        const probability = unigram[glyph] ?? 0;
+        mass += probability;
+        cost += probability * directionCost[direction];
+      }
+    }
+  }
+  return { mass, cost, score: cost / mass };
 }
 
 function analyze(unigram, bigram, positions) {
@@ -122,14 +162,19 @@ function analyze(unigram, bigram, positions) {
   return { transitionMass, transitionCost, transitionTravel, reachMass, reachCost, reach, effort };
 }
 
-const keymap = loadConst('./keymap.js', 'KEYMAP');
+const options = parseArgs(process.argv.slice(2));
+const keymap = applyCenterVariant(loadConst('./keymap.js', 'KEYMAP'), options.centers);
 const unigram = loadConst('./ngram.js', 'UNIGRAM');
 const bigram = loadConst('./ngram.js', 'BIGRAM');
 const positions = findPositions(keymap);
-const swapped = applySwap(positions, process.argv.slice(2));
+const swapped = applySwap(positions, options.swap);
 const result = analyze(unigram, bigram, positions);
+const selection = analyzeSelection(unigram, keymap);
+const effortWithLean = result.effort + options.leanScale * selection.score;
 
-console.log(swapped ? `Layout: swap ${swapped[0]} ↔ ${swapped[1]}` : 'Layout: current keymap');
+const layoutParts = [options.centers === 'yt' ? 'centers យ/ត' : 'frequency centers'];
+if (swapped) layoutParts.push(`swap ${swapped[0]} ↔ ${swapped[1]}`);
+console.log(`Layout: ${layoutParts.join(', ')}`);
 console.log(`Assumptions: horizontal=${MODEL.horizontalPitch}, vertical=${MODEL.verticalPitch}, thumbHome=(${MODEL.thumbHome.join(',')}), reachWeight=${MODEL.reachWeight}`);
 console.log(`Transition mass:   ${result.transitionMass.toFixed(8)}`);
 console.log(`Transition cost:   ${result.transitionCost.toFixed(8)}`);
@@ -138,3 +183,8 @@ console.log(`Reach mass:        ${result.reachMass.toFixed(8)}`);
 console.log(`Reach cost:        ${result.reachCost.toFixed(8)}`);
 console.log(`Reach:             ${result.reach.toFixed(8)}`);
 console.log(`Effort:            ${result.effort.toFixed(8)}`);
+console.log(`Selection mass:    ${selection.mass.toFixed(8)}`);
+console.log(`Selection cost:    ${selection.cost.toFixed(8)}`);
+console.log(`Selection score:   ${selection.score.toFixed(8)}`);
+console.log(`Lean scale:        ${options.leanScale.toFixed(8)}`);
+console.log(`Effort + lean:     ${effortWithLean.toFixed(8)}`);

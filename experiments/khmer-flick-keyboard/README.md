@@ -9,11 +9,12 @@ the production mobile Quick Access sign tray, sculpted keycaps,
 number/space/return/delete controls, safe-area padding, and a compact layout that
 adapts to short phone screens.
 
-The header includes three independent, persistent display switches. **Night**
+The header includes independent, persistent display switches. **Night**
 changes the full interface palette; **Heat** controls whether prediction rings
 are visible without changing the underlying n-gram calculations; **Centre only**
 hides direction hints so each key displays only its large centre character and
-compacts the key rows to use less screen space.
+compacts the key rows to use less screen space; **`យត`** switches to Layout B,
+where `យ` replaces `រ` and `ត` replaces `ន` as their family centres.
 
 Khmer text uses **Kantumruy Pro** from Google Fonts so Android browsers render
 the same stronger, screen-readable glyphs instead of choosing a device fallback.
@@ -63,7 +64,12 @@ back-off model measured on a 31.4M-character corpus.
   glyph (`max`, not sum — so a key with one likely direction member still lights).
 - **Visual:** a glowing border ring on the **top ~6** likely keys, ring brightness
   proportional to probability; start guidance is softer than contextual heat.
-  Key fills remain unchanged. The Lean Preview stays a plain selection signal.
+  Across those keys, only the **top 8 individual characters** receive a tight
+  rectangular outline. Those eight are re-ranked onto the full heat scale: rank
+  1 is red, the middle ranks cross yellow/green/cyan, and rank 8 is blue. Opacity
+  also fades by rank, keeping the exact character guidance informative without
+  marking every member. Key
+  fills remain unchanged, and the Lean Preview stays a plain selection signal.
 - **Data:** `ngram.js` — pruned `TRIGRAM` / `BIGRAM` / `UNIGRAM` tables
   (`{context: {next: prob}}`), about 195 KB. Regenerate from the corpus as needed.
 

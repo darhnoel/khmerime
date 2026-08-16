@@ -13,6 +13,7 @@ const previewGlyph = popup.querySelector('.preview-glyph');
 const nightToggle = document.getElementById('night-toggle');
 const heatToggle = document.getElementById('heat-toggle');
 const centerToggle = document.getElementById('center-toggle');
+const layoutToggle = document.getElementById('layout-toggle');
 
 const LEAN_THRESHOLD = 10; // px around initial contact that keeps the center selected
 const PREVIEW_GAP = 18;    // px between the finger and preview bubble
@@ -23,6 +24,13 @@ copyOutputButton.addEventListener('click', copyOutputText);
 nightToggle.addEventListener('click', () => setDisplayOption('night', !document.body.classList.contains('night')));
 heatToggle.addEventListener('click', () => setDisplayOption('heat', document.body.classList.contains('heat-off')));
 centerToggle.addEventListener('click', () => setDisplayOption('center', !document.body.classList.contains('center-only')));
+layoutToggle.addEventListener('click', () => {
+  const enabled = !document.body.classList.contains('layout-b');
+  setDisplayOption('layout', enabled);
+  cancelLean();
+  renderKeymap();
+  updateHeat();
+});
 
 function savedDisplayOption(name, fallback) {
   try {
@@ -41,9 +49,12 @@ function setDisplayOption(name, enabled, persist = true) {
   } else if (name === 'heat') {
     document.body.classList.toggle('heat-off', !enabled);
     heatToggle.setAttribute('aria-checked', String(enabled));
-  } else {
+  } else if (name === 'center') {
     document.body.classList.toggle('center-only', enabled);
     centerToggle.setAttribute('aria-checked', String(enabled));
+  } else {
+    document.body.classList.toggle('layout-b', enabled);
+    layoutToggle.setAttribute('aria-checked', String(enabled));
   }
   if (persist) {
     try { localStorage.setItem(`khmer-lean-${name}`, String(enabled)); } catch { /* storage is optional */ }
@@ -53,6 +64,7 @@ function setDisplayOption(name, enabled, persist = true) {
 setDisplayOption('night', savedDisplayOption('night', false), false);
 setDisplayOption('heat', savedDisplayOption('heat', true), false);
 setDisplayOption('center', savedDisplayOption('center', false), false);
+setDisplayOption('layout', savedDisplayOption('layout', false), false);
 
 async function copyOutputText() {
   const text = committed + preedit;
@@ -106,16 +118,13 @@ const QUICK_ACCESS_ITEMS = [
 
 // --- Build the keyboard from KEYMAP ------------------------------------------
 const keyEls = []; // all character-key elements, for the bigram heatmap
-KEYMAP.forEach(row => {
+const keyRowEls = KEYMAP.map(() => {
   const rowEl = document.createElement('div');
   rowEl.className = 'kb-row';
-  row.forEach(def => {
-    const el = makeKey(def);
-    keyEls.push(el);
-    rowEl.appendChild(el);
-  });
   kb.appendChild(rowEl);
+  return rowEl;
 });
+renderKeymap();
 
 QUICK_ACCESS_ITEMS.forEach(item => quickAccess.appendChild(makeQuickAccessKey(item)));
 
@@ -134,18 +143,48 @@ function makeKey(def) {
   el.type = 'button';
   el.className = 'key';
   el.setAttribute('aria-label', def.c);
-  el.innerHTML = `<span class="center">${def.c}</span>`;
+  const center = document.createElement('span');
+  center.className = 'center member';
+  center.textContent = def.c;
+  el.appendChild(center);
+  el.__members = { c: center };
   for (const dir of ['u', 'l', 'r', 'd']) {
     if (def[dir]) {
       const h = document.createElement('span');
       h.className = `hint ${dir}`;
-      h.textContent = def[dir];
+      const member = document.createElement('span');
+      member.className = 'member';
+      member.textContent = def[dir];
+      h.appendChild(member);
       el.appendChild(h);
+      el.__members[dir] = member;
     }
   }
   el.__def = def;
   el.addEventListener('pointerdown', onPress);
   return el;
+}
+
+function activeKeymap() {
+  if (!document.body.classList.contains('layout-b')) return KEYMAP;
+  return KEYMAP.map(row => row.map(original => {
+    const def = { ...original };
+    if (def.c === 'រ') [def.c, def.l] = [def.l, def.c];
+    if (def.c === 'ន') [def.c, def.u] = [def.u, def.c];
+    return def;
+  }));
+}
+
+function renderKeymap() {
+  keyEls.length = 0;
+  activeKeymap().forEach((row, rowIndex) => {
+    const children = row.map(def => {
+      const el = makeKey(def);
+      keyEls.push(el);
+      return el;
+    });
+    keyRowEls[rowIndex].replaceChildren(...children);
+  });
 }
 
 function makeAction(label, fn, className = '', ariaLabel = label) {
@@ -289,8 +328,9 @@ function hidePopup() { popup.style.display = 'none'; }
 // At rest, filtered unigram heat points to characters that can start a word.
 // During composition, trigram/bigram heat points to the statistically likely
 // next character. Only the top few keys carry a probability-scaled ring.
-const HEAT_TOP = 6;          // how many keys/glyphs may glow
+const HEAT_TOP = 6;          // how many key families may glow
 const HEAT_FLOOR = 0.02;     // ignore anything below 2% — not worth a hint
+const MEMBER_TOP = 8;        // exact-character hints across the glowing families
 
 // Raw unigram frequency is misleading at word start because coeng and dependent
 // vowels are globally common but cannot start a Khmer word. Keep only consonants
@@ -353,6 +393,17 @@ function paintHeat(el, t, opacity) {
   el.style.setProperty('--heat-color', heatColor(t));
 }
 
+function paintMemberHeat(el, rankHeat, opacity) {
+  if (!el) return;
+  if (opacity <= 0) {
+    el.style.setProperty('--member-heat', '0');
+    el.style.setProperty('--member-heat-color', 'transparent');
+    return;
+  }
+  el.style.setProperty('--member-heat', opacity.toFixed(2));
+  el.style.setProperty('--member-heat-color', heatColor(rankHeat));
+}
+
 // Paint the resting board: each key glows by its MOST LIKELY glyph (max, not sum).
 function updateHeat() {
   const { dist, isStart } = heatContext();
@@ -371,13 +422,30 @@ function updateHeat() {
   const glowing = new Set(
     scored.filter(s => s.p >= HEAT_FLOOR).sort((a, b) => b.p - a.p).slice(0, HEAT_TOP).map(s => s.el)
   );
+  // Member guidance is deliberately sparse: rank individual characters across
+  // the glowing families, then outline only the eight strongest candidates.
+  const rankedMembers = keyEls
+    .filter(el => glowing.has(el))
+    .flatMap(el => ['c', 'u', 'l', 'r', 'd'].map(d => ({ el: el.__members[d], p: dist[el.__def[d]] || 0 })))
+    .filter(item => item.el && item.p > 0)
+    .sort((a, b) => b.p - a.p)
+    .slice(0, MEMBER_TOP);
+  const memberRank = new Map(rankedMembers.map((item, rank) => [item.el, rank]));
   for (const { el, p } of scored) {
     if (glowing.has(el)) {
       const t = heatScale(p, max);           // 0..1 → blue..red
       const opacity = isStart ? 0.28 + 0.32 * t : 0.6 + 0.4 * t;
       paintHeat(el, t, opacity);              // idle guidance is softer than prediction
+      for (const d of ['c', 'u', 'l', 'r', 'd']) {
+        const member = el.__members[d];
+        const rank = memberRank.get(member);
+        const rankStrength = rank === undefined ? 0 : 1 - (rank / MEMBER_TOP) * 0.6;
+        const rankHeat = rank === undefined ? 0 : 1 - rank / Math.max(1, rankedMembers.length - 1);
+        paintMemberHeat(member, rankHeat, rankStrength);
+      }
     } else {
       paintHeat(el, -1);
+      for (const d of ['c', 'u', 'l', 'r', 'd']) paintMemberHeat(el.__members[d], 0, 0);
     }
   }
 }

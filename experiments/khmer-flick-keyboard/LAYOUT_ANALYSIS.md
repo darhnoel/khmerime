@@ -33,6 +33,7 @@ Run the checked-in calculation with:
 ```sh
 node analyze-layout.mjs
 node analyze-layout.mjs --swap រ ្
+node analyze-layout.mjs --centers yt --lean-scale 0.25
 ```
 
 The current center layout has this objective under the explicitly assumed
@@ -67,6 +68,35 @@ reach.
 The n-gram data has no explicit word-boundary token, so word-initial and
 word-final placement is represented indirectly through observed adjacent
 characters.
+
+## Centre-character A/B comparison
+
+The app provides a manual Layout B switch that directly swaps `រ ↔ យ` and
+`ន ↔ ត` within their existing families. Key positions and family membership do
+not change. The key-to-key objective therefore gives both layouts the same
+`E = 1.91072919`.
+
+To compare centre selection provisionally, the analysis script also reports:
+
+```text
+S = Σ P(g) q(direction(g)) / Σ P(g)
+q(center) = 0
+q(up/down) = 1.05
+q(left/right) = 1.12
+Eₖ = E + kS
+```
+
+`k` is an assumed scale for within-key leaning, not an experimentally validated
+ergonomic constant. With the illustrative `k = 0.25`:
+
+| Variant | Centres | Directional rate | `S` | `Eₖ` |
+|---|---|---:|---:|---:|
+| A | `រ`, `ន` | 47.16% | 0.50655 | 2.03737 |
+| B | `យ`, `ត` | 52.83% | 0.56815 | 2.05277 |
+
+Under every positive `k`, Layout A has lower modeled mechanical effort. Layout
+B remains useful for testing whether recognition or memorability offsets its
+higher directional-selection rate.
 
 ## Member ranking and inward gravity
 
