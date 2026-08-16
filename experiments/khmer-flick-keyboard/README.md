@@ -1,12 +1,24 @@
-# Khmer Flick Keyboard — MVP
+# Khmer Directional Lean Keyboard — MVP
 
-A throwaway prototype of a Japanese-kana-style **flick keyboard** for Khmer.
-15 keys in a 3×5 grid; each key holds up to 5 glyphs reached by flicking.
+A throwaway prototype of a compact **Directional Lean keyboard** for Khmer.
+It has 15 keys in a 3×5 grid; each key holds a center member and up to four
+direction members.
 
 The prototype uses mobile keyboard conventions: a three-slot candidate strip,
 the production mobile Quick Access sign tray, sculpted keycaps,
 number/space/return/delete controls, safe-area padding, and a compact layout that
 adapts to short phone screens.
+
+The header includes three independent, persistent display switches. **Night**
+changes the full interface palette; **Heat** controls whether prediction rings
+are visible without changing the underlying n-gram calculations; **Centre only**
+hides direction hints so each key displays only its large centre character and
+compacts the key rows to use less screen space.
+
+Khmer text uses **Kantumruy Pro** from Google Fonts so Android browsers render
+the same stronger, screen-readable glyphs instead of choosing a device fallback.
+If the webfont cannot load, the app falls back to Noto Sans Khmer and then the
+device sans-serif font.
 
 ## Transition-optimized layout
 
@@ -30,7 +42,7 @@ node analyze-layout.mjs
 node analyze-layout.mjs --swap រ ្
 ```
 
-Within each family, the most frequent member is the center tap. Flick members
+Within each family, the most frequent member is the center tap. Direction members
 are then assigned by frequency and gravity toward the geometric center key `រ`.
 The same map works unchanged for either hand. The exact percentages and complete
 direction table are recorded in the analysis.
@@ -47,13 +59,11 @@ back-off model measured on a 31.4M-character corpus.
   highlights the `ន`, `រ`, `ក`, `ប`, and `ស` families.
 - **Context:** once composition starts, P(next | last two glyphs) backs off from
   trigram to bigram (last glyph).
-- **Granularity (hybrid):** on the resting board each key is scored by its *most
-  likely* glyph (`max`, not sum — so a key with one hot flick still lights); when a
-  key is touched, the flick popup scores each direction by that glyph's own
-  probability, guiding the drag.
+- **Granularity:** on the resting board each key is scored by its *most likely*
+  glyph (`max`, not sum — so a key with one likely direction member still lights).
 - **Visual:** a glowing border ring on the **top ~6** likely keys, ring brightness
   proportional to probability; start guidance is softer than contextual heat.
-  The popup uses the same per-direction ring. Key fills remain unchanged.
+  Key fills remain unchanged. The Lean Preview stays a plain selection signal.
 - **Data:** `ngram.js` — pruned `TRIGRAM` / `BIGRAM` / `UNIGRAM` tables
   (`{context: {next: prob}}`), about 195 KB. Regenerate from the corpus as needed.
 
@@ -70,13 +80,17 @@ cd experiments/khmer-flick-keyboard
 python3 -m http.server 8000    # then visit http://localhost:8000
 ```
 
-Works on a phone (touch) or desktop (mouse drag).
+Works on a phone (touch) or desktop (mouse movement while pressed).
 
 ## How it works
 
-- **Tap a key** → commits its **center** glyph.
-- **Press and drag** toward up / left / right / down → a 5-way popup shows the
-  choices; release on a direction to commit that glyph. Drag under ~22px = tap.
+- **Press a key** → a one-character Lean Preview immediately shows its center.
+- **Lean while holding** toward up / left / right / down → the preview follows
+  the finger and shows the provisional target.
+- The first 10px around contact is the **Neutral Zone**. Returning there restores
+  the center. A missing direction also keeps the center selected.
+- Movement never cancels the gesture. The final release vector chooses and
+  commits the character, regardless of whether release occurs inside the key.
 - Khmer-labelled space, return, and `⌫` backspace (deletes one code point).
 - `123` is a visual mode-switch placeholder in this layout prototype.
 - **Copyable output**: typed text supports normal selection; the top-right
@@ -85,7 +99,7 @@ Works on a phone (touch) or desktop (mouse drag).
   that start with the current word (prefix match). Tap one to complete it. The
   accepted suggestion creates an invisible boundary so the following joined
   Khmer word gets its own suggestions without inserting a space.
-- **Quick Access signs**: `់`, `៉`, and `។` moved to flicks on the coeng key
+- **Quick Access signs**: `់`, `៉`, and `។` moved to direction members on the coeng key
   without duplication. The scrollable row starts `ឲ្យ ៏ ័ ៈ ៍ ៌ ៊ ៗ …`.
   Combining marks insert the raw mark.
 
@@ -115,11 +129,12 @@ input, no engine integration. This bar is a layout/UX sketch, not the real IME.
    No key overflows — the wide vowel rows in the draft are just 5 keys side by side.
 2. **Composed sras kept as-is.** `ុះ / េះ / ោះ` remain one-gesture entries—no
    need to type them in two steps, and no >5-glyph keys.
-3. **Flick-commit gesture** (not tap-cycle) — the whole point of the design.
+3. **Directional Lean gesture** (not tap-cycle): subtle movement selects a
+   direction while a single-character preview confirms the pending result.
 4. **Transition placement, inward gravity within keys.** Corpus transitions
-   determine key position. Frequency determines the center tap and flick rank;
-   higher-ranked flicks point toward `រ` before lower-ranked flicks point out.
-5. **Fast marks join coeng.** `់`, `៉`, and `។` are direct flicks from `្` and
+   determine key position. Frequency determines the center tap and direction rank;
+   higher-ranked members point toward `រ` before lower-ranked members point out.
+5. **Fast marks join coeng.** `់`, `៉`, and `។` are direct direction members of `្` and
    are removed from Quick Access, so there are no duplicate inputs.
 
 ## Editing the layout
@@ -135,6 +150,6 @@ instead of describing the result as frequency-optimized.
 ## Not in the MVP (later)
 
 - Grapheme-cluster backspace (base+sign deletes as one).
-- Long-flick / second layer (not needed — nothing exceeds 5 glyphs).
+- Long-lean / second layer (not needed — nothing exceeds 5 glyphs).
 - Real key-repeat, haptics, sound, theming, coeng (្) subscript stacking logic.
 - Any integration with the actual khmerime engine — this is a layout sketch only.

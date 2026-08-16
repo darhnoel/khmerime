@@ -1,27 +1,58 @@
-// Khmer flick keyboard — interaction (MVP)
-// ========================================
-// Flick-commit gesture: press a key -> a 5-way popup appears -> drag toward a
-// direction -> release commits that glyph. A quick tap (no real drag) commits
-// the center. Works with both touch and mouse (mouse = desktop testing).
+// Khmer compact keyboard — Directional Lean interaction (MVP)
+// ===========================================================
+// Pressing previews the center member. A subtle shift toward a displayed family
+// member updates the preview; releasing commits it. Returning to neutral restores
+// the center. Works with touch and mouse (mouse = desktop testing).
 
 const output = document.getElementById('output');
 const copyOutputButton = document.getElementById('copy-output');
 const popup = document.getElementById('popup');
 const kb = document.getElementById('kb');
 const quickAccess = document.getElementById('quick-access');
-const cells = {
-  c: popup.querySelector('.cell.c'),
-  u: popup.querySelector('.cell.u'),
-  l: popup.querySelector('.cell.l'),
-  r: popup.querySelector('.cell.r'),
-  d: popup.querySelector('.cell.d'),
-};
+const previewGlyph = popup.querySelector('.preview-glyph');
+const nightToggle = document.getElementById('night-toggle');
+const heatToggle = document.getElementById('heat-toggle');
+const centerToggle = document.getElementById('center-toggle');
 
-const FLICK_THRESHOLD = 22; // px before a drag counts as a direction, not a tap
+const LEAN_THRESHOLD = 10; // px around initial contact that keeps the center selected
+const PREVIEW_GAP = 18;    // px between the finger and preview bubble
 
-let active = null; // { key, startX, startY, dir }
+let active = null; // { def, key, pointerId, startX, startY, dir }
 
 copyOutputButton.addEventListener('click', copyOutputText);
+nightToggle.addEventListener('click', () => setDisplayOption('night', !document.body.classList.contains('night')));
+heatToggle.addEventListener('click', () => setDisplayOption('heat', document.body.classList.contains('heat-off')));
+centerToggle.addEventListener('click', () => setDisplayOption('center', !document.body.classList.contains('center-only')));
+
+function savedDisplayOption(name, fallback) {
+  try {
+    const value = localStorage.getItem(`khmer-lean-${name}`);
+    return value === null ? fallback : value === 'true';
+  } catch {
+    return fallback;
+  }
+}
+
+function setDisplayOption(name, enabled, persist = true) {
+  if (name === 'night') {
+    document.body.classList.toggle('night', enabled);
+    nightToggle.setAttribute('aria-checked', String(enabled));
+    document.querySelector('meta[name="theme-color"]').content = enabled ? '#181b20' : '#f6f7f9';
+  } else if (name === 'heat') {
+    document.body.classList.toggle('heat-off', !enabled);
+    heatToggle.setAttribute('aria-checked', String(enabled));
+  } else {
+    document.body.classList.toggle('center-only', enabled);
+    centerToggle.setAttribute('aria-checked', String(enabled));
+  }
+  if (persist) {
+    try { localStorage.setItem(`khmer-lean-${name}`, String(enabled)); } catch { /* storage is optional */ }
+  }
+}
+
+setDisplayOption('night', savedDisplayOption('night', false), false);
+setDisplayOption('heat', savedDisplayOption('heat', true), false);
+setDisplayOption('center', savedDisplayOption('center', false), false);
 
 async function copyOutputText() {
   const text = committed + preedit;
@@ -163,28 +194,40 @@ function makeQuickAccessKey(item) {
 // --- Gesture handling ---------------------------------------------------------
 function onPress(e) {
   e.preventDefault();
+  if (active) return;
   e.currentTarget.setPointerCapture?.(e.pointerId);
   const def = e.currentTarget.__def;
-  active = { def, key: e.currentTarget, startX: e.clientX, startY: e.clientY, dir: 'c' };
+  active = {
+    def,
+    key: e.currentTarget,
+    pointerId: e.pointerId,
+    startX: e.clientX,
+    startY: e.clientY,
+    dir: 'c',
+  };
   active.key.classList.add('is-pressed');
-  showPopup(def, e.currentTarget);
+  showPreview(def.c, e.clientX, e.clientY);
   window.addEventListener('pointermove', onMove);
   window.addEventListener('pointerup', onRelease, { once: true });
   window.addEventListener('pointercancel', onCancel, { once: true });
 }
 
 function onMove(e) {
-  if (!active) return;
+  if (!active || e.pointerId !== active.pointerId) return;
   const dir = directionOf(e.clientX - active.startX, e.clientY - active.startY, active.def);
   active.dir = dir;
-  highlight(dir);
+  updatePreview(active.def[dir], e.clientX, e.clientY);
 }
 
-function onRelease() {
+function onRelease(e) {
+  if (active && e.pointerId !== active.pointerId) return;
   window.removeEventListener('pointermove', onMove);
   window.removeEventListener('pointercancel', onCancel);
   if (active) {
-    const glyph = active.def[active.dir];
+    // Movement only previews. Make the actual choice once, using the final
+    // release vector, so a fast flick cannot leave a stale direction selected.
+    const dir = directionOf(e.clientX - active.startX, e.clientY - active.startY, active.def);
+    const glyph = active.def[dir];
     if (glyph) insert(glyph);
     active.key.classList.remove('is-pressed');
   }
@@ -192,19 +235,25 @@ function onRelease() {
   active = null;
 }
 
-function onCancel() {
+function onCancel(e) {
+  if (active && e.pointerId !== active.pointerId) return;
   window.removeEventListener('pointermove', onMove);
   window.removeEventListener('pointerup', onRelease);
+  cancelLean();
+}
+
+function cancelLean() {
+  window.removeEventListener('pointermove', onMove);
   active?.key.classList.remove('is-pressed');
   hidePopup();
   active = null;
 }
 
-// Which direction a drag vector points to — only counts if past the threshold
-// AND that direction actually has a glyph; otherwise falls back to center.
+// A displacement only selects a direction after leaving the neutral zone.
+// Diagonals use their dominant axis. Missing family members fall back to center.
 function directionOf(dx, dy, def) {
   const dist = Math.hypot(dx, dy);
-  if (dist < FLICK_THRESHOLD) return 'c';
+  if (dist < LEAN_THRESHOLD) return 'c';
   const horizontal = Math.abs(dx) > Math.abs(dy);
   let dir;
   if (horizontal) dir = dx > 0 ? 'r' : 'l';
@@ -212,31 +261,26 @@ function directionOf(dx, dy, def) {
   return def[dir] ? dir : 'c';
 }
 
-// --- Popup --------------------------------------------------------------------
-function showPopup(def, key) {
-  for (const dir of ['c', 'u', 'l', 'r', 'd']) {
-    const cell = cells[dir];
-    cell.textContent = def[dir] || '';
-    cell.classList.toggle('empty', !def[dir]);
-    cell.classList.remove('active');
-  }
-  cells.c.classList.add('active');
-  updatePopupHeat(def);
-  // Center the cross on the key and clamp it inside the viewport. Keeping the
-  // choices visible is especially important for the edge keys on narrow phones.
-  const rect = key.getBoundingClientRect();
-  const width = 174;
-  const height = 174;
-  const safe = 4;
-  const idealLeft = rect.left + rect.width / 2 - width / 2;
-  const idealTop = rect.top + rect.height / 2 - height / 2;
-  popup.style.left = Math.max(safe, Math.min(innerWidth - width - safe, idealLeft)) + 'px';
-  popup.style.top = Math.max(safe, Math.min(innerHeight - height - safe, idealTop)) + 'px';
-  popup.style.display = 'block';
+// --- Lean Preview -------------------------------------------------------------
+function showPreview(glyph, x, y) {
+  previewGlyph.textContent = glyph;
+  positionPreview(x, y);
+  popup.style.display = 'flex';
 }
 
-function highlight(dir) {
-  for (const d of ['c', 'u', 'l', 'r', 'd']) cells[d].classList.toggle('active', d === dir);
+function updatePreview(glyph, x, y) {
+  previewGlyph.textContent = glyph;
+  positionPreview(x, y);
+}
+
+function positionPreview(x, y) {
+  const width = 64;
+  const height = 64;
+  const safe = 4;
+  const idealLeft = x - width / 2;
+  const idealTop = y - height - PREVIEW_GAP;
+  popup.style.left = Math.max(safe, Math.min(innerWidth - width - safe, idealLeft)) + 'px';
+  popup.style.top = Math.max(safe, Math.min(innerHeight - height - safe, idealTop)) + 'px';
 }
 
 function hidePopup() { popup.style.display = 'none'; }
@@ -338,24 +382,8 @@ function updateHeat() {
   }
 }
 
-// Paint the flick popup: each direction glows by its own glyph's probability.
-function updatePopupHeat(def) {
-  const { dist, isStart } = heatContext();
-  const vals = ['c', 'u', 'l', 'r', 'd'].map(d => (def[d] && dist[def[d]]) || 0);
-  const max = Math.max(...vals, 0);
-  ['c', 'u', 'l', 'r', 'd'].forEach((d, i) => {
-    if (vals[i] >= HEAT_FLOOR && max) {
-      const t = heatScale(vals[i], max);
-      const opacity = isStart ? 0.28 + 0.32 * t : 0.6 + 0.4 * t;
-      paintHeat(cells[d], t, opacity);
-    } else {
-      paintHeat(cells[d], -1);
-    }
-  });
-}
-
 // --- Composition: preedit + commit (IME model) --------------------------------
-// Flicks/marks build an underlined PREEDIT (the word being composed) that is not
+// Lean selections and marks build an underlined PREEDIT (the word being composed) that is not
 // yet in the document. Suggestions rank against the preedit. Enter or a
 // suggestion-tap COMMITS it into the committed text and clears the preedit.
 // Space commits the raw preedit (if any) then adds a literal separator. This
@@ -375,7 +403,7 @@ function render() {
 }
 function scrollOut() { output.scrollTop = output.scrollHeight; }
 
-// A flick / quick-access mark appends to the composing preedit.
+// A lean selection / quick-access mark appends to the composing preedit.
 function insert(s) { preedit += s; render(); }
 
 // Commit the current preedit (raw) into the document, then clear it.

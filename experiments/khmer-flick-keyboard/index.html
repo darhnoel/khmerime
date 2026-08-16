@@ -4,7 +4,10 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
 <meta name="theme-color" content="#f6f7f9" />
-<title>Khmer Flick Keyboard</title>
+<title>Khmer Directional Lean Keyboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Kantumruy+Pro:wght@400;500;600&amp;display=swap" rel="stylesheet" />
 <style>
   :root {
     color-scheme: light;
@@ -17,6 +20,10 @@
     --key-shadow: #858a92;
     --pressed: #c5c9cf;
     --gap: clamp(5px, 1.7vw, 8px);
+    --page: #f6f7f9;
+    --surface: #fff;
+    --composer-end: #fbfbfc;
+    --border: #eceef1;
   }
 
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -25,9 +32,9 @@
     margin: 0;
     height: 100%;
     overflow: hidden;
-    font-family: "Noto Sans Khmer", "Khmer OS Battambang", system-ui, sans-serif;
+    font-family: "Kantumruy Pro", "Noto Sans Khmer", system-ui, sans-serif;
     color: var(--ink);
-    background: #f6f7f9;
+    background: var(--page);
     touch-action: manipulation;
     user-select: none;
     -webkit-user-select: none;
@@ -42,7 +49,7 @@
     min-height: 100%;
     display: flex;
     flex-direction: column;
-    background: #fff;
+    background: var(--surface);
     box-shadow: 0 0 36px rgb(18 25 38 / 8%);
   }
 
@@ -50,9 +57,10 @@
     min-height: 54px;
     padding: max(10px, env(safe-area-inset-top)) 16px 9px;
     display: grid;
-    grid-template-columns: 72px 1fr 72px;
-    align-items: end;
-    border-bottom: 1px solid #eceef1;
+    grid-template-columns: 42px minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 6px;
+    border-bottom: 1px solid var(--border);
     font-family: system-ui, sans-serif;
   }
 
@@ -66,27 +74,75 @@
   }
 
   .app-bar .back { text-align: left; font-size: 25px; line-height: 28px; }
-  .app-bar .done { text-align: right; }
-  .app-title { text-align: center; }
-  .app-title strong { display: block; font: 600 15px/18px system-ui, sans-serif; }
-  .app-title span { display: block; color: var(--muted); font: 12px/15px system-ui, sans-serif; }
+  .app-title { min-width: 0; text-align: center; }
+  .app-title strong { display: block; font: 600 16px/20px "Kantumruy Pro", system-ui, sans-serif; }
+  .app-title span {
+    display: block;
+    overflow: hidden;
+    color: var(--muted);
+    font: 12px/15px system-ui, sans-serif;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .header-actions { display: flex; align-items: center; gap: 5px; }
+  .app-bar .done {
+    min-width: 48px;
+    font-family: "Kantumruy Pro", system-ui, sans-serif;
+    text-align: right;
+  }
+
+  .app-bar .display-toggle {
+    width: 32px;
+    height: 32px;
+    min-height: 32px;
+    padding: 0;
+    border: 1px solid #c9cdd3;
+    border-radius: 9px;
+    color: var(--muted);
+    font: 600 17px/30px system-ui, sans-serif;
+    text-align: center;
+  }
+
+  .app-bar .display-toggle[aria-checked="true"] {
+    border-color: var(--accent);
+    background: var(--accent);
+    color: #fff;
+  }
 
   .composer {
     flex: 1 1 auto;
     min-height: 0;
     padding: 20px 18px;
     overflow-y: auto;
-    background: linear-gradient(#fff, #fbfbfc);
+    background: linear-gradient(var(--surface), var(--composer-end));
   }
 
   .recipient {
     padding-bottom: 12px;
-    border-bottom: 1px solid #eceef1;
+    border-bottom: 1px solid var(--border);
     color: var(--muted);
-    font: 15px/22px system-ui, sans-serif;
+    font: 400 16px/24px "Kantumruy Pro", system-ui, sans-serif;
   }
 
   .recipient b { color: var(--ink); font-weight: 500; }
+
+  .display-toggle {
+    appearance: none;
+    min-height: 32px;
+    padding: 4px 11px;
+    border: 1px solid #c9cdd3;
+    border-radius: 999px;
+    background: var(--surface);
+    color: var(--muted);
+    font: 600 13px/20px system-ui, sans-serif;
+  }
+
+  .display-toggle[aria-checked="true"] {
+    border-color: var(--accent);
+    background: var(--accent);
+    color: #fff;
+  }
 
   #output {
     min-height: 92px;
@@ -128,7 +184,7 @@
     background: var(--keyboard);
     border-top: 1px solid #c4c7cc;
     padding-bottom: env(safe-area-inset-bottom);
-    font-family: "Noto Sans Khmer", "Khmer OS Battambang", system-ui, sans-serif;
+    font-family: "Kantumruy Pro", "Noto Sans Khmer", system-ui, sans-serif;
   }
 
   #suggestions {
@@ -152,7 +208,8 @@
     background: transparent;
     color: #202329;
     font-family: inherit;
-    font-size: 19px;
+    font-size: 20px;
+    font-weight: 500;
     line-height: 28px;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -187,9 +244,10 @@
     border: 0;
     border-right: 1px solid rgb(100 105 113 / 24%);
     background: transparent;
-    color: #25282e;
+    color: #202329;
     font-family: inherit;
-    font-size: 19px;
+    font-size: 21px;
+    font-weight: 500;
     line-height: 30px;
     text-align: center;
   }
@@ -225,16 +283,17 @@
     --heat: 0;   /* 0..1 next-key probability, set by the bigram heatmap */
     position: relative;
     flex: 1 1 0;
-    height: clamp(56px, 15.5vw, 64px);
+    height: clamp(64px, 18vw, 74px);
     min-width: 0;
     overflow: hidden;
     border-radius: 6px;
     background: var(--key);
     box-shadow: 0 1px 0 1px var(--key-shadow), 0 2px 1px rgb(33 38 45 / 18%);
     font-family: inherit;
-    font-size: 25px;
+    font-size: 26px;
+    font-weight: 500;
     line-height: 1;
-    transition: transform 50ms ease, background 50ms ease, box-shadow 50ms ease;
+    transition: height 140ms ease, transform 50ms ease, background 50ms ease, box-shadow 50ms ease;
     touch-action: none;
   }
 
@@ -259,13 +318,46 @@
     transform: translateY(1px);
   }
 
+  body.heat-off .key::after { opacity: 0 !important; }
+  body.center-only { --gap: clamp(4px, 1.2vw, 6px); }
+  body.center-only .kb { padding-top: 5px; }
+  body.center-only .key { height: clamp(48px, 13vw, 56px); }
+  body.center-only .key .hint { opacity: 0; }
+  body.center-only .action { height: clamp(40px, 10.5vw, 48px); }
+
+  body.night {
+    --ink: #f2f4f7;
+    --muted: #aeb4bd;
+    --accent: #5aa2ff;
+    --keyboard: #252930;
+    --key: #3b4048;
+    --key-special: #4b515b;
+    --key-shadow: #171a1f;
+    --pressed: #555c66;
+    --page: #101216;
+    --surface: #181b20;
+    --composer-end: #15181d;
+    --border: #30343b;
+  }
+
+  body.night .phone { box-shadow: 0 0 36px rgb(0 0 0 / 35%); }
+  body.night .keyboard-shell { border-top-color: #15181d; }
+  body.night .key .hint { color: #c9ced6; }
+  body.night #suggestions .sug,
+  body.night #quick-access .quick-key { color: #eef1f5; }
+  body.night .app-bar .display-toggle { border-color: #555b65; }
+  body.night .app-bar .display-toggle[aria-checked="true"] { border-color: var(--accent); }
+  body.night .action.space { background: #363b43; }
+  body.night .home-indicator { background: #e8ebef; }
+
   .key .center { pointer-events: none; }
   .key .hint {
     position: absolute;
-    color: #666a71;
+    color: #3d4148;
     font-family: inherit;
-    font-size: 13px;
-    line-height: 1.25;
+    font-size: 16px;
+    font-weight: 500;
+    line-height: 1.3;
     white-space: nowrap;
     pointer-events: none;
   }
@@ -296,7 +388,7 @@
     border-radius: 6px;
     background: var(--key-special);
     box-shadow: 0 1px 0 1px #7e838b, 0 2px 1px rgb(33 38 45 / 14%);
-    font: 500 15px/1 system-ui, sans-serif;
+    font: 500 15px/1 "Kantumruy Pro", system-ui, sans-serif;
   }
 
   .action:active { background: #989da5; transform: translateY(1px); box-shadow: 0 1px 0 #757a82; }
@@ -317,48 +409,29 @@
     position: fixed;
     z-index: 50;
     display: none;
-    width: 174px;
-    height: 174px;
+    width: 64px;
+    height: 64px;
+    align-items: center;
+    justify-content: center;
     pointer-events: none;
     filter: drop-shadow(0 4px 8px rgb(18 25 38 / 22%));
   }
 
-  #popup .cell {
-    --heat: 0;   /* bigram heat for this flick direction */
-    position: absolute;
-    width: 56px;
-    height: 56px;
+  #popup .preview-glyph {
+    width: 64px;
+    height: 64px;
     display: flex;
     align-items: center;
     justify-content: center;
-    border: 1px solid #a6aab0;
-    border-radius: 8px;
-    background: #fff;
-    color: var(--ink);
-    font-size: 26px;
+    border: 1px solid #0f61ca;
+    border-radius: 12px;
+    background: var(--accent);
+    color: #fff;
+    font-family: "Kantumruy Pro", "Noto Sans Khmer", system-ui, sans-serif;
+    font-size: 32px;
+    font-weight: 500;
+    line-height: 1;
   }
-
-  /* Per-direction heat ring in the popup, matching the resting keys. */
-  #popup .cell::after {
-    content: "";
-    position: absolute;
-    inset: 0;
-    border-radius: inherit;
-    pointer-events: none;
-    box-shadow: inset 0 0 0 3px var(--heat-color, transparent);
-    opacity: var(--heat, 0);
-    transition: opacity 120ms ease;
-  }
-
-  #popup .cell.empty { display: none; }
-  /* The active (drag-target) cell fills accent and hides its heat ring. */
-  #popup .cell.active { border-color: var(--accent); background: var(--accent); color: #fff; }
-  #popup .cell.active::after { opacity: 0; }
-  .cell.c { left: 59px; top: 59px; }
-  .cell.u { left: 59px; top: 0; }
-  .cell.d { left: 59px; top: 118px; }
-  .cell.l { left: 0; top: 59px; }
-  .cell.r { left: 118px; top: 59px; }
 
   @media (min-width: 521px) {
     body { padding-block: 18px; background: #e8eaee; }
@@ -373,8 +446,11 @@
     #suggestions { height: 39px; }
     #quick-access { height: 37px; padding-block: 2px 3px; }
     .kb { padding-top: 5px; }
-    .key { height: 48px; }
+    .key { height: 54px; font-size: 23px; }
+    .key .hint { font-size: 14px; }
     .action { height: 41px; }
+    body.center-only .key { height: 44px; }
+    body.center-only .action { height: 38px; }
     .home-indicator { display: none; }
   }
 
@@ -389,9 +465,14 @@
       <button class="back" type="button" aria-label="Back">‹</button>
       <div class="app-title">
         <strong>សារថ្មី</strong>
-        <span>Khmer Flick</span>
+        <span>Khmer Directional Lean</span>
       </div>
-      <button class="done" id="copy-output" type="button">ចម្លង</button>
+      <div class="header-actions">
+        <button class="display-toggle" id="night-toggle" type="button" role="switch" aria-checked="false" aria-label="Night mode" title="Night mode">☾</button>
+        <button class="display-toggle" id="heat-toggle" type="button" role="switch" aria-checked="true" aria-label="Heatmap" title="Heatmap">◉</button>
+        <button class="display-toggle" id="center-toggle" type="button" role="switch" aria-checked="false" aria-label="Centre characters only" title="Centre characters only">ក</button>
+        <button class="done" id="copy-output" type="button">ចម្លង</button>
+      </div>
     </header>
 
     <section class="composer" aria-label="Message composer">
@@ -399,7 +480,7 @@
       <div id="output" role="textbox" aria-multiline="true" aria-readonly="true" aria-label="Typed text" tabindex="0"><span id="committed"></span><span id="preedit"></span></div>
     </section>
 
-    <section class="keyboard-shell" aria-label="Khmer flick keyboard">
+    <section class="keyboard-shell" aria-label="Khmer directional lean keyboard">
       <div id="suggestions" aria-label="Word suggestions"></div>
       <div id="quick-access" aria-label="Frequently used Khmer signs"></div>
       <div class="kb" id="kb"></div>
@@ -408,16 +489,12 @@
   </main>
 
   <div id="popup" aria-hidden="true">
-    <div class="cell u"></div>
-    <div class="cell l"></div>
-    <div class="cell c"></div>
-    <div class="cell r"></div>
-    <div class="cell d"></div>
+    <div class="preview-glyph"></div>
   </div>
 
   <script src="keymap.js?v=16"></script>
   <script src="ngram.js?v=16"></script>
   <script src="words.js?v=16"></script>
-  <script src="keyboard.js?v=16"></script>
+  <script src="keyboard.js?v=22"></script>
 </body>
 </html>
