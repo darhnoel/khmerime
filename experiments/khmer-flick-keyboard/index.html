@@ -321,13 +321,16 @@
     content: "";
     position: absolute;
     z-index: -1;
-    inset: -3px -5px;
-    border-radius: 7px;
-    background: var(--member-heat-color, transparent);
-    box-shadow: 0 0 7px var(--member-heat-color, transparent);
-    opacity: calc(var(--member-heat, 0) * .28);
+    width: 1.6em;
+    aspect-ratio: 1;
+    left: 50%;
+    top: 50%;
+    border-radius: 50%;
+    background: radial-gradient(circle, var(--member-heat-color, transparent) 0 32%, transparent 72%);
+    opacity: calc(var(--member-heat, 0) * .34);
+    transform: translate(-50%, -50%);
     pointer-events: none;
-    transition: background-color 120ms ease, box-shadow 120ms ease, opacity 120ms ease;
+    transition: opacity 120ms ease;
   }
 
   .key.is-pressed {
@@ -570,6 +573,6 @@
   <script src="keymap.js?v=16"></script>
   <script src="ngram.js?v=16"></script>
   <script src="words.js?v=16"></script>
-  <script src="keyboard.js?v=32"></script>
+  <script src="keyboard.js?v=33"></script>
 </body>
 </html>

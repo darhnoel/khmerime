@@ -65,7 +65,7 @@ back-off model measured on a 31.4M-character corpus.
 - **Visual:** a glowing border ring on the **top ~6** likely keys, ring brightness
   proportional to probability; start guidance is softer than contextual heat.
   Across those keys, only the **top 8 individual characters** receive a tight
-  compact translucent background glow. Those eight are re-ranked onto the full heat scale: rank
+  compact circular radial glow. Those eight are re-ranked onto the full heat scale: rank
   1 is red, the middle ranks cross yellow/green/cyan, and rank 8 is blue. Opacity
   also fades by rank, keeping the exact character guidance informative without
   marking every member. Key fills remain unchanged, and heat ranking does not
