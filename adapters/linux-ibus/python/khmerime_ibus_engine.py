@@ -24,7 +24,7 @@ if str(SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPT_DIR))
 
 from ibus_bridge_client import BridgeClient, BridgeResponse
-from ibus_candidate_renderer import candidate_rows
+from ibus_candidate_renderer import PHRASE, candidate_rows, phrase_rows, surface_mode
 from ibus_component import ENGINE_NAME, ENGINE_NIDA_NAME, SERVICE_NAME, component_xml, register_component
 from ibus_refinement_scheduler import RefinementScheduler
 from ibus_render_plan import CURSOR, RELOAD, RenderPlanner
@@ -49,6 +49,9 @@ from gi.repository import GLib, IBus  # noqa: E402
 KEY_RETURN = 0xFF0D
 KEY_KP_ENTER = 0xFF8D
 KEY_CAPS_LOCK = 0xFFE5
+KEY_SPACE = 0x20
+KEY_UP = 0xFF52
+KEY_DOWN = 0xFF54
 STATE_LOCK_MASK = int(IBus.ModifierType.LOCK_MASK)
 STATE_RELEASE_MASK = int(IBus.ModifierType.RELEASE_MASK)
 MODE_PROPERTY_KEY = "InputMode"
@@ -101,6 +104,13 @@ class KhmerIMEEngine(IBus.Engine):
         self._last_preedit = ""
         self._last_raw_preedit = ""
         self._last_readiness = "unknown"
+        # Visible-row → `phrase_candidates` index for the Phrase level. Empty at
+        # every other level, which is also what makes phrase keys inert there.
+        self._phrase_indices: list[int] = []
+        # Which visible phrase row is selected, mirrored from the snapshot's
+        # `selected_phrase_index`. The session owns this; the IBus table cursor
+        # is only a rendering of it.
+        self._phrase_row: Optional[int] = None
         self._focus_events = 0
         self._reset_events = 0
         self._last_enter_focus_events = 0
@@ -246,15 +256,24 @@ class KhmerIMEEngine(IBus.Engine):
                 preedit_visible,
             )
 
+        mode = surface_mode(snapshot)
         candidates = snapshot.get("candidates") or []
         candidate_display = snapshot.get("candidate_display") or []
-        rendered_candidates = candidate_rows(candidates, candidate_display)
-        selected = snapshot.get("selected_index")
-        cursor = (
-            min(selected, len(rendered_candidates) - 1)
-            if isinstance(selected, int) and rendered_candidates
-            else None
-        )
+        if mode == PHRASE:
+            # Phrase level: rows are whole-composition hypotheses, not the focused
+            # segment's words. Keep the session indices so a selection maps back.
+            rendered_candidates, self._phrase_indices, cursor = phrase_rows(snapshot)
+            self._phrase_row = cursor
+        else:
+            self._phrase_indices = []
+            self._phrase_row = None
+            rendered_candidates = candidate_rows(candidates, candidate_display, mode)
+            selected = snapshot.get("selected_index")
+            cursor = (
+                min(selected, len(rendered_candidates) - 1)
+                if isinstance(selected, int) and rendered_candidates
+                else None
+            )
         table_action = self._render_plan.candidate_list_action(rendered_candidates, cursor)
         if table_action == RELOAD:
             self._table.clear()
@@ -496,12 +515,54 @@ class KhmerIMEEngine(IBus.Engine):
                 return chunk
         return None
 
+    def _phrase_index_for_key(self, keyval: int) -> Optional[int]:
+        """The `phrase_candidates` index a key selects at the Phrase level.
+
+        `None` means "not a phrase key here" — the caller forwards the key to
+        the bridge unchanged. Mirrors macOS `CandidateSurface::command_for_key`:
+        Space/Down step forward, Up steps back (both wrapping), digits pick a
+        visible row. Returns `None` at every other level because
+        `_phrase_indices` is empty there, so Space keeps cycling word
+        candidates in Flat and Segment mode.
+        """
+        rows = len(self._phrase_indices)
+        if rows == 0:
+            return None
+
+        if keyval in (KEY_SPACE, KEY_DOWN, KEY_UP):
+            delta = -1 if keyval == KEY_UP else 1
+            current = self._phrase_row if isinstance(self._phrase_row, int) else 0
+            return self._phrase_indices[(current + delta) % rows]
+
+        if 0x31 <= keyval <= 0x39:
+            row = keyval - 0x31
+        elif keyval == 0x30:
+            row = 9
+        else:
+            return None
+        # A digit past the last row is not a selection; let it stay an ordinary
+        # key rather than silently picking the wrong phrase.
+        return self._phrase_indices[row] if row < rows else None
+
+    def _select_phrase(self, index: int) -> bool:
+        response = self._call_bridge_raw({"cmd": "select_phrase", "index": int(index)})
+        if response is None or not response.ok:
+            return False
+        self._apply_response(response)
+        return True
+
     def do_process_key_event(self, keyval: int, keycode: int, state: int) -> bool:
         callback_started = time.perf_counter()
         if int(keyval) == KEY_CAPS_LOCK:
             return self._handle_caps_lock_key(int(state))
         if int(state) & STATE_RELEASE_MASK:
             return False
+        phrase_index = self._phrase_index_for_key(int(keyval))
+        if phrase_index is not None:
+            self._cancel_pending_refinement()
+            self._segmented_preview.cancel()
+            if self._select_phrase(phrase_index):
+                return True
         self._cancel_pending_refinement()
         self._segmented_preview.cancel()
         preedit_before = self._last_preedit
