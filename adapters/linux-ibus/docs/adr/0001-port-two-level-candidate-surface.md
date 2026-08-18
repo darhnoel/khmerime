@@ -97,22 +97,26 @@ Derive a **surface mode** from the snapshot (same rule as macOS's `CandidateSurf
 
 Then:
 
-- **Phrase & Segment mode:** candidate rows are **Khmer-only** — drop the per-row `(roman)` hint. The
-  roman lives in the segment preview (aux text) instead. Keep the `≈` derived marker and `✓`
-  recommended marker as today.
+- **Phrase mode:** each whole-phrase row shows that candidate's own canonical Lexicon romanization,
+  for example `តម្រា (tamrea / tomrea)`. For a multi-segment reading, join the segments with ` · `.
+  This is candidate metadata, not a repetition of the composition's shared typed input. An
+  out-of-Lexicon model result has no invented canonical pair and may fall back to its consumed input.
+  Render at most the top five eligible Phrase Candidates in decoder order. Model-assisted rows count
+  toward that same five-row total; they do not create extra rows.
+- **Segment mode:** candidate rows remain **Khmer-only**. The focused segment's roman input lives in
+  the segment preview (aux text). Keep the `≈` derived marker and `✓` recommended marker as today.
 - **Flat mode:** keep the per-row roman hint (`output (hint)`) — there is no header carrying it, so it
   is the only place the roman shows. This mirrors macOS's Flat-mode exception exactly.
 - **Segment preview (aux text):** keep it as the roman-carrying header. Consider dropping the inline
   `output(input)` gluing in favor of showing the roman for the *focused* segment more prominently — but
-  the aux text is already the natural home for roman, so the minimum change is: **just stop repeating
-  roman on the candidate rows and let the aux text keep it.**
+  the aux text remains the natural home for the active segmentation input.
 
 ## IBus-specific decisions (the "practical, not pixel-identical" calls)
 
 - **No two-row aligned chip header.** IBus aux text is a single line. Keep the existing
-  ` | `-separated `output(input)` preview as the roman-carrying line. The macOS win (roman off every
-  candidate row, kept in one header place) is achieved by fixing #2 above; the *shape* of the header
-  stays IBus-native. Do not try to fake column alignment in aux text.
+  ` | `-separated `output(input)` preview as the active segmentation line. Phrase rows additionally
+  show their own canonical roman pairs because alternative readings can have different Lexicon
+  spellings. Do not try to fake column alignment in aux text.
 - **No dynamic panel width / horizontal scroll.** IBus owns the lookup-table geometry; the macOS width
   clamp and truncation are panel concerns that do not exist here. Skip them.
 - **Overflow:** IBus's lookup table already handles long rows its own way; nothing to add.
@@ -123,10 +127,8 @@ The IBus renderers are pure Python with existing unit tests — ideal for red-gr
 
 1. **Surface mode from snapshot.** New pure helper `surface_mode(snapshot) -> "flat"|"phrase"|"segment"`
    in a small module (or extend `ibus_render_plan`). Test the three conditions above.
-2. **Khmer-only rows in Phrase/Segment mode.** Give `candidate_rows` the mode; assert it drops the
-   `(roman)` suffix when mode is phrase/segment, and keeps it in flat. Reuse the macOS test cases:
-   `output="អ្នកបន្ថែមទៀត"` → row is exactly `អ្នកបន្ថែមទៀត` in phrase mode; `≈`/`✓` markers survive.
-   (No `✦` model marker on IBus yet — that arrives with the AI iteration.)
+2. **Mode-specific roman display.** Flat rows keep suggestion hints, Phrase rows show each phrase's
+   canonical roman pairs, and Segment-edit rows are Khmer-only. Assert provenance markers survive.
 3. **Wire mode through the engine.** `khmerime_ibus_engine` computes the mode from the snapshot and
    passes it to `candidate_rows`. Cover with an `ibus_bridge_protocol`-style end-to-end assertion if
    practical, else a renderer-level test.

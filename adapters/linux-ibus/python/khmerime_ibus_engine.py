@@ -293,8 +293,9 @@ class KhmerIMEEngine(IBus.Engine):
                 text = IBus.Text.new_from_string(str(candidate))
                 colour = colours.get(row)
                 if colour is not None:
-                    # Colour only the ✦ glyph, so an unverified model candidate
-                    # can never pass as human-reviewed Lexicon data (ADR-0016).
+                    # Colour only the warning glyph on panels that preserve IBus
+                    # attributes. GNOME drops the attribute but keeps the red
+                    # Unicode fallback emitted by the candidate renderer.
                     fg, start, end = colour
                     attrs = IBus.AttrList.new()
                     attrs.append(IBus.attr_foreground_new(fg, start, end))

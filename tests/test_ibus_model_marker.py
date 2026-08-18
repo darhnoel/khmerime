@@ -5,7 +5,7 @@ output would be indistinguishable from human-reviewed Lexicon data.
 
   no ✦      plain Lexicon candidate (from_model = false)
   white ✦   from_model && lexicon_verified — model-assisted but trusted
-  red ✦     from_model && !lexicon_verified — visibly unverified, still shown
+  red 🔻    from_model && !lexicon_verified — visibly unverified, still shown
 
 Red candidates stay selectable on purpose: an out-of-Lexicon model word may be
 a name or loanword the user genuinely wants. The Lexicon gate is a marker, not
@@ -19,6 +19,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "adapters" / "linux
 
 from ibus_candidate_renderer import (  # noqa: E402
     MODEL_MARK,
+    UNVERIFIED_MODEL_MARK,
     UNVERIFIED_FG,
     marker_spans,
     phrase_rows,
@@ -64,19 +65,19 @@ def test_unverified_model_phrase_is_shown_not_filtered():
 
     rows, indices, _ = phrase_rows(snapshot)
 
-    assert rows == [f"{MODEL_MARK} សំបុក"]
+    assert rows == [f"{UNVERIFIED_MODEL_MARK} សំបុក"]
     assert indices == [0], "an unverified row must stay selectable"
 
 
 def test_marker_spans_colour_only_the_unverified_marker_glyph():
-    rows = [f"{MODEL_MARK} សុខភាព", f"{MODEL_MARK} សំបុក", "ខ្ញុំទៅ"]
+    rows = [f"{MODEL_MARK} សុខភាព", f"{UNVERIFIED_MODEL_MARK} សំបុក", "ខ្ញុំទៅ"]
     flags = [(True, True), (True, False), (False, True)]
 
     spans = marker_spans(rows, flags)
 
-    # Only the red (unverified) row needs an attribute; verified white ✦ is the
-    # default label colour and needs none.
-    assert spans == [(1, UNVERIFIED_FG, 0, len(MODEL_MARK))]
+    # Only the red (unverified) row needs an attribute; its Unicode marker also
+    # remains visibly red in GNOME Shell, which discards candidate attributes.
+    assert spans == [(1, UNVERIFIED_FG, 0, len(UNVERIFIED_MODEL_MARK))]
 
 
 def test_marker_spans_are_empty_without_model_candidates():
