@@ -3,7 +3,7 @@ use std::sync::mpsc::{self, Receiver, RecvTimeoutError, TryRecvError};
 use std::thread;
 use std::time::{Duration, Instant};
 
-use khmerime_core::{DecoderConfig, DecoderMode, Result as KhmerResult, Transliterator};
+use khmerime_core::{DecoderConfig, DecoderMode, Result as KhmerResult, SpanProposalMode, Transliterator};
 use khmerime_linux_ibus::{
     fallback_empty_snapshot_json, BridgeCommand, BridgeReadiness, BridgeResponse, BridgeTimings, DesktopHistoryStore,
 };
@@ -231,9 +231,26 @@ fn build_full_engines() -> KhmerResult<FullEngines> {
     log_startup_stage_end("full_live_engine", started);
 
     let started = Instant::now();
-    eprintln!("[ibus-startup] full_visible_refiner.start");
-    let visible_refiner =
-        Transliterator::from_shared_data_with_config(&shared, visible_refiner_config().with_mode(DecoderMode::Hybrid));
+    // Log the armed state: whether a provider is actually registered is the one fact
+    // static inspection of the public build cannot confirm.
+    let span_env = span_proposals_env();
+    eprintln!(
+        "[ibus-startup] full_visible_refiner.start span_provider_active={} {}={:?}",
+        span_provider_active(span_env.as_deref()),
+        SPAN_PROPOSALS_ENV,
+        span_env
+    );
+    // When a provider is armed, keep the mode `shadow_interactive` gives us — the shape iOS and
+    // Android use for their smart refiner. `Hybrid` routes the result through `merge_results`
+    // with the legacy decoder, which is right for a deterministic refiner but lets the Lexicon
+    // list crowd out the single whole-word model rescue.
+    let visible_config = visible_refiner_config();
+    let visible_config = if span_provider_active(span_proposals_env().as_deref()) {
+        visible_config
+    } else {
+        visible_config.with_mode(DecoderMode::Hybrid)
+    };
+    let visible_refiner = Transliterator::from_shared_data_with_config(&shared, visible_config);
     log_startup_stage_end("full_visible_refiner", started);
 
     let started = Instant::now();
@@ -248,9 +265,52 @@ fn build_full_engines() -> KhmerResult<FullEngines> {
     })
 }
 
+/// Arming switch for the span-proposal seam, matching the macOS IMK adapter's contract.
+/// `model` resolves to a provider registered by a separate, private build; `static-test`
+/// is the deterministic in-tree provider used by tests. Anything else — including unset —
+/// leaves the seam inert, so the public build is the pure lookup + fuzzy engine (ADR-0016).
+const SPAN_PROPOSALS_ENV: &str = "KHMERIME_SPAN_PROPOSALS";
+
+/// Weighted-span budget for the debounced visible refiner when a model provider is armed.
+/// Matches the macOS IMK adapter; iOS/Android allow more still (2 s) on their own refiners.
+/// iOS/Android use 2 s and their comments explicitly reject the live decoder's 250 ms as too
+/// tight for "one provider inference". Observed cost here is ~135-150 ms, but that is one word on
+/// this machine; the refine is debounced and off the keystroke path, so the headroom is free.
+const MODEL_REFINE_MAX_LATENCY_MS: u64 = 2_000;
+
+fn span_proposal_mode_for(value: Option<&str>) -> SpanProposalMode {
+    match value {
+        Some("model") => SpanProposalMode::Model,
+        Some("static-test") => SpanProposalMode::StaticTest,
+        _ => SpanProposalMode::Disabled,
+    }
+}
+
+/// Whether a provider is armed at all. When false the model never runs, so the debounced
+/// refinement path does no provider work.
+fn span_provider_active(value: Option<&str>) -> bool {
+    !matches!(span_proposal_mode_for(value), SpanProposalMode::Disabled)
+}
+
+fn span_proposals_env() -> Option<String> {
+    std::env::var(SPAN_PROPOSALS_ENV).ok()
+}
+
 fn visible_refiner_config() -> DecoderConfig {
-    let mut config = DecoderConfig::shadow_interactive();
-    config.wfst_max_latency_ms = 75;
+    // The model runs only on the debounced Visible Refiner, never on the keystroke hot
+    // path (ADR-0016). The live engine's config is deliberately left untouched.
+    let span_env = span_proposals_env();
+    let mut config =
+        DecoderConfig::shadow_interactive().with_span_proposal_mode(span_proposal_mode_for(span_env.as_deref()));
+    // 75 ms is right for a deterministic refiner, but neural inference alone costs ~135-150 ms,
+    // so that budget made every model-carrying decode time out and be discarded wholesale by
+    // `phrase_candidates` — the model's answer never reached the user. When a provider is armed
+    // the refine is debounced and off the keystroke path, so it can afford macOS's 250 ms.
+    config.wfst_max_latency_ms = if span_provider_active(span_env.as_deref()) {
+        MODEL_REFINE_MAX_LATENCY_MS
+    } else {
+        75
+    };
     config
 }
 
@@ -366,7 +426,15 @@ fn apply_command(runtime: &mut BridgeRuntime, command: BridgeCommand) -> (Bridge
             }
             BridgeCommand::RefineComposition { raw_preedit } => {
                 let started = Instant::now();
-                session.apply_refined_candidate(&raw_preedit);
+                // Debounced pause-refine, flat path first. `apply_refined_candidate` promotes a
+                // whole-phrase reading to `candidates[0]` for a composition that has not been
+                // segmented yet (the common case under Deferred, where previews are built
+                // lazily). Only when it declines — which includes the case it explicitly bails
+                // on, an already-segmented session — do we run the segmented refine, the one
+                // path that consults the visible refiner and therefore any model provider.
+                if session.apply_refined_candidate(&raw_preedit).is_none() {
+                    session.refine_segmented_with_visible_refiner(&raw_preedit);
+                }
                 t_proc = started.elapsed().as_secs_f64() * 1000.0;
                 (ImeSessionUpdate::default(), false)
             }
@@ -589,7 +657,55 @@ fn main() {
 
 #[cfg(test)]
 mod tests {
-    use super::{enter_refiner_grace, LONG_ENTER_REFINER_GRACE};
+    use super::{
+        enter_refiner_grace, span_proposal_mode_for, span_provider_active, LONG_ENTER_REFINER_GRACE,
+        MODEL_REFINE_MAX_LATENCY_MS,
+    };
+    use khmerime_core::SpanProposalMode;
+
+    #[test]
+    fn span_proposals_are_disabled_by_default() {
+        // The seam is inert unless explicitly armed: the free build must behave
+        // exactly as the pure lookup + fuzzy engine (ADR-0016).
+        assert_eq!(span_proposal_mode_for(None), SpanProposalMode::Disabled);
+        assert_eq!(span_proposal_mode_for(Some("")), SpanProposalMode::Disabled);
+        assert_eq!(span_proposal_mode_for(Some("off")), SpanProposalMode::Disabled);
+        assert!(!span_provider_active(None));
+    }
+
+    #[test]
+    fn model_and_static_test_arm_the_provider() {
+        assert_eq!(span_proposal_mode_for(Some("model")), SpanProposalMode::Model);
+        assert_eq!(
+            span_proposal_mode_for(Some("static-test")),
+            SpanProposalMode::StaticTest
+        );
+        assert!(span_provider_active(Some("model")));
+        assert!(span_provider_active(Some("static-test")));
+    }
+
+    #[test]
+    fn arming_a_provider_raises_the_refiner_latency_budget() {
+        // Neural inference costs ~135-150 ms. At the deterministic 75 ms budget every
+        // model-carrying decode is stamped Timeout and discarded wholesale, so the model's
+        // answer never reaches the user even though it computed the right word.
+        assert!(
+            MODEL_REFINE_MAX_LATENCY_MS > 150,
+            "budget must exceed observed inference cost"
+        );
+        assert_eq!(super::span_proposal_mode_for(Some("model")), SpanProposalMode::Model);
+        assert!(span_provider_active(Some("model")));
+        assert!(
+            !span_provider_active(None),
+            "unarmed keeps the tight deterministic budget"
+        );
+    }
+
+    #[test]
+    fn an_unknown_value_stays_disabled_rather_than_guessing() {
+        assert_eq!(span_proposal_mode_for(Some("yes")), SpanProposalMode::Disabled);
+        assert!(!span_provider_active(Some("yes")));
+    }
 
     #[test]
     fn short_enter_commits_do_not_wait_for_full_refiner() {

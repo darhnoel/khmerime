@@ -6,7 +6,12 @@ from typing import Any, Callable, Dict
 
 from ibus_debounced_bridge_work import DebouncedBridgeWork
 
-REFINE_MIN_RAW_PREEDIT_LEN = 10
+# Two, not ten. The original floor was tuned for "long composition" refinement and predates
+# the Word Rescuer, which proposes one whole-composition span for a SINGLE word — so the
+# inputs that need it most (`domra` → តម្រា, five characters) never got refined at all. Two
+# matches the model's own span gate, which rejects anything shorter. The work is debounced
+# and off the keystroke path, so refining short words costs nothing the user feels.
+REFINE_MIN_RAW_PREEDIT_LEN = 2
 REFINE_DEBOUNCE_MS = 400
 REFINE_SLOW_LOG_MS = 30.0
 

@@ -24,7 +24,14 @@ if str(SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPT_DIR))
 
 from ibus_bridge_client import BridgeClient, BridgeResponse
-from ibus_candidate_renderer import PHRASE, candidate_rows, phrase_rows, surface_mode
+from ibus_candidate_renderer import (
+    PHRASE,
+    candidate_rows,
+    marker_spans,
+    phrase_provenance,
+    phrase_rows,
+    surface_mode,
+)
 from ibus_component import ENGINE_NAME, ENGINE_NIDA_NAME, SERVICE_NAME, component_xml, register_component
 from ibus_refinement_scheduler import RefinementScheduler
 from ibus_render_plan import CURSOR, RELOAD, RenderPlanner
@@ -264,9 +271,13 @@ class KhmerIMEEngine(IBus.Engine):
             # segment's words. Keep the session indices so a selection maps back.
             rendered_candidates, self._phrase_indices, cursor = phrase_rows(snapshot)
             self._phrase_row = cursor
+            row_attributes = marker_spans(
+                rendered_candidates, phrase_provenance(snapshot, self._phrase_indices)
+            )
         else:
             self._phrase_indices = []
             self._phrase_row = None
+            row_attributes = []
             rendered_candidates = candidate_rows(candidates, candidate_display, mode)
             selected = snapshot.get("selected_index")
             cursor = (
@@ -277,8 +288,19 @@ class KhmerIMEEngine(IBus.Engine):
         table_action = self._render_plan.candidate_list_action(rendered_candidates, cursor)
         if table_action == RELOAD:
             self._table.clear()
-            for candidate in rendered_candidates:
-                self._table.append_candidate(IBus.Text.new_from_string(str(candidate)))
+            colours = {row: (fg, start, end) for row, fg, start, end in row_attributes}
+            for row, candidate in enumerate(rendered_candidates):
+                text = IBus.Text.new_from_string(str(candidate))
+                colour = colours.get(row)
+                if colour is not None:
+                    # Colour only the warning glyph on panels that preserve IBus
+                    # attributes. GNOME drops the attribute but keeps the red
+                    # Unicode fallback emitted by the candidate renderer.
+                    fg, start, end = colour
+                    attrs = IBus.AttrList.new()
+                    attrs.append(IBus.attr_foreground_new(fg, start, end))
+                    text.set_attributes(attrs)
+                self._table.append_candidate(text)
             if cursor is not None:
                 self._table.set_cursor_pos(cursor)
             self.update_lookup_table(self._table, bool(rendered_candidates))

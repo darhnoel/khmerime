@@ -78,6 +78,41 @@ def test_phrase_level_paints_whole_phrase_rows_not_word_candidates():
     assert _painted_rows(engine) == ["ខ្ញុំទៅ", "ខ្ញុំតៅ"]
 
 
+def test_whole_word_model_surface_keeps_non_model_alternatives():
+    from ibus_candidate_renderer import MODEL_MARK
+
+    phrase_candidates = [
+        _phrase("ដំរី", 1),
+        _phrase("តម្រា", 1, from_model=True),
+        _phrase("ដំរ៉ា", 1),
+    ]
+    for phrase in phrase_candidates:
+        phrase["segments"][0]["input"] = "domra"
+    before_selection = _phrase_snapshot()
+    before_selection["raw_preedit"] = "domra"
+    before_selection["preedit"] = "domra"
+    before_selection["segmented_active"] = False
+    before_selection["phrase_candidates"] = phrase_candidates
+    after_selection = _phrase_snapshot(selected_phrase_index=1)
+    after_selection["raw_preedit"] = "domra"
+    after_selection["preedit"] = "domra"
+    after_selection["segmented_active"] = True
+    after_selection["segment_preview"] = [
+        {"output": "តម្រា", "input": "domra", "focused": True},
+    ]
+    after_selection["phrase_candidates"] = phrase_candidates
+    engine = _recording_engine([_response(before_selection), _response(after_selection)])
+
+    engine.do_process_key_event(ord("v"), 0, 0)
+    expected_rows = ["ដំរី (domra)", f"{MODEL_MARK} តម្រា (domra)", "ដំរ៉ា (domra)"]
+    assert _painted_rows(engine) == expected_rows
+
+    engine.do_process_key_event(KEY_SPACE, 0, 0)
+
+    assert _painted_rows(engine) == expected_rows
+    assert _sent_commands(engine)[-1] == {"cmd": "select_phrase", "index": 1}
+
+
 def test_space_at_the_phrase_level_selects_the_next_phrase():
     engine = _recording_engine(
         [
@@ -165,6 +200,47 @@ def test_space_in_segment_edit_mode_still_cycles_words():
     engine.do_process_key_event(KEY_SPACE, 0, 0)
 
     assert _sent_commands(engine)[-1]["cmd"] == "process_key_event"
+
+
+def test_unverified_model_row_is_painted_with_a_red_marker():
+    # ADR-0016: the warning mark must survive the snapshot → adapter path, and red must be
+    # distinguishable from white, or unverified output passes as reviewed data.
+    from ibus_candidate_renderer import UNVERIFIED_FG, UNVERIFIED_MODEL_MARK
+
+    snapshot = _phrase_snapshot()
+    snapshot["phrase_candidates"] = [
+        _phrase("ខ្ញុំទៅ", 2),
+        _phrase("សំបុក", 1, from_model=True),
+    ]
+    snapshot["phrase_candidates"][1]["lexicon_verified"] = False
+    engine = _recording_engine([_response(snapshot)])
+
+    engine.do_process_key_event(ord("v"), 0, 0)
+
+    rows = _painted_rows(engine)
+    assert rows == ["ខ្ញុំទៅ", f"{UNVERIFIED_MODEL_MARK} សំបុក"]
+
+    # The plain Lexicon row carries no attributes; the unverified row colours
+    # only its leading marker glyph. The glyph itself is red as a GNOME fallback.
+    plain, marked = engine._table.candidates  # noqa: SLF001
+    assert not plain.attributes
+    assert marked.attributes == [("foreground", UNVERIFIED_FG, 0, len(UNVERIFIED_MODEL_MARK))]
+
+
+def test_verified_model_row_is_marked_but_not_coloured():
+    from ibus_candidate_renderer import MODEL_MARK
+
+    snapshot = _phrase_snapshot()
+    snapshot["phrase_candidates"] = [
+        _phrase("ខ្ញុំទៅ", 2),
+        _phrase("សុខភាព", 1, from_model=True),
+    ]
+    engine = _recording_engine([_response(snapshot)])
+
+    engine.do_process_key_event(ord("v"), 0, 0)
+
+    assert _painted_rows(engine) == ["ខ្ញុំទៅ", f"{MODEL_MARK} សុខភាព"]
+    assert not engine._table.candidates[1].attributes  # noqa: SLF001
 
 
 def test_space_in_a_flat_composition_still_cycles_candidates():

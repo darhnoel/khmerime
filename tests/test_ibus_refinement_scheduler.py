@@ -109,3 +109,50 @@ def test_refinement_scheduler_ignores_stale_response():
     timers.run_latest()
 
     assert applied == []
+
+
+def test_short_word_is_scheduled_for_refinement():
+    # The Word Rescuer proposes ONE whole-composition span for a single word, so the
+    # words that most need it are short — `domra` (តម្រា) is five characters. The old
+    # 10-char floor predates the model: it was tuned for "long composition" refinement
+    # and silently starved the model of exactly the inputs it exists to handle.
+    timers = TimerHarness()
+    calls = []
+
+    scheduler = RefinementScheduler(
+        call_refine=lambda payload: (calls.append(payload["raw_preedit"]), response_for(payload["raw_preedit"]))[1],
+        apply_response=lambda _response: None,
+        current_raw_preedit=lambda: "domra",
+        log=lambda _message: None,
+        timeout_add=timers.timeout_add,
+        source_remove=timers.source_remove,
+        idle_add=lambda callback, *args: callback(*args),
+        debounce_ms=1,
+    )
+
+    scheduler.schedule("domra")
+    assert timers.callbacks, "a short word must still arm the debounce timer"
+    timers.run_latest()
+
+    assert calls == ["domra"], "the model never sees the word if the refine is never sent"
+
+
+def test_single_character_is_not_scheduled():
+    # Still don't refine on the first keystroke: one character carries no word to rescue
+    # and the model's own span gate rejects it (needs >= 2 chars).
+    timers = TimerHarness()
+    calls = []
+
+    scheduler = RefinementScheduler(
+        call_refine=lambda payload: (calls.append(payload["raw_preedit"]), response_for(payload["raw_preedit"]))[1],
+        apply_response=lambda _response: None,
+        current_raw_preedit=lambda: "d",
+        log=lambda _message: None,
+        timeout_add=timers.timeout_add,
+        source_remove=timers.source_remove,
+        idle_add=lambda callback, *args: callback(*args),
+        debounce_ms=1,
+    )
+
+    scheduler.schedule("d")
+    assert not calls

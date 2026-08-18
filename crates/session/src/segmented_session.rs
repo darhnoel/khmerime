@@ -61,6 +61,16 @@ fn would_collapse_segmentation(current: Option<&SegmentedSession>, refinement: &
     refined_segments < current_segments
 }
 
+/// A one-span model winner is an intentional whole-composition replacement, not the
+/// timeout collapse guarded by [`would_collapse_segmentation`]. Keep the guard strict for
+/// ordinary/roman fallbacks, while allowing a provenance-carrying Khmer rescue through.
+fn model_rescue_won(refinement: &SegmentedRefinement) -> bool {
+    refinement
+        .phrase_candidates
+        .first()
+        .is_some_and(|candidate| candidate.from_model && candidate.segments.len() == 1 && has_khmer(&candidate.text))
+}
+
 /// The model compute for a segmented refinement — **pure**: reads the refiner + input + history,
 /// returns the result, mutates nothing. This is where the model time is spent, so it is the
 /// part that must run OFF the session lock. The adapter calls it between
@@ -106,9 +116,14 @@ pub fn compute_segmented_refinement(
             segments: candidate
                 .segments
                 .into_iter()
-                .map(|segment| PhraseSegment {
-                    input: segment.input,
-                    output: segment.output,
+                .map(|segment| {
+                    let mut roman_hints = refiner.exact_match_roman_variants(&segment.input, &segment.output);
+                    roman_hints.truncate(3);
+                    PhraseSegment {
+                        input: segment.input,
+                        output: segment.output,
+                        roman_hints,
+                    }
                 })
                 .collect(),
         })
@@ -373,9 +388,16 @@ impl ImeSession {
                 segments: candidate
                     .segments
                     .into_iter()
-                    .map(|segment| PhraseSegment {
-                        input: segment.input,
-                        output: segment.output,
+                    .map(|segment| {
+                        let mut roman_hints = self
+                            .transliterator
+                            .exact_match_roman_variants(&segment.input, &segment.output);
+                        roman_hints.truncate(3);
+                        PhraseSegment {
+                            input: segment.input,
+                            output: segment.output,
+                            roman_hints,
+                        }
                     })
                     .collect(),
             })
@@ -452,7 +474,12 @@ impl ImeSession {
     /// (e.g. the model span-proposal provider) instead of the cheap live engine. Called off
     /// the keystroke hot path. Falls back to the live rebuild if no visible refiner is set.
     pub fn refine_segmented_with_visible_refiner(&mut self, raw_preedit: &str) -> bool {
-        if self.options.segmented_preview != SegmentedPreviewMode::Enabled {
+        // `Deferred` defers *when* a preview is built (lazily, off the keystroke path), not
+        // *whether* the visible refiner may build one. This refine is already debounced, so
+        // both Deferred and Enabled run it; only `Disabled` opts out entirely. Gating on
+        // `Enabled` alone left the IBus bridge — the one adapter that uses Deferred — never
+        // consulting the visible refiner, so a model provider was unreachable there.
+        if self.options.segmented_preview == SegmentedPreviewMode::Disabled {
             return false;
         }
         if self.segment_edit_state.is_some() {
@@ -473,7 +500,7 @@ impl ImeSession {
         if would_degrade_to_roman(&self.candidates, &refinement) {
             return self.segmented_session.is_some();
         }
-        if would_collapse_segmentation(self.segmented_session.as_ref(), &refinement) {
+        if would_collapse_segmentation(self.segmented_session.as_ref(), &refinement) && !model_rescue_won(&refinement) {
             return self.segmented_session.is_some();
         }
         self.segmented_session = refinement.segmented_session;
@@ -524,7 +551,7 @@ impl ImeSession {
         if would_degrade_to_roman(&self.candidates, &refinement) {
             return self.segmented_session.is_some();
         }
-        if would_collapse_segmentation(self.segmented_session.as_ref(), &refinement) {
+        if would_collapse_segmentation(self.segmented_session.as_ref(), &refinement) && !model_rescue_won(&refinement) {
             return true; // keep the richer live segmentation; the timed-out refine is worse
         }
         self.segmented_session = refinement.segmented_session;
@@ -559,7 +586,8 @@ mod tests {
 
     use crate::ime_session::ImeSession;
     use crate::test_support::{
-        phase_a_session_without_segmented_preview, segmented_default_session_like_ibus_bridge, session, type_ascii,
+        phase_a_session_without_segmented_preview, segmented_default_session_like_ibus_bridge,
+        segmented_deferred_session_like_ibus_bridge, session, type_ascii,
     };
 
     // Lock-free refine: the model runs OFF the session lock, then the result is applied. If the
@@ -612,6 +640,40 @@ mod tests {
         assert!(
             session.snapshot().segmented_active,
             "a refinement that collapses the multi-word segmentation must not wipe the phrase strip"
+        );
+    }
+
+    #[test]
+    fn successful_model_rescue_may_replace_a_live_multiword_segmentation() {
+        // Real IBus ordering: the cheap 220 ms refresh first builds `dom|ra`, then the
+        // 400 ms Visible Refiner returns a successful one-span model rescue. Segment-count
+        // collapse alone cannot distinguish that intentional winner from a timeout fallback.
+        let mut session = session();
+        type_ascii(&mut session, "khnhomtov");
+        assert!(session.snapshot().segmented_active);
+
+        let rescued = super::SegmentedRefinement {
+            segmented_session: None,
+            candidates: vec!["តម្រា".to_string()],
+            phrase_candidates: vec![crate::adapter_contract::PhraseCandidate {
+                text: "តម្រា".to_string(),
+                segments: vec![crate::adapter_contract::PhraseSegment {
+                    input: "khnhomtov".to_string(),
+                    output: "តម្រា".to_string(),
+                    roman_hints: vec![],
+                }],
+                from_model: true,
+                lexicon_verified: true,
+            }],
+        };
+
+        session.apply_segmented_refinement("khnhomtov", rescued);
+        let snapshot = session.snapshot();
+
+        assert_eq!(snapshot.candidates.first().map(String::as_str), Some("តម្រា"));
+        assert_eq!(
+            snapshot.phrase_candidates.first().map(|item| item.from_model),
+            Some(true)
         );
     }
 
@@ -810,6 +872,35 @@ mod tests {
             Some(1),
             "single-word visible refine must not reset the user's Space/Down selection"
         );
+    }
+
+    #[test]
+    fn visible_refine_runs_under_deferred_segmented_preview() {
+        // The IBus bridge builds its session with `Deferred` — a latency choice, not a
+        // statement that the good engine should never run. Gating this debounced refine on
+        // `Enabled` meant IBus alone never consulted the visible refiner, so a model
+        // span-proposal provider was silently unreachable there.
+        let mut session = segmented_deferred_session_like_ibus_bridge();
+        type_ascii(&mut session, "khnhomtov");
+        let raw = session.snapshot().raw_preedit.clone();
+
+        assert!(
+            session.refine_segmented_with_visible_refiner(&raw),
+            "a debounced refine must reach the visible refiner under Deferred, not just Enabled"
+        );
+        assert!(session.snapshot().segmented_active);
+    }
+
+    #[test]
+    fn visible_refine_stays_disabled_when_segmented_preview_is_off() {
+        // Disabled still means disabled: that adapter opted out of segmented previews
+        // entirely, so the refine must not build one behind its back.
+        let mut session = phase_a_session_without_segmented_preview();
+        type_ascii(&mut session, "khnhomtov");
+        let raw = session.snapshot().raw_preedit.clone();
+
+        assert!(!session.refine_segmented_with_visible_refiner(&raw));
+        assert!(!session.snapshot().segmented_active);
     }
 
     #[test]

@@ -588,7 +588,14 @@ fn bridge_snapshot_exposes_phrase_candidates_for_the_phrase_level() {
     // Each phrase carries its own segmentation, which is what makes it a whole-phrase
     // reading rather than a word candidate.
     assert!(phrases[0]["text"].as_str().is_some_and(|text| !text.is_empty()));
-    assert!(phrases[0]["segments"].is_array());
+    let segments = phrases[0]["segments"]
+        .as_array()
+        .expect("each phrase must serialize its segmentation");
+    assert!(!segments.is_empty());
+    assert!(
+        segments.iter().all(|segment| segment["roman_hints"].is_array()),
+        "each phrase segment must carry its own canonical roman variants to Python"
+    );
 
     shutdown_and_assert_ok(child, &mut stdin, &mut stdout);
 }

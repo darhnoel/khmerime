@@ -1,8 +1,9 @@
-"""Engine-level behavior: the rows IBus actually paints carry roman only in
-Flat mode. In a Segmented Session the roman lives in the segment preview (aux
-text), so Phrase and Segment rows are Khmer-only — the two-level Candidate
-Surface port (linux-ibus ADR-0001). Reuses the gi-stub harness from
-test_ibus_mode_property; the bridge is faked at _call_bridge_raw.
+"""Engine-level behavior for rows IBus actually paints.
+
+Flat rows carry their normal suggestion hints. Phrase rows carry each whole
+candidate's own canonical roman pair, while Segment-edit rows stay Khmer-only.
+Reuses the gi-stub harness from test_ibus_mode_property; the bridge is faked at
+_call_bridge_raw.
 """
 
 from __future__ import annotations
