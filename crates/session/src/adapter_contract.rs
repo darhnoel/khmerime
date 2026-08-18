@@ -162,6 +162,9 @@ pub struct PhraseCandidate {
 pub struct PhraseSegment {
     pub input: String,
     pub output: String,
+    /// Canonical Lexicon romanizations for this Khmer output, ranked with an
+    /// exact input spelling first when present. Empty for unverified model text.
+    pub roman_hints: Vec<String>,
 }
 
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize)]

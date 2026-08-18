@@ -153,10 +153,12 @@ mod tests {
                         PhraseSegment {
                             input: "khnhom".to_owned(),
                             output: "ខ្ញុំ".to_owned(),
+                            roman_hints: vec![],
                         },
                         PhraseSegment {
                             input: "tov".to_owned(),
                             output: "ទៅ".to_owned(),
+                            roman_hints: vec![],
                         },
                     ],
                     ..PhraseCandidate::default()
@@ -167,10 +169,12 @@ mod tests {
                         PhraseSegment {
                             input: "khnhom".to_owned(),
                             output: "ខ្ចុំ".to_owned(),
+                            roman_hints: vec![],
                         },
                         PhraseSegment {
                             input: "tov".to_owned(),
                             output: "ទៅ".to_owned(),
+                            roman_hints: vec![],
                         },
                     ],
                     ..PhraseCandidate::default()
@@ -198,6 +202,7 @@ mod tests {
         let seg = |i: &str, o: &str| PhraseSegment {
             input: i.to_owned(),
             output: o.to_owned(),
+            roman_hints: vec![],
         };
         SessionSnapshot {
             segmented_active: true,

@@ -217,6 +217,7 @@ mod tests {
                     segments: vec![PhraseSegment {
                         input: "muoy".to_owned(),
                         output: "one".to_owned(),
+                        roman_hints: vec![],
                     }],
                     ..PhraseCandidate::default()
                 },

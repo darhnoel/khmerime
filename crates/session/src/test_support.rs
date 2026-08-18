@@ -99,6 +99,27 @@ pub(crate) fn phase_a_session_without_segmented_preview() -> ImeSession {
     session
 }
 
+/// The IBus bridge's *actual* configuration: same engines as
+/// [`segmented_default_session_like_ibus_bridge`], but with
+/// `SegmentedPreviewMode::Deferred`, which is what the bridge passes when
+/// `--deferred-segmented-preview` is set (it always is, from the Python adapter).
+pub(crate) fn segmented_deferred_session_like_ibus_bridge() -> ImeSession {
+    let live =
+        Transliterator::from_default_data_with_config(DecoderConfig::shadow_interactive()).expect("default data");
+    let mut visible_config = DecoderConfig::shadow_interactive().with_mode(DecoderMode::Hybrid);
+    visible_config.wfst_max_latency_ms = 75;
+    let visible_refiner = Transliterator::from_default_data_with_config(visible_config).expect("default data");
+    let mut session = ImeSession::builder(live, HashMap::new())
+        .visible_refiner(visible_refiner)
+        .options(ImeSessionOptions {
+            segmented_preview: SegmentedPreviewMode::Deferred,
+            page_size: 10,
+        })
+        .build();
+    session.focus_in();
+    session
+}
+
 pub(crate) fn segmented_default_session_like_ibus_bridge() -> ImeSession {
     let live =
         Transliterator::from_default_data_with_config(DecoderConfig::shadow_interactive()).expect("default data");

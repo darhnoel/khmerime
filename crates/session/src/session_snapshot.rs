@@ -241,6 +241,15 @@ mod tests {
         assert!(recommended
             .iter()
             .any(|entry| entry.roman_hints.iter().any(|hint| hint == "jea")));
+        assert!(
+            snapshot.phrase_candidates.iter().any(|phrase| {
+                phrase
+                    .segments
+                    .iter()
+                    .any(|segment| segment.output == "ជា" && segment.roman_hints.iter().any(|hint| hint == "jea"))
+            }),
+            "phrase rows must retain canonical roman pairs after selection"
+        );
     }
 
     #[test]
