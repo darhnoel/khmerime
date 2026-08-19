@@ -68,6 +68,11 @@ class RefinementScheduler:
             )
 
     def _should_retry(self, raw_preedit: str, response: Any) -> bool:
+        # The bridge runs the refinement on a worker thread and answers immediately so the
+        # stdio pipe stays free for keystrokes. Its result therefore is not in this snapshot;
+        # poll again to collect it, as long as the user is still composing the same text.
+        if getattr(response, "refinement_pending", False) and raw_preedit == self._current_raw_preedit():
+            return True
         readiness = getattr(response, "readiness", "unknown")
         if readiness == "phase_a" and raw_preedit == self._current_raw_preedit():
             self._log(
