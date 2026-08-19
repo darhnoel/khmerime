@@ -85,6 +85,26 @@ fn spawn_full_bridge_deferred_preview() -> (Child, ChildStdin, BufReader<std::pr
     spawn_bridge_with_args(&["--synchronous-full-startup", "--deferred-segmented-preview"])
 }
 
+/// The bridge as the IBus adapter actually launches it — `--deferred-segmented-preview` — with
+/// the in-tree deterministic span-proposal provider armed. `static-test` keeps this runnable in
+/// the public build: no model, no private crate, but the same `SpanProposalMode` code path a real
+/// provider takes.
+fn spawn_deferred_bridge_with_span_proposals() -> (Child, ChildStdin, BufReader<std::process::ChildStdout>) {
+    let mut command = Command::new(bridge_path());
+    command
+        .args(["--synchronous-full-startup", "--deferred-segmented-preview"])
+        .env("KHMERIME_SPAN_PROPOSALS", "static-test");
+    let mut child = command
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::null())
+        .spawn()
+        .expect("spawn bridge");
+    let stdin = child.stdin.take().expect("stdin");
+    let stdout = child.stdout.take().expect("stdout");
+    (child, stdin, BufReader::new(stdout))
+}
+
 fn send_command(stdin: &mut impl Write, command: &str) {
     writeln!(stdin, "{command}").expect("write command");
     stdin.flush().expect("flush command");
@@ -1004,6 +1024,94 @@ fn bridge_consumes_up_down_during_segmented_selection() {
     assert_eq!(up["consumed"], Value::Bool(true));
     assert_eq!(up["snapshot"]["segmented_active"], Value::Bool(true));
     assert_eq!(up["snapshot"]["focused_segment_index"], Value::from(0));
+
+    shutdown_and_assert_ok(child, &mut stdin, &mut stdout);
+}
+
+/// The refine must reach the visible refiner in the mode the adapter actually runs.
+///
+/// This is the configuration regression that hid three separate bugs: `refine_inputs`,
+/// `apply_segmented_refinement`, and `refine_segmented_with_visible_refiner` each required
+/// `SegmentedPreviewMode::Enabled`, while the IBus bridge passes `Deferred`. Tests that spawned
+/// the bridge *without* `--deferred-segmented-preview` all passed, so a span-proposal provider was
+/// unreachable in the only mode that ships.
+#[test]
+fn deferred_bridge_runs_the_refine_and_settles_its_pending_flag() {
+    let (child, mut stdin, mut stdout) = spawn_deferred_bridge_with_span_proposals();
+
+    send_command(&mut stdin, r#"{"cmd":"focus_in"}"#);
+    let _ = read_response(&mut stdout);
+    send_ascii_text(&mut stdin, &mut stdout, "khnhomtov");
+
+    // First refine: the work is handed to a worker thread, so the bridge answers immediately and
+    // reports the result as still pending rather than blocking the pipe to produce it.
+    send_command(&mut stdin, r#"{"cmd":"refine_composition","raw_preedit":"khnhomtov"}"#);
+    let started = read_response(&mut stdout);
+    assert_eq!(started["ok"], Value::Bool(true));
+    assert_eq!(
+        started["refinement_pending"],
+        Value::Bool(true),
+        "under Deferred the refine must actually start; a silent no-op is the bug this guards"
+    );
+
+    // Poll until the worker's result has been collected. It must settle: a pending flag that
+    // never clears means the adapter would poll forever.
+    let mut settled = false;
+    for _ in 0..40 {
+        std::thread::sleep(Duration::from_millis(50));
+        send_command(&mut stdin, r#"{"cmd":"snapshot"}"#);
+        let response = read_response(&mut stdout);
+        if response["refinement_pending"] != Value::Bool(true) {
+            settled = true;
+            assert!(
+                !response["snapshot"]["candidates"]
+                    .as_array()
+                    .map(|items| items.is_empty())
+                    .unwrap_or(true),
+                "a settled refinement must leave candidates behind"
+            );
+            break;
+        }
+    }
+    assert!(settled, "the pending refinement never completed");
+
+    shutdown_and_assert_ok(child, &mut stdin, &mut stdout);
+}
+
+/// A refine must never occupy the stdio pipe. The bridge is single-threaded over one pipe, so a
+/// synchronous refine makes the next keystroke queue behind it — measured at 300-600 ms of input
+/// lag once a model provider is armed.
+#[test]
+fn deferred_bridge_answers_a_refine_without_blocking_the_pipe() {
+    let (child, mut stdin, mut stdout) = spawn_deferred_bridge_with_span_proposals();
+
+    send_command(&mut stdin, r#"{"cmd":"focus_in"}"#);
+    let _ = read_response(&mut stdout);
+    send_ascii_text(&mut stdin, &mut stdout, "khnhomtov");
+
+    let started = Instant::now();
+    send_command(&mut stdin, r#"{"cmd":"refine_composition","raw_preedit":"khnhomtov"}"#);
+    let _ = read_response(&mut stdout);
+    let refine_reply = started.elapsed();
+
+    // The refine itself costs hundreds of milliseconds; the *answer* must not.
+    assert!(
+        refine_reply < Duration::from_millis(60),
+        "refine reply took {refine_reply:.2?}; it is running inline and will stall typing"
+    );
+
+    // And a keystroke arriving while that work is still in flight is served promptly.
+    let started = Instant::now();
+    send_command(
+        &mut stdin,
+        r#"{"cmd":"process_key_event","keyval":97,"keycode":0,"state":0}"#,
+    );
+    let _ = read_response(&mut stdout);
+    let keystroke = started.elapsed();
+    assert!(
+        keystroke < KEYPRESS_MAX_BUDGET,
+        "keystroke during an in-flight refine took {keystroke:.2?}, over the {KEYPRESS_MAX_BUDGET:.2?} budget"
+    );
 
     shutdown_and_assert_ok(child, &mut stdin, &mut stdout);
 }

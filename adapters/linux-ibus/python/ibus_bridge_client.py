@@ -20,6 +20,7 @@ class BridgeResponse:
     snapshot: Dict[str, Any]
     error: Optional[str]
     timings: Optional[Dict[str, float]] = None
+    refinement_pending: bool = False
 
 
 class BridgeClient:
@@ -95,6 +96,7 @@ class BridgeClient:
             snapshot=data.get("snapshot", {}),
             error=data.get("error"),
             timings=data.get("timings"),
+            refinement_pending=bool(data.get("refinement_pending", False)),
         )
 
     def shutdown(self) -> None:

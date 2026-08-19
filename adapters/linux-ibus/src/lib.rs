@@ -99,6 +99,11 @@ pub struct BridgeResponse<S> {
     pub error: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub timings: Option<BridgeTimings>,
+    /// True when a refinement is still computing on a worker thread. The refine command returns
+    /// immediately so the stdio pipe stays free for keystrokes, which means its result is not in
+    /// this snapshot yet — the adapter polls again to collect it.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub refinement_pending: bool,
 }
 
 pub fn fallback_empty_snapshot_json(error: impl Into<String>) -> serde_json::Value {

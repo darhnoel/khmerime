@@ -1,4 +1,4 @@
-.PHONY: help web web-release web-phone web-local desktop stats suggest suggest-wfst suggest-shadow shadow-eval data-split data-build data-check lexicon-editor visualize-lexicon visualize-lexicon-streamlit download-page fmt test test-golden test-ui platform-check platform-check-linux platform-check-android platform-check-ios platform-check-macos platform-check-windows platform-ios-assets platform-android-assets platform-build-ios platform-test-ios platform-install-ios-sim platform-reinstall-ios-sim platform-install-ios-device platform-reinstall-ios-device platform-build-macos platform-diagnose-macos platform-install-macos platform-reinstall-macos platform-build-windows platform-install-windows platform-uninstall-windows platform-reinstall-windows platform-smoke-windows-notepad platform-smoke-windows-notepad-python windows-package linux-package macos-package android-package ios-package ios-release package ibus-install ibus-uninstall ibus-smoke paper-current paper-current-clean platform-test-android platform-build-android android-adb-device platform-install-android platform-reinstall-android setup-hooks
+.PHONY: help web web-release web-phone web-local desktop stats suggest suggest-wfst suggest-shadow shadow-eval data-split data-build data-check lexicon-editor visualize-lexicon visualize-lexicon-streamlit download-page fmt test test-golden test-ui platform-check platform-check-linux platform-check-android platform-check-ios platform-check-macos platform-check-windows platform-ios-assets platform-android-assets platform-build-ios platform-test-ios platform-install-ios-sim platform-reinstall-ios-sim platform-install-ios-device platform-reinstall-ios-device platform-build-macos platform-diagnose-macos platform-install-macos platform-reinstall-macos platform-build-windows platform-install-windows platform-uninstall-windows platform-reinstall-windows platform-smoke-windows-notepad platform-smoke-windows-notepad-python windows-package linux-package macos-package android-package ios-package ios-release package ibus-install ibus-uninstall ibus-smoke ibus-smoke-gedit paper-current paper-current-clean platform-test-android platform-build-android android-adb-device platform-install-android platform-reinstall-android setup-hooks
 
 DX ?= dx
 PYTHON ?= python3
@@ -135,6 +135,7 @@ help:
 	"  make ibus-install                Build and install KhmerIME IBus engine files (may use sudo)" \
 	"  make ibus-uninstall              Remove KhmerIME IBus engine files" \
 	"  make ibus-smoke                  Run bridge + IBus discovery smoke checks" \
+	"  make ibus-smoke-gedit            Type into gedit via live IBus and report engine output" \
 	"  make paper-current               Build the current implementation paper PDF" \
 	"  make paper-current-clean         Remove LaTeX build byproducts from the paper folder" \
 	"" \
@@ -507,6 +508,15 @@ ibus-uninstall:
 
 ibus-smoke:
 	bash scripts/platforms/linux/ibus/smoke_test.sh
+
+# Types into a real gedit window through the running ibus-daemon and reports what the engine
+# saw. Needs an X session with the engine installed and selected; the bridge protocol tests
+# cannot reach the adapter, panel, or engine-routing layers this covers.
+# Uses the system interpreter by default: python3-xlib and gi are system packages, and a
+# project venv typically has neither.
+IBUS_SMOKE_PYTHON ?= /usr/bin/python3
+ibus-smoke-gedit:
+	$(IBUS_SMOKE_PYTHON) scripts/platforms/linux/ibus/gedit_smoke.py --text $(or $(TEXT),tonle) --screenshot $(or $(SHOT),/tmp/khmerime-gedit-smoke.png)
 
 paper-current:
 	cd $(PAPER_CURRENT_DIR) && TEXMFVAR=/tmp/texmf-var lualatex -interaction=nonstopmode -halt-on-error $(PAPER_CURRENT_TEX)

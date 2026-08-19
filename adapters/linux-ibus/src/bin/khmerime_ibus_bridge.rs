@@ -8,8 +8,8 @@ use khmerime_linux_ibus::{
     fallback_empty_snapshot_json, BridgeCommand, BridgeReadiness, BridgeResponse, BridgeTimings, DesktopHistoryStore,
 };
 use khmerime_session::{
-    HistoryStore, ImeSession, ImeSessionOptions, ImeSessionSnapshot, ImeSessionUpdate, InputMode, SegmentedPreviewMode,
-    SessionCommand,
+    compute_segmented_refinement, HistoryStore, ImeSession, ImeSessionOptions, ImeSessionSnapshot, ImeSessionUpdate,
+    InputMode, SegmentedPreviewMode, SegmentedRefinement, SessionCommand,
 };
 
 // Short grace, not a wait: full warmup measured at ~2.8s in release builds, so
@@ -25,12 +25,30 @@ struct FullEngines {
     commit_refiner: Transliterator,
 }
 
+/// A refinement computed on a worker thread, tagged with the composition generation it was
+/// started for so a result made stale by newer typing can be dropped instead of applied.
+struct PendingRefinement {
+    generation: u64,
+    raw: String,
+    refinement: SegmentedRefinement,
+}
+
 struct BridgeRuntime {
     session: ImeSession,
     readiness: BridgeReadiness,
     full_warmup: Option<Receiver<Result<FullEngines, String>>>,
     pending_engines: Option<FullEngines>,
     full_segmented_preview_mode: SegmentedPreviewMode,
+    /// In-flight background refinement. The bridge answers `RefineComposition` immediately and
+    /// collects the result on a later command, so the ~280 ms refine never occupies the stdio
+    /// pipe — a keystroke arriving mid-refine is served straight away instead of queueing.
+    refine_worker: Option<Receiver<PendingRefinement>>,
+    /// Bumped on every key event. A refinement whose generation no longer matches was made
+    /// stale by typing that happened while it computed.
+    generation: u64,
+    /// Composition the last background refinement was started for, so a poll loop does not
+    /// re-arm the same work forever.
+    last_refined: Option<String>,
 }
 
 impl BridgeRuntime {
@@ -61,6 +79,9 @@ impl BridgeRuntime {
             full_warmup,
             pending_engines: None,
             full_segmented_preview_mode,
+            refine_worker: None,
+            generation: 0,
+            last_refined: None,
         })
     }
 
@@ -90,6 +111,9 @@ impl BridgeRuntime {
             full_warmup: None,
             pending_engines: None,
             full_segmented_preview_mode,
+            refine_worker: None,
+            generation: 0,
+            last_refined: None,
         })
     }
 
@@ -106,6 +130,58 @@ impl BridgeRuntime {
                 self.readiness = BridgeReadiness::Failed;
                 eprintln!("[ibus-startup] full_warmup.disconnected");
             }
+        }
+    }
+
+    /// Start a refinement on a worker thread and return at once, leaving the stdio pipe free.
+    /// The snapshot phase (`refine_inputs`) is cheap — an `Arc` bump and two small clones — so
+    /// the caller pays microseconds instead of the ~280 ms the refinement itself costs.
+    fn start_background_refine(&mut self, raw_preedit: &str) -> bool {
+        if self.refine_worker.is_some() {
+            return false; // one in flight is enough; the next poll picks it up
+        }
+        if self.last_refined.as_deref() == Some(raw_preedit) {
+            // Already refined this exact composition. Without this the adapter's
+            // poll-until-collected loop would re-arm a fresh refinement on every poll and
+            // never settle.
+            return false;
+        }
+        let Some((refiner, raw, history)) = self.session.refine_inputs(raw_preedit) else {
+            return false;
+        };
+        self.last_refined = Some(raw_preedit.to_owned());
+        let generation = self.generation;
+        let (sender, receiver) = mpsc::channel();
+        thread::spawn(move || {
+            let refinement = compute_segmented_refinement(&refiner, &raw, &history);
+            let _ = sender.send(PendingRefinement {
+                generation,
+                raw,
+                refinement,
+            });
+        });
+        self.refine_worker = Some(receiver);
+        true
+    }
+
+    /// Collect a finished background refinement, if any. Applied only when the composition has
+    /// not moved on: a refinement computed for text the user has since edited would clobber the
+    /// candidates they are now looking at.
+    fn poll_background_refine(&mut self) {
+        let Some(receiver) = self.refine_worker.take() else {
+            return;
+        };
+        match receiver.try_recv() {
+            Ok(pending) => {
+                if pending.generation == self.generation {
+                    self.session
+                        .apply_segmented_refinement(&pending.raw, pending.refinement);
+                }
+            }
+            Err(TryRecvError::Empty) => {
+                self.refine_worker = Some(receiver);
+            }
+            Err(TryRecvError::Disconnected) => {}
         }
     }
 
@@ -190,6 +266,7 @@ fn build_response(
         snapshot,
         error: None,
         timings: None,
+        refinement_pending: false,
     }
 }
 
@@ -207,6 +284,7 @@ fn error_response(
         snapshot: session.snapshot(),
         error: Some(message.into()),
         timings: None,
+        refinement_pending: false,
     }
 }
 
@@ -381,6 +459,15 @@ fn apply_command(runtime: &mut BridgeRuntime, command: BridgeCommand) -> (Bridge
     let mut t_hist = 0.0_f64;
 
     runtime.poll_full_warmup();
+    // Collect a finished background refinement before serving this command, so its result
+    // reaches the snapshot at the next opportunity rather than blocking the pipe to produce it.
+    runtime.poll_background_refine();
+    if matches!(command, BridgeCommand::ProcessKeyEvent { .. }) {
+        // Any key invalidates a refinement in flight for the older composition, and re-opens
+        // refinement for whatever the composition becomes — including the same text typed again.
+        runtime.generation = runtime.generation.wrapping_add(1);
+        runtime.last_refined = None;
+    }
 
     let is_enter = matches!(
         command,
@@ -412,6 +499,8 @@ fn apply_command(runtime: &mut BridgeRuntime, command: BridgeCommand) -> (Bridge
     }
 
     let mut response_error = None;
+    // Set by the RefineComposition arm; started after the session borrow ends.
+    let mut background_refine_for: Option<String> = None;
     let (update, should_exit) = {
         let session = &mut runtime.session;
         match command {
@@ -432,9 +521,13 @@ fn apply_command(runtime: &mut BridgeRuntime, command: BridgeCommand) -> (Bridge
                 // lazily). Only when it declines — which includes the case it explicitly bails
                 // on, an already-segmented session — do we run the segmented refine, the one
                 // path that consults the visible refiner and therefore any model provider.
-                if session.apply_refined_candidate(&raw_preedit).is_none() {
-                    session.refine_segmented_with_visible_refiner(&raw_preedit);
-                }
+                // The segmented refine is what carries model provenance into `phrase_candidates`,
+                // so it must run whether or not the flat promotion succeeded — gating it on the
+                // flat path failing left a successful flat refine short-circuiting the model
+                // result entirely. It is handed to a worker thread after this borrow ends, so the
+                // ~280 ms never occupies the pipe.
+                session.apply_refined_candidate(&raw_preedit);
+                background_refine_for = Some(raw_preedit);
                 t_proc = started.elapsed().as_secs_f64() * 1000.0;
                 (ImeSessionUpdate::default(), false)
             }
@@ -508,12 +601,18 @@ fn apply_command(runtime: &mut BridgeRuntime, command: BridgeCommand) -> (Bridge
         }
     };
 
+    if let Some(raw) = background_refine_for {
+        runtime.start_background_refine(&raw);
+    }
+    let refinement_pending = runtime.refine_worker.is_some();
+
     runtime.poll_full_warmup();
     runtime.maybe_complete_full_upgrade();
     let snap_started = Instant::now();
     let snapshot = runtime.session.snapshot();
     let t_snap = snap_started.elapsed().as_secs_f64() * 1000.0;
     let mut response = build_response(snapshot, runtime.readiness, update);
+    response.refinement_pending = refinement_pending;
     response.error = response_error;
     if emit_timings {
         let total = cmd_started.elapsed().as_secs_f64() * 1000.0;

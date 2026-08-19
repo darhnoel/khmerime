@@ -515,7 +515,11 @@ impl ImeSession {
     /// copies), or `None` if a refine shouldn't run. The caller runs [`compute_segmented_refinement`]
     /// OFF the session lock, then re-locks for [`Self::apply_segmented_refinement`].
     pub fn refine_inputs(&self, raw: &str) -> Option<(Arc<Transliterator>, String, HashMap<String, usize>)> {
-        if self.options.segmented_preview != SegmentedPreviewMode::Enabled {
+        // Same rule as `refine_segmented_with_visible_refiner`: `Deferred` defers *when* a
+        // preview is built, not *whether* the visible refiner may run. Requiring `Enabled` here
+        // meant the IBus bridge — the only adapter using `Deferred` — could never snapshot the
+        // inputs for an off-pipe refine, so its model provider stayed unreachable.
+        if self.options.segmented_preview == SegmentedPreviewMode::Disabled {
             return None;
         }
         if self.segment_edit_state.is_some() {
@@ -536,7 +540,9 @@ impl ImeSession {
     /// while the model ran (`composition_raw != raw`), the stale refinement is discarded rather
     /// than clobbering the candidates the user is now looking at.
     pub fn apply_segmented_refinement(&mut self, raw: &str, refinement: SegmentedRefinement) -> bool {
-        if self.options.segmented_preview != SegmentedPreviewMode::Enabled {
+        // `Deferred` defers when a preview is built, not whether a computed refinement may be
+        // applied; only `Disabled` opts out. Mirrors `refine_inputs`, which produced this.
+        if self.options.segmented_preview == SegmentedPreviewMode::Disabled {
             return false;
         }
         if self.segment_edit_state.is_some() {
