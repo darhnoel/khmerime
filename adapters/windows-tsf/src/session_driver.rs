@@ -8,7 +8,7 @@ use std::sync::mpsc::{self, Receiver, TryRecvError};
 use std::thread;
 use std::time::Instant;
 
-use khmerime_core::{DecoderConfig, Result as KhmerResult, Transliterator};
+use khmerime_core::{DecoderConfig, Result as KhmerResult, SpanProposalMode, Transliterator};
 use khmerime_session::{HistoryStore, ImeSession, NativeKeyEvent, SegmentedPreviewMode, SessionCommand};
 
 use crate::diagnostics::log;
@@ -31,10 +31,21 @@ pub enum DriverReadiness {
     Failed,
 }
 
+/// The engines produced by the full warmup.
+///
+/// Grouped so the swap is atomic: the live engine and its **Visible Refiner** must be installed
+/// together, or a refine could run against a different engine than the one that produced the
+/// composition.
+pub struct FullEngines {
+    pub live: Transliterator,
+    /// `None` when unarmed — see [`visible_refiner_config`].
+    pub visible_refiner: Option<Transliterator>,
+}
+
 pub struct WindowsSessionDriver {
     session: ImeSession,
-    full_warmup: Option<Receiver<Result<Transliterator, String>>>,
-    pending_engine: Option<Transliterator>,
+    full_warmup: Option<Receiver<Result<FullEngines, String>>>,
+    pending_engines: Option<FullEngines>,
     readiness: DriverReadiness,
 }
 
@@ -43,7 +54,7 @@ impl WindowsSessionDriver {
         Self {
             session,
             full_warmup: None,
-            pending_engine: None,
+            pending_engines: None,
             readiness: DriverReadiness::Full,
         }
     }
@@ -74,7 +85,7 @@ impl WindowsSessionDriver {
         Ok(Self {
             session: ImeSession::new(transliterator, HashMap::new()),
             full_warmup: Some(spawn_full_engine_warmup()),
-            pending_engine: None,
+            pending_engines: None,
             readiness: DriverReadiness::PhaseA,
         })
     }
@@ -85,7 +96,7 @@ impl WindowsSessionDriver {
             return;
         };
         match receiver.try_recv() {
-            Ok(Ok(engine)) => self.install_full_engine(engine),
+            Ok(Ok(engines)) => self.install_full_engines(engines),
             Ok(Err(error)) => {
                 self.readiness = DriverReadiness::Failed;
                 log(format!("[warmup-trace] full_warmup.failed error={error}"));
@@ -100,18 +111,26 @@ impl WindowsSessionDriver {
         }
     }
 
-    fn install_full_engine(&mut self, engine: Transliterator) {
+    fn install_full_engines(&mut self, engines: FullEngines) {
         if self.session.composition_is_empty() {
-            self.session
-                .replace_engines(engine, None, SegmentedPreviewMode::Enabled);
-            self.readiness = DriverReadiness::Full;
+            self.apply_full_engines(engines);
             log("[warmup-trace] full_upgrade.applied");
             return;
         }
 
-        self.pending_engine = Some(engine);
+        self.pending_engines = Some(engines);
         self.readiness = DriverReadiness::FullPending;
         log("[warmup-trace] full_upgrade.deferred active_composition=true");
+    }
+
+    fn apply_full_engines(&mut self, engines: FullEngines) {
+        self.session.replace_engines_with_refiners(
+            engines.live,
+            engines.visible_refiner,
+            None,
+            SegmentedPreviewMode::Enabled,
+        );
+        self.readiness = DriverReadiness::Full;
     }
 
     /// Applies a deferred upgrade once the composition goes idle.
@@ -119,12 +138,10 @@ impl WindowsSessionDriver {
         if self.readiness != DriverReadiness::FullPending || !self.session.composition_is_empty() {
             return;
         }
-        let Some(engine) = self.pending_engine.take() else {
+        let Some(engines) = self.pending_engines.take() else {
             return;
         };
-        self.session
-            .replace_engines(engine, None, SegmentedPreviewMode::Enabled);
-        self.readiness = DriverReadiness::Full;
+        self.apply_full_engines(engines);
         log("[warmup-trace] full_upgrade.applied_after_idle");
     }
 
@@ -173,6 +190,27 @@ impl WindowsSessionDriver {
         derive_render_state(&self.session.snapshot(), &result)
     }
 
+    /// Runs the **Visible Refiner** against the live **Composition**.
+    ///
+    /// Routing is the part worth hiding: a **Segmented Session** refreshes its preview, while a
+    /// flat composition refines its **Candidate List**. Callers should not have to know which
+    /// shape the composition is in, only that they want it refined.
+    ///
+    /// Both shared entry points already reject a stale `raw_preedit`, a touched selection, and a
+    /// non-roman input mode, so this deliberately re-checks none of that — duplicating those
+    /// guards here is how the two copies drift apart.
+    pub fn refine_now(&mut self) -> bool {
+        let raw = self.session.composition_raw().to_owned();
+        if raw.is_empty() {
+            return false;
+        }
+        if self.session.segmented_preview_active() {
+            self.session.refresh_segmented_preview(&raw)
+        } else {
+            self.session.apply_refined_candidate(&raw).is_some()
+        }
+    }
+
     pub fn snapshot_render_state(&self) -> WindowsRenderState {
         derive_render_state(&self.session.snapshot(), &Default::default())
     }
@@ -181,6 +219,44 @@ impl WindowsSessionDriver {
         &self.session
     }
 }
+
+/// Arming switch for the span-proposal seam, matching the IBus bridge and macOS IMK contract.
+///
+/// `model` resolves to a provider registered by a separate, private build; `static-test` is the
+/// deterministic in-tree provider used by tests. Anything else — including unset — leaves the seam
+/// inert, so the public build is the pure lookup + fuzzy engine (ADR-0016).
+pub const SPAN_PROPOSALS_ENV: &str = "KHMERIME_SPAN_PROPOSALS";
+
+pub fn span_proposal_mode_for(value: Option<&str>) -> SpanProposalMode {
+    match value {
+        Some("model") => SpanProposalMode::Model,
+        Some("static-test") => SpanProposalMode::StaticTest,
+        _ => SpanProposalMode::Disabled,
+    }
+}
+
+/// The **Visible Refiner** config for this arming value, or `None` to build no refiner at all.
+///
+/// Returning `None` when unarmed is deliberate and differs from the IBus bridge, which always
+/// builds a visible refiner (Hybrid when unarmed). Windows has never had one, so constructing it
+/// unconditionally would change ranking for every existing user; the free build must stay exactly
+/// as it is.
+pub fn visible_refiner_config(value: Option<&str>) -> Option<DecoderConfig> {
+    let mode = span_proposal_mode_for(value);
+    if mode == SpanProposalMode::Disabled {
+        return None;
+    }
+    let mut config = DecoderConfig::shadow_interactive().with_span_proposal_mode(mode);
+    // The stock 250 ms budget is sized for a deterministic refiner. Neural inference costs
+    // ~135-150 ms before the WFST does any work, so decodes carrying a model proposal blow the
+    // budget and are discarded wholesale — indistinguishable from the model having nothing to say.
+    // The refine is debounced and off the keystroke path, so the headroom is free.
+    config.wfst_max_latency_ms = MODEL_REFINE_MAX_LATENCY_MS;
+    Some(config)
+}
+
+/// Budget for the debounced **Visible Refiner** once a provider is armed.
+const MODEL_REFINE_MAX_LATENCY_MS: u64 = 2_000;
 
 /// Identifies which host application process is paying this warmup.
 ///
@@ -202,7 +278,7 @@ fn host_process_label() -> String {
 /// `parse_lexicon` + `parse_dictionary_image` prefix that Phase A also pays from
 /// the `ranked_lexicon` and `search_index` stages that Phase A skips. See
 /// `docs/adr/0001-warmup-must-not-leak-roman-into-the-document.md`.
-fn spawn_full_engine_warmup() -> Receiver<Result<Transliterator, String>> {
+fn spawn_full_engine_warmup() -> Receiver<Result<FullEngines, String>> {
     let (sender, receiver) = mpsc::channel();
     thread::spawn(move || {
         let host = host_process_label();
@@ -212,7 +288,18 @@ fn spawn_full_engine_warmup() -> Receiver<Result<Transliterator, String>> {
         let result = Transliterator::from_default_shared_data_with_stage_logger(|stage, elapsed_ms| {
             log(format!("[warmup-trace] stage={stage} elapsed_ms={elapsed_ms:.2}"));
         })
-        .map(|shared| Transliterator::from_shared_data_with_config(&shared, DecoderConfig::shadow_interactive()))
+        .map(|shared| {
+            // Both engines are cheap clones over one SharedTransliteratorData, so the refiner adds
+            // no build cost beyond its own decoder config.
+            let live = Transliterator::from_shared_data_with_config(&shared, DecoderConfig::shadow_interactive());
+            let visible_refiner = visible_refiner_config(std::env::var(SPAN_PROPOSALS_ENV).ok().as_deref())
+                .map(|config| Transliterator::from_shared_data_with_config(&shared, config));
+            log(format!(
+                "[warmup-trace] span_provider_armed={}",
+                visible_refiner.is_some()
+            ));
+            FullEngines { live, visible_refiner }
+        })
         .map_err(|err| err.to_string());
         let total_ms = started.elapsed().as_secs_f64() * 1000.0;
 
@@ -255,6 +342,103 @@ mod tests {
         }
     }
 
+    // An unarmed Windows build must stay byte-identical to today's free behaviour. Linux always
+    // builds a visible refiner (Hybrid when unarmed), but Windows has never had one, so switching
+    // it on unconditionally would change ranking for every existing user. No arming, no refiner.
+    #[test]
+    fn an_unarmed_build_has_no_visible_refiner() {
+        assert!(visible_refiner_config(None).is_none());
+        assert!(visible_refiner_config(Some("")).is_none());
+    }
+
+    // 75 ms is right for a deterministic refiner but starves neural inference, which costs
+    // ~135-150 ms on its own. With the default budget every model-carrying decode times out and is
+    // discarded wholesale, so the model's answer never reaches the user and the failure looks
+    // exactly like "the model had nothing to say". The refine is debounced and off the keystroke
+    // path, so it can afford the headroom.
+    #[test]
+    fn an_armed_refiner_gets_a_budget_neural_inference_can_meet() {
+        let config = visible_refiner_config(Some("model")).expect("model arming builds a refiner");
+
+        assert!(
+            config.wfst_max_latency_ms >= 2_000,
+            "armed refiner budget too tight for inference: {}ms",
+            config.wfst_max_latency_ms
+        );
+    }
+
+    // The refiner has to arrive with the full engine, not with Phase A: Phase A exists to accept
+    // the first keystroke in ~15 ms, and building a second engine there would put the cost straight
+    // back. Attaching it during the swap keeps cold start unchanged.
+    #[test]
+    fn an_armed_driver_attaches_a_visible_refiner_when_the_full_engine_lands() {
+        let mut driver = phase_a_driver();
+        driver.process_callback(WindowsTsfCallback::Activate);
+        assert!(!driver.session().visible_refiner_active());
+
+        driver.install_full_engines(FullEngines {
+            live: fixture_engine(
+                "jea	candidate
+",
+            ),
+            visible_refiner: Some(fixture_engine(
+                "jea	candidate
+",
+            )),
+        });
+
+        assert!(driver.session().visible_refiner_active());
+    }
+
+    fn fixture_engine_with(tsv: &str, config: DecoderConfig) -> Transliterator {
+        Transliterator::from_tsv_str_with_config(tsv, config).expect("fixture must parse")
+    }
+
+    /// A driver whose refiner is armed with the deterministic in-tree provider.
+    ///
+    /// Uses the real Lexicon rather than a fixture: span proposals are assembled by the WFST
+    /// lattice, which a two-entry fixture cannot feed, so a fixture would report "no model
+    /// candidate" for the wrong reason. Both engines are cheap clones over one
+    /// SharedTransliteratorData, so this pays a single build.
+    ///
+    /// `qzx -> គហិបតី` is a StaticTest row chosen precisely because it is absent from the Lexicon:
+    /// only the provider can produce it, so seeing it proves the refine reached the span-proposal
+    /// seam rather than just re-ranking Lexicon entries.
+    fn statically_armed_driver() -> WindowsSessionDriver {
+        let shared = Transliterator::from_default_shared_data().expect("default data must build");
+        let live = Transliterator::from_shared_data_with_config(&shared, DecoderConfig::shadow_interactive());
+        let refiner_config = visible_refiner_config(Some("static-test")).expect("static-test arms a refiner");
+        let visible_refiner = Transliterator::from_shared_data_with_config(&shared, refiner_config);
+
+        let mut driver = WindowsSessionDriver::new(ImeSession::new(
+            Transliterator::from_shared_data_with_config(&shared, DecoderConfig::shadow_interactive()),
+            HashMap::new(),
+        ));
+        driver.install_full_engines(FullEngines {
+            live,
+            visible_refiner: Some(visible_refiner),
+        });
+        driver
+    }
+
+    // The refine is what makes the provider reachable at all: arming builds the refiner, but
+    // nothing consults it until something asks for a refinement off the keystroke path.
+    #[test]
+    fn a_refine_surfaces_a_model_candidate_the_lexicon_cannot_produce() {
+        let mut driver = statically_armed_driver();
+        driver.process_callback(WindowsTsfCallback::Activate);
+        type_ascii(&mut driver, "qzx");
+
+        driver.refine_now();
+
+        let render = driver.snapshot_render_state();
+        let candidates = render.candidate_surface.rows();
+        assert!(
+            candidates.iter().any(|row| row.contains('គ')),
+            "refine did not surface the model candidate; rows={candidates:?}"
+        );
+    }
+
     fn fixture_engine(tsv: &str) -> Transliterator {
         Transliterator::from_tsv_str_with_config(tsv, DecoderConfig::shadow_interactive()).expect("fixture must parse")
     }
@@ -271,7 +455,10 @@ mod tests {
         let mut driver = phase_a_driver();
         driver.process_callback(WindowsTsfCallback::Activate);
 
-        driver.install_full_engine(fixture_engine("jea\tswapped\n"));
+        driver.install_full_engines(FullEngines {
+            live: fixture_engine("jea\tswapped\n"),
+            visible_refiner: None,
+        });
 
         assert_eq!(driver.readiness(), DriverReadiness::Full);
     }
@@ -283,12 +470,15 @@ mod tests {
         type_ascii(&mut driver, "jea");
         assert!(!driver.session().composition_is_empty());
 
-        driver.install_full_engine(fixture_engine("jea\tswapped\n"));
+        driver.install_full_engines(FullEngines {
+            live: fixture_engine("jea\tswapped\n"),
+            visible_refiner: None,
+        });
 
         // Swapping mid-composition would re-decode the user's in-flight input
         // under a different engine, so the upgrade must wait.
         assert_eq!(driver.readiness(), DriverReadiness::FullPending);
-        assert!(driver.pending_engine.is_some());
+        assert!(driver.pending_engines.is_some());
     }
 
     #[test]
@@ -296,13 +486,16 @@ mod tests {
         let mut driver = phase_a_driver();
         driver.process_callback(WindowsTsfCallback::Activate);
         type_ascii(&mut driver, "jea");
-        driver.install_full_engine(fixture_engine("jea\tswapped\n"));
+        driver.install_full_engines(FullEngines {
+            live: fixture_engine("jea\tswapped\n"),
+            visible_refiner: None,
+        });
         assert_eq!(driver.readiness(), DriverReadiness::FullPending);
 
         driver.process_key_event(key(SESSION_KEY_ESCAPE));
 
         assert_eq!(driver.readiness(), DriverReadiness::Full);
-        assert!(driver.pending_engine.is_none());
+        assert!(driver.pending_engines.is_none());
     }
 
     #[test]
@@ -310,7 +503,10 @@ mod tests {
         let mut driver = phase_a_driver();
         driver.process_callback(WindowsTsfCallback::Activate);
         type_ascii(&mut driver, "jea");
-        driver.install_full_engine(fixture_engine("jea\tswapped\n"));
+        driver.install_full_engines(FullEngines {
+            live: fixture_engine("jea\tswapped\n"),
+            visible_refiner: None,
+        });
 
         let render = driver.process_key_event(key(SESSION_KEY_RETURN));
 
