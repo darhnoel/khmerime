@@ -205,7 +205,10 @@ impl WindowsSessionDriver {
             return false;
         }
         if self.session.segmented_preview_active() {
-            self.session.refresh_segmented_preview(&raw)
+            // NOT refresh_segmented_preview: that rebuilds from the cheap live engine and never
+            // consults the Visible Refiner, which leaves a registered provider unreachable on
+            // exactly the compositions the model exists to fix.
+            self.session.refine_segmented_with_visible_refiner(&raw)
         } else {
             self.session.apply_refined_candidate(&raw).is_some()
         }
@@ -414,6 +417,35 @@ mod tests {
     fn a_refine_waits_for_the_user_to_pause() {
         assert!(!refine_is_due(Duration::from_millis(20), "domra"));
         assert!(refine_is_due(Duration::from_millis(400), "domra"));
+    }
+
+    // A segmented composition is the case the model exists FOR: "domra" segments to ដុំ|រ៉ា and
+    // the whole-word reading ដំរី loses. The session has two segmented entry points and only one
+    // of them consults the Visible Refiner -- refresh_segmented_preview rebuilds from the live
+    // engine. Calling that one leaves the provider unreachable, which is precisely the bug the
+    // IBus bridge already hit (see refine_segmented_with_visible_refiner's doc comment).
+    #[test]
+    fn a_refine_on_a_segmented_composition_reaches_the_provider() {
+        let mut driver = statically_armed_driver();
+        driver.process_callback(WindowsTsfCallback::Activate);
+        type_ascii(&mut driver, "novpeldael");
+        assert!(
+            driver.session().segmented_preview_active(),
+            "novpeldael must segment, or this test is not exercising the segmented path"
+        );
+
+        driver.refine_now();
+
+        let snapshot = driver.session().snapshot();
+        assert!(
+            snapshot.phrase_candidates.iter().any(|candidate| candidate.from_model),
+            "no model-derived phrase candidate after refine; phrases={:?}",
+            snapshot
+                .phrase_candidates
+                .iter()
+                .map(|c| (c.text.clone(), c.from_model))
+                .collect::<Vec<_>>()
+        );
     }
 
     fn fixture_engine_with(tsv: &str, config: DecoderConfig) -> Transliterator {

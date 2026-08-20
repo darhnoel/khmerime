@@ -242,6 +242,10 @@ impl KhmerImeEditSession_Impl {
                     .ok();
             }
             if let Some(window) = &state.candidate_window {
+                // Publish here too: while the user types the preedit changes every key, so this
+                // edit-session path runs and refresh_candidates does not. Publishing in only one
+                // of the two paths left the refine worker with no window to post to.
+                state.shared.publish_candidate_hwnd(window.hwnd_raw());
                 if let Some(anchor) = anchor {
                     window.update(&self.render_state.candidate_surface, anchor);
                 } else {

@@ -47,12 +47,11 @@ impl CandidateSurface {
                     .map(|(index, candidate)| CandidateDisplayEntry {
                         output: candidate.text.clone(),
                         recommended: index == 0,
-                        roman_hints: vec![candidate
-                            .segments
-                            .iter()
-                            .map(|segment| segment.input.as_str())
-                            .collect::<Vec<_>>()
-                            .join(" ")],
+                        // Deliberately empty: this hint was the INPUT's segmentation, identical
+                        // for every row, so unrelated readings all claimed the same romanization.
+                        // The header already shows roman per segment.
+                        roman_hints: Vec::new(),
+                        from_model: candidate.from_model,
                         ..CandidateDisplayEntry::default()
                     })
                     .collect(),
@@ -133,6 +132,62 @@ mod tests {
     };
 
     use super::{CandidateSurface, CandidateSurfaceMode};
+
+    // Phrase rows must be Khmer-only. The hint here was the INPUT's segmentation, which is the
+    // same string for every row, so a candidate like កាម្រា rendered as "កាម្រា (domra)" even
+    // though it does not romanize to domra at all. Roman belongs in the header, which already
+    // shows it per segment. Matches the linux-ibus two-level candidate surface decision.
+    #[test]
+    fn phrase_rows_carry_no_per_row_roman_hint() {
+        let snapshot = SessionSnapshot {
+            segmented_active: true,
+            phrase_candidates: vec![PhraseCandidate {
+                text: "ដំរី".to_owned(),
+                segments: vec![PhraseSegment {
+                    input: "domra".to_owned(),
+                    ..PhraseSegment::default()
+                }],
+                ..PhraseCandidate::default()
+            }],
+            ..SessionSnapshot::default()
+        };
+
+        let surface = CandidateSurface::from_snapshot(&snapshot);
+
+        assert!(
+            surface.display()[0].roman_hints.is_empty(),
+            "phrase rows must not repeat roman; got {:?}",
+            surface.display()[0].roman_hints
+        );
+    }
+
+    // Model provenance has to survive into the display entry or the popup cannot draw ✦. The
+    // Lexicon gate is a marker, not a filter: an out-of-Lexicon word may be a name or a loanword,
+    // so the row stays visible and selectable and is merely labelled.
+    #[test]
+    fn a_model_derived_phrase_row_carries_its_provenance() {
+        let snapshot = SessionSnapshot {
+            segmented_active: true,
+            phrase_candidates: vec![
+                PhraseCandidate {
+                    text: "ដុំរ៉ា".to_owned(),
+                    from_model: false,
+                    ..PhraseCandidate::default()
+                },
+                PhraseCandidate {
+                    text: "ដំរី".to_owned(),
+                    from_model: true,
+                    ..PhraseCandidate::default()
+                },
+            ],
+            ..SessionSnapshot::default()
+        };
+
+        let surface = CandidateSurface::from_snapshot(&snapshot);
+
+        assert!(!surface.display()[0].from_model);
+        assert!(surface.display()[1].from_model);
+    }
 
     #[test]
     fn segmented_composition_projects_whole_phrase_candidates_by_default() {
@@ -234,7 +289,8 @@ mod tests {
         assert_eq!(surface.cycle_phrase(-1), Some(SessionCommand::SelectPhrase(1)));
         assert_eq!(surface.select_phrase_row(0), Some(SessionCommand::SelectPhrase(0)));
         assert_eq!(surface.select_phrase_row(2), None);
-        assert_eq!(surface.display()[0].roman_hints, ["muoy"]);
+        // Phrase rows are Khmer-only now; see phrase_rows_carry_no_per_row_roman_hint.
+        assert!(surface.display()[0].roman_hints.is_empty());
         assert_eq!(
             surface.command_for_key(super::SESSION_KEY_DOWN),
             Some(SessionCommand::SelectPhrase(1))

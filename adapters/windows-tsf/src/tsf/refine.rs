@@ -107,6 +107,8 @@ pub fn spawn_refine_worker(shared: Arc<SessionShared>) -> Arc<AtomicBool> {
     let stop = Arc::clone(&running);
 
     thread::spawn(move || {
+        log("[refine] worker started");
+        let mut last_logged_raw = String::new();
         while stop.load(Ordering::Relaxed) {
             thread::sleep(POLL_INTERVAL);
 
@@ -138,8 +140,20 @@ pub fn spawn_refine_worker(shared: Arc<SessionShared>) -> Arc<AtomicBool> {
                 continue;
             }
 
+            let started = Instant::now();
             let changed = driver.refine_now();
+            let elapsed_ms = started.elapsed().as_secs_f64() * 1000.0;
             drop(driver_slot);
+
+            // Log every attempt, not just the ones that changed something: a refine that runs and
+            // finds nothing looks identical to a worker that never ran, which is exactly the
+            // ambiguity that made the first Windows attempt undiagnosable.
+            if last_logged_raw != raw {
+                log(format!(
+                    "[refine] ran raw={raw} changed={changed} elapsed_ms={elapsed_ms:.1}"
+                ));
+                last_logged_raw = raw.clone();
+            }
 
             // Record the attempt either way: a refine that produced nothing must not be retried
             // every poll for the same composition.
@@ -148,6 +162,9 @@ pub fn spawn_refine_worker(shared: Arc<SessionShared>) -> Arc<AtomicBool> {
             }
 
             let hwnd = shared.candidate_hwnd.load(Ordering::Relaxed);
+            if changed && hwnd == 0 {
+                log("[refine] changed but no candidate window handle; cannot repaint");
+            }
             if changed && hwnd != 0 {
                 log("[refine] applied; posting repaint");
                 // SAFETY: PostMessageW is documented as callable from any thread; it queues the

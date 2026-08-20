@@ -54,6 +54,10 @@ impl ImeSession {
                     recommended: recommended_keys.contains(&normalized_suggestion_key(item)),
                     roman_hints,
                     is_raw_fallback: item.as_str() == candidate_input,
+                    // The flat Candidate List carries no per-candidate provenance: a span
+                    // proposal reaches the user through phrase candidates, which track it on
+                    // PhraseCandidate::from_model.
+                    from_model: false,
                 }
             })
             .collect::<Vec<_>>();
