@@ -9,4 +9,5 @@ pub mod composition;
 pub mod display_attributes;
 pub mod edit_session;
 pub mod key_event_sink;
+pub mod refine;
 pub mod thread_context;

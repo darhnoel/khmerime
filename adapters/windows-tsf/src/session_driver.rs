@@ -6,7 +6,7 @@
 use std::collections::HashMap;
 use std::sync::mpsc::{self, Receiver, TryRecvError};
 use std::thread;
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 use khmerime_core::{DecoderConfig, Result as KhmerResult, SpanProposalMode, Transliterator};
 use khmerime_session::{HistoryStore, ImeSession, NativeKeyEvent, SegmentedPreviewMode, SessionCommand};
@@ -220,6 +220,23 @@ impl WindowsSessionDriver {
     }
 }
 
+/// How long the user must pause before a refine is worth starting.
+///
+/// Short enough to feel responsive, long enough that ordinary typing never triggers inference.
+const REFINE_QUIET_PERIOD: Duration = Duration::from_millis(250);
+
+/// Compositions shorter than this are not worth a model round trip: the Lexicon already answers
+/// them well, and the model's value is on longer inputs the segmenter splits badly.
+const REFINE_MIN_RAW_LEN: usize = 4;
+
+/// Whether a refine should start now.
+///
+/// Kept pure so the debounce is tested without threads or clocks: the caller owns the timing, this
+/// owns the policy.
+pub fn refine_is_due(idle: Duration, raw_preedit: &str) -> bool {
+    raw_preedit.chars().count() >= REFINE_MIN_RAW_LEN && idle >= REFINE_QUIET_PERIOD
+}
+
 /// Arming switch for the span-proposal seam, matching the IBus bridge and macOS IMK contract.
 ///
 /// `model` resolves to a provider registered by a separate, private build; `static-test` is the
@@ -388,6 +405,15 @@ mod tests {
         });
 
         assert!(driver.session().visible_refiner_active());
+    }
+
+    // The refine must not fire while the user is mid-word: every keystroke invalidates the
+    // previous composition, so refining on each one burns ~150 ms of inference to produce a result
+    // that is already stale. Waiting for a pause is what makes the model affordable at all.
+    #[test]
+    fn a_refine_waits_for_the_user_to_pause() {
+        assert!(!refine_is_due(Duration::from_millis(20), "domra"));
+        assert!(refine_is_due(Duration::from_millis(400), "domra"));
     }
 
     fn fixture_engine_with(tsv: &str, config: DecoderConfig) -> Transliterator {

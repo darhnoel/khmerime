@@ -14,7 +14,7 @@ use windows::Win32::Graphics::Gdi::{
 use windows::Win32::UI::WindowsAndMessaging::{
     CreateWindowExW, DefWindowProcW, DestroyWindow, GetSystemMetrics, GetWindowLongPtrW, RegisterClassExW,
     SetWindowLongPtrW, SetWindowPos, ShowWindow, CS_HREDRAW, CS_VREDRAW, GWLP_USERDATA, HMENU, HWND_TOPMOST,
-    SM_CXSCREEN, SM_CYSCREEN, SWP_NOACTIVATE, SWP_SHOWWINDOW, SW_HIDE, WM_NCHITTEST, WM_PAINT, WNDCLASSEXW,
+    SM_CXSCREEN, SM_CYSCREEN, SWP_NOACTIVATE, SWP_SHOWWINDOW, SW_HIDE, WM_APP, WM_NCHITTEST, WM_PAINT, WNDCLASSEXW,
     WS_EX_NOACTIVATE, WS_EX_TOOLWINDOW, WS_EX_TOPMOST, WS_POPUP,
 };
 
@@ -104,6 +104,15 @@ impl CandidateWindow {
 
     /// Refresh the candidate list and show the window next to `location`.
     /// Hides the window if `candidates` is empty.
+    /// Raw window handle, for posting [`WM_KHMERIME_REFINE_READY`] from a worker thread.
+    ///
+    /// `HWND` is not `Send`, so callers pass the raw value across the thread boundary and
+    /// reconstruct it; posting a message is one of the few window operations documented as safe
+    /// from any thread.
+    pub fn hwnd_raw(&self) -> isize {
+        self.hwnd.0 as isize
+    }
+
     pub fn update(&self, surface: &CandidateSurface, location: &CursorLocation) {
         if surface.rows().is_empty() {
             self.hide();
@@ -308,8 +317,19 @@ fn register_class() -> Result<()> {
     Ok(())
 }
 
+/// Posted by the refine worker once it has updated the session off the key path.
+///
+/// The repaint cannot happen on the worker: `update` swaps the window's paint data through a raw
+/// pointer with no synchronisation, so it must run on the window's owning thread. Posting is the
+/// handoff.
+pub const WM_KHMERIME_REFINE_READY: u32 = WM_APP + 1;
+
 unsafe extern "system" fn candidate_wnd_proc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
     match msg {
+        WM_KHMERIME_REFINE_READY => {
+            crate::tsf::refine::on_refine_ready();
+            LRESULT(0)
+        }
         WM_PAINT => {
             let data_ptr = GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *const CandidateData;
             let mut ps = std::mem::zeroed::<PAINTSTRUCT>();
