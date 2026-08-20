@@ -47,10 +47,18 @@ impl CandidateSurface {
                     .map(|(index, candidate)| CandidateDisplayEntry {
                         output: candidate.text.clone(),
                         recommended: index == 0,
-                        // Deliberately empty: this hint was the INPUT's segmentation, identical
-                        // for every row, so unrelated readings all claimed the same romanization.
-                        // The header already shows roman per segment.
-                        roman_hints: Vec::new(),
+                        // The canonical Lexicon romanization of THIS reading, one hint per
+                        // segment. Not the input's segmentation, which is identical on every row
+                        // and made unrelated readings all claim the same spelling. Segments whose
+                        // output is unverified model text carry no hint, so a phrase containing
+                        // any such segment shows nothing rather than a half-truth.
+                        roman_hints: candidate
+                            .segments
+                            .iter()
+                            .map(|segment| segment.roman_hints.first().cloned())
+                            .collect::<Option<Vec<_>>>()
+                            .map(|hints| vec![hints.join(" ")])
+                            .unwrap_or_default(),
                         from_model: candidate.from_model,
                         ..CandidateDisplayEntry::default()
                     })
@@ -137,8 +145,37 @@ mod tests {
     // same string for every row, so a candidate like កាម្រា rendered as "កាម្រា (domra)" even
     // though it does not romanize to domra at all. Roman belongs in the header, which already
     // shows it per segment. Matches the linux-ibus two-level candidate surface decision.
+    // Dropping roman entirely was an over-correction. What was wrong was the SOURCE: the input's
+    // segmentation, identical on every row. PhraseSegment.roman_hints carries the canonical
+    // Lexicon romanization of each segment's Khmer output, which is per-candidate and correct.
     #[test]
-    fn phrase_rows_carry_no_per_row_roman_hint() {
+    fn phrase_rows_show_the_canonical_roman_of_their_own_reading() {
+        let snapshot = SessionSnapshot {
+            segmented_active: true,
+            phrase_candidates: vec![PhraseCandidate {
+                text: "ដំរី".to_owned(),
+                segments: vec![PhraseSegment {
+                    input: "domra".to_owned(),
+                    output: "ដំរី".to_owned(),
+                    roman_hints: vec!["damrei".to_owned()],
+                }],
+                ..PhraseCandidate::default()
+            }],
+            ..SessionSnapshot::default()
+        };
+
+        let surface = CandidateSurface::from_snapshot(&snapshot);
+
+        assert_eq!(
+            surface.display()[0].roman_hints,
+            ["damrei"],
+            "a phrase row must show its own reading's roman, not the input"
+        );
+    }
+
+    // Unverified model text has no canonical romanization, so there is nothing honest to show.
+    #[test]
+    fn a_phrase_row_with_no_canonical_roman_shows_none() {
         let snapshot = SessionSnapshot {
             segmented_active: true,
             phrase_candidates: vec![PhraseCandidate {
