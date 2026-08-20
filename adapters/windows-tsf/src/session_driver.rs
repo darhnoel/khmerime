@@ -5,11 +5,14 @@
 
 use std::collections::HashMap;
 use std::sync::mpsc::{self, Receiver, TryRecvError};
+use std::sync::Arc;
 use std::thread;
 use std::time::{Duration, Instant};
 
 use khmerime_core::{DecoderConfig, Result as KhmerResult, SpanProposalMode, Transliterator};
-use khmerime_session::{HistoryStore, ImeSession, NativeKeyEvent, SegmentedPreviewMode, SessionCommand};
+use khmerime_session::{
+    HistoryStore, ImeSession, NativeKeyEvent, SegmentedPreviewMode, SegmentedRefinement, SessionCommand,
+};
 
 use crate::diagnostics::log;
 use crate::{derive_render_state, map_callback_to_session_commands, WindowsRenderState, WindowsTsfCallback};
@@ -188,6 +191,27 @@ impl WindowsSessionDriver {
         };
         self.maybe_complete_full_upgrade();
         derive_render_state(&self.session.snapshot(), &result)
+    }
+
+    /// Cheap snapshot of everything a refine needs, taken under the lock.
+    ///
+    /// Split out so inference runs *off* the session lock. Holding the lock across a 280-500 ms
+    /// model decode makes every keystroke behind it wait; the IBus bridge measured 300-650 ms of
+    /// input lag doing exactly that on its single pipe.
+    pub fn refine_inputs(&self) -> Option<(Arc<Transliterator>, String, HashMap<String, usize>)> {
+        let raw = self.session.composition_raw().to_owned();
+        if raw.is_empty() {
+            return None;
+        }
+        self.session.refine_inputs(&raw)
+    }
+
+    /// Applies a refinement computed elsewhere, if the composition has not moved on.
+    ///
+    /// The staleness check lives in the shared session, which compares against its own
+    /// `composition_raw` — the adapter must not second-guess it.
+    pub fn apply_refinement(&mut self, raw: &str, refinement: SegmentedRefinement) -> bool {
+        self.session.apply_segmented_refinement(raw, refinement)
     }
 
     /// Runs the **Visible Refiner** against the live **Composition**.
@@ -445,6 +469,31 @@ mod tests {
                 .iter()
                 .map(|c| (c.text.clone(), c.from_model))
                 .collect::<Vec<_>>()
+        );
+    }
+
+    // Holding the session lock across inference makes every keystroke behind it wait -- the same
+    // 300-650 ms input lag the IBus bridge measured when it ran the refine on its single pipe.
+    // The cure is to snapshot cheaply, compute off the lock, and apply only if the composition
+    // has not moved. This pins the race that removing the lock introduces.
+    #[test]
+    fn a_refinement_computed_off_the_lock_is_discarded_when_the_composition_moved() {
+        let mut driver = statically_armed_driver();
+        driver.process_callback(WindowsTsfCallback::Activate);
+        type_ascii(&mut driver, "novpeldael");
+
+        let (refiner, raw, history) = driver
+            .refine_inputs()
+            .expect("an armed segmented composition offers refine inputs");
+
+        // The user keeps typing while inference runs.
+        type_ascii(&mut driver, "x");
+
+        let refinement = khmerime_session::compute_segmented_refinement(&refiner, &raw, &history);
+
+        assert!(
+            !driver.apply_refinement(&raw, refinement),
+            "a refinement for a composition the user has moved past must not be applied"
         );
     }
 

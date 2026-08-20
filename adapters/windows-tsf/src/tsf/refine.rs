@@ -23,6 +23,8 @@ use windows::Win32::UI::WindowsAndMessaging::PostMessageW;
 
 use crate::com::text_service::TextServiceState;
 use crate::diagnostics::log;
+use khmerime_session::compute_segmented_refinement;
+
 use crate::session_driver::refine_is_due;
 use crate::tsf::candidates::WM_KHMERIME_REFINE_READY;
 use crate::tsf::edit_session::refresh_candidates;
@@ -120,52 +122,87 @@ pub fn spawn_refine_worker(shared: Arc<SessionShared>) -> Arc<AtomicBool> {
                 .map(|at| at.elapsed())
                 .unwrap_or_default();
 
-            // The lock is held across inference. That is acceptable *because* the refine only
-            // starts after the user has paused: a keystroke racing it is a bounded, rare stall,
-            // not a per-keystroke cost. Refining without it would need the session to hand out a
-            // read-only refine, which it does not.
-            let Ok(mut driver_slot) = shared.driver.lock() else {
-                break;
-            };
-            let Some(driver) = driver_slot.as_mut() else { continue };
+            // Snapshot cheaply under the lock, then let go. Inference costs 280-500 ms with a
+            // provider armed; holding the session lock across it makes every keystroke behind it
+            // wait, which is the 300-650 ms input lag the IBus bridge hit running its refine on
+            // the command pipe. The refiner is an Arc and the history a clone, so the snapshot is
+            // cheap and the expensive part runs with nothing blocked.
+            let snapshot = {
+                let Ok(mut driver_slot) = shared.driver.lock() else {
+                    break;
+                };
+                let Some(driver) = driver_slot.as_mut() else { continue };
 
-            let raw = driver.session().composition_raw().to_owned();
-            let already_done = shared
-                .refine_done_for
-                .lock()
-                .ok()
-                .map(|done| done.as_deref() == Some(raw.as_str()))
-                .unwrap_or(false);
-            if already_done || !refine_is_due(idle, &raw) {
+                let raw = driver.session().composition_raw().to_owned();
+                let already_done = shared
+                    .refine_done_for
+                    .lock()
+                    .ok()
+                    .map(|done| done.as_deref() == Some(raw.as_str()))
+                    .unwrap_or(false);
+                if already_done || !refine_is_due(idle, &raw) {
+                    continue;
+                }
+                driver.refine_inputs()
+            };
+
+            let Some((refiner, raw, history)) = snapshot else {
                 continue;
-            }
+            };
 
             let started = Instant::now();
-            let changed = driver.refine_now();
+            let refinement = compute_segmented_refinement(&refiner, &raw, &history);
             let elapsed_ms = started.elapsed().as_secs_f64() * 1000.0;
-            drop(driver_slot);
+
+            // Re-acquire only to apply. The shared session compares against its own
+            // composition_raw and rejects the result if the user has moved on.
+            // apply_segmented_refinement returns true from several guard paths that do NOT apply
+            // anything, so its bool cannot distinguish "applied" from "rejected". Report what
+            // actually reached the candidate list instead -- reading the bool as success is what
+            // hid a discarded refinement behind a cheerful changed=true.
+            let (changed, model_rows) = {
+                let Ok(mut driver_slot) = shared.driver.lock() else {
+                    break;
+                };
+                match driver_slot.as_mut() {
+                    Some(driver) => {
+                        let changed = driver.apply_refinement(&raw, refinement);
+                        let model_rows = driver
+                            .session()
+                            .snapshot()
+                            .phrase_candidates
+                            .iter()
+                            .filter(|candidate| candidate.from_model)
+                            .count();
+                        (changed, model_rows)
+                    }
+                    None => continue,
+                }
+            };
 
             // Log every attempt, not just the ones that changed something: a refine that runs and
             // finds nothing looks identical to a worker that never ran, which is exactly the
             // ambiguity that made the first Windows attempt undiagnosable.
             if last_logged_raw != raw {
                 log(format!(
-                    "[refine] ran raw={raw} changed={changed} elapsed_ms={elapsed_ms:.1}"
+                    "[refine] ran raw={raw} changed={changed} model_rows={model_rows} elapsed_ms={elapsed_ms:.1}"
                 ));
                 last_logged_raw = raw.clone();
             }
 
-            // Record the attempt either way: a refine that produced nothing must not be retried
-            // every poll for the same composition.
             if let Ok(mut done) = shared.refine_done_for.lock() {
                 *done = Some(raw);
             }
 
             let hwnd = shared.candidate_hwnd.load(Ordering::Relaxed);
-            if changed && hwnd == 0 {
-                log("[refine] changed but no candidate window handle; cannot repaint");
+            if hwnd == 0 {
+                log("[refine] no candidate window handle; cannot repaint");
             }
-            if changed && hwnd != 0 {
+            // Repaint after every completed refine rather than gating on `changed`: that bool is
+            // apply_segmented_refinement's return value, which is true on guard paths that apply
+            // nothing and false on paths that do apply. Repainting re-renders current state, so
+            // doing it unconditionally is both cheap and correct.
+            if hwnd != 0 {
                 log("[refine] applied; posting repaint");
                 // SAFETY: PostMessageW is documented as callable from any thread; it queues the
                 // message for the window's owning thread rather than touching window state here.
