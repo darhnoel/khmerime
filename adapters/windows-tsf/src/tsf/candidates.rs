@@ -519,8 +519,6 @@ pub fn segment_preview_text(entries: &[SegmentPreviewEntry]) -> Option<String> {
 fn display_candidate_rows(surface: &CandidateSurface) -> Vec<String> {
     let candidates = surface.rows();
     let candidate_display = surface.display();
-    // Phrase rows carry no roman by design, so "no hints" no longer implies "derived" there.
-    let derived_mark_is_meaningful = surface.mode() != CandidateSurfaceMode::Phrase;
     let use_display = candidate_display.len() == candidates.len();
     candidates
         .iter()
@@ -550,7 +548,7 @@ fn display_candidate_rows(surface: &CandidateSurface) -> Vec<String> {
                 format!("{MODEL_MARK} {output}")
             } else if entry.recommended {
                 format!("{RECOMMENDED_MARK} {output}")
-            } else if hints.is_empty() && derived_mark_is_meaningful {
+            } else if hints.is_empty() {
                 format!("{DERIVED_MARK} {output}")
             } else {
                 output.to_owned()
@@ -592,6 +590,44 @@ mod tests {
     // "~" derived mark must NOT appear on ordinary phrase rows. That mark keys off "no roman
     // hints", which was a fine proxy for the flat list but became meaningless once phrase rows
     // stopped carrying roman at all.
+    // CONTEXT.md, Roman Hint: "If no exact Roman Hint exists for a candidate, the UI must not
+    // invent one; it should show a derived marker instead." That rule is not flat-list-only -- a
+    // phrase row with no canonical romanization must say so, or the reader cannot tell "no roman
+    // exists" from "roman is not shown on this surface".
+    #[test]
+    fn a_phrase_row_without_canonical_roman_shows_the_derived_marker() {
+        let snapshot = SessionSnapshot {
+            segmented_active: true,
+            phrase_candidates: vec![
+                // Index 0 is the recommended row and takes ✓, so the derived rule is checked on
+                // the row below it.
+                khmerime_session::PhraseCandidate {
+                    text: "ដុំរ៉ា".to_owned(),
+                    ..Default::default()
+                },
+                khmerime_session::PhraseCandidate {
+                    text: "ដមរ៉ា".to_owned(),
+                    segments: vec![khmerime_session::PhraseSegment {
+                        input: "domra".to_owned(),
+                        output: "ដមរ៉ា".to_owned(),
+                        roman_hints: vec![],
+                    }],
+                    ..Default::default()
+                },
+            ],
+            ..SessionSnapshot::default()
+        };
+        let surface = CandidateSurface::from_snapshot(&snapshot);
+
+        let rows = display_candidate_rows(&surface);
+
+        assert!(
+            rows[1].contains(DERIVED_MARK),
+            "a phrase row with no exact Roman Hint must carry the derived marker: {:?}",
+            rows[1]
+        );
+    }
+
     #[test]
     fn phrase_rows_mark_model_provenance_without_marking_everything_derived() {
         let snapshot = SessionSnapshot {

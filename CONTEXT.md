@@ -74,6 +74,12 @@ _Avoid_: bare coeng sign when you mean the full subscript consonant
 
 **Roman Hint**:
 The exact romanized key or keys displayed beside a Khmer candidate to show why that candidate is available. Roman Hints are display metadata for the **Candidate List**; they do not replace the raw roman **Preedit** and do not change the **Commit Text**. If no exact Roman Hint exists for a candidate, the UI must not invent one; it should show a derived marker instead.
+A Roman Hint describes the *candidate*, never the input: two different Khmer readings of one
+roman input do not share a hint. A **Phrase Candidate** spanning several segments carries one
+canonical spelling per segment in reading order; a single-segment phrase carries the same hints
+the same word would carry in a flat **Candidate List**, so a word reads identically whether or not
+the composition happened to segment. When any segment has no exact hint the whole row has none —
+a partial hint would be an invented one.
 _Avoid_: invented hint, transliteration label, candidate subtitle
 
 **Pronunciation Variant**:

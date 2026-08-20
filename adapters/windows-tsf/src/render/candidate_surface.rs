@@ -52,13 +52,21 @@ impl CandidateSurface {
                         // and made unrelated readings all claim the same spelling. Segments whose
                         // output is unverified model text carry no hint, so a phrase containing
                         // any such segment shows nothing rather than a half-truth.
-                        roman_hints: candidate
-                            .segments
-                            .iter()
-                            .map(|segment| segment.roman_hints.first().cloned())
-                            .collect::<Option<Vec<_>>>()
-                            .map(|hints| vec![hints.join(" ")])
-                            .unwrap_or_default(),
+                        roman_hints: match candidate.segments.as_slice() {
+                            // A one-word phrase row is the same thing a flat row is, so it reads
+                            // identically: every canonical spelling, which the renderer joins
+                            // with " / ".
+                            [only] => only.roman_hints.clone(),
+                            // Multi-segment: one spelling per segment, in reading order. Showing
+                            // every variant of every segment would be combinatorial and
+                            // unreadable on a single popup row.
+                            segments => segments
+                                .iter()
+                                .map(|segment| segment.roman_hints.first().cloned())
+                                .collect::<Option<Vec<_>>>()
+                                .map(|hints| vec![hints.join(" ")])
+                                .unwrap_or_default(),
+                        },
                         from_model: candidate.from_model,
                         ..CandidateDisplayEntry::default()
                     })
@@ -171,6 +179,30 @@ mod tests {
             ["damrei"],
             "a phrase row must show its own reading's roman, not the input"
         );
+    }
+
+    // A one-word phrase row IS the same thing a flat row is, so it must read identically. Showing
+    // only one spelling there would lose information the flat list already gives, and make the
+    // same word render differently depending on whether the composition happened to segment.
+    #[test]
+    fn a_single_segment_phrase_row_shows_every_canonical_spelling() {
+        let snapshot = SessionSnapshot {
+            segmented_active: true,
+            phrase_candidates: vec![PhraseCandidate {
+                text: "ដំរី".to_owned(),
+                segments: vec![PhraseSegment {
+                    input: "domra".to_owned(),
+                    output: "ដំរី".to_owned(),
+                    roman_hints: vec!["damrei".to_owned(), "domrei".to_owned()],
+                }],
+                ..PhraseCandidate::default()
+            }],
+            ..SessionSnapshot::default()
+        };
+
+        let surface = CandidateSurface::from_snapshot(&snapshot);
+
+        assert_eq!(surface.display()[0].roman_hints, ["damrei", "domrei"]);
     }
 
     // Unverified model text has no canonical romanization, so there is nothing honest to show.
