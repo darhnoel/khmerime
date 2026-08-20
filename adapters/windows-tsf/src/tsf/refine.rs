@@ -1,0 +1,217 @@
+//! Debounced **Visible Refiner** delivery for TSF.
+//!
+//! The model runs on the debounced refiner, never on the keystroke path (ADR-0016). On Linux the
+//! debounce lives in the Python adapter and the result is applied on the GLib main loop; TSF has
+//! no such loop, and its candidate window is thread-affine, so the same split is expressed with a
+//! worker thread plus one posted window message:
+//!
+//! ```text
+//! worker:   pause detected -> lock -> refine_now() -> PostMessage(hwnd, WM_KHMERIME_REFINE_READY)
+//! wnd_proc: message -> derive render state -> refresh_candidates()   // window's owning thread
+//! ```
+
+use std::cell::RefCell;
+use std::sync::atomic::{AtomicBool, AtomicIsize, Ordering};
+use std::sync::{Arc, Mutex};
+use std::thread;
+use std::time::{Duration, Instant};
+
+use crate::session_driver::WindowsSessionDriver;
+
+use windows::Win32::Foundation::{HWND, LPARAM, WPARAM};
+use windows::Win32::UI::WindowsAndMessaging::PostMessageW;
+
+use crate::com::text_service::TextServiceState;
+use crate::diagnostics::log;
+use khmerime_session::compute_segmented_refinement;
+
+use crate::session_driver::refine_is_due;
+use crate::tsf::candidates::WM_KHMERIME_REFINE_READY;
+use crate::tsf::edit_session::refresh_candidates;
+
+/// How often the worker checks whether the user has paused.
+const POLL_INTERVAL: Duration = Duration::from_millis(50);
+
+/// The half of the text service that is **not** thread-affine.
+///
+/// `TextServiceState` holds COM interfaces and an `HWND`, so it is neither `Send` nor `Sync` and
+/// can never cross a thread boundary. The session, the debounce timestamps and the popup handle
+/// can, so they live here and the COM state merely references them. Without this split the refine
+/// worker could not exist at all.
+#[derive(Default)]
+pub struct SessionShared {
+    pub driver: Mutex<Option<WindowsSessionDriver>>,
+    /// When the last key arrived, so the worker can tell typing from a pause.
+    pub last_keystroke: Mutex<Option<Instant>>,
+    /// Composition the worker has already answered, so a refine that produced nothing is not
+    /// retried every poll for the same input.
+    pub refine_done_for: Mutex<Option<String>>,
+    /// Candidate popup handle as a raw value, published once the window exists.
+    pub candidate_hwnd: AtomicIsize,
+}
+
+impl SessionShared {
+    /// Records a keystroke, invalidating whatever the last refine answered.
+    pub fn note_keystroke(&self) {
+        if let Ok(mut at) = self.last_keystroke.lock() {
+            *at = Some(Instant::now());
+        }
+        if let Ok(mut done) = self.refine_done_for.lock() {
+            *done = None;
+        }
+    }
+
+    /// Publishes the popup handle so the worker can post to it.
+    pub fn publish_candidate_hwnd(&self, hwnd: isize) {
+        self.candidate_hwnd.store(hwnd, Ordering::Relaxed);
+    }
+}
+
+thread_local! {
+    /// The TSF state owned by *this* thread.
+    ///
+    /// TSF activates the text service per thread and the candidate window belongs to that same
+    /// thread, so the message handler can only ever need this thread's state. A thread-local keeps
+    /// that invariant structural instead of threading a handle through the window struct.
+    static ACTIVE_STATE: RefCell<Option<Arc<Mutex<TextServiceState>>>> = const { RefCell::new(None) };
+}
+
+/// Binds this thread's state so [`on_refine_ready`] can find it. Called from `Activate`.
+pub fn bind_thread_state(state: Arc<Mutex<TextServiceState>>) {
+    ACTIVE_STATE.with(|slot| *slot.borrow_mut() = Some(state));
+}
+
+/// Releases the binding. Called from `Deactivate`.
+pub fn clear_thread_state() {
+    ACTIVE_STATE.with(|slot| *slot.borrow_mut() = None);
+}
+
+/// Repaints the candidate popup after a refine. Runs on the window's owning thread.
+pub fn on_refine_ready() {
+    let Some(state) = ACTIVE_STATE.with(|slot| slot.borrow().clone()) else {
+        return;
+    };
+    let render_state = {
+        let Ok(guard) = state.lock() else { return };
+        let Ok(driver) = guard.shared.driver.lock() else { return };
+        let Some(driver) = driver.as_ref() else { return };
+        driver.snapshot_render_state()
+    };
+    refresh_candidates(&state, &render_state);
+}
+
+/// Starts the debounce worker for this text service.
+///
+/// Returns the flag that stops it; `Deactivate` clears it so the thread does not outlive the
+/// profile it belongs to.
+pub fn spawn_refine_worker(shared: Arc<SessionShared>) -> Arc<AtomicBool> {
+    let running = Arc::new(AtomicBool::new(true));
+    let stop = Arc::clone(&running);
+
+    thread::spawn(move || {
+        log("[refine] worker started");
+        let mut last_logged_raw = String::new();
+        while stop.load(Ordering::Relaxed) {
+            thread::sleep(POLL_INTERVAL);
+
+            let idle = shared
+                .last_keystroke
+                .lock()
+                .ok()
+                .and_then(|at| *at)
+                .map(|at| at.elapsed())
+                .unwrap_or_default();
+
+            // Snapshot cheaply under the lock, then let go. Inference costs 280-500 ms with a
+            // provider armed; holding the session lock across it makes every keystroke behind it
+            // wait, which is the 300-650 ms input lag the IBus bridge hit running its refine on
+            // the command pipe. The refiner is an Arc and the history a clone, so the snapshot is
+            // cheap and the expensive part runs with nothing blocked.
+            let snapshot = {
+                let Ok(mut driver_slot) = shared.driver.lock() else {
+                    break;
+                };
+                let Some(driver) = driver_slot.as_mut() else { continue };
+
+                let raw = driver.session().composition_raw().to_owned();
+                let already_done = shared
+                    .refine_done_for
+                    .lock()
+                    .ok()
+                    .map(|done| done.as_deref() == Some(raw.as_str()))
+                    .unwrap_or(false);
+                if already_done || !refine_is_due(idle, &raw) {
+                    continue;
+                }
+                driver.refine_inputs()
+            };
+
+            let Some((refiner, raw, history)) = snapshot else {
+                continue;
+            };
+
+            let started = Instant::now();
+            let refinement = compute_segmented_refinement(&refiner, &raw, &history);
+            let elapsed_ms = started.elapsed().as_secs_f64() * 1000.0;
+
+            // Re-acquire only to apply. The shared session compares against its own
+            // composition_raw and rejects the result if the user has moved on.
+            // apply_segmented_refinement returns true from several guard paths that do NOT apply
+            // anything, so its bool cannot distinguish "applied" from "rejected". Report what
+            // actually reached the candidate list instead -- reading the bool as success is what
+            // hid a discarded refinement behind a cheerful changed=true.
+            let (changed, model_rows) = {
+                let Ok(mut driver_slot) = shared.driver.lock() else {
+                    break;
+                };
+                match driver_slot.as_mut() {
+                    Some(driver) => {
+                        let changed = driver.apply_refinement(&raw, refinement);
+                        let model_rows = driver
+                            .session()
+                            .snapshot()
+                            .phrase_candidates
+                            .iter()
+                            .filter(|candidate| candidate.from_model)
+                            .count();
+                        (changed, model_rows)
+                    }
+                    None => continue,
+                }
+            };
+
+            // Log every attempt, not just the ones that changed something: a refine that runs and
+            // finds nothing looks identical to a worker that never ran, which is exactly the
+            // ambiguity that made the first Windows attempt undiagnosable.
+            if last_logged_raw != raw {
+                log(format!(
+                    "[refine] ran raw={raw} changed={changed} model_rows={model_rows} elapsed_ms={elapsed_ms:.1}"
+                ));
+                last_logged_raw = raw.clone();
+            }
+
+            if let Ok(mut done) = shared.refine_done_for.lock() {
+                *done = Some(raw);
+            }
+
+            let hwnd = shared.candidate_hwnd.load(Ordering::Relaxed);
+            if hwnd == 0 {
+                log("[refine] no candidate window handle; cannot repaint");
+            }
+            // Repaint after every completed refine rather than gating on `changed`: that bool is
+            // apply_segmented_refinement's return value, which is true on guard paths that apply
+            // nothing and false on paths that do apply. Repainting re-renders current state, so
+            // doing it unconditionally is both cheap and correct.
+            if hwnd != 0 {
+                log("[refine] applied; posting repaint");
+                // SAFETY: PostMessageW is documented as callable from any thread; it queues the
+                // message for the window's owning thread rather than touching window state here.
+                unsafe {
+                    let _ = PostMessageW(HWND(hwnd as *mut _), WM_KHMERIME_REFINE_READY, WPARAM(0), LPARAM(0));
+                }
+            }
+        }
+    });
+
+    running
+}

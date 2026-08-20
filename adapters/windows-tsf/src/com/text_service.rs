@@ -21,7 +21,9 @@ use crate::tsf::key_event_sink::KhmerImeKeyEventSink;
 pub const TEXT_SERVICE_LIFECYCLE: &[&str] = &["Activate", "Deactivate"];
 
 pub struct TextServiceState {
-    pub driver: Option<WindowsSessionDriver>,
+    /// The portable half: session, debounce timestamps, popup handle. Separated because the rest
+    /// of this struct holds COM interfaces and an HWND and can never leave this thread.
+    pub shared: std::sync::Arc<crate::tsf::refine::SessionShared>,
     pub thread_mgr: Option<ITfThreadMgr>,
     pub client_id: u32,
     pub key_sink: Option<ITfKeyEventSink>,
@@ -43,12 +45,14 @@ pub struct TextServiceState {
     pub warmup_started_at: Option<Instant>,
     /// Keys passed through to the host because the driver was still warming.
     pub warmup_passthrough_count: u32,
+    /// Stop flag for the refine worker; cleared on Deactivate so it does not outlive the profile.
+    pub refine_worker: Option<std::sync::Arc<std::sync::atomic::AtomicBool>>,
 }
 
 impl Default for TextServiceState {
     fn default() -> Self {
         Self {
-            driver: None,
+            shared: Default::default(),
             thread_mgr: None,
             client_id: 0,
             key_sink: None,
@@ -58,6 +62,7 @@ impl Default for TextServiceState {
             last_candidate_anchor: None,
             warmup_started_at: None,
             warmup_passthrough_count: 0,
+            refine_worker: None,
         }
     }
 }
@@ -111,13 +116,18 @@ impl ITfTextInputProcessor_Impl for KhmerImeTextService_Impl {
             // keystroke can arrive. Phase A skips the expensive ranked-lexicon and
             // search-index stages, so this is a short block, not the full engine
             // build. The full engine swaps in from a background thread. See ADR-0001.
-            state.driver = match crate::session_driver::WindowsSessionDriver::from_phase_a_data_traced() {
+            let built = match crate::session_driver::WindowsSessionDriver::from_phase_a_data_traced() {
                 Ok(driver) => Some(activate_driver(driver)),
                 Err(error) => {
                     log(format!("TextService::Activate phase A build failed: {error}"));
                     None
                 }
             };
+            if let Ok(mut slot) = state.shared.driver.lock() {
+                *slot = built;
+            }
+            crate::tsf::refine::bind_thread_state(Arc::clone(&self.state));
+            state.refine_worker = Some(crate::tsf::refine::spawn_refine_worker(Arc::clone(&state.shared)));
             state.warmup_started_at = Some(Instant::now());
             state.warmup_passthrough_count = 0;
             state.composition = None;
@@ -143,15 +153,21 @@ impl ITfTextInputProcessor_Impl for KhmerImeTextService_Impl {
         log("TextService::Deactivate");
         let (thread_mgr, client_id, _key_sink) = {
             let mut state = lock_state(&self.state)?;
-            if let Some(driver) = state.driver.as_mut() {
-                driver.process_callback(crate::WindowsTsfCallback::Deactivate);
+            if let Ok(mut slot) = state.shared.driver.lock() {
+                if let Some(driver) = slot.as_mut() {
+                    driver.process_callback(crate::WindowsTsfCallback::Deactivate);
+                }
+                *slot = None;
             }
+            if let Some(running) = state.refine_worker.take() {
+                running.store(false, std::sync::atomic::Ordering::Relaxed);
+            }
+            crate::tsf::refine::clear_thread_state();
             let thread_mgr = state.thread_mgr.take();
             let client_id = state.client_id;
             let key_sink = state.key_sink.take();
             state.composition = None;
             state.client_id = 0;
-            state.driver = None;
             state.current_preedit.clear();
             (thread_mgr, client_id, key_sink)
         };

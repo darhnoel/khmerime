@@ -120,6 +120,10 @@ pub fn refresh_candidates(state: &Arc<Mutex<TextServiceState>>, render_state: &W
                 .ok();
         }
         if let Some(window) = &guard.candidate_window {
+            // Publish the handle so the refine worker can post a repaint to this window's owning
+            // thread. Done here rather than at creation because this is the one place the window
+            // is guaranteed to exist.
+            guard.shared.publish_candidate_hwnd(window.hwnd_raw());
             match &anchor {
                 Some(a) => window.update(&render_state.candidate_surface, a),
                 None => window.hide(),
@@ -238,6 +242,10 @@ impl KhmerImeEditSession_Impl {
                     .ok();
             }
             if let Some(window) = &state.candidate_window {
+                // Publish here too: while the user types the preedit changes every key, so this
+                // edit-session path runs and refresh_candidates does not. Publishing in only one
+                // of the two paths left the refine worker with no window to post to.
+                state.shared.publish_candidate_hwnd(window.hwnd_raw());
                 if let Some(anchor) = anchor {
                     window.update(&self.render_state.candidate_surface, anchor);
                 } else {

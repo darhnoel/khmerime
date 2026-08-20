@@ -14,7 +14,7 @@ use windows::Win32::Graphics::Gdi::{
 use windows::Win32::UI::WindowsAndMessaging::{
     CreateWindowExW, DefWindowProcW, DestroyWindow, GetSystemMetrics, GetWindowLongPtrW, RegisterClassExW,
     SetWindowLongPtrW, SetWindowPos, ShowWindow, CS_HREDRAW, CS_VREDRAW, GWLP_USERDATA, HMENU, HWND_TOPMOST,
-    SM_CXSCREEN, SM_CYSCREEN, SWP_NOACTIVATE, SWP_SHOWWINDOW, SW_HIDE, WM_NCHITTEST, WM_PAINT, WNDCLASSEXW,
+    SM_CXSCREEN, SM_CYSCREEN, SWP_NOACTIVATE, SWP_SHOWWINDOW, SW_HIDE, WM_APP, WM_NCHITTEST, WM_PAINT, WNDCLASSEXW,
     WS_EX_NOACTIVATE, WS_EX_TOOLWINDOW, WS_EX_TOPMOST, WS_POPUP,
 };
 
@@ -48,6 +48,9 @@ const SELECT_INSET_X: i32 = 4;
 const TEXT_GAP: i32 = 12;
 const RECOMMENDED_MARK: &str = "\u{2713}";
 const DERIVED_MARK: &str = "~";
+/// Marks a candidate a span-proposal provider contributed. Same glyph the IBus and macOS
+/// adapters use, so the three desktop surfaces read alike.
+const MODEL_MARK: &str = "\u{2726}";
 const SEGMENT_SEPARATOR: &str = " | ";
 
 static CLASS_REGISTERED: OnceLock<()> = OnceLock::new();
@@ -104,13 +107,22 @@ impl CandidateWindow {
 
     /// Refresh the candidate list and show the window next to `location`.
     /// Hides the window if `candidates` is empty.
+    /// Raw window handle, for posting [`WM_KHMERIME_REFINE_READY`] from a worker thread.
+    ///
+    /// `HWND` is not `Send`, so callers pass the raw value across the thread boundary and
+    /// reconstruct it; posting a message is one of the few window operations documented as safe
+    /// from any thread.
+    pub fn hwnd_raw(&self) -> isize {
+        self.hwnd.0 as isize
+    }
+
     pub fn update(&self, surface: &CandidateSurface, location: &CursorLocation) {
         if surface.rows().is_empty() {
             self.hide();
             return;
         }
 
-        let display = display_candidate_rows(surface.rows(), surface.display());
+        let display = display_candidate_rows(surface);
         let mut rows: Vec<(String, bool)> = Vec::new();
         if let Some(preview) = segment_preview_text(surface.context()) {
             rows.push((preview, false));
@@ -308,8 +320,19 @@ fn register_class() -> Result<()> {
     Ok(())
 }
 
+/// Posted by the refine worker once it has updated the session off the key path.
+///
+/// The repaint cannot happen on the worker: `update` swaps the window's paint data through a raw
+/// pointer with no synchronisation, so it must run on the window's owning thread. Posting is the
+/// handoff.
+pub const WM_KHMERIME_REFINE_READY: u32 = WM_APP + 1;
+
 unsafe extern "system" fn candidate_wnd_proc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
     match msg {
+        WM_KHMERIME_REFINE_READY => {
+            crate::tsf::refine::on_refine_ready();
+            LRESULT(0)
+        }
         WM_PAINT => {
             let data_ptr = GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *const CandidateData;
             let mut ps = std::mem::zeroed::<PAINTSTRUCT>();
@@ -441,10 +464,7 @@ pub fn inline_preview_text(render_state: &WindowsRenderState) -> Option<String> 
         }
     }
     if !render_state.candidate_surface.rows().is_empty() {
-        let display = display_candidate_rows(
-            render_state.candidate_surface.rows(),
-            render_state.candidate_surface.display(),
-        );
+        let display = display_candidate_rows(&render_state.candidate_surface);
         let candidates = display
             .iter()
             .take(5)
@@ -496,7 +516,9 @@ pub fn segment_preview_text(entries: &[SegmentPreviewEntry]) -> Option<String> {
     }
 }
 
-fn display_candidate_rows(candidates: &[String], candidate_display: &[CandidateDisplayEntry]) -> Vec<String> {
+fn display_candidate_rows(surface: &CandidateSurface) -> Vec<String> {
+    let candidates = surface.rows();
+    let candidate_display = surface.display();
     let use_display = candidate_display.len() == candidates.len();
     candidates
         .iter()
@@ -520,7 +542,11 @@ fn display_candidate_rows(candidates: &[String], candidate_display: &[CandidateD
                 .take(3)
                 .collect::<Vec<_>>();
 
-            let mut label = if entry.recommended {
+            let mut label = if entry.from_model {
+                // Provenance outranks the other marks: which engine produced a reading is more
+                // useful to the user than whether ranking prefers it.
+                format!("{MODEL_MARK} {output}")
+            } else if entry.recommended {
                 format!("{RECOMMENDED_MARK} {output}")
             } else if hints.is_empty() {
                 format!("{DERIVED_MARK} {output}")
@@ -543,12 +569,98 @@ mod tests {
     use super::*;
     use khmerime_session::SessionSnapshot;
 
+    /// Builds a flat-mode surface, the shape display_candidate_rows used to be handed directly.
+    fn flat_surface(candidates: &[&str], display: Vec<CandidateDisplayEntry>) -> CandidateSurface {
+        CandidateSurface::from_snapshot(&SessionSnapshot {
+            candidates: candidates.iter().map(|c| (*c).to_owned()).collect(),
+            candidate_display: display,
+            ..SessionSnapshot::default()
+        })
+    }
+
     fn render_state(snapshot: SessionSnapshot, preedit: &str) -> WindowsRenderState {
         WindowsRenderState {
             preedit: preedit.to_owned(),
             candidate_surface: CandidateSurface::from_snapshot(&snapshot),
             ..WindowsRenderState::default()
         }
+    }
+
+    // Two things at once, because they interact: a model-derived row must be marked, and the
+    // "~" derived mark must NOT appear on ordinary phrase rows. That mark keys off "no roman
+    // hints", which was a fine proxy for the flat list but became meaningless once phrase rows
+    // stopped carrying roman at all.
+    // CONTEXT.md, Roman Hint: "If no exact Roman Hint exists for a candidate, the UI must not
+    // invent one; it should show a derived marker instead." That rule is not flat-list-only -- a
+    // phrase row with no canonical romanization must say so, or the reader cannot tell "no roman
+    // exists" from "roman is not shown on this surface".
+    #[test]
+    fn a_phrase_row_without_canonical_roman_shows_the_derived_marker() {
+        let snapshot = SessionSnapshot {
+            segmented_active: true,
+            phrase_candidates: vec![
+                // Index 0 is the recommended row and takes ✓, so the derived rule is checked on
+                // the row below it.
+                khmerime_session::PhraseCandidate {
+                    text: "ដុំរ៉ា".to_owned(),
+                    ..Default::default()
+                },
+                khmerime_session::PhraseCandidate {
+                    text: "ដមរ៉ា".to_owned(),
+                    segments: vec![khmerime_session::PhraseSegment {
+                        input: "domra".to_owned(),
+                        output: "ដមរ៉ា".to_owned(),
+                        roman_hints: vec![],
+                    }],
+                    ..Default::default()
+                },
+            ],
+            ..SessionSnapshot::default()
+        };
+        let surface = CandidateSurface::from_snapshot(&snapshot);
+
+        let rows = display_candidate_rows(&surface);
+
+        assert!(
+            rows[1].contains(DERIVED_MARK),
+            "a phrase row with no exact Roman Hint must carry the derived marker: {:?}",
+            rows[1]
+        );
+    }
+
+    #[test]
+    fn phrase_rows_mark_model_provenance_without_marking_everything_derived() {
+        let snapshot = SessionSnapshot {
+            segmented_active: true,
+            phrase_candidates: vec![
+                khmerime_session::PhraseCandidate {
+                    text: "ដុំរ៉ា".to_owned(),
+                    from_model: false,
+                    ..Default::default()
+                },
+                khmerime_session::PhraseCandidate {
+                    text: "ដំរី".to_owned(),
+                    from_model: true,
+                    ..Default::default()
+                },
+            ],
+            ..SessionSnapshot::default()
+        };
+        let surface = CandidateSurface::from_snapshot(&snapshot);
+
+        let rows = display_candidate_rows(&surface);
+
+        assert!(rows[1].contains(MODEL_MARK), "model row unmarked: {:?}", rows[1]);
+        assert!(
+            !rows[1].contains(DERIVED_MARK),
+            "model row must not also read as derived: {:?}",
+            rows[1]
+        );
+        assert!(
+            !rows[0].contains(DERIVED_MARK),
+            "ordinary phrase row wrongly marked derived: {:?}",
+            rows[0]
+        );
     }
 
     #[test]
@@ -620,9 +732,9 @@ mod tests {
 
     #[test]
     fn candidate_rows_match_ibus_metadata_labels() {
-        let rows = display_candidate_rows(
-            &["ជា".to_owned(), "ជៀ".to_owned(), "jea".to_owned()],
-            &[
+        let surface = flat_surface(
+            &["ជា", "ជៀ", "jea"],
+            vec![
                 CandidateDisplayEntry {
                     output: "ជា".to_owned(),
                     recommended: true,
@@ -640,16 +752,18 @@ mod tests {
                     recommended: false,
                     roman_hints: vec![],
                     is_raw_fallback: true,
+                    ..Default::default()
                 },
             ],
         );
 
+        let rows = display_candidate_rows(&surface);
         assert_eq!(rows, vec!["\u{2713} ជា (jea / chea)", "ជៀ (jia)", "~ jea"]);
     }
 
     #[test]
     fn candidate_rows_fall_back_to_plain_candidates_without_metadata() {
-        let rows = display_candidate_rows(&["ជា".to_owned(), "jea".to_owned()], &[]);
+        let rows = display_candidate_rows(&flat_surface(&["ជា", "jea"], vec![]));
 
         assert_eq!(rows, vec!["ជា", "jea"]);
     }

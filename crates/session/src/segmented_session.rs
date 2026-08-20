@@ -61,14 +61,19 @@ fn would_collapse_segmentation(current: Option<&SegmentedSession>, refinement: &
     refined_segments < current_segments
 }
 
-/// A one-span model winner is an intentional whole-composition replacement, not the
-/// timeout collapse guarded by [`would_collapse_segmentation`]. Keep the guard strict for
-/// ordinary/roman fallbacks, while allowing a provenance-carrying Khmer rescue through.
-fn model_rescue_won(refinement: &SegmentedRefinement) -> bool {
+/// Whether a refinement carries a one-span model rescue — an intentional whole-composition
+/// replacement, as opposed to the timeout collapse guarded by [`would_collapse_segmentation`].
+///
+/// Checks every phrase candidate, not just the top one. Segment count cannot tell a timed-out
+/// refine from a successful rescue, but provenance can: a from_model Khmer candidate anywhere in
+/// the list is evidence the model ran to completion. Inspecting only `.first()` discarded whole
+/// refinements whose rescue ranked below a Lexicon match — `komnab` returned កំណាព្យ at position
+/// four, so the guard read it as a timeout and threw away every model candidate with it.
+fn refinement_carries_model_rescue(refinement: &SegmentedRefinement) -> bool {
     refinement
         .phrase_candidates
-        .first()
-        .is_some_and(|candidate| candidate.from_model && candidate.segments.len() == 1 && has_khmer(&candidate.text))
+        .iter()
+        .any(|candidate| candidate.from_model && candidate.segments.len() == 1 && has_khmer(&candidate.text))
 }
 
 /// The model compute for a segmented refinement — **pure**: reads the refiner + input + history,
@@ -500,7 +505,9 @@ impl ImeSession {
         if would_degrade_to_roman(&self.candidates, &refinement) {
             return self.segmented_session.is_some();
         }
-        if would_collapse_segmentation(self.segmented_session.as_ref(), &refinement) && !model_rescue_won(&refinement) {
+        if would_collapse_segmentation(self.segmented_session.as_ref(), &refinement)
+            && !refinement_carries_model_rescue(&refinement)
+        {
             return self.segmented_session.is_some();
         }
         self.segmented_session = refinement.segmented_session;
@@ -557,7 +564,9 @@ impl ImeSession {
         if would_degrade_to_roman(&self.candidates, &refinement) {
             return self.segmented_session.is_some();
         }
-        if would_collapse_segmentation(self.segmented_session.as_ref(), &refinement) && !model_rescue_won(&refinement) {
+        if would_collapse_segmentation(self.segmented_session.as_ref(), &refinement)
+            && !refinement_carries_model_rescue(&refinement)
+        {
             return true; // keep the richer live segmentation; the timed-out refine is worse
         }
         self.segmented_session = refinement.segmented_session;
@@ -646,6 +655,60 @@ mod tests {
         assert!(
             session.snapshot().segmented_active,
             "a refinement that collapses the multi-word segmentation must not wipe the phrase strip"
+        );
+    }
+
+    #[test]
+    fn a_model_rescue_below_the_top_is_still_proof_the_refine_was_not_a_timeout() {
+        // Real case: komnab. The live path builds កុំ|ញ៉ាប, and the refiner returns កំណាព្យ as a
+        // from_model whole-composition rescue — but at position 4, behind Lexicon matches. The
+        // collapse guard only inspects `.first()`, so it read the refinement as a timeout and
+        // discarded the whole thing, model candidates included. The user saw no ✦ at all and the
+        // model's correct answer never reached the candidate list.
+        //
+        // Segment count cannot distinguish a timeout from a rescue; provenance can. A refinement
+        // carrying ANY model-derived Khmer candidate is evidence the model ran to completion.
+        let mut session = session();
+        type_ascii(&mut session, "khnhomtov");
+        assert!(session.snapshot().segmented_active);
+
+        let segment = |input: &str, output: &str| crate::adapter_contract::PhraseSegment {
+            input: input.to_string(),
+            output: output.to_string(),
+            roman_hints: vec![],
+        };
+        let rescued_but_not_first = super::SegmentedRefinement {
+            segmented_session: None,
+            candidates: vec!["កំណប់".to_string(), "កំណាព្យ".to_string()],
+            phrase_candidates: vec![
+                crate::adapter_contract::PhraseCandidate {
+                    text: "កំណប់".to_string(),
+                    segments: vec![segment("khnhomtov", "កំណប់")],
+                    from_model: false,
+                    lexicon_verified: true,
+                    ..Default::default()
+                },
+                crate::adapter_contract::PhraseCandidate {
+                    text: "កំណាព្យ".to_string(),
+                    segments: vec![segment("khnhomtov", "កំណាព្យ")],
+                    from_model: true,
+                    lexicon_verified: true,
+                    ..Default::default()
+                },
+            ],
+        };
+
+        session.apply_segmented_refinement("khnhomtov", rescued_but_not_first);
+
+        assert!(
+            session.snapshot().phrase_candidates.iter().any(|c| c.from_model),
+            "a refinement carrying a model rescue must not be discarded merely because the rescue              is not ranked first; phrases={:?}",
+            session
+                .snapshot()
+                .phrase_candidates
+                .iter()
+                .map(|c| (c.text.clone(), c.from_model))
+                .collect::<Vec<_>>()
         );
     }
 

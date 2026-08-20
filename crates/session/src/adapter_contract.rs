@@ -179,6 +179,10 @@ pub struct CandidateDisplayEntry {
     /// Rules** floor. Renderers that hide ASCII candidates must still show this
     /// one, so the user can always fall back to committing their literal input.
     pub is_raw_fallback: bool,
+    /// True when a span-proposal provider contributed this candidate. Renderers mark it so the
+    /// user can tell a model suggestion from a **Lexicon** one. This is a marker, not a filter:
+    /// an out-of-Lexicon reading may be a name or a loanword and stays selectable.
+    pub from_model: bool,
 }
 
 /// Result of processing one adapter command.

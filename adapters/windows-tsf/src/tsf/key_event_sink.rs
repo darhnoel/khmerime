@@ -68,7 +68,9 @@ impl ITfKeyEventSink_Impl for KhmerImeKeyEventSink_Impl {
 
         let (client_id, current_preedit, has_active_composition, render_state) = {
             let mut state = lock_state(&self.state)?;
-            if state.driver.is_none() {
+            let shared = Arc::clone(&state.shared);
+            let mut driver_slot = shared.driver.lock().map_err(|_| Error::from(E_FAIL))?;
+            if driver_slot.is_none() {
                 // Phase A is built synchronously in Activate, so this is no longer the
                 // warmup path — reaching here means the Phase A build itself failed and
                 // roman is leaking into the document. See ADR-0001.
@@ -84,11 +86,13 @@ impl ITfKeyEventSink_Impl for KhmerImeKeyEventSink_Impl {
                 ));
                 return Ok(FALSE);
             }
-            let driver = state.driver.as_mut().expect("driver present");
+            let driver = driver_slot.as_mut().expect("driver present");
             if !event_would_be_consumed(event, &driver.session().snapshot()) {
                 return Ok(FALSE);
             }
             let render_state = driver.process_callback(WindowsTsfCallback::KeyDown(event));
+            // Restart the debounce: this keystroke invalidates whatever the last refine answered.
+            state.shared.note_keystroke();
             let current_preedit = state.current_preedit.clone();
             let has_active_composition = state.composition.is_some();
             (state.client_id, current_preedit, has_active_composition, render_state)
@@ -132,7 +136,8 @@ fn lock_state(state: &Arc<Mutex<TextServiceState>>) -> Result<std::sync::MutexGu
 
 fn driver_would_handle_key(state: &Arc<Mutex<TextServiceState>>, input: WindowsKeyInput) -> Result<bool> {
     let state = lock_state(state)?;
-    let Some(driver) = state.driver.as_ref() else {
+    let driver_slot = state.shared.driver.lock().map_err(|_| Error::from(E_FAIL))?;
+    let Some(driver) = driver_slot.as_ref() else {
         return Ok(false);
     };
     let ConvertedKey::Event(event) = convert_windows_key(input) else {
