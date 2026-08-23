@@ -339,14 +339,14 @@ class KhmerInputHandler(
         if (index < 0 || index >= segments.size) return
         val focusedIndex = current.focusedSegmentIndex ?: 0
         if (index == focusedIndex && !current.segmentEditActive) {
+            // Second tap on the already-focused segment: enter Segment Edit Mode.
             render(session.processTab())
             transitionTo(KeyboardState.Qwerty)
         } else if (index != focusedIndex) {
-            val diff = index - focusedIndex
-            var state = current
-            if (diff > 0) repeat(diff) { state = session.processRight() }
-            else repeat(-diff) { state = session.processLeft() }
-            render(state)
+            // First tap on a different segment: focus it only (highlight), no
+            // edit mode. A follow-up tap on it then edits. Uses the focus-only
+            // session primitive since arrows are inert outside edit mode.
+            render(session.focusSegment(index))
         }
     }
 

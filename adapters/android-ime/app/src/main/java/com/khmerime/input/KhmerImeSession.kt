@@ -29,6 +29,7 @@ class KhmerImeSession {
     fun processLeft(): KhmerRenderState = parse(nativeProcessLeft(nativeHandle))
     fun processRight(): KhmerRenderState = parse(nativeProcessRight(nativeHandle))
     fun processTab(): KhmerRenderState = parse(nativeProcessTab(nativeHandle))
+    fun focusSegment(index: Int): KhmerRenderState = parse(nativeFocusSegment(nativeHandle, index))
     fun processDigit(n: Int): KhmerRenderState = parse(nativeProcessDigit(nativeHandle, n))
     fun selectPhrase(index: Int): KhmerRenderState = parse(nativeSelectPhrase(nativeHandle, index))
     fun enterCharPick(): KhmerRenderState = parse(nativeEnterCharPick(nativeHandle))
@@ -58,6 +59,7 @@ class KhmerImeSession {
     private external fun nativeProcessLeft(handle: Long): String
     private external fun nativeProcessRight(handle: Long): String
     private external fun nativeProcessTab(handle: Long): String
+    private external fun nativeFocusSegment(handle: Long, index: Int): String
     private external fun nativeProcessDigit(handle: Long, n: Int): String
     private external fun nativeSelectPhrase(handle: Long, index: Int): String
     private external fun nativeEnterCharPick(handle: Long): String

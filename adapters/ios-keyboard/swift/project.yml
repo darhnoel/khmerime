@@ -117,6 +117,7 @@ targets:
       - path: KhmerIMEKeyboard/Layout/KeyboardHostLayout.swift
       - path: KhmerIMEKeyboard/Layout/KeyboardLayerFactory.swift
       - path: KhmerIMEKeyboard/Layout/KeyboardLayerVisibility.swift
+      - path: KhmerIMEKeyboard/Layout/SwitchKeyVisibility.swift
       - path: KhmerIMEKeyboard/Layout/KeyboardLayoutMetrics.swift
       - path: KhmerIMEKeyboard/Layout/KeyboardViewHierarchyBuilder.swift
       - path: KhmerIMEKeyboard/Layout/QwertyCharacterGridLayout.swift
@@ -131,7 +132,6 @@ targets:
       - path: KhmerIMEKeyboard/Views/KeyboardRootView.swift
       - path: KhmerIMEKeyboard/Views/KeyStyle.swift
       - path: KhmerIMEKeyboard/Views/BackspaceButton.swift
-      - path: KhmerIMEKeyboard/Views/GlobeKeyButton.swift
       - path: KhmerIMEKeyboard/Views/StripLabelPool.swift
       - path: KhmerIMEKeyboard/Views/StripPresentationSpec.swift
       - path: KhmerIMEKeyboard/Views/StripView.swift

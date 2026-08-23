@@ -5,6 +5,7 @@ import com.khmerime.layout.KeyboardKeyAction
 import com.khmerime.layout.KeyboardLayer
 import com.khmerime.layout.KeyboardLayerSpec
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotNull
 import org.junit.Test
 
 class KeyboardLayerSpecTest {
@@ -18,9 +19,14 @@ class KeyboardLayerSpecTest {
                 listOf("Q", "W", "E", "R", "T", "Y", "U", "I", "O", "P"),
                 listOf("A", "S", "D", "F", "G", "H", "J", "K", "L"),
                 listOf("✦", "Z", "X", "C", "V", "B", "N", "M", "⌫"),
-                listOf("En", "123", "space", ".", "↵"),
+                // no standalone "." on Qwerty (typeable from 123); globe is left,
+                // En moved right of space to rebalance the row.
+                listOf("123", "space", "En", "↵"),
             ),
-            KeyboardLayerSpec.rows(KeyboardLayer.Qwerty).map { row -> row.map { it.label } },
+            // the globe is icon-rendered, so it carries no text label; compare
+            // only the labelled keys.
+            KeyboardLayerSpec.rows(KeyboardLayer.Qwerty)
+                .map { row -> row.filter { it.iconRes == null }.map { it.label } },
         )
     }
 
@@ -31,17 +37,33 @@ class KeyboardLayerSpecTest {
             KeyboardLayerSpec.rows(KeyboardLayer.Numeric)[2].map { it.label },
         )
         assertEquals(
-            listOf("En", "ABC", "space", "↵"),
-            KeyboardLayerSpec.rows(KeyboardLayer.Numeric)[3].map { it.label },
+            listOf("ABC", "space", "En", "↵"),
+            KeyboardLayerSpec.rows(KeyboardLayer.Numeric)[3].filter { it.iconRes == null }.map { it.label },
         )
         assertEquals(
             listOf("123", ".", ",", "?", "!", "'", "⌫"),
             KeyboardLayerSpec.rows(KeyboardLayer.Symbols)[2].map { it.label },
         )
         assertEquals(
-            listOf("En", "ABC", "space", "↵"),
-            KeyboardLayerSpec.rows(KeyboardLayer.Symbols)[3].map { it.label },
+            listOf("ABC", "space", "En", "↵"),
+            KeyboardLayerSpec.rows(KeyboardLayer.Symbols)[3].filter { it.iconRes == null }.map { it.label },
         )
+    }
+
+    @Test
+    fun everyLayerHasANextKeyboardGlobeFirstInTheBottomRow() {
+        // App Store / user-reported parity (ADR-0022): a next-keyboard control
+        // is always present. On Android it is an icon globe at the start of the
+        // bottom row (a monochrome vector drawable, not a color emoji).
+        KeyboardLayer.entries.forEach { layer ->
+            val globe = KeyboardLayerSpec.rows(layer).last().first()
+            assertEquals(
+                "$layer globe must switch keyboards",
+                KeyboardKeyAction.NextKeyboard,
+                globe.action,
+            )
+            assertNotNull("$layer globe must render an icon, not text", globe.iconRes)
+        }
     }
 
     @Test
@@ -51,10 +73,6 @@ class KeyboardLayerSpecTest {
 
         assertEquals("all 25 numeric-layer text keys must be literal", 25, numericLiterals.size)
         assertEquals("all 25 symbol-layer text keys must be literal", 25, symbolLiterals.size)
-        assertEquals(
-            KeyboardKeyAction.InsertLiteral,
-            allKeys(KeyboardLayer.Qwerty).single { it.label == "." }.action,
-        )
         assertEquals(
             KeyboardKeyAction.Insert,
             allKeys(KeyboardLayer.Qwerty).single { it.label == "O" }.action,

@@ -94,9 +94,27 @@ struct KeyboardLayerFactory {
         row.spacing = 6
         row.distribution = .fill
 
+        // Row order: [globe][leftLabel][space][EN][⏎] (ADR-0022 rebalance).
+        // Globe stays in the standard left position; EN moves to the right of
+        // space so the left isn't crowded. The standalone "." is dropped — it's
+        // typeable from the 123 layer — which also balances the row.
+        _ = includePeriod
+
         let globeBtn = makeGlobeKey()
         globeBtn.widthAnchor.constraint(equalToConstant: specialKeyW).isActive = true
         row.addArrangedSubview(globeBtn)
+
+        let leftBtn = makeSpecialKey(leftLabel, action: leftAction)
+        leftBtn.titleLabel?.font = .systemFont(ofSize: 13, weight: .medium)
+        leftBtn.widthAnchor.constraint(equalToConstant: specialKeyW).isActive = true
+        row.addArrangedSubview(leftBtn)
+
+        // Space bar stretches to fill the remaining width.
+        let spaceBtn = makeSpecialKey("space", action: actions.space)
+        spaceBtn.titleLabel?.font = .systemFont(ofSize: 13)
+        spaceBtn.setContentHuggingPriority(.init(rawValue: 1), for: .horizontal)
+        spaceBtn.setContentCompressionResistancePriority(.init(rawValue: 1), for: .horizontal)
+        row.addArrangedSubview(spaceBtn)
 
         let enBtn = makeSpecialKey("EN", action: actions.toggleEnglish)
         enBtn.titleLabel?.font = .systemFont(ofSize: 13, weight: .medium)
@@ -104,26 +122,8 @@ struct KeyboardLayerFactory {
         enBtn.tag = enKeyTag
         row.addArrangedSubview(enBtn)
 
-        let leftBtn = makeSpecialKey(leftLabel, action: leftAction)
-        leftBtn.titleLabel?.font = .systemFont(ofSize: 13, weight: .medium)
-        leftBtn.widthAnchor.constraint(equalToConstant: specialKeyW).isActive = true
-
-        // Space bar stretches to fill the remaining width.
-        let spaceBtn = makeSpecialKey("space", action: actions.space)
-        spaceBtn.titleLabel?.font = .systemFont(ofSize: 13)
-        spaceBtn.setContentHuggingPriority(.init(rawValue: 1), for: .horizontal)
-        spaceBtn.setContentCompressionResistancePriority(.init(rawValue: 1), for: .horizontal)
-
         let returnBtn = makeSpecialKey("⏎", action: actions.returnKey)
         returnBtn.widthAnchor.constraint(equalToConstant: returnKeyW).isActive = true
-
-        row.addArrangedSubview(leftBtn)
-        row.addArrangedSubview(spaceBtn)
-        if includePeriod {
-            let periodBtn = makeLiteralSpecialKey(".")
-            periodBtn.widthAnchor.constraint(equalToConstant: specialKeyW).isActive = true
-            row.addArrangedSubview(periodBtn)
-        }
         row.addArrangedSubview(returnBtn)
         return row
     }
@@ -220,17 +220,6 @@ struct KeyboardLayerFactory {
         return btn
     }
 
-    private func makeLiteralSpecialKey(_ literal: String) -> UIButton {
-        let btn = GlassKeyButton(frame: .zero)
-        btn.setTitle(literal, for: .normal)
-        btn.previewLabel = literal
-        KeyStyle.applySpecial(btn, isIPad: isIPad)
-        btn.onPress = { [weak target, weak btn] in
-            _ = target?.perform(actions.literal, with: btn)
-        }
-        return btn
-    }
-
     func makeSpecialKey(_ title: String, action: Selector, previewLabel: String? = nil) -> UIButton {
         let btn = GlassKeyButton(frame: .zero)
         btn.setTitle(title, for: .normal)
@@ -240,11 +229,12 @@ struct KeyboardLayerFactory {
         return btn
     }
 
-    // The next-keyboard key. Uses the SF Symbol "globe" sized and tinted to match
-    // the other special keys. GlobeKeyButton handles long-press detection internally
-    // via timer; KeyboardViewController wires onShortTap / onLongPress callbacks.
+    // The next-keyboard key. SF Symbol "globe" sized/tinted like the other
+    // special keys. A plain GlassKeyButton (not a custom timer button): the
+    // controller wires handleInputModeList(from:with:) on .allTouchEvents, and
+    // UIKit itself does tap=advance / long-press=picker with live events.
     func makeGlobeKey() -> UIButton {
-        let btn = GlobeKeyButton(frame: .zero)
+        let btn = GlassKeyButton(frame: .zero)
         let config = UIImage.SymbolConfiguration(pointSize: isIPad ? 17 : 15, weight: .medium)
         btn.setImage(UIImage(systemName: "globe", withConfiguration: config), for: .normal)
         KeyStyle.applySpecial(btn, isIPad: isIPad)

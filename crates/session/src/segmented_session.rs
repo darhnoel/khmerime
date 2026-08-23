@@ -169,6 +169,32 @@ impl ImeSession {
         self.move_segment_focus(1)
     }
 
+    /// Focus an absolute segment index WITHOUT entering Segment Edit Mode. This
+    /// is the touch-keyboard primitive (no Tab key): the first tap on a segment
+    /// focuses it (highlight only); a later Tab / repeat-tap enters edit mode.
+    /// Consumed but inert when there is no multi-segment session or the index is
+    /// out of range.
+    pub fn focus_segment(&mut self, index: usize) -> SessionResult {
+        let Some(mut session) = self.segmented_session.clone() else {
+            return SessionResult::default();
+        };
+        if index >= session.segments.len() {
+            return SessionResult {
+                consumed: true,
+                ..SessionResult::default()
+            };
+        }
+        session.focused = index;
+        self.segmented_session = Some(session);
+        // Focus-only: leaving Segment Edit Mode is part of "just focus this" —
+        // a plain highlight, not an active edit. A follow-up tap re-enters edit.
+        self.segment_edit_state = None;
+        SessionResult {
+            consumed: true,
+            ..SessionResult::default()
+        }
+    }
+
     // Move segment focus by `delta`, but ONLY while in Segment Edit Mode (after Tab): re-enter edit
     // on the new focused segment (macos-imk ADR-0004) so the user can cycle each segment's words in
     // turn. Before Tab the arrows are consumed (they never leak to the document) but INERT — moving
@@ -604,6 +630,35 @@ mod tests {
         phase_a_session_without_segmented_preview, segmented_default_session_like_ibus_bridge,
         segmented_deferred_session_like_ibus_bridge, session, type_ascii,
     };
+
+    // Tapping a segment on a touch keyboard (no Tab key) must be able to focus a
+    // segment WITHOUT entering Segment Edit Mode — the first tap highlights, a
+    // second tap enters edit. `focus_segment(index)` is that primitive.
+    #[test]
+    fn focus_segment_moves_focus_without_entering_edit_mode() {
+        let mut session = session();
+        type_ascii(&mut session, "khnhomtov");
+        assert_eq!(session.snapshot().focused_segment_index, Some(0));
+        assert!(!session.snapshot().segment_edit_active);
+
+        let result = session.focus_segment(1);
+
+        assert!(result.consumed);
+        let snap = session.snapshot();
+        assert_eq!(snap.focused_segment_index, Some(1));
+        assert!(!snap.segment_edit_active, "focus_segment must not enter edit mode");
+    }
+
+    #[test]
+    fn focus_segment_out_of_range_is_a_noop() {
+        let mut session = session();
+        type_ascii(&mut session, "khnhomtov");
+        let before = session.snapshot().focused_segment_index;
+
+        session.focus_segment(99);
+
+        assert_eq!(session.snapshot().focused_segment_index, before);
+    }
 
     // Lock-free refine: the model runs OFF the session lock, then the result is applied. If the
     // user typed more while it computed, the composition no longer matches and the stale
