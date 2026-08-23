@@ -165,11 +165,27 @@ The public KhmerIME page that helps users choose a platform download, try the **
 _Avoid_: homepage, product site
 
 **Online Beta**:
-The in-browser build of KhmerIME (the dioxus-app, deployed at the beta URL) where a visitor types romanized Khmer and sees candidates without installing anything. Reached from the **Download Landing Page** as its secondary trial path; a quick trial surface, not a replacement for the installed platform IMEs.
+The focused, in-browser Khmer writing workspace (the dioxus-app, deployed at the beta URL) where a user writes with KhmerIME without installing a platform IME. It is local-first and grows from one persistent writing surface into named **Document**s; it remains browser-sandboxed and does not replace installed platform IMEs.
 _Avoid_: playground, demo, web app
 
+**Document**:
+A manually titled body of plain Khmer or roman text in the **Online Beta**. A Document belongs to at most one **Collection**, may carry many **Tag**s, and has recoverable **Document Version**s.
+_Avoid_: note, file, editor text
+
+**Collection**:
+The single organizational home of a **Document** in the **Online Beta**. A Document without an explicitly chosen Collection belongs to Unfiled.
+_Avoid_: folder (implies filesystem semantics), group
+
+**Tag**:
+A reusable label that may classify many **Document**s, while each Document may carry many Tags. Tags complement Collections rather than replacing their single-home hierarchy.
+_Avoid_: category, label
+
+**Document Version**:
+A recoverable, persisted checkpoint of a **Document** across editing sessions. It is distinct from Undo/Redo, which only reverses edits in the current session.
+_Avoid_: undo history, autosave
+
 **Silk Veil**:
-The shared glassmorphic visual identity for KhmerIME's public web surfaces — the **Download Landing Page** and the **Online Beta**. A deep-ink / charcoal-plum base, soft translucent pearl-glass panes with white rim highlights, an ember-amber primary action, sparse peacock-teal accents, and warm ivory text — distinct from the previous light cream/terracotta web styling.
+The glassmorphic visual identity for KhmerIME's marketing surface, the **Download Landing Page**. A deep-ink / charcoal-plum base, soft translucent pearl-glass panes with white rim highlights, an ember-amber primary action, sparse peacock-teal accents, and warm ivory text; the focused **Online Beta** document workspace deliberately uses its own restrained light/dark interface.
 _Avoid_: Liquid Glass Theme, light download theme, glass accents
 
 **Companion App**:

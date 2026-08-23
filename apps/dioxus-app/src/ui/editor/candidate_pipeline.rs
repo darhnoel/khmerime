@@ -8,9 +8,8 @@ use roman_lookup::{
 use crate::{engine, CompositionMark, SuggestionPopup};
 
 use super::manual_flow::{manual_state_visible_candidates, refresh_manual_state_candidates};
-use super::segmented_flow::build_segmented_session;
 use super::view_helpers::{candidate_composition_mark, suggestion_popup_position};
-use super::{slice_chars, CandidateMode, EditorSignals, InputMode, SegmentedSession};
+use super::{slice_chars, CandidateLevel, CandidateMode, EditorSignals, InputMode, SegmentedSession};
 
 const SHADOW_DEBOUNCE_SHORT_MS: u32 = 220;
 const SHADOW_DEBOUNCE_MEDIUM_MS: u32 = 320;
@@ -18,7 +17,7 @@ const SHADOW_DEBOUNCE_LONG_MS: u32 = 420;
 
 #[cfg(test)]
 pub(super) use roman_lookup::connect_khmer_display;
-pub(crate) use roman_lookup::normalized_suggestion_key;
+use roman_lookup::normalized_suggestion_key;
 
 fn cancel_suggestion_loading(mut state: EditorSignals) {
     state.suggestion_loading.set(false);
@@ -68,6 +67,35 @@ fn shadow_debounce_ms(token: &str) -> u32 {
     }
 }
 
+pub(super) fn phrase_surface_candidates(
+    candidates: Vec<roman_lookup::DecodeCandidate>,
+) -> Vec<roman_lookup::DecodeCandidate> {
+    // Phrase mode describes the decoder's best reading, not the existence of
+    // any lower-ranked fragmented alternative. For an exact input such as
+    // `gumnit`, the top candidate is the single-span `គំនិត`; a lower candidate
+    // (`គំនិត្យ`) happens to have multiple spans. Filtering first used to drop
+    // the exact reading and incorrectly promote that lower candidate into a
+    // one-row Phrase surface.
+    if !candidates
+        .first()
+        .is_some_and(|candidate| candidate.segments.len() >= 2)
+    {
+        return Vec::new();
+    }
+
+    candidates
+        .into_iter()
+        .filter(|candidate| candidate.segments.len() >= 2 || candidate.from_model)
+        .map(|mut candidate| {
+            candidate.text = roman_lookup::connect_khmer_display(&candidate.text);
+            for segment in &mut candidate.segments {
+                segment.output = roman_lookup::connect_khmer_display(&segment.output);
+            }
+            candidate
+        })
+        .collect()
+}
+
 #[cfg(target_arch = "wasm32")]
 async fn shadow_debounce_delay(delay_ms: u32) {
     gloo_timers::future::TimeoutFuture::new(delay_ms).await;
@@ -108,38 +136,83 @@ fn spawn_shadow_refinement(mut state: EditorSignals, value: String, token: Strin
             return;
         }
         let history_shadow = state.history();
-        let observation = engine(DecoderMode::Shadow).shadow_observation(&token, &history_shadow);
+        let shadow = engine(DecoderMode::Shadow);
+        let observation = shadow.shadow_observation(&token, &history_shadow);
         if shadow_request_is_stale(state, request_id, &value, &token) {
             state.suggestion_loading.set(false);
             return;
         }
-        let next_segmented = build_segmented_session(&observation, &token, &history_shadow);
-        let visible = choose_visible_suggestions(
-            &legacy_items,
-            &observation,
-            next_segmented.as_ref(),
-            state.segmented_refine_mode(),
-        );
+        // Match the desktop Candidate Surface: when the decoder finds a real
+        // segmentation, normal typing exposes complete phrase hypotheses first.
+        // Single-word legacy fallbacks are not alternatives for the complete
+        // phrase and are deliberately omitted (macOS ADR-0004).
+        let phrase_candidates = phrase_surface_candidates(shadow.phrase_candidates(&token, &history_shadow));
+        let phrase_mode = phrase_candidates.iter().any(|candidate| candidate.segments.len() >= 2);
+        let visible = if phrase_mode {
+            phrase_candidates
+                .iter()
+                .map(|candidate| candidate.text.clone())
+                .collect::<Vec<_>>()
+        } else {
+            // Never expose focused-segment candidates during normal typing.
+            // Without a whole-phrase surface, fall back to ordinary complete
+            // transliteration rows and keep Segment Edit unavailable.
+            choose_visible_suggestions(&legacy_items, &observation, None, false)
+        };
         let packs = personal_lexicon_packs(state.user_dictionary());
-        let visible = normalize_visible_suggestions(Transliterator::merge_lexicon_packs(
-            &token,
-            &history_shadow,
-            &packs,
-            &visible,
-        ));
+        let visible = if phrase_mode {
+            normalize_visible_suggestions(visible)
+        } else {
+            normalize_visible_suggestions(Transliterator::merge_lexicon_packs(
+                &token,
+                &history_shadow,
+                &packs,
+                &visible,
+            ))
+        };
         let user_items = Transliterator::lexicon_pack_exact_matches(&token, &packs);
-        let (recommended_indices, mut roman_variant_hints) =
-            recommended_indices_and_roman_hints(engine(DecoderMode::Legacy), &token, &visible);
-        decorate_user_dictionary_hints(&visible, &user_items, &mut roman_variant_hints);
+        let (recommended_indices, roman_variant_hints) = if phrase_mode {
+            let hints = phrase_candidates
+                .iter()
+                .enumerate()
+                .map(|(index, candidate)| {
+                    let roman = candidate
+                        .segments
+                        .iter()
+                        .map(|segment| segment.input.as_str())
+                        .collect::<Vec<_>>()
+                        .join(" ");
+                    (index, vec![roman])
+                })
+                .collect::<HashMap<_, _>>();
+            (vec![0], hints)
+        } else {
+            let (recommended, mut hints) =
+                recommended_indices_and_roman_hints(engine(DecoderMode::Legacy), &token, &visible);
+            decorate_user_dictionary_hints(&visible, &user_items, &mut hints);
+            (recommended, hints)
+        };
 
         state.shadow_debug.set(Some(observation));
-        state.segmented_session.set(next_segmented);
+        state.segmented_session.set(None);
         state.segmented_refine_mode.set(false);
+        state
+            .phrase_candidates
+            .set(if phrase_mode { phrase_candidates } else { Vec::new() });
+        state.candidate_level.set(if phrase_mode {
+            CandidateLevel::Phrase
+        } else {
+            CandidateLevel::Flat
+        });
+        state.active_phrase_index.set(0);
         state.candidate_mode.set(CandidateMode::Transliteration);
         state.recommended_indices.set(recommended_indices);
         state.roman_variant_hints.set(roman_variant_hints);
-        let preserve_selection = state.active_token() == token && !state.suggestions().is_empty();
+        let preserve_selection = !phrase_mode && state.active_token() == token && !state.suggestions().is_empty();
         apply_visible_candidates(state, visible, preserve_selection);
+        if phrase_mode && !state.suggestions().is_empty() {
+            state.selection_started.set(true);
+        }
         if state.suggestion_request_id() == request_id {
             state.suggestion_loading.set(false);
         }
@@ -272,6 +345,8 @@ async fn update_manual_candidates(
     state.shadow_debug.set(None);
     state.segmented_session.set(None);
     state.segmented_refine_mode.set(false);
+    state.phrase_candidates.set(Vec::new());
+    state.candidate_level.set(CandidateLevel::Flat);
 
     let mut manual_state = match state.manual_typing_state() {
         Some(existing) if existing.raw_roman == token => existing,
@@ -326,6 +401,8 @@ async fn update_next_word_candidates(value: &str, request_id: u64, mut state: Ed
     state.shadow_debug.set(None);
     state.segmented_session.set(None);
     state.segmented_refine_mode.set(false);
+    state.phrase_candidates.set(Vec::new());
+    state.candidate_level.set(CandidateLevel::Flat);
 
     let history_snapshot = state.history();
     let items = legacy.next_word_suggestions(&previous_token, sentence_start, &history_snapshot);
@@ -375,6 +452,8 @@ async fn update_transliteration_candidates(
     state.shadow_debug.set(None);
     state.segmented_session.set(None);
     state.segmented_refine_mode.set(false);
+    state.phrase_candidates.set(Vec::new());
+    state.candidate_level.set(CandidateLevel::Flat);
     let user_items = Transliterator::lexicon_pack_exact_matches(&token, &packs);
     let items = legacy_items.clone();
     let (recommended_indices, mut roman_variant_hints) = recommended_indices_and_roman_hints(legacy, &token, &items);
@@ -404,7 +483,6 @@ async fn update_transliteration_candidates(
         roman_variant_hints,
         preserve_selection,
     );
-
     if let Some(token) = shadow_token {
         spawn_shadow_refinement(state, value, token, legacy_items);
     }

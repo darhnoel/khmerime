@@ -15,8 +15,8 @@ const CHAR_WIDTH_MULTIPLIER: f64 = 0.58;
 const POPUP_HORIZONTAL_OFFSET: f64 = 18.0;
 const POPUP_VERTICAL_OFFSET: f64 = 10.0;
 const POPUP_SAFE_MARGIN: f64 = 8.0;
-const POPUP_WIDTH: f64 = 280.0;
-const POPUP_HEIGHT: f64 = 220.0;
+const POPUP_WIDTH: f64 = 360.0;
+const POPUP_HEIGHT: f64 = 280.0;
 #[cfg(any(not(target_arch = "wasm32"), test))]
 const COMPOSITION_MIN_WIDTH: f64 = 12.0;
 
@@ -576,8 +576,8 @@ mod tests {
             client_width: 640.0,
             client_height: 480.0,
         });
-        assert_eq!(popup.left, 352.0);
-        assert_eq!(popup.top, 252.0);
+        assert_eq!(popup.left, 272.0);
+        assert_eq!(popup.top, 192.0);
     }
 
     #[test]
@@ -593,8 +593,8 @@ mod tests {
             client_width: 380.0,
             client_height: 320.0,
         });
-        // caret_top = 250, above = 20, below would overflow the viewport.
-        assert_eq!(popup.top, 20.0);
+        // caret_top = 250; the 280px panel flips above, then clamps to the safe margin.
+        assert_eq!(popup.top, 8.0);
     }
 
     #[test]

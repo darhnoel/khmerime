@@ -1,7 +1,9 @@
 use std::collections::HashMap;
 
 use dioxus::prelude::*;
-use roman_lookup::{DecoderMode, ManualComposeCandidate, ManualComposeKind, SegmentedSession, ShadowObservation};
+use roman_lookup::{
+    DecodeCandidate, DecoderMode, ManualComposeCandidate, ManualComposeKind, SegmentedSession, ShadowObservation,
+};
 
 use crate::{CompositionMark, EngineReadiness, SuggestionPopup};
 
@@ -25,6 +27,14 @@ pub(crate) enum CandidateMode {
     None,
     Transliteration,
     NextWord,
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub(crate) enum CandidateLevel {
+    #[default]
+    Flat,
+    Phrase,
+    Segment,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -118,6 +128,9 @@ pub(crate) struct EditorSignals {
     pub shadow_debug: Signal<Option<ShadowObservation>>,
     pub segmented_session: Signal<Option<SegmentedSession>>,
     pub segmented_refine_mode: Signal<bool>,
+    pub phrase_candidates: Signal<Vec<DecodeCandidate>>,
+    pub candidate_level: Signal<CandidateLevel>,
+    pub active_phrase_index: Signal<usize>,
     pub suggestion_loading: Signal<bool>,
     pub suggestion_request_id: Signal<u64>,
     pub candidate_mode: Signal<CandidateMode>,
@@ -187,6 +200,18 @@ impl EditorSignals {
         (self.segmented_refine_mode)()
     }
 
+    pub(crate) fn phrase_candidates(self) -> Vec<DecodeCandidate> {
+        (self.phrase_candidates)()
+    }
+
+    pub(crate) fn candidate_level(self) -> CandidateLevel {
+        (self.candidate_level)()
+    }
+
+    pub(crate) fn active_phrase_index(self) -> usize {
+        (self.active_phrase_index)()
+    }
+
     pub(crate) fn suggestion_loading(self) -> bool {
         (self.suggestion_loading)()
     }
@@ -246,6 +271,9 @@ impl EditorSignals {
         self.shadow_debug.set(None);
         self.segmented_session.set(None);
         self.segmented_refine_mode.set(false);
+        self.phrase_candidates.set(Vec::new());
+        self.candidate_level.set(CandidateLevel::Flat);
+        self.active_phrase_index.set(0);
         self.suggestion_loading.set(false);
         self.candidate_mode.set(CandidateMode::None);
         self.active_token.set(String::new());

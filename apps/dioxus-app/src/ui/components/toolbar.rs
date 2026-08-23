@@ -1,17 +1,59 @@
 use dioxus::prelude::*;
 
-use crate::ui::components::segment_preview::SegmentPreview;
-use crate::ui::storage::{save_enabled, save_font_size};
-use crate::{EngineReadiness, MAX_FONT_SIZE, MIN_FONT_SIZE};
-
 use crate::ui::editor::{
     dismiss_manual_save_request, remove_user_dictionary_mapping, save_manual_save_request, switch_input_mode,
     update_candidates, EditorSignals, InputMode,
 };
+use crate::ui::storage::{save_enabled, save_font_size, save_sidebar_open, Theme};
+use crate::{EngineReadiness, MAX_FONT_SIZE, MIN_FONT_SIZE};
 
 #[component]
-pub(crate) fn AppToolbar(state: EditorSignals, show_guide: Signal<bool>, font_size: Signal<usize>) -> Element {
+fn Icon(name: &'static str) -> Element {
+    let path = match name {
+        "menu" => rsx! { path { d: "M4 7h16M4 12h16M4 17h16" } },
+        "pen" => rsx! {
+            path { d: "M12 20h9" }
+            path { d: "M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" }
+        },
+        "list" => rsx! {
+            path { d: "M8 6h13M8 12h13M8 18h13" }
+            path { d: "M3 6h.01M3 12h.01M3 18h.01" }
+        },
+        "keyboard" => rsx! {
+            rect { x: "2", y: "6", width: "20", height: "12", rx: "2" }
+            path { d: "M6 10h.01M10 10h.01M14 10h.01M18 10h.01M7 14h10" }
+        },
+        "book" => rsx! {
+            path { d: "M4 19.5A2.5 2.5 0 0 1 6.5 17H20" }
+            path { d: "M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2Z" }
+        },
+        "bookmark" => rsx! { path { d: "M6 3h12v18l-6-4-6 4Z" } },
+        "gear" => rsx! {
+            circle { cx: "12", cy: "12", r: "3" }
+            path { d: "M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06-.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09A1.65 1.65 0 0 0 15 4.6a1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09A1.65 1.65 0 0 0 19.4 15Z" }
+        },
+        "collapse" => rsx! { path { d: "m15 18-6-6 6-6" } },
+        _ => rsx! {},
+    };
+    rsx! {
+        svg {
+            width: "18", height: "18", view_box: "0 0 24 24", fill: "none",
+            stroke: "currentColor", stroke_width: "1.7", stroke_linecap: "round",
+            stroke_linejoin: "round", {path}
+        }
+    }
+}
+
+#[component]
+pub(crate) fn AppToolbar(
+    state: EditorSignals,
+    show_guide: Signal<bool>,
+    font_size: Signal<usize>,
+    theme: Signal<Theme>,
+    sidebar_open: Signal<bool>,
+) -> Element {
     let mut show_saved_dictionary = use_signal(|| false);
+    let mut show_settings = use_signal(|| false);
     let mut saved_entries = state
         .user_dictionary()
         .into_iter()
@@ -20,173 +62,173 @@ pub(crate) fn AppToolbar(state: EditorSignals, show_guide: Signal<bool>, font_si
     saved_entries.sort_by(|left, right| left.0.cmp(&right.0).then_with(|| left.1.cmp(&right.1)));
 
     rsx! {
-        div { class: "workspace-top",
-            div { class: "toolbar",
-                div { class: "font-tools",
-                    label { class: "font-stepper-group",
-                        span { class: "tool-label", "Font" }
-                        input {
-                            class: "font-stepper",
-                            "data-testid": "font-size-input",
-                            r#type: "number",
-                            min: "{MIN_FONT_SIZE}",
-                            max: "{MAX_FONT_SIZE}",
-                            step: "2",
-                            inputmode: "numeric",
-                            aria_label: "Font size in pixels",
-                            value: "{font_size()}",
-                            oninput: move |event| {
-                                let Ok(parsed_size) = event.value().parse::<usize>() else {
-                                    return;
-                                };
-                                let next = parsed_size.clamp(MIN_FONT_SIZE, MAX_FONT_SIZE);
-                                font_size.set(next);
-                                save_font_size(next, MIN_FONT_SIZE, MAX_FONT_SIZE);
-                                if state.roman_enabled() {
-                                    spawn(update_candidates(state.text(), state));
-                                }
-                            },
-                        }
-                        span { class: "font-stepper-unit", "px" }
+        header { class: "topbar",
+            div { class: "topbar-brand",
+                button {
+                    class: "chrome-button sidebar-toggle", "data-testid": "toggle-sidebar",
+                    title: "Toggle sidebar", aria_label: "បើក ឬបិទរបារចំហៀង",
+                    aria_expanded: "{sidebar_open()}",
+                    onclick: move |_| {
+                        let next = !sidebar_open();
+                        sidebar_open.set(next);
+                        save_sidebar_open(next);
+                    },
+                    Icon { name: "menu" }
+                }
+                span { class: "wordmark", "KhmerIME" }
+                span { class: "beta-badge", "Beta" }
+            }
+            div { class: "topbar-right",
+                if state.engine_readiness() == EngineReadiness::Booting {
+                    div { class: "engine-status loading", "data-testid": "engine-status", role: "status",
+                        span { class: "engine-status-spinner", aria_hidden: "true" }
+                        span { "កំពុងរៀបចំ…" }
                     }
+                } else if state.engine_readiness() == EngineReadiness::LegacyReady {
+                    div { class: "engine-status partial", "data-testid": "engine-status", role: "status", "កំពុងបំពេញទិន្នន័យ…" }
+                } else if state.engine_readiness() == EngineReadiness::Failed {
+                    div { class: "engine-status error", "data-testid": "engine-status", role: "status", "ម៉ាស៊ីនមានបញ្ហា" }
                 }
-                div { class: "toolbar-segment-slot",
-                    SegmentPreview { state }
+                button {
+                    class: if show_settings() { "chrome-button active" } else { "chrome-button" },
+                    "data-testid": "toggle-settings", title: "Settings", aria_label: "ការកំណត់",
+                    onclick: move |_| show_settings.set(!show_settings()), Icon { name: "gear" }
                 }
-                div { class: "mode-tools",
-                    if state.engine_readiness() == EngineReadiness::Booting {
-                        div {
-                            class: "engine-status loading",
-                            "data-testid": "engine-status",
-                            role: "status",
-                            aria_label: "Preparing resources",
-                            span { class: "engine-status-spinner", aria_hidden: "true" }
-                        }
-                    } else if state.engine_readiness() == EngineReadiness::LegacyReady {
-                        div {
-                            class: "engine-status partial",
-                            "data-testid": "engine-status",
-                            role: "status",
-                            aria_label: "Core engine ready, ranking still warming up",
-                            "Core Ready"
-                        }
-                    } else if state.engine_readiness() == EngineReadiness::Failed {
-                        div {
-                            class: "engine-status loading",
-                            "data-testid": "engine-status",
-                            role: "status",
-                            aria_label: "Engine fallback mode",
-                            "Fallback"
-                        }
+            }
+        }
+
+        if sidebar_open() {
+            button { class: "sidebar-scrim", aria_label: "បិទរបារចំហៀង",
+                onclick: move |_| { sidebar_open.set(false); save_sidebar_open(false); } }
+        }
+
+        aside { class: "app-sidebar", aria_label: "ការរុករក និងឧបករណ៍",
+            nav { class: "sidebar-nav",
+                section { class: "sidebar-section",
+                    h2 { "របៀបបញ្ចូល" }
+                    button {
+                        class: if state.input_mode() == InputMode::NormalWordSuggestion { "sidebar-item active" } else { "sidebar-item" },
+                        "data-testid": "mode-word", title: "{InputMode::NormalWordSuggestion.label()}",
+                        onclick: move |_| switch_input_mode(InputMode::NormalWordSuggestion, state),
+                        Icon { name: "list" } span { "ពាក្យ" }
                     }
                     button {
-                        class: if state.roman_enabled() { "mode-pill active" } else { "mode-pill" },
-                        "data-testid": "toggle-live-edit",
+                        class: if state.input_mode() == InputMode::ManualCharacterTyping { "sidebar-item active" } else { "sidebar-item" },
+                        "data-testid": "mode-manual", title: "{InputMode::ManualCharacterTyping.label()}",
+                        onclick: move |_| switch_input_mode(InputMode::ManualCharacterTyping, state),
+                        Icon { name: "keyboard" } span { "សរសេរដោយដៃ" }
+                    }
+                }
+                section { class: "sidebar-section sidebar-behavior",
+                    h2 { "ការបម្លែង" }
+                    button {
+                        class: "sidebar-item sidebar-toggle-item", "data-testid": "toggle-live-edit",
+                        aria_pressed: "{state.roman_enabled()}",
                         onclick: move |_| {
                             let next = !state.roman_enabled();
                             state.roman_enabled.set(next);
                             save_enabled(next);
-                            if next {
-                                spawn(update_candidates(state.text(), state));
-                            } else {
-                                state.clear_candidate_state_and_picker();
-                            }
+                            if next { spawn(update_candidates(state.text(), state)); }
+                            else { state.clear_candidate_state_and_picker(); }
                         },
-                        if state.roman_enabled() {
-                            span { class: "toolbar-label-long", "Live Edit" }
-                            span { class: "toolbar-label-short", "Live" }
-                        } else {
-                            span { class: "toolbar-label-long", "Live Edit Off" }
-                            span { class: "toolbar-label-short", "Off" }
-                        }
+                        Icon { name: "pen" } span { "វាយផ្ទាល់" }
+                        span { class: if state.roman_enabled() { "toggle-switch on" } else { "toggle-switch" }, aria_hidden: "true" }
                     }
+                }
+                section { class: "sidebar-section",
+                    h2 { "ឧបករណ៍" }
                     button {
-                        class: if state.input_mode() == InputMode::NormalWordSuggestion { "mode-pill active" } else { "mode-pill" },
-                        "data-testid": "mode-word",
-                        onclick: move |_| switch_input_mode(InputMode::NormalWordSuggestion, state),
-                        span { class: "toolbar-label-long", {InputMode::NormalWordSuggestion.label()} }
-                        span { class: "toolbar-label-short", "Word" }
-                    }
-                    button {
-                        class: if state.input_mode() == InputMode::ManualCharacterTyping { "mode-pill active" } else { "mode-pill" },
-                        "data-testid": "mode-manual",
-                        onclick: move |_| switch_input_mode(InputMode::ManualCharacterTyping, state),
-                        span { class: "toolbar-label-long", {InputMode::ManualCharacterTyping.label()} }
-                        span { class: "toolbar-label-short", "Man" }
-                    }
-                    button {
-                        class: if show_guide() { "ghost active" } else { "ghost" },
-                        "data-testid": "toggle-rules",
+                        class: if show_guide() { "sidebar-item active" } else { "sidebar-item" },
+                        "data-testid": "toggle-rules", aria_pressed: "{show_guide()}",
                         onclick: move |_| show_guide.set(!show_guide()),
-                        if show_guide() {
-                            span { class: "toolbar-label-long", "Hide Rules" }
-                            span { class: "toolbar-label-short", "Close" }
-                        } else {
-                            span { class: "toolbar-label-long", "Rules" }
-                            span { class: "toolbar-label-short", "Guide" }
-                        }
+                        Icon { name: "book" } span { "ក្បួន និងផ្លូវកាត់" }
                     }
                     button {
-                        class: if show_saved_dictionary() { "ghost active" } else { "ghost" },
-                        "data-testid": "toggle-saved-mappings",
+                        class: if show_saved_dictionary() { "sidebar-item active" } else { "sidebar-item" },
+                        "data-testid": "toggle-saved-mappings", aria_pressed: "{show_saved_dictionary()}",
                         onclick: move |_| show_saved_dictionary.set(!show_saved_dictionary()),
-                        span { class: "toolbar-label-long", "Saved ({saved_entries.len()})" }
-                        span { class: "toolbar-label-short", "Saved {saved_entries.len()}" }
+                        Icon { name: "bookmark" } span { "ពាក្យរក្សាទុក" }
+                        span { class: "sidebar-count", "{saved_entries.len()}" }
                     }
-                }
-            }
-            if let Some(request) = state.manual_save_request() {
-                div { class: "manual-save-banner",
-                    div { class: "manual-save-text",
-                        span { class: "manual-save-label", "Manual compose" }
-                        span { class: "manual-save-map", "{request.roman} → {request.khmer}" }
-                    }
-                    div { class: "manual-save-actions",
-                        button {
-                            class: "mode-pill active",
-                            "data-testid": "manual-save",
-                            onclick: move |_| {
-                                let _ = save_manual_save_request(state);
-                            },
-                            "Save Mapping"
-                        }
-                        button {
-                            class: "ghost",
-                            "data-testid": "manual-save-dismiss",
-                            onclick: move |_| dismiss_manual_save_request(state),
-                            "Dismiss"
-                        }
-                    }
-                }
-            }
-            if show_saved_dictionary() {
-                div { class: "dictionary-panel",
-                    div { class: "dictionary-panel-head",
-                        span { class: "dictionary-panel-title", "Saved manual mappings" }
-                        if saved_entries.is_empty() {
-                            span { class: "dictionary-panel-empty", "No saved mappings yet." }
-                        }
-                    }
-                    if !saved_entries.is_empty() {
-                        div { class: "dictionary-list",
-                            for (roman, khmer) in saved_entries.iter() {
-                                div {
-                                    key: "saved-{roman}-{khmer}",
-                                    class: "dictionary-row",
-                                    span { class: "dictionary-map", "{roman} → {khmer}" }
-                                    button {
-                                        class: "ghost dictionary-remove",
-                                        onclick: {
-                                            let roman = roman.clone();
-                                            let khmer = khmer.clone();
-                                            move |_| {
-                                                let _ = remove_user_dictionary_mapping(&roman, &khmer, state);
-                                            }
-                                        },
-                                        "Remove"
+                    if show_saved_dictionary() {
+                        div { class: "sidebar-saved-list",
+                            if saved_entries.is_empty() { p { "មិនទាន់មានពាក្យរក្សាទុកទេ។" } }
+                            else {
+                                for (roman, khmer) in saved_entries.iter() {
+                                    div { class: "sidebar-saved-row", key: "saved-{roman}-{khmer}",
+                                        span { "{roman} → {khmer}" }
+                                        button {
+                                            aria_label: "លុប {roman} → {khmer}", title: "Remove",
+                                            onclick: {
+                                                let roman = roman.clone();
+                                                let khmer = khmer.clone();
+                                                move |_| { let _ = remove_user_dictionary_mapping(&roman, &khmer, state); }
+                                            }, "×"
+                                        }
                                     }
                                 }
                             }
+                        }
+                    }
+                }
+            }
+            button { class: "sidebar-collapse", aria_label: "បង្រួមរបារចំហៀង",
+                onclick: move |_| { sidebar_open.set(false); save_sidebar_open(false); },
+                Icon { name: "collapse" } span { "បង្រួមរបារ" }
+            }
+        }
+
+        if let Some(request) = state.manual_save_request() {
+            div { class: "workspace-context",
+                div { class: "manual-save-banner",
+                    div { class: "manual-save-text",
+                        span { class: "manual-save-label", "ការផ្គុំដោយដៃ" }
+                        span { class: "manual-save-map", "{request.roman} → {request.khmer}" }
+                    }
+                    div { class: "manual-save-actions",
+                        button { class: "mode-pill active", "data-testid": "manual-save",
+                            onclick: move |_| { let _ = save_manual_save_request(state); }, "រក្សាទុក" }
+                        button { class: "ghost", "data-testid": "manual-save-dismiss",
+                            onclick: move |_| dismiss_manual_save_request(state), "រំលង" }
+                    }
+                }
+            }
+        }
+
+        if show_settings() {
+            button { class: "modal-scrim", aria_label: "បិទការកំណត់", onclick: move |_| show_settings.set(false) }
+            section { class: "settings-modal", role: "dialog", aria_modal: "true", aria_labelledby: "settings-title",
+                div { class: "settings-head",
+                    div { h2 { id: "settings-title", "ការកំណត់" } p { "កែរូបរាង និងបទពិសោធន៍សរសេរ" } }
+                    button { class: "settings-close", "data-testid": "settings-close", aria_label: "បិទការកំណត់",
+                        onclick: move |_| show_settings.set(false), "✕" }
+                }
+                div { class: "settings-group",
+                    h3 { "រូបរាង" }
+                    div { class: "settings-row",
+                        span { class: "settings-label", "ពណ៌ផ្ទៃ" }
+                        div { class: "theme-switch", role: "group", aria_label: "ពណ៌ផ្ទៃ",
+                            button { class: if theme() == Theme::System { "active" } else { "" }, onclick: move |_| theme.set(Theme::System), "ប្រព័ន្ធ" }
+                            button { class: if theme() == Theme::Light { "active" } else { "" }, onclick: move |_| theme.set(Theme::Light), "ភ្លឺ" }
+                            button { class: if theme() == Theme::Dark { "active" } else { "" }, onclick: move |_| theme.set(Theme::Dark), "ងងឹត" }
+                        }
+                    }
+                    div { class: "settings-row",
+                        span { class: "settings-label", "ទំហំអក្សរ" }
+                        label { class: "font-stepper-group",
+                            input {
+                                class: "font-stepper", "data-testid": "font-size-input", r#type: "number",
+                                min: "{MIN_FONT_SIZE}", max: "{MAX_FONT_SIZE}", step: "2", inputmode: "numeric",
+                                aria_label: "ទំហំអក្សរជាភីកសែល", value: "{font_size()}",
+                                oninput: move |event| {
+                                    let Ok(parsed_size) = event.value().parse::<usize>() else { return; };
+                                    let next = parsed_size.clamp(MIN_FONT_SIZE, MAX_FONT_SIZE);
+                                    font_size.set(next);
+                                    save_font_size(next, MIN_FONT_SIZE, MAX_FONT_SIZE);
+                                    if state.roman_enabled() { spawn(update_candidates(state.text(), state)); }
+                                }
+                            }
+                            span { class: "font-stepper-unit", "px" }
                         }
                     }
                 }

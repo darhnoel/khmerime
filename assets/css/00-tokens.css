@@ -1,38 +1,92 @@
-/* Theme tokens and shared animations */
+/* Semantic theme tokens for ADR-0023's focused document workspace.
+   No data-theme attribute follows the operating-system preference. */
 
-:root {
-  color-scheme: dark;
-  --bg: #14101b;
-  --surface: rgba(255, 249, 242, 0.06);
-  --surface-strong: #1c1622;
-  --surface-elevated: rgba(255, 255, 255, 0.08);
-  --ink: #f4ece2;
-  --muted: #c4b9ac;
-  --line: rgba(255, 255, 255, 0.14);
-  --accent: #e98a4e;
-  --accent-strong: #f4a661;
-  --accent-soft: rgba(233, 138, 78, 0.12);
-  --active: rgba(233, 138, 78, 0.18);
-  --hover: rgba(255, 255, 255, 0.06);
-  --shadow: 0 28px 80px rgba(0, 0, 0, 0.45);
+:root,
+:root[data-theme="light"] {
+  color-scheme: light;
+  --bg: #eef2f4;
+  --surface: #ffffff;
+  --surface-strong: #ffffff;
+  --surface-elevated: #e7edef;
+  --surface-muted: #f5f7f8;
+  --sidebar: #f5f7f8;
+  --ink: #172126;
+  --muted: #66737a;
+  --line: rgba(23, 33, 38, 0.12);
+  --line-strong: rgba(23, 33, 38, 0.2);
+  --accent: #247f90;
+  --accent-contrast: #ffffff;
+  --accent-strong: #176879;
+  --accent-soft: rgba(36, 127, 144, 0.12);
+  --danger: #b42318;
+  --active: rgba(36, 127, 144, 0.17);
+  --hover: rgba(23, 33, 38, 0.055);
+  --focus-ring: rgba(36, 127, 144, 0.28);
+  --overlay: rgba(14, 22, 27, 0.42);
+  --shadow: 0 24px 64px rgba(29, 43, 50, 0.13);
+  --document-shadow: 0 1px 2px rgba(29, 43, 50, 0.05), 0 18px 48px rgba(29, 43, 50, 0.08);
   --mobile-keyboard-offset: 0px;
   --mobile-segment-min-height: 34px;
   --mobile-candidate-footer-min-height: 34px;
 }
 
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #10171c;
+  --surface: #182229;
+  --surface-strong: #182229;
+  --surface-elevated: #223039;
+  --surface-muted: #141d23;
+  --sidebar: #121b21;
+  --ink: #edf4f5;
+  --muted: #9eabb2;
+  --line: rgba(237, 244, 245, 0.12);
+  --line-strong: rgba(237, 244, 245, 0.2);
+  --accent: #63b8c7;
+  --accent-contrast: #10171c;
+  --accent-strong: #86d0dc;
+  --accent-soft: rgba(99, 184, 199, 0.14);
+  --danger: #ff8a80;
+  --active: rgba(99, 184, 199, 0.2);
+  --hover: rgba(237, 244, 245, 0.065);
+  --focus-ring: rgba(99, 184, 199, 0.32);
+  --overlay: rgba(4, 8, 11, 0.66);
+  --shadow: 0 28px 72px rgba(0, 0, 0, 0.42);
+  --document-shadow: 0 1px 1px rgba(0, 0, 0, 0.28), 0 24px 64px rgba(0, 0, 0, 0.22);
+}
 
-@keyframes loading-spin {
-  to {
-    transform: rotate(360deg);
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]) {
+    color-scheme: dark;
+    --bg: #10171c;
+    --surface: #182229;
+    --surface-strong: #182229;
+    --surface-elevated: #223039;
+    --surface-muted: #141d23;
+    --sidebar: #121b21;
+    --ink: #edf4f5;
+    --muted: #9eabb2;
+    --line: rgba(237, 244, 245, 0.12);
+    --line-strong: rgba(237, 244, 245, 0.2);
+    --accent: #63b8c7;
+    --accent-contrast: #10171c;
+    --accent-strong: #86d0dc;
+    --accent-soft: rgba(99, 184, 199, 0.14);
+    --danger: #ff8a80;
+    --active: rgba(99, 184, 199, 0.2);
+    --hover: rgba(237, 244, 245, 0.065);
+    --focus-ring: rgba(99, 184, 199, 0.32);
+    --overlay: rgba(4, 8, 11, 0.66);
+    --shadow: 0 28px 72px rgba(0, 0, 0, 0.42);
+    --document-shadow: 0 1px 1px rgba(0, 0, 0, 0.28), 0 24px 64px rgba(0, 0, 0, 0.22);
   }
 }
 
-@keyframes segment-placeholder-pulse {
-  0% {
-    background-position: 200% 0;
-  }
+@keyframes loading-spin {
+  to { transform: rotate(360deg); }
+}
 
-  100% {
-    background-position: -200% 0;
-  }
+@keyframes segment-placeholder-pulse {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
 }

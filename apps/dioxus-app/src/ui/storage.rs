@@ -17,6 +17,94 @@ const STORAGE_HISTORY: &str = "roman_lookup.history";
 const STORAGE_USER_DICTIONARY: &str = "roman_lookup.user_dictionary";
 #[cfg(target_arch = "wasm32")]
 const STORAGE_FONT_SIZE: &str = "roman_lookup.font_size";
+#[cfg(target_arch = "wasm32")]
+const STORAGE_THEME: &str = "roman_lookup.theme";
+#[cfg(target_arch = "wasm32")]
+const STORAGE_SIDEBAR_OPEN: &str = "roman_lookup.sidebar_open";
+
+/// The editor color theme. System follows the browser/OS preference and is the
+/// default; explicit Light and Dark choices override it on `<html>`.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum Theme {
+    System,
+    Light,
+    Dark,
+}
+
+impl Theme {
+    pub(crate) fn data_attr(self) -> Option<&'static str> {
+        match self {
+            Theme::System => None,
+            Theme::Light => Some("light"),
+            Theme::Dark => Some("dark"),
+        }
+    }
+
+    #[cfg(target_arch = "wasm32")]
+    fn storage_key(self) -> &'static str {
+        match self {
+            Theme::System => "system",
+            Theme::Light => "light",
+            Theme::Dark => "dark",
+        }
+    }
+
+    #[cfg(target_arch = "wasm32")]
+    fn from_storage_key(value: &str) -> Option<Self> {
+        match value {
+            "system" => Some(Theme::System),
+            "light" => Some(Theme::Light),
+            "dark" => Some(Theme::Dark),
+            _ => None,
+        }
+    }
+}
+
+#[cfg(target_arch = "wasm32")]
+pub(crate) fn load_theme() -> Theme {
+    storage_get_web(STORAGE_THEME)
+        .as_deref()
+        .and_then(Theme::from_storage_key)
+        .unwrap_or(Theme::System)
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+pub(crate) fn load_theme() -> Theme {
+    Theme::System
+}
+
+#[cfg(target_arch = "wasm32")]
+pub(crate) fn save_theme(theme: Theme) {
+    let _ = storage_set_web(STORAGE_THEME, theme.storage_key());
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+pub(crate) fn save_theme(_: Theme) {}
+
+#[cfg(target_arch = "wasm32")]
+pub(crate) fn load_sidebar_open() -> bool {
+    if let Some(saved) = storage_get_web(STORAGE_SIDEBAR_OPEN) {
+        return saved != "0";
+    }
+    window()
+        .and_then(|window| window.inner_width().ok())
+        .and_then(|width| width.as_f64())
+        .map(|width| width >= 1280.0)
+        .unwrap_or(false)
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+pub(crate) fn load_sidebar_open() -> bool {
+    true
+}
+
+#[cfg(target_arch = "wasm32")]
+pub(crate) fn save_sidebar_open(open: bool) {
+    let _ = storage_set_web(STORAGE_SIDEBAR_OPEN, if open { "1" } else { "0" });
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+pub(crate) fn save_sidebar_open(_: bool) {}
 
 #[cfg(target_arch = "wasm32")]
 fn storage_get_web(key: &str) -> Option<String> {
@@ -181,3 +269,19 @@ pub(crate) fn save_font_size(value: usize, min_font_size: usize, max_font_size: 
 
 #[cfg(not(target_arch = "wasm32"))]
 pub(crate) fn save_font_size(_: usize, _: usize, _: usize) {}
+
+#[cfg(test)]
+mod tests {
+    use super::Theme;
+
+    #[test]
+    fn system_theme_leaves_the_root_unstamped() {
+        assert_eq!(Theme::System.data_attr(), None);
+    }
+
+    #[test]
+    fn explicit_themes_map_to_data_attributes() {
+        assert_eq!(Theme::Light.data_attr(), Some("light"));
+        assert_eq!(Theme::Dark.data_attr(), Some("dark"));
+    }
+}
