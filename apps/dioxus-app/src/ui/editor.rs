@@ -1,5 +1,6 @@
 mod candidate_pipeline;
 mod commit_flow;
+mod flick;
 mod manual_flow;
 mod segmented_flow;
 mod state;
