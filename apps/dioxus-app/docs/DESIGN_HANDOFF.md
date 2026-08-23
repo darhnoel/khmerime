@@ -1,7 +1,7 @@
 # Design handoff — dioxus editor webapp
 
 > **Update (2026-08-23):** The layout and theme direction described below has
-> been superseded by [ADR-0023](0023-online-beta-becomes-a-local-first-document-workspace.md).
+> been superseded by [ADR-0001](adr/0001-local-first-focused-document-workspace.md).
 > The implemented first slice is now a focused document workspace with a
 > responsive sidebar, centered document surface, mutually exclusive candidate
 > surfaces, persistent mode-aware hints, and Light/Dark/System themes. The
@@ -136,7 +136,7 @@ The functional redesign is in; the **polish and craft** are open. Priorities:
 ## Design source of truth
 
 The earlier `/design` canvas remains historical reference for the docked-bar
-interaction. ADR-0023 and the focused-document grill are now the source of truth
+interaction. ADR-0001 (webapp) and the focused-document grill are now the source of truth
 for layout and theming. Working files:
 `khmerime-lab/prototypes/dioxus-editor-redesign/` (Main, NextWordA/B, ThemeLight/
 Slate/Ink `.dc.html`). The user picked **NextWord A (docked bar)** and **Theme

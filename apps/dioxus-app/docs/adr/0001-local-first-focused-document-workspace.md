@@ -1,6 +1,11 @@
 # The Online Beta becomes a local-first focused document workspace
 
-The **Online Beta** began as a quick trial surface, but a full-bleed canvas left its editor, settings, and candidate surfaces visually unrelated on wide screens. We will evolve it into a focused, local-first document workspace: a minimal top bar, a collapsible 260 px navigation sidebar, and a centered plain-text **Document** surface capped near 920 px. This deliberately supersedes ADR-0010's shared Silk Veil visual identity for the Online Beta; Silk Veil remains the **Download Landing Page** identity, while ADR-0010's solid candidate/preedit surfaces and WCAG contrast requirement remain in force.
+> Webapp context ADR 0001 (`apps/dioxus-app/docs/adr/`). References to bare
+> `ADR-00NN` below point to the **root system sequence** (`docs/adr/`); see
+> `CONTEXT-MAP.md`. (Originally numbered 0023 in the root sequence before the
+> webapp got its own context.)
+
+The **Online Beta** began as a quick trial surface, but a full-bleed canvas left its editor, settings, and candidate surfaces visually unrelated on wide screens. We will evolve it into a focused, local-first document workspace: a minimal top bar, a collapsible 260 px navigation sidebar, and a centered plain-text **Document** surface capped near 920 px. This deliberately supersedes root ADR-0010's shared Silk Veil visual identity for the Online Beta; Silk Veil remains the **Download Landing Page** identity, while ADR-0010's solid candidate/preedit surfaces and WCAG contrast requirement remain in force.
 
 ## Decision
 
