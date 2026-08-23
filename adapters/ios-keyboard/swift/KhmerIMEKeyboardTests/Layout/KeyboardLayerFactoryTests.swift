@@ -26,8 +26,9 @@ final class KeyboardLayerFactoryTests: XCTestCase {
         XCTAssertEqual(buttonTitles(in: rows[0]), ["Q", "W", "E", "R", "T", "Y", "U", "I", "O", "P"])
         XCTAssertEqual(buttonTitles(in: rows[1]), ["A", "S", "D", "F", "G", "H", "J", "K", "L"])
         XCTAssertEqual(buttonTitles(in: rows[2]), ["123", "Z", "X", "C", "V", "B", "N", "M", "⌫"])
-        // Globe uses an SF Symbol image, so it has no title (empty slot).
-        XCTAssertEqual(buttonTitles(in: rows[3]), ["", "EN", "✦", "space", ".", "⏎"])
+        // Globe uses an SF Symbol image, so it has no title (empty slot). Row is
+        // [globe][✦][space][EN][⏎] (ADR-0022 rebalance); "." dropped.
+        XCTAssertEqual(buttonTitles(in: rows[3]), ["", "✦", "space", "EN", "⏎"])
     }
 
     func test_numericAndSymbolsLayersBuildExpectedModeSwitchRows() {
@@ -35,31 +36,24 @@ final class KeyboardLayerFactoryTests: XCTestCase {
         let symbolsRows = standardRows(in: factory.buildSymbolsView())
 
         XCTAssertEqual(buttonTitles(in: numericRows[2]), ["ABC", ".", ",", "?", "!", "'", "⌫"])
-        XCTAssertEqual(buttonTitles(in: numericRows[3]), ["", "EN", "#+=", "space", "⏎"])
+        XCTAssertEqual(buttonTitles(in: numericRows[3]), ["", "#+=", "space", "EN", "⏎"])
         XCTAssertEqual(buttonTitles(in: symbolsRows[2]), ["123", ".", ",", "?", "!", "'", "⌫"])
-        XCTAssertEqual(buttonTitles(in: symbolsRows[3]), ["", "EN", "ABC", "space", "⏎"])
+        XCTAssertEqual(buttonTitles(in: symbolsRows[3]), ["", "ABC", "space", "EN", "⏎"])
     }
 
     func test_visiblePunctuationAndSymbolsRouteThroughLiteralAction() {
         let numericRows = standardRows(in: factory.buildNumericView())
         let symbolButtons = numericRows[0].subviews.compactMap { $0 as? UIButton }
         let literalButtons: [GlassKeyButton] = symbolButtons.compactMap { $0 as? GlassKeyButton }
-        let qwertyPeriod = standardRows(in: factory.buildQwertyView())[3]
-            .subviews.compactMap { $0 as? UIButton }
-            .first { $0.title(for: .normal) == "." }
 
         literalButtons.forEach { button in
             button.configureForTesting(runner: { _, to, _, onUpdate in onUpdate(to) })
             button.touchesBegan(Set(), with: nil)
         }
-        if let period = qwertyPeriod as? GlassKeyButton {
-            period.configureForTesting(runner: { _, to, _, onUpdate in onUpdate(to) })
-            period.touchesBegan(Set(), with: nil)
-        }
 
-        XCTAssertEqual(target.literalInputs, ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0", "."])
-        XCTAssertEqual(qwertyPeriod.map { actionNames(on: $0) } ?? [], [],
-            "period must use the rapid text-key touch-down path, not touchUpInside")
+        // "." is no longer on the Qwerty row (ADR-0022); the digits still route
+        // through the rapid literal touch-down path.
+        XCTAssertEqual(target.literalInputs, ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0"])
     }
 
     func test_numericLayerSwappedModeButtonsKeepTheirActions() {
@@ -69,24 +63,25 @@ final class KeyboardLayerFactoryTests: XCTestCase {
 
         XCTAssertEqual(row3Buttons.first?.title(for: .normal), "ABC")
         XCTAssertEqual(row3Buttons.first.map(actionNames(on:)), ["abcTapped"])
-        XCTAssertEqual(bottomButtons[2].title(for: .normal), "#+=")
-        XCTAssertEqual(actionNames(on: bottomButtons[2]), ["symbolsTapped"])
+        // Bottom row is [globe][#+=][space][EN][⏎]; #+= sits at index 1 now.
+        XCTAssertEqual(bottomButtons[1].title(for: .normal), "#+=")
+        XCTAssertEqual(actionNames(on: bottomButtons[1]), ["symbolsTapped"])
     }
 
     func test_bottomRowTagsGlobeAndEnAndWiresActionsToTarget() {
         let row = factory.makeBottomRow(leftLabel: "123", leftAction: ActionTarget.actions.numeric, includePeriod: true)
         let buttons = row.arrangedSubviews.compactMap { $0 as? UIButton }
 
+        // Row order: [globe][123][space][EN][⏎] (ADR-0022).
         XCTAssertEqual(buttons[0].tag, 42, "globe must carry globeKeyTag")
-        XCTAssertEqual(buttons[1].tag, 43, "EN must carry enKeyTag")
+        XCTAssertEqual(buttons[3].tag, 43, "EN must carry enKeyTag")
         // Globe has no factory-wired tap action: KeyboardViewController wires
         // handleInputModeList(from:with:) for .allTouchEvents at runtime.
         XCTAssertEqual(actionNames(on: buttons[0]), [])
-        XCTAssertEqual(actionNames(on: buttons[1]), ["toggleEnglishTapped"])
-        XCTAssertEqual(actionNames(on: buttons[2]), ["numericTapped"])
-        XCTAssertEqual(actionNames(on: buttons[3]), ["spaceTapped"])
-        XCTAssertEqual(actionNames(on: buttons[4]), [], "period commits through GlassKeyButton.onPress")
-        XCTAssertEqual(actionNames(on: buttons[5]), ["returnTapped"])
+        XCTAssertEqual(actionNames(on: buttons[1]), ["numericTapped"])
+        XCTAssertEqual(actionNames(on: buttons[2]), ["spaceTapped"])
+        XCTAssertEqual(actionNames(on: buttons[3]), ["toggleEnglishTapped"])
+        XCTAssertEqual(actionNames(on: buttons[4]), ["returnTapped"])
     }
 
     func test_globeKeyUsesGlobeSymbolStyledLikeOtherKeys() {
@@ -119,14 +114,14 @@ final class KeyboardLayerFactoryTests: XCTestCase {
         let bottomRow = factory.makeBottomRow(leftLabel: "123", leftAction: ActionTarget.actions.numeric, includePeriod: true)
         let bottomKeys = bottomRow.arrangedSubviews.compactMap { $0 as? GlassKeyButton }
 
+        // Bottom row is [globe][123][space][EN][⏎] (ADR-0022); no character keys.
         XCTAssertEqual(letter?.previewLabel, "K")
         XCTAssertEqual(symbol?.previewLabel, "?")
         XCTAssertNil(bottomKeys[0].previewLabel, "globe must not show a key preview popup")
-        XCTAssertNil(bottomKeys[1].previewLabel, "EN is a mode key, not a character key")
-        XCTAssertNil(bottomKeys[2].previewLabel, "123 is a mode key, not a character key")
-        XCTAssertNil(bottomKeys[3].previewLabel, "space is a control key")
-        XCTAssertEqual(bottomKeys[4].previewLabel, ".", "period is a small punctuation key")
-        XCTAssertNil(bottomKeys[5].previewLabel, "return is a control key")
+        XCTAssertNil(bottomKeys[1].previewLabel, "123 is a mode key, not a character key")
+        XCTAssertNil(bottomKeys[2].previewLabel, "space is a control key")
+        XCTAssertNil(bottomKeys[3].previewLabel, "EN is a mode key, not a character key")
+        XCTAssertNil(bottomKeys[4].previewLabel, "return is a control key")
     }
 
     func test_qwertyCharacterGridKeepsLettersUniformAndWidensEdgeControls() {
