@@ -56,8 +56,8 @@ class KeyboardViewController: UIInputViewController {
         KeyboardLayoutMetrics(device: isIPad ? .pad : .phone)
     }
 
-    // Tags shared with KeyboardLayerFactory: globe and EN occupy the same slot
-    // (Option B) — exactly one is visible at a time based on needsInputModeSwitchKey.
+    // Tags shared with KeyboardLayerFactory. Both globe and EN are ALWAYS
+    // visible now (ADR-0022) — the globe must always offer keyboard switching.
     static let globeKeyTag = globeKeyViewTag
     static let enKeyTag    = 998
 
