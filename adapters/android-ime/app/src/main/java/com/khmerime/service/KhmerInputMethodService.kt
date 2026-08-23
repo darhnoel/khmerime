@@ -33,6 +33,7 @@ import android.os.Build
 import android.view.Gravity
 import android.view.View
 import android.view.inputmethod.EditorInfo
+import android.view.inputmethod.InputMethodManager
 import android.widget.LinearLayout
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
@@ -333,7 +334,27 @@ class KhmerInputMethodService : InputMethodService() {
             KeyboardKeyAction.SwitchToSymbols -> renderKeyboardLayer(KeyboardLayer.Symbols)
             KeyboardKeyAction.TogglePanel -> handler?.toggleSuggestCharacter()
             KeyboardKeyAction.ToggleEnglish -> handler?.toggleEnglish()
-            KeyboardKeyAction.NextKeyboard -> Unit
+            KeyboardKeyAction.NextKeyboard -> switchToNextKeyboard()
+        }
+    }
+
+    // Advance to the next input method (ADR-0022). Uses the modern service API on
+    // API 28+, falls back to the InputMethodManager token API below that, and to
+    // the system picker if no next IME can be advanced to (e.g. we're the only
+    // enabled keyboard) — so there is always a way out.
+    private fun switchToNextKeyboard() {
+        val advanced = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            switchToNextInputMethod(false)
+        } else {
+            val imm = getSystemService(InputMethodManager::class.java)
+            val token = window?.window?.attributes?.token
+            @Suppress("DEPRECATION")
+            if (token != null) imm?.switchToNextInputMethod(token, false) ?: false else false
+        }
+        if (!advanced) {
+            // No next IME to advance to (e.g. we're the only enabled keyboard) —
+            // open the system picker so the user can still add/switch keyboards.
+            getSystemService(InputMethodManager::class.java)?.showInputMethodPicker()
         }
     }
 

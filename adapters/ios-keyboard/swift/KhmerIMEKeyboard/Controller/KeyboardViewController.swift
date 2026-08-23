@@ -162,9 +162,12 @@ class KeyboardViewController: UIInputViewController {
 
     override func viewWillLayoutSubviews() {
         super.viewWillLayoutSubviews()
-        let show = needsInputModeSwitchKey
-        view.allDescendants(tag: Self.globeKeyTag).forEach { $0.isHidden = !show }
-        view.allDescendants(tag: Self.enKeyTag).forEach { $0.isHidden = show }
+        // The globe is ALWAYS visible (ADR-0022): gating it on
+        // needsInputModeSwitchKey hid it on iPad / iPhone X-class devices and
+        // got the app rejected under Guideline 4.4.1. EN stays visible too.
+        let visibility = SwitchKeyVisibility(needsInputModeSwitchKey: needsInputModeSwitchKey)
+        view.allDescendants(tag: Self.globeKeyTag).forEach { $0.isHidden = visibility.globeHidden }
+        view.allDescendants(tag: Self.enKeyTag).forEach { $0.isHidden = visibility.englishHidden }
     }
 
     override func textDidChange(_ textInput: UITextInput?) {

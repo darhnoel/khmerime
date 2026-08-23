@@ -1,5 +1,7 @@
 package com.khmerime.layout
 
+import com.khmerime.R
+
 enum class KeyboardLayer {
     Qwerty,
     Numeric,
@@ -24,6 +26,10 @@ data class KeyboardKey(
     val label: String,
     val action: KeyboardKeyAction,
     val input: String = label,
+    // When set, the key renders this drawable instead of its text label (used
+    // for the monochrome globe on the next-keyboard key). `label` is kept as the
+    // accessibility / key-preview text.
+    val iconRes: Int? = null,
 )
 
 object KeyboardLayerSpec {
@@ -35,6 +41,7 @@ object KeyboardLayerSpec {
                 letters("zxcvbnm") +
                 special("⌫", KeyboardKeyAction.Backspace),
             listOf(
+                globeKey(),
                 special("En", KeyboardKeyAction.ToggleEnglish),
                 special("123", KeyboardKeyAction.SwitchToNumeric),
                 special("space", KeyboardKeyAction.Space),
@@ -50,6 +57,7 @@ object KeyboardLayerSpec {
                 inserts(listOf(".", ",", "?", "!", "'")) +
                 special("⌫", KeyboardKeyAction.Backspace),
             listOf(
+                globeKey(),
                 special("En", KeyboardKeyAction.ToggleEnglish),
                 special("ABC", KeyboardKeyAction.SwitchToQwerty),
                 special("space", KeyboardKeyAction.Space),
@@ -64,6 +72,7 @@ object KeyboardLayerSpec {
                 inserts(listOf(".", ",", "?", "!", "'")) +
                 special("⌫", KeyboardKeyAction.Backspace),
             listOf(
+                globeKey(),
                 special("En", KeyboardKeyAction.ToggleEnglish),
                 special("ABC", KeyboardKeyAction.SwitchToQwerty),
                 special("space", KeyboardKeyAction.Space),
@@ -80,4 +89,9 @@ object KeyboardLayerSpec {
 
     private fun special(label: String, action: KeyboardKeyAction): KeyboardKey =
         KeyboardKey(label, action)
+
+    // The next-keyboard key: a monochrome globe vector (ADR-0022). "Globe" is
+    // the key-preview / accessibility label; the icon is what's drawn.
+    private fun globeKey(): KeyboardKey =
+        KeyboardKey("Globe", KeyboardKeyAction.NextKeyboard, iconRes = R.drawable.ic_tip_globe)
 }

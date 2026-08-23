@@ -4,9 +4,12 @@ import com.khmerime.layout.KeyboardKey
 import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Paint
+import android.graphics.PorterDuff
 import android.graphics.Rect
 import android.graphics.RectF
+import android.graphics.drawable.Drawable
 import android.util.TypedValue
+import androidx.core.content.ContextCompat
 import android.view.HapticFeedbackConstants
 import android.view.MotionEvent
 import android.view.View
@@ -23,6 +26,10 @@ open class GlassKeyView(
         get() = (resources.configuration.uiMode and
                 android.content.res.Configuration.UI_MODE_NIGHT_MASK) ==
                 android.content.res.Configuration.UI_MODE_NIGHT_YES
+
+    // Lazily-loaded, mutable drawable for icon keys (e.g. the globe). Tinted to
+    // the current text color each draw so it tracks light/dark + active state.
+    private var iconDrawable: Drawable? = null
 
     private val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val borderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; strokeWidth = 1f }
@@ -110,8 +117,27 @@ open class GlassKeyView(
         )
         canvas.drawRoundRect(rect, cornerRadius, cornerRadius, bgPaint)
         canvas.drawRoundRect(rect, cornerRadius, cornerRadius, borderPaint)
-        canvas.drawText(key.label, width / 2f, height / 2f - (textPaint.descent() + textPaint.ascent()) / 2f, textPaint)
+        val iconRes = key.iconRes
+        if (iconRes != null) {
+            drawIcon(canvas, iconRes, tint = textPaint.color)
+        } else {
+            canvas.drawText(key.label, width / 2f, height / 2f - (textPaint.descent() + textPaint.ascent()) / 2f, textPaint)
+        }
         canvas.restoreToCount(save)
+    }
+
+    // Draw an icon key: the drawable centered at ~50% of the key height, tinted
+    // to `tint` so it matches the text glyphs' color in every theme/state.
+    private fun drawIcon(canvas: Canvas, iconRes: Int, tint: Int) {
+        val drawable = (iconDrawable ?: ContextCompat.getDrawable(context, iconRes)?.also {
+            iconDrawable = it
+        }) ?: return
+        drawable.mutate().setColorFilter(tint, PorterDuff.Mode.SRC_IN)
+        val size = (minOf(width, height) * 0.5f).toInt()
+        val left = (width - size) / 2
+        val top = (height - size) / 2
+        drawable.setBounds(left, top, left + size, top + size)
+        drawable.draw(canvas)
     }
 
     override fun onTouchEvent(event: MotionEvent): Boolean {

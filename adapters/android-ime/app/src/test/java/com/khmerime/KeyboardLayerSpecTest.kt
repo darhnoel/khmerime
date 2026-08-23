@@ -5,6 +5,7 @@ import com.khmerime.layout.KeyboardKeyAction
 import com.khmerime.layout.KeyboardLayer
 import com.khmerime.layout.KeyboardLayerSpec
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotNull
 import org.junit.Test
 
 class KeyboardLayerSpecTest {
@@ -20,7 +21,10 @@ class KeyboardLayerSpecTest {
                 listOf("✦", "Z", "X", "C", "V", "B", "N", "M", "⌫"),
                 listOf("En", "123", "space", ".", "↵"),
             ),
-            KeyboardLayerSpec.rows(KeyboardLayer.Qwerty).map { row -> row.map { it.label } },
+            // the globe is icon-rendered, so it carries no text label; compare
+            // only the labelled keys.
+            KeyboardLayerSpec.rows(KeyboardLayer.Qwerty)
+                .map { row -> row.filter { it.iconRes == null }.map { it.label } },
         )
     }
 
@@ -32,7 +36,7 @@ class KeyboardLayerSpecTest {
         )
         assertEquals(
             listOf("En", "ABC", "space", "↵"),
-            KeyboardLayerSpec.rows(KeyboardLayer.Numeric)[3].map { it.label },
+            KeyboardLayerSpec.rows(KeyboardLayer.Numeric)[3].filter { it.iconRes == null }.map { it.label },
         )
         assertEquals(
             listOf("123", ".", ",", "?", "!", "'", "⌫"),
@@ -40,8 +44,24 @@ class KeyboardLayerSpecTest {
         )
         assertEquals(
             listOf("En", "ABC", "space", "↵"),
-            KeyboardLayerSpec.rows(KeyboardLayer.Symbols)[3].map { it.label },
+            KeyboardLayerSpec.rows(KeyboardLayer.Symbols)[3].filter { it.iconRes == null }.map { it.label },
         )
+    }
+
+    @Test
+    fun everyLayerHasANextKeyboardGlobeFirstInTheBottomRow() {
+        // App Store / user-reported parity (ADR-0022): a next-keyboard control
+        // is always present. On Android it is an icon globe at the start of the
+        // bottom row (a monochrome vector drawable, not a color emoji).
+        KeyboardLayer.entries.forEach { layer ->
+            val globe = KeyboardLayerSpec.rows(layer).last().first()
+            assertEquals(
+                "$layer globe must switch keyboards",
+                KeyboardKeyAction.NextKeyboard,
+                globe.action,
+            )
+            assertNotNull("$layer globe must render an icon, not text", globe.iconRes)
+        }
     }
 
     @Test
