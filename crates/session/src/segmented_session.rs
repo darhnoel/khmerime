@@ -646,10 +646,7 @@ mod tests {
         assert!(result.consumed);
         let snap = session.snapshot();
         assert_eq!(snap.focused_segment_index, Some(1));
-        assert!(
-            !snap.segment_edit_active,
-            "focus_segment must not enter edit mode"
-        );
+        assert!(!snap.segment_edit_active, "focus_segment must not enter edit mode");
     }
 
     #[test]
