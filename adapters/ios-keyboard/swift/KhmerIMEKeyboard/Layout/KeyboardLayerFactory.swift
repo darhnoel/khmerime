@@ -229,11 +229,12 @@ struct KeyboardLayerFactory {
         return btn
     }
 
-    // The next-keyboard key. Uses the SF Symbol "globe" sized and tinted to match
-    // the other special keys. GlobeKeyButton handles long-press detection internally
-    // via timer; KeyboardViewController wires onShortTap / onLongPress callbacks.
+    // The next-keyboard key. SF Symbol "globe" sized/tinted like the other
+    // special keys. A plain GlassKeyButton (not a custom timer button): the
+    // controller wires handleInputModeList(from:with:) on .allTouchEvents, and
+    // UIKit itself does tap=advance / long-press=picker with live events.
     func makeGlobeKey() -> UIButton {
-        let btn = GlobeKeyButton(frame: .zero)
+        let btn = GlassKeyButton(frame: .zero)
         let config = UIImage.SymbolConfiguration(pointSize: isIPad ? 17 : 15, weight: .medium)
         btn.setImage(UIImage(systemName: "globe", withConfiguration: config), for: .normal)
         KeyStyle.applySpecial(btn, isIPad: isIPad)

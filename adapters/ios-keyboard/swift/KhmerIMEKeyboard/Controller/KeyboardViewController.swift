@@ -58,7 +58,7 @@ class KeyboardViewController: UIInputViewController {
 
     // Tags shared with KeyboardLayerFactory: globe and EN occupy the same slot
     // (Option B) — exactly one is visible at a time based on needsInputModeSwitchKey.
-    static let globeKeyTag = 999
+    static let globeKeyTag = globeKeyViewTag
     static let enKeyTag    = 998
 
     private var layerActions: KeyboardLayerActions {
@@ -382,19 +382,18 @@ class KeyboardViewController: UIInputViewController {
         }
     }
 
-    // Wire every globe key (one per layer): short tap advances to the next
-    // keyboard; long press shows the system keyboard picker. GlobeKeyButton
-    // detects the long press internally via a timer and calls
-    // handleInputModeList(from:with:) with the real touch event so the system
-    // picker animates from the correct location.
+    // Wire every globe key (one per layer) to UIKit's built-in next-keyboard
+    // handling: handleInputModeList(from:with:) on .allTouchEvents. UIKit calls
+    // it with a LIVE event and itself decides tap vs long-press — a tap advances
+    // to the next keyboard, a long press shows the system picker anchored at the
+    // button. (A custom timer that stashed the touchesBegan event failed: a
+    // UIEvent captured then is stale 0.5s later, so the picker never appeared.)
     private func wireGlobeButtons() {
         rootView.allDescendants(tag: Self.globeKeyTag)
-            .compactMap { $0 as? GlobeKeyButton }
+            .compactMap { $0 as? UIButton }
             .forEach { btn in
-                btn.onShortTap = { [weak self] in self?.advanceToNextInputMode() }
-                btn.onLongPress = { [weak self] button, event in
-                    self?.handleInputModeList(from: button, with: event)
-                }
+                btn.removeTarget(nil, action: nil, for: .allTouchEvents)
+                btn.addTarget(self, action: #selector(handleInputModeList(from:with:)), for: .allTouchEvents)
             }
     }
 }

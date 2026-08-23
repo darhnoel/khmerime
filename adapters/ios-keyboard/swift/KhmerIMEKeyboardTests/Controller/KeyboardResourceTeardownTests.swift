@@ -21,9 +21,11 @@ final class KeyboardResourceTeardownTests: XCTestCase {
         backspace.onHoldEnd = {}
         nested.addSubview(backspace)
 
-        let globe = GlobeKeyButton()
-        globe.onShortTap = {}
-        globe.onLongPress = { _, _ in }
+        // The globe is now a plain button wired via addTarget on .allTouchEvents
+        // (next-keyboard handling); teardown must drop that target.
+        let globe = GlassKeyButton()
+        globe.tag = globeKeyViewTag
+        globe.addTarget(target, action: #selector(TeardownTarget.action), for: .allTouchEvents)
         nested.addSubview(globe)
 
         let gestureHost = UIView()
@@ -48,8 +50,7 @@ final class KeyboardResourceTeardownTests: XCTestCase {
         XCTAssertNil(backspace.onTap)
         XCTAssertNil(backspace.onHoldFire)
         XCTAssertNil(backspace.onHoldEnd)
-        XCTAssertNil(globe.onShortTap)
-        XCTAssertNil(globe.onLongPress)
+        XCTAssertNil(globe.actions(forTarget: target, forControlEvent: .allTouchEvents))
         XCTAssertTrue(gestureHost.gestureRecognizers?.isEmpty ?? true)
         XCTAssertNil(strip.onKhmerRowTapped)
         XCTAssertNil(strip.onKhmerRowLongPressed)
