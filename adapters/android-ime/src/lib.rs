@@ -338,6 +338,24 @@ pub extern "C" fn Java_com_khmerime_input_KhmerImeSession_nativeProcessTab(
     render_json(&mut env, &s.snapshot(), &result)
 }
 
+// Focus an absolute segment WITHOUT entering edit mode — the touch keyboard's
+// first-tap primitive (no Tab key). See ImeSession::focus_segment.
+#[no_mangle]
+pub extern "C" fn Java_com_khmerime_input_KhmerImeSession_nativeFocusSegment(
+    mut env: JNIEnv,
+    _obj: JObject,
+    handle: jlong,
+    index: jint,
+) -> jstring {
+    let s = unsafe { session_mut(handle) };
+    let result = if index >= 0 {
+        s.focus_segment(index as usize)
+    } else {
+        Default::default()
+    };
+    render_json(&mut env, &s.snapshot(), &result)
+}
+
 #[no_mangle]
 pub extern "C" fn Java_com_khmerime_input_KhmerImeSession_nativeProcessDigit(
     mut env: JNIEnv,
