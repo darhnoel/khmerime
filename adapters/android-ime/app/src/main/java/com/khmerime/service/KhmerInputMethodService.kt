@@ -298,6 +298,12 @@ class KhmerInputMethodService : InputMethodService() {
             view.onHoldFire = { handler?.backspaceHoldFired() }
             view.onHoldEnd = { handler?.backspaceHoldEnded() }
         }
+        // Long-press the globe opens the system keyboard picker (parity with iOS).
+        if (view is GlassKeyView && key.action == KeyboardKeyAction.NextKeyboard) {
+            view.onLongPress = {
+                getSystemService(InputMethodManager::class.java)?.showInputMethodPicker()
+            }
+        }
         // Keypress preview bubble on letter keys only (iOS parity — no bubble over
         // space/backspace/return/toggles).
         if ((key.action == KeyboardKeyAction.Insert || key.action == KeyboardKeyAction.InsertLiteral) &&

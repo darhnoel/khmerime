@@ -41,11 +41,12 @@ object KeyboardLayerSpec {
                 letters("zxcvbnm") +
                 special("⌫", KeyboardKeyAction.Backspace),
             listOf(
+                // globe stays in the standard left position; En moves to the old
+                // "." slot (right of space) so the left side isn't crowded.
                 globeKey(),
-                special("En", KeyboardKeyAction.ToggleEnglish),
                 special("123", KeyboardKeyAction.SwitchToNumeric),
                 special("space", KeyboardKeyAction.Space),
-                KeyboardKey(".", KeyboardKeyAction.InsertLiteral),
+                special("En", KeyboardKeyAction.ToggleEnglish),
                 special("↵", KeyboardKeyAction.Return),
             ),
         )
@@ -58,9 +59,9 @@ object KeyboardLayerSpec {
                 special("⌫", KeyboardKeyAction.Backspace),
             listOf(
                 globeKey(),
-                special("En", KeyboardKeyAction.ToggleEnglish),
                 special("ABC", KeyboardKeyAction.SwitchToQwerty),
                 special("space", KeyboardKeyAction.Space),
+                special("En", KeyboardKeyAction.ToggleEnglish),
                 special("↵", KeyboardKeyAction.Return),
             ),
         )
@@ -73,9 +74,9 @@ object KeyboardLayerSpec {
                 special("⌫", KeyboardKeyAction.Backspace),
             listOf(
                 globeKey(),
-                special("En", KeyboardKeyAction.ToggleEnglish),
                 special("ABC", KeyboardKeyAction.SwitchToQwerty),
                 special("space", KeyboardKeyAction.Space),
+                special("En", KeyboardKeyAction.ToggleEnglish),
                 special("↵", KeyboardKeyAction.Return),
             ),
         )

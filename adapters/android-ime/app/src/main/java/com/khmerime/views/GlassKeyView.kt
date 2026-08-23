@@ -66,6 +66,16 @@ open class GlassKeyView(
     var onPreviewShow: ((GlassKeyView) -> Unit)? = null
     var onPreviewHide: (() -> Unit)? = null
 
+    // Optional long-press (e.g. the globe → system keyboard picker). When it
+    // fires, the following ACTION_UP does NOT also invoke the tap.
+    var onLongPress: (() -> Unit)? = null
+    private val longPressHandler = android.os.Handler(android.os.Looper.getMainLooper())
+    private var longPressFired = false
+    private val longPressRunnable = Runnable {
+        longPressFired = true
+        onLongPress?.invoke()
+    }
+
     val previewLabel: String get() = key.label
 
     fun copyVisualBounds(out: Rect) {
@@ -147,19 +157,26 @@ open class GlassKeyView(
                 performKeyPressHaptic()
                 animator.press()
                 onPreviewShow?.invoke(this)
+                if (onLongPress != null) {
+                    longPressFired = false
+                    longPressHandler.postDelayed(longPressRunnable, LONG_PRESS_MS)
+                }
                 return true
             }
             MotionEvent.ACTION_UP -> {
+                longPressHandler.removeCallbacks(longPressRunnable)
                 animator.release()
                 onPreviewHide?.invoke()
                 val accepted = releaseIsInsidePressedBounds(event)
                 clearPressedBounds()
-                if (accepted) {
+                // A fired long-press consumes the gesture — no tap on release.
+                if (accepted && !longPressFired) {
                     onClick()
                 }
                 return true
             }
             MotionEvent.ACTION_CANCEL -> {
+                longPressHandler.removeCallbacks(longPressRunnable)
                 clearPressedBounds()
                 animator.release()
                 onPreviewHide?.invoke()
@@ -167,5 +184,9 @@ open class GlassKeyView(
             }
         }
         return super.onTouchEvent(event)
+    }
+
+    private companion object {
+        const val LONG_PRESS_MS = 500L // match iOS GlobeKeyButton.longPressDuration
     }
 }

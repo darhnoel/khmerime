@@ -19,7 +19,9 @@ class KeyboardLayerSpecTest {
                 listOf("Q", "W", "E", "R", "T", "Y", "U", "I", "O", "P"),
                 listOf("A", "S", "D", "F", "G", "H", "J", "K", "L"),
                 listOf("✦", "Z", "X", "C", "V", "B", "N", "M", "⌫"),
-                listOf("En", "123", "space", ".", "↵"),
+                // no standalone "." on Qwerty (typeable from 123); globe is left,
+                // En moved right of space to rebalance the row.
+                listOf("123", "space", "En", "↵"),
             ),
             // the globe is icon-rendered, so it carries no text label; compare
             // only the labelled keys.
@@ -35,7 +37,7 @@ class KeyboardLayerSpecTest {
             KeyboardLayerSpec.rows(KeyboardLayer.Numeric)[2].map { it.label },
         )
         assertEquals(
-            listOf("En", "ABC", "space", "↵"),
+            listOf("ABC", "space", "En", "↵"),
             KeyboardLayerSpec.rows(KeyboardLayer.Numeric)[3].filter { it.iconRes == null }.map { it.label },
         )
         assertEquals(
@@ -43,7 +45,7 @@ class KeyboardLayerSpecTest {
             KeyboardLayerSpec.rows(KeyboardLayer.Symbols)[2].map { it.label },
         )
         assertEquals(
-            listOf("En", "ABC", "space", "↵"),
+            listOf("ABC", "space", "En", "↵"),
             KeyboardLayerSpec.rows(KeyboardLayer.Symbols)[3].filter { it.iconRes == null }.map { it.label },
         )
     }
@@ -71,10 +73,6 @@ class KeyboardLayerSpecTest {
 
         assertEquals("all 25 numeric-layer text keys must be literal", 25, numericLiterals.size)
         assertEquals("all 25 symbol-layer text keys must be literal", 25, symbolLiterals.size)
-        assertEquals(
-            KeyboardKeyAction.InsertLiteral,
-            allKeys(KeyboardLayer.Qwerty).single { it.label == "." }.action,
-        )
         assertEquals(
             KeyboardKeyAction.Insert,
             allKeys(KeyboardLayer.Qwerty).single { it.label == "O" }.action,
