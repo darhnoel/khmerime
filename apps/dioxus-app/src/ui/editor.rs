@@ -7,28 +7,23 @@ mod state;
 mod view_helpers;
 
 pub(crate) use candidate_pipeline::update_candidates;
-pub(crate) use commit_flow::{click_candidate, commit_active_selection, switch_input_mode};
-pub(crate) use manual_flow::{
-    dismiss_manual_save_request, remove_user_dictionary_mapping, save_manual_save_request, set_manual_kind_filter,
-    skip_manual_roman_char, undo_manual_step,
-};
+pub(crate) use commit_flow::{click_candidate, commit_active_selection};
+pub(crate) use flick::{resolve, Direction, Key, Preedit, KEYMAP};
+pub(crate) use manual_flow::{remove_user_dictionary_mapping, replace_manual_save_request, save_manual_save_request};
 #[cfg(test)]
 pub(crate) use roman_lookup::SegmentedChoice;
 pub(crate) use roman_lookup::SegmentedSession;
 pub(crate) use segmented_flow::{enter_segment_edit, exit_segment_edit, move_segment_focus, select_segment_candidate};
-pub(crate) use state::{
-    char_len, slice_chars, CandidateLevel, CandidateMode, EditorSignals, InputMode, ManualSaveRequest,
-    ManualTypingState,
-};
+pub(crate) use state::{char_len, slice_chars, CandidateLevel, CandidateMode, EditorSignals, ManualSaveRequest};
 pub(crate) use view_helpers::{
-    composition_preview_style, composition_style, is_space_key, popup_style, refresh_popup_position, shortcut_index,
-    shortcut_label, should_exit_number_pick, visible_page_start,
+    composition_style, is_space_key, popup_style, refresh_popup_position, shortcut_index, shortcut_label,
+    should_exit_number_pick, visible_page_start,
 };
 
 #[cfg(test)]
 use candidate_pipeline::{
-    choose_visible_suggestions, connect_khmer_display, next_word_boundary, next_word_context,
-    phrase_surface_candidates, recommended_indices_and_roman_hints, request_matches_snapshot,
+    choose_visible_suggestions, connect_khmer_display, merge_phrase_and_whole_candidates, next_word_boundary,
+    next_word_context, phrase_surface_candidates, recommended_indices_and_roman_hints, request_matches_snapshot,
 };
 #[cfg(test)]
 use segmented_flow::{build_segmented_session, reflow_segmented_session_from_selection};
@@ -40,10 +35,10 @@ mod tests {
     };
 
     use super::{
-        build_segmented_session, char_len, choose_visible_suggestions, connect_khmer_display, next_word_boundary,
-        next_word_context, phrase_surface_candidates, recommended_indices_and_roman_hints,
-        reflow_segmented_session_from_selection, request_matches_snapshot, slice_chars, SegmentedChoice,
-        SegmentedSession,
+        build_segmented_session, char_len, choose_visible_suggestions, connect_khmer_display,
+        merge_phrase_and_whole_candidates, next_word_boundary, next_word_context, phrase_surface_candidates,
+        recommended_indices_and_roman_hints, reflow_segmented_session_from_selection, request_matches_snapshot,
+        slice_chars, SegmentedChoice, SegmentedSession,
     };
 
     fn sample_observation() -> ShadowObservation {
@@ -115,6 +110,25 @@ mod tests {
                 .collect::<Vec<_>>(),
             vec!["ខ្ញុំទៅ", "ណូអែល"]
         );
+    }
+
+    #[test]
+    fn phrase_surface_keeps_missing_whole_input_and_saved_readings() {
+        let phrase_candidates = vec![decode_candidate("ចអណ្ឌា", vec![("chan", "ចអន"), ("da", "្ឌា")], false)];
+        let whole_input = vec!["ចអណ្ឌា".to_owned(), "ច័ន្ទដា".to_owned(), "ចន្ទា".to_owned()];
+
+        let merged = merge_phrase_and_whole_candidates("chanda", phrase_candidates, &whole_input);
+
+        assert_eq!(
+            merged
+                .iter()
+                .map(|candidate| candidate.text.as_str())
+                .collect::<Vec<_>>(),
+            vec!["ចអណ្ឌា", "ច័ន្ទដា", "ចន្ទា"]
+        );
+        assert_eq!(merged[1].segments.len(), 1);
+        assert_eq!(merged[1].segments[0].input, "chanda");
+        assert_eq!(merged[1].segments[0].output, "ច័ន្ទដា");
     }
 
     #[test]

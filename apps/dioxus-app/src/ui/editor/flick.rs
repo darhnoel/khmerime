@@ -135,6 +135,13 @@ pub(crate) struct Preedit {
 }
 
 impl Preedit {
+    pub(crate) fn from_text(text: impl Into<String>) -> Self {
+        let text = text.into();
+        Self {
+            units: if text.is_empty() { Vec::new() } else { vec![text] },
+        }
+    }
+
     /// Push one selected member as a new Entry Unit. Empty members are ignored
     /// (a center-tap on an empty-center key inserts nothing).
     pub(crate) fn push(&mut self, member: &str) {
@@ -146,6 +153,12 @@ impl Preedit {
     /// Remove the last Entry Unit atomically. Returns true if one was removed.
     pub(crate) fn backspace(&mut self) -> bool {
         self.units.pop().is_some()
+    }
+
+    /// Remove and return the last Entry Unit so the DOM integration can delete
+    /// the same number of code points from the Document atomically.
+    pub(crate) fn pop_unit(&mut self) -> Option<String> {
+        self.units.pop()
     }
 
     /// The current preedit text (units joined).
@@ -287,6 +300,15 @@ mod tests {
         assert!(p.backspace()); // removes the whole ឲ្យ unit at once
         assert_eq!(p.text(), "");
         assert!(!p.backspace()); // nothing left
+    }
+
+    #[test]
+    fn pop_unit_returns_the_complete_last_entry_unit() {
+        let mut p = Preedit::default();
+        p.push("ក");
+        p.push("ឲ្យ");
+        assert_eq!(p.pop_unit().as_deref(), Some("ឲ្យ"));
+        assert_eq!(p.text(), "ក");
     }
 
     #[test]

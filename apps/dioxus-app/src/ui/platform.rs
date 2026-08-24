@@ -311,6 +311,18 @@ pub(crate) async fn current_editor_caret() -> Option<usize> {
     Some(utf16_index_to_char_index(&editor.value(), utf16_index))
 }
 
+#[cfg(target_arch = "wasm32")]
+pub(crate) async fn current_editor_selection() -> Option<(usize, usize)> {
+    let editor = editor_textarea()?;
+    let value = editor.value();
+    let start = editor.selection_start().ok().flatten()?;
+    let end = editor.selection_end().ok().flatten()?;
+    Some((
+        utf16_index_to_char_index(&value, start),
+        utf16_index_to_char_index(&value, end),
+    ))
+}
+
 #[cfg(not(target_arch = "wasm32"))]
 pub(crate) async fn current_editor_caret() -> Option<usize> {
     let script = format!(
@@ -322,6 +334,25 @@ pub(crate) async fn current_editor_caret() -> Option<usize> {
         editor_id = EDITOR_ID,
     );
     document::eval(&script).join::<usize>().await.ok()
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+pub(crate) async fn current_editor_selection() -> Option<(usize, usize)> {
+    let script = format!(
+        r#"
+            const el = document.getElementById({editor_id:?});
+            if (!el) return "";
+            const utf16Start = typeof el.selectionStart === "number" ? el.selectionStart : 0;
+            const utf16End = typeof el.selectionEnd === "number" ? el.selectionEnd : utf16Start;
+            const start = Array.from(el.value.slice(0, utf16Start)).length;
+            const end = Array.from(el.value.slice(0, utf16End)).length;
+            return `${{start}},${{end}}`;
+        "#,
+        editor_id = EDITOR_ID,
+    );
+    let raw = document::eval(&script).join::<String>().await.ok()?;
+    let (start, end) = raw.split_once(',')?;
+    Some((start.parse().ok()?, end.parse().ok()?))
 }
 
 #[cfg(target_arch = "wasm32")]

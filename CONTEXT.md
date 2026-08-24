@@ -41,11 +41,11 @@ The visible Khmer choices for the active **Composition** or focused **Segmented 
 _Avoid_: suggestions (too broad), inline candidates
 
 **Phrase Candidate**:
-One complete Khmer rendering of the *entire* **Composition** — a whole-phrase hypothesis carrying its own internal segmentation, not a single word. The decoder ranks several of these; the top-ranked one is the default **Strip** preview, and tapping another Phrase Candidate makes that selected phrase the **Strip** preview. Distinct from a **Candidate**, which is one Khmer choice for a *single* segment. Selecting a Phrase Candidate makes its segmentation the active **Segmented Session**.
+One complete Khmer rendering of the *entire* **Composition** — a whole-input hypothesis carrying one or more internal segments. Complete single-word readings and multi-word segmented readings coexist as Phrase Candidates; finding a segmentation never discards the whole-word alternatives. Distinct from a **Candidate**, which is one Khmer choice for a *single* focused segment.
 _Avoid_: sentence candidate, sequence, full-composition candidate, phrase suggestion, n-best (implementation term)
 
 **Candidate Surface**:
-The two-level candidate presentation for a **Segmented Session**: whole-phrase **Phrase Candidate**s are the default level, and the focused segment's word **Candidate List** is a second level reached on demand (Tab on desktop; a double-touch into **Phrase Edit** on mobile). Keeping the two levels separate stops a correct word alternative from looking like a wrong whole-phrase alternative. A flat, single-segment **Composition** has no second level and shows the ordinary **Candidate List**. This is *adapter presentation policy*, not new ranking — the shared engine still owns Phrase Candidates, **Segment Edit Mode**, selection, and commits; each adapter only chooses which existing level to expose and how to paint it. The **Phrase Wheel** is the mobile presentation of the phrase level; the desktop popup (macOS, Windows, Linux) is another. Enter commits the previewed **Composition** from either level.
+The two-level candidate presentation for a **Segmented Session**: complete **Phrase Candidate**s are the default level, and the focused segment's word **Candidate List** is a second level reached on demand (Tab on desktop; a double-touch into **Phrase Edit** on mobile). The phrase level merges complete interpretations without forcing single-segment or multi-segment readings to outrank the other; a flat **Composition** has no second level. This is *adapter presentation policy*, not new ranking — the shared engine still owns Phrase Candidates, **Segment Edit Mode**, selection, and commits.
 _Avoid_: candidate popup (too generic), suggestion box, phrase panel
 
 **Phrase Wheel**:

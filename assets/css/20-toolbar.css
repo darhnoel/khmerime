@@ -124,6 +124,7 @@ button:focus-visible, input:focus-visible, textarea:focus-visible {
   font-size: 0.68rem;
   text-align: center;
 }
+.sidebar-chevron { flex: 0 0 auto !important; color: var(--muted); font-size: 1.15rem; line-height: 1; }
 .toggle-switch {
   position: relative;
   flex: 0 0 auto !important;

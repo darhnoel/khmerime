@@ -55,37 +55,6 @@ def _goto_app(page, url: str) -> None:
             continue
 
 
-def _manual_candidate_index(page, text: str) -> int:
-    popup = page.locator("[data-testid='suggestion-popup']").last
-    expect(popup).to_be_visible(timeout=15_000)
-    expect(popup.locator(".suggestion button").first).to_be_visible(timeout=15_000)
-
-    words = popup.locator(".suggestion .suggestion-word")
-    count = words.count()
-    for index in range(count):
-        if words.nth(index).inner_text().strip() == text:
-            return index
-    raise AssertionError(f"manual candidate not found: {text!r}")
-
-
-def _click_manual_candidate(page, text: str) -> None:
-    popup = page.locator("[data-testid='suggestion-popup']").last
-    index = _manual_candidate_index(page, text)
-    popup.locator(".suggestion button").nth(index).click()
-
-
-def _manual_active_candidate_word(page) -> str:
-    popup = page.locator("[data-testid='suggestion-popup']").last
-    expect(popup).to_be_visible(timeout=15_000)
-    return popup.locator(".suggestion.active .suggestion-word").last.inner_text().strip()
-
-
-def _manual_active_candidate_hint(page) -> str:
-    popup = page.locator("[data-testid='suggestion-popup']").last
-    expect(popup).to_be_visible(timeout=15_000)
-    return popup.locator(".suggestion.active .suggestion-roman-hint").last.inner_text().strip()
-
-
 def _set_editor_caret(page, caret: int) -> int:
     return page.eval_on_selector(
         "[data-testid='editor-input']",
@@ -243,24 +212,6 @@ def test_web_ui_desktop_popup_and_live_edit_toggle(web_server: str, page) -> Non
     live_edit_button.click()
     expect(live_edit_button).to_have_class(re.compile(r".*active.*"))
 
-    rules_button = page.locator("[data-testid='toggle-rules']").last
-    document_width = page.locator(".editor-card").last.bounding_box()["width"]
-    rules_button.click()
-    expect(rules_button).to_have_class(re.compile(r".*active.*"))
-    guide = page.locator("[data-testid='guide-sheet']").last
-    expect(guide).to_be_visible(timeout=15_000)
-    expect(guide).to_have_css("position", "fixed")
-    assert page.locator(".editor-card").last.bounding_box()["width"] == document_width
-    page.keyboard.press("Escape")
-    expect(guide).to_have_count(0)
-    expect(rules_button).not_to_have_class(re.compile(r".*active.*"))
-
-    rules_button.click()
-    expect(page.locator("[data-testid='guide-sheet']").last).to_be_visible(timeout=15_000)
-    page.locator("[data-testid='close-rules']").last.click()
-    expect(page.locator("[data-testid='guide-sheet']")).to_have_count(0)
-
-
 def test_web_ui_mobile_keeps_caret_candidate_surface(web_server: str, mobile_page) -> None:
     _goto_app(mobile_page, web_server)
 
@@ -296,9 +247,10 @@ def test_web_ui_exact_gumnit_stays_flat_and_ranks_correct_spelling_first(web_ser
     expect(popup.locator(".candidate-choice .suggestion-word").first).to_have_text("គំនិត")
 
 
-def test_web_ui_mobile_rules_open_as_full_width_scroll_sheet(web_server: str, mobile_page) -> None:
+def test_web_ui_mobile_rules_open_as_full_width_page(web_server: str, mobile_page) -> None:
     _goto_app(mobile_page, web_server)
 
+    mobile_page.locator("[data-testid='toggle-sidebar']").last.click()
     rules_button = mobile_page.locator("[data-testid='toggle-rules']").last
     rules_button.click()
     guide = mobile_page.locator("[data-testid='guide-sheet']").last
@@ -306,12 +258,34 @@ def test_web_ui_mobile_rules_open_as_full_width_scroll_sheet(web_server: str, mo
 
     viewport_width = mobile_page.evaluate("window.innerWidth")
     assert guide.bounding_box()["width"] == viewport_width
+    assert guide.bounding_box()["height"] == mobile_page.evaluate("window.innerHeight")
     assert guide.locator(".guide-scroll").evaluate("node => node.scrollHeight > node.clientHeight")
     expect(guide.locator(".guide-scroll")).to_have_css("scrollbar-width", "none")
-    expect(guide.locator(".guide-overflow-cue")).to_be_visible()
+    expect(guide.locator(".guide-overflow-cue")).to_have_count(0)
 
     mobile_page.keyboard.press("Escape")
     expect(mobile_page.locator("[data-testid='guide-sheet']")).to_have_count(0)
+
+
+def test_web_ui_rules_open_as_dedicated_page(web_server: str, page) -> None:
+    _goto_app(page, web_server)
+
+    rules_button = page.locator("[data-testid='toggle-rules']").last
+    rules_button.click()
+    guide = page.locator("[data-testid='guide-sheet']").last
+    expect(guide).to_be_visible(timeout=15_000)
+    expect(guide).to_have_css("position", "fixed")
+    assert guide.bounding_box()["width"] == page.evaluate("window.innerWidth")
+    assert guide.bounding_box()["height"] == page.evaluate("window.innerHeight")
+
+    page.keyboard.press("Escape")
+    expect(guide).to_have_count(0)
+    expect(rules_button).not_to_have_class(re.compile(r".*active.*"))
+
+    rules_button.click()
+    expect(page.locator("[data-testid='guide-sheet']").last).to_be_visible(timeout=15_000)
+    page.locator("[data-testid='close-rules']").last.click()
+    expect(page.locator("[data-testid='guide-sheet']")).to_have_count(0)
 
 
 def test_web_ui_mobile_up_down_controls_cycle_candidates(web_server: str, mobile_page) -> None:
@@ -476,120 +450,93 @@ def test_web_ui_mobile_pretext_is_loaded_and_sets_layout_vars(web_server: str, m
 
 
 @pytest.mark.slow
-def test_web_ui_manual_selection_lock_blocks_printable_typing(web_server: str, page) -> None:
+def test_web_ui_add_pair_flick_save_and_normal_decode(web_server: str, page) -> None:
     _goto_app(page, web_server)
 
     editor = page.locator("[data-testid='editor-input']").last
     expect(editor).to_be_visible(timeout=20_000)
-    page.locator("[data-testid='mode-manual']").last.click()
+    expect(page.locator("[data-testid='engine-status']")).to_have_count(0, timeout=20_000)
+    page.locator("[data-testid='toggle-saved-mappings']").last.click()
+    expect(page.locator("[data-testid='saved-words-page']")).to_be_visible()
+    page.locator("[data-testid='add-saved-mapping']").last.click()
 
-    editor.click()
-    editor.type("imsorida")
-    expect(page.locator("[data-testid='suggestion-popup']").last).to_be_visible(timeout=15_000)
+    modal = page.locator("[data-testid='add-pair-modal']")
+    expect(modal).to_be_visible()
+    roman_field = page.locator("[data-testid='add-pair-roman']")
+    khmer_field = page.locator("[data-testid='add-pair-khmer']")
+    expect(roman_field).to_have_attribute("placeholder", "ឧ. khnhom")
+    for field in (roman_field, khmer_field):
+        weight = int(field.evaluate("el => getComputedStyle(el).fontWeight"))
+        assert weight <= 500, "placeholder fields must not inherit the label's bold weight"
+    keyboard = page.locator("[data-testid='flick-keyboard']")
+    expect(keyboard).to_be_visible()
+    expect(editor).to_have_value("")
+    expect(page.locator("[data-testid='suggestion-popup']")).to_have_count(0)
+    roman_field.fill("zzqname")
 
-    editor.press("Space")
-    editor.press("x")
-    expect(editor).to_have_value("imsorida")
+    center_key = page.locator("[data-testid='flick-key-1-1']")
+    center_key.click()
+    expect(khmer_field).to_have_value("ក")
+    expect(editor).to_have_value("")
+
+    box = center_key.bounding_box()
+    assert box is not None
+    x = box["x"] + box["width"] / 2
+    y = box["y"] + box["height"] / 2
+    page.mouse.move(x, y)
+    page.mouse.down()
+    expect(page.locator(".flick-preview")).to_be_visible()
+    page.mouse.move(x, y + 24)
+    page.mouse.up()
+    expect(khmer_field).to_have_value("កគ")
+    page.locator("[data-testid='flick-backspace']").click()
+    expect(khmer_field).to_have_value("ក")
+
+    page.locator("[data-testid='add-pair-save']").click()
+    expect(modal).to_have_count(0)
+    row = page.locator(".saved-words-row")
+    expect(row).to_contain_text("zzqname")
+    expect(row).to_contain_text("ក")
+
+    search = page.locator("[data-testid='saved-words-search']")
+    search.fill("missing")
+    expect(page.locator(".saved-words-row")).to_have_count(0)
+    search.fill("ក")
+    expect(page.locator(".saved-words-row")).to_have_count(1)
+
+    page.locator("[data-testid='saved-word-menu-button']").click()
+    page.locator("[data-testid='edit-saved-word']").click()
+    expect(page.locator("[data-testid='add-pair-roman']")).to_have_value("zzqname")
+    expect(page.locator("[data-testid='add-pair-khmer']")).to_have_value("ក")
+    page.locator("[data-testid='add-pair-cancel']").click()
+
+    page.locator("[data-testid='saved-word-menu-button']").click()
+    page.locator("[data-testid='delete-saved-word']").click()
+    expect(page.locator(".saved-words-row")).to_have_count(0)
+    expect(page.locator("[data-testid='saved-words-toast']")).to_be_visible()
+    page.locator("[data-testid='undo-delete-saved-word']").click()
+    expect(page.locator(".saved-words-row")).to_have_count(1)
+
+    page.locator("[data-testid='saved-words-back']").click()
+
+    editor.fill("zzqname")
+    popup = page.locator("[data-testid='suggestion-popup']").last
+    expect(popup).to_be_visible(timeout=15_000)
+    expect(popup.locator(".suggestion-word").first).to_have_text("ក")
 
 
 @pytest.mark.slow
-def test_web_ui_manual_skip_undo_and_inline_preview_sync(web_server: str, page) -> None:
+def test_web_ui_flick_keyboard_treats_composed_key_as_one_backspace_unit(web_server: str, page) -> None:
     _goto_app(page, web_server)
 
     editor = page.locator("[data-testid='editor-input']").last
-    expect(editor).to_be_visible(timeout=20_000)
-    page.locator("[data-testid='mode-manual']").last.click()
+    page.locator("[data-testid='toggle-saved-mappings']").last.click()
+    page.locator("[data-testid='add-saved-mapping']").last.click()
 
-    editor.click()
-    editor.type("imsorida")
-    expect(page.locator("[data-testid='suggestion-popup']").last).to_be_visible(timeout=15_000)
-
-    editor.press("Space")
-
-    manual_progress = page.locator("[data-testid='manual-progress']")
-    expect(manual_progress).to_have_count(0)
-    expect(page.locator("[data-testid='manual-preview']")).to_have_count(0)
-
-    remaining_before = "imsorida"
-    editor.press("s")
-    expect(manual_progress).to_be_visible(timeout=15_000)
-    remaining_node = manual_progress.locator(".manual-progress-remaining strong")
-    remaining_after_skip = remaining_node.inner_text().strip()
-    assert remaining_after_skip != remaining_before
-    assert len(remaining_after_skip) < len(remaining_before)
-    expect(editor).to_have_value("imsorida")
-
-    editor.press("u")
-    expect(manual_progress).to_have_count(0)
-    expect(editor).to_have_value("imsorida")
-
-    editor.press("Enter")
-
-    built_text_node = manual_progress.locator(".manual-progress-built strong")
-    expect(built_text_node).to_be_visible(timeout=15_000)
-    built_text = built_text_node.inner_text().strip()
-    assert built_text, "manual built text should not be empty after selecting a candidate"
-
-    inline_preview_text = page.locator(".composition-preview .composition-preview-text").last
-    expect(inline_preview_text).to_have_text(built_text)
-
-
-@pytest.mark.slow
-def test_web_ui_manual_sambath_shows_context_subscript_fallback(web_server: str, page) -> None:
-    _goto_app(page, web_server)
-
-    editor = page.locator("[data-testid='editor-input']").last
-    expect(editor).to_be_visible(timeout=20_000)
-    page.locator("[data-testid='mode-manual']").last.click()
-
-    editor.click()
-    editor.type("sambath")
-    expect(page.locator("[data-testid='suggestion-popup']").last).to_be_visible(timeout=15_000)
-
-    editor.press("Space")
-    for _ in range(5):
-        editor.press("s")
-    _click_manual_candidate(page, "ត")
-
-    max_cycles = 64
-    for _ in range(max_cycles):
-        if _manual_active_candidate_word(page) == "្ត":
-            break
-        editor.press("Space")
-    else:
-        raise AssertionError("manual context fallback candidate '្ត' did not appear while cycling")
-
-    hint = _manual_active_candidate_hint(page)
-    assert "subscript" in hint
-    assert "context repeat" in hint
-    assert "no-consume" in hint
-
-
-@pytest.mark.slow
-def test_web_ui_manual_sambath2_space_s_skips_without_text_mutation(web_server: str, page) -> None:
-    _goto_app(page, web_server)
-
-    editor = page.locator("[data-testid='editor-input']").last
-    expect(editor).to_be_visible(timeout=20_000)
-    page.locator("[data-testid='mode-manual']").last.click()
-
-    editor.click()
-    editor.type("sambath")
-    expect(page.locator("[data-testid='suggestion-popup']").last).to_be_visible(timeout=15_000)
-
-    editor.press("Space")
-    manual_progress = page.locator("[data-testid='manual-progress']")
-    expect(manual_progress).to_have_count(0)
-    expect(page.locator("[data-testid='manual-preview']")).to_have_count(0)
-    remaining_before = "sambath"
-
-    editor.press("s")
-
-    expect(editor).to_have_value("sambath")
-    expect(manual_progress).to_be_visible(timeout=15_000)
-    remaining_node = manual_progress.locator(".manual-progress-remaining strong")
-    remaining_after = remaining_node.inner_text().strip()
-    assert remaining_after != remaining_before
-    assert len(remaining_after) < len(remaining_before)
-    expect(page.locator("[data-testid='suggestion-popup']").last).to_be_visible(timeout=15_000)
-    expect(manual_progress).to_be_visible(timeout=15_000)
+    page.locator("[data-testid='flick-key-3-1']").click()
+    expect(page.locator("[data-testid='add-pair-khmer']")).to_have_value("ឲ្យ")
+    expect(editor).to_have_value("")
+    page.locator("[data-testid='flick-backspace']").click()
+    expect(page.locator("[data-testid='add-pair-khmer']")).to_have_value("")
+    expect(page.locator("[data-testid='flick-space']")).to_have_count(0)
+    expect(page.locator("[data-testid='flick-enter']")).to_have_count(0)

@@ -1,5 +1,12 @@
 # Design handoff — dioxus editor webapp
 
+> **Add-pair Khmer entry (2026-08-24):** [ADR-0002](adr/0002-direct-khmer-entry-uses-an-embedded-flick-keyboard.md)
+> replaces the Manual Roman candidate-builder with a 4×5 Flick keyboard inside
+> the Saved words add-pair modal. Flick fills only the Khmer half of a
+> `roman → khmer` mapping; it never edits the Document. Multi-codepoint members
+> remain atomic Entry Units for backspace, and directional preview appears only
+> while a key is pressed.
+
 > **Update (2026-08-23):** The layout and theme direction described below has
 > been superseded by [ADR-0001](adr/0001-local-first-focused-document-workspace.md).
 > The implemented first slice is now a focused document workspace with a
@@ -15,9 +22,7 @@
 > The old automatic segmented replacement overlay is forbidden. The web panel
 > uses five-row pages, a fixed minimum footprint, caret anchoring on desktop and
 > mobile, an IMK-like boundary/selection treatment, and a quiet page count.
-> Manual mode no longer renders the detached workspace preview. After the first
-> build/skip, its Built/Remaining/Next state appears as a compact header inside
-> the content-sized caret popup; before state diverges, that header is hidden.
+> This historical Manual-mode description is superseded by ADR-0002.
 
 > **Rules sheet refinement (2026-08-23):** `ក្បួន និងផ្លូវកាត់` now opens a
 > non-modal fixed sheet over the right side instead of participating in the

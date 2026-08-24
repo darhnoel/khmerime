@@ -37,20 +37,20 @@ pub(crate) fn GuidePanel(show_guide: Signal<bool>) -> Element {
                 class: "guide",
                 "data-testid": "guide-sheet",
                 role: "dialog",
-                aria_modal: "false",
+                aria_modal: "true",
                 aria_labelledby: "guide-title",
                 div { class: "guide-header",
-                    div {
-                        h2 { id: "guide-title", "ក្បួន និងផ្លូវកាត់" }
-                        p { "ជំនួយខ្លីៗសម្រាប់ការវាយអក្សរខ្មែរ" }
-                    }
                     button {
                         class: "guide-close",
                         "data-testid": "close-rules",
-                        aria_label: "បិទក្បួន និងផ្លូវកាត់",
-                        title: "Close",
+                        aria_label: "ត្រឡប់",
+                        title: "Back",
                         onclick: move |_| show_guide.set(false),
-                        "×"
+                        "‹"
+                    }
+                    div {
+                        h2 { id: "guide-title", "ក្បួន និងផ្លូវកាត់" }
+                        p { "ជំនួយខ្លីៗសម្រាប់ការវាយអក្សរខ្មែរ" }
                     }
                 }
 
@@ -125,10 +125,6 @@ pub(crate) fn GuidePanel(show_guide: Signal<bool>) -> Element {
                             }
                         }
                     }
-                }
-                div { class: "guide-overflow-cue", aria_hidden: "true",
-                    span { "រំកិលមើលបន្ថែម" }
-                    span { "↓" }
                 }
             }
         }

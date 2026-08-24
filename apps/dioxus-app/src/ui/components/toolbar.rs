@@ -1,9 +1,7 @@
 use dioxus::prelude::*;
 
-use crate::ui::editor::{
-    dismiss_manual_save_request, remove_user_dictionary_mapping, save_manual_save_request, switch_input_mode,
-    update_candidates, EditorSignals, InputMode,
-};
+use crate::ui::components::SavedWordsPage;
+use crate::ui::editor::{update_candidates, EditorSignals};
 use crate::ui::storage::{save_enabled, save_font_size, save_sidebar_open, Theme};
 use crate::{EngineReadiness, MAX_FONT_SIZE, MIN_FONT_SIZE};
 
@@ -104,21 +102,6 @@ pub(crate) fn AppToolbar(
 
         aside { class: "app-sidebar", aria_label: "ការរុករក និងឧបករណ៍",
             nav { class: "sidebar-nav",
-                section { class: "sidebar-section",
-                    h2 { "របៀបបញ្ចូល" }
-                    button {
-                        class: if state.input_mode() == InputMode::NormalWordSuggestion { "sidebar-item active" } else { "sidebar-item" },
-                        "data-testid": "mode-word", title: "{InputMode::NormalWordSuggestion.label()}",
-                        onclick: move |_| switch_input_mode(InputMode::NormalWordSuggestion, state),
-                        Icon { name: "list" } span { "ពាក្យ" }
-                    }
-                    button {
-                        class: if state.input_mode() == InputMode::ManualCharacterTyping { "sidebar-item active" } else { "sidebar-item" },
-                        "data-testid": "mode-manual", title: "{InputMode::ManualCharacterTyping.label()}",
-                        onclick: move |_| switch_input_mode(InputMode::ManualCharacterTyping, state),
-                        Icon { name: "keyboard" } span { "សរសេរដោយដៃ" }
-                    }
-                }
                 section { class: "sidebar-section sidebar-behavior",
                     h2 { "ការបម្លែង" }
                     button {
@@ -146,29 +129,10 @@ pub(crate) fn AppToolbar(
                     button {
                         class: if show_saved_dictionary() { "sidebar-item active" } else { "sidebar-item" },
                         "data-testid": "toggle-saved-mappings", aria_pressed: "{show_saved_dictionary()}",
-                        onclick: move |_| show_saved_dictionary.set(!show_saved_dictionary()),
+                        onclick: move |_| show_saved_dictionary.set(true),
                         Icon { name: "bookmark" } span { "ពាក្យរក្សាទុក" }
                         span { class: "sidebar-count", "{saved_entries.len()}" }
-                    }
-                    if show_saved_dictionary() {
-                        div { class: "sidebar-saved-list",
-                            if saved_entries.is_empty() { p { "មិនទាន់មានពាក្យរក្សាទុកទេ។" } }
-                            else {
-                                for (roman, khmer) in saved_entries.iter() {
-                                    div { class: "sidebar-saved-row", key: "saved-{roman}-{khmer}",
-                                        span { "{roman} → {khmer}" }
-                                        button {
-                                            aria_label: "លុប {roman} → {khmer}", title: "Remove",
-                                            onclick: {
-                                                let roman = roman.clone();
-                                                let khmer = khmer.clone();
-                                                move |_| { let _ = remove_user_dictionary_mapping(&roman, &khmer, state); }
-                                            }, "×"
-                                        }
-                                    }
-                                }
-                            }
-                        }
+                        span { class: "sidebar-chevron", aria_hidden: "true", "›" }
                     }
                 }
             }
@@ -178,21 +142,8 @@ pub(crate) fn AppToolbar(
             }
         }
 
-        if let Some(request) = state.manual_save_request() {
-            div { class: "workspace-context",
-                div { class: "manual-save-banner",
-                    div { class: "manual-save-text",
-                        span { class: "manual-save-label", "ការផ្គុំដោយដៃ" }
-                        span { class: "manual-save-map", "{request.roman} → {request.khmer}" }
-                    }
-                    div { class: "manual-save-actions",
-                        button { class: "mode-pill active", "data-testid": "manual-save",
-                            onclick: move |_| { let _ = save_manual_save_request(state); }, "រក្សាទុក" }
-                        button { class: "ghost", "data-testid": "manual-save-dismiss",
-                            onclick: move |_| dismiss_manual_save_request(state), "រំលង" }
-                    }
-                }
-            }
+        if show_saved_dictionary() {
+            SavedWordsPage { state, open: show_saved_dictionary }
         }
 
         if show_settings() {

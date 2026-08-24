@@ -5,6 +5,7 @@ ADDR="${ADDR:-0.0.0.0}"
 PORT="${PORT:-4173}"
 FEATURES="${DX_FEATURES:-}"
 VERBOSE="${DX_VERBOSE:-}"
+DIOXUS_CLI="${DIOXUS_CLI:-dx}"
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 APP_DIR="$ROOT_DIR/apps/dioxus-app"
@@ -66,7 +67,7 @@ watch_and_patch_shell() {
   done
 }
 
-DX_CMD=(dx serve --platform web --addr "$ADDR" --port "$PORT" --open false)
+DX_CMD=("$DIOXUS_CLI" serve --platform web --addr "$ADDR" --port "$PORT" --open false)
 if [[ -n "$FEATURES" ]]; then
   DX_CMD+=(--features "$FEATURES")
 fi

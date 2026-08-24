@@ -7,15 +7,13 @@ use roman_lookup::{
 
 use crate::{engine, CompositionMark, SuggestionPopup};
 
-use super::manual_flow::{manual_state_visible_candidates, refresh_manual_state_candidates};
 use super::view_helpers::{candidate_composition_mark, suggestion_popup_position};
-use super::{slice_chars, CandidateLevel, CandidateMode, EditorSignals, InputMode, SegmentedSession};
+use super::{slice_chars, CandidateLevel, CandidateMode, EditorSignals, SegmentedSession};
 
 const SHADOW_DEBOUNCE_SHORT_MS: u32 = 220;
 const SHADOW_DEBOUNCE_MEDIUM_MS: u32 = 320;
 const SHADOW_DEBOUNCE_LONG_MS: u32 = 420;
 
-#[cfg(test)]
 pub(super) use roman_lookup::connect_khmer_display;
 use roman_lookup::normalized_suggestion_key;
 
@@ -96,6 +94,38 @@ pub(super) fn phrase_surface_candidates(
         .collect()
 }
 
+pub(super) fn merge_phrase_and_whole_candidates(
+    token: &str,
+    mut phrase_candidates: Vec<roman_lookup::DecodeCandidate>,
+    whole_items: &[String],
+) -> Vec<roman_lookup::DecodeCandidate> {
+    let mut seen = phrase_candidates
+        .iter()
+        .map(|candidate| normalized_suggestion_key(&candidate.text))
+        .collect::<HashSet<_>>();
+
+    for item in whole_items {
+        let text = connect_khmer_display(item);
+        if text.is_empty() || !seen.insert(normalized_suggestion_key(&text)) {
+            continue;
+        }
+        phrase_candidates.push(roman_lookup::DecodeCandidate {
+            text: text.clone(),
+            score_bps: None,
+            confidence_bps: None,
+            segments: vec![roman_lookup::DecodeSegment {
+                input: token.to_owned(),
+                output: text,
+                weight_bps: 0,
+            }],
+            from_model: false,
+            lexicon_verified: false,
+        });
+    }
+
+    phrase_candidates
+}
+
 #[cfg(target_arch = "wasm32")]
 async fn shadow_debounce_delay(delay_ms: u32) {
     gloo_timers::future::TimeoutFuture::new(delay_ms).await;
@@ -142,12 +172,14 @@ fn spawn_shadow_refinement(mut state: EditorSignals, value: String, token: Strin
             state.suggestion_loading.set(false);
             return;
         }
-        // Match the desktop Candidate Surface: when the decoder finds a real
-        // segmentation, normal typing exposes complete phrase hypotheses first.
-        // Single-word legacy fallbacks are not alternatives for the complete
-        // phrase and are deliberately omitted (macOS ADR-0004).
-        let phrase_candidates = phrase_surface_candidates(shadow.phrase_candidates(&token, &history_shadow));
+        // A segmentation is one complete interpretation of the token, not a
+        // reason to discard complete single-word lexicon or saved readings.
+        // Keep weighted-span order, then append missing whole-input readings.
+        let mut phrase_candidates = phrase_surface_candidates(shadow.phrase_candidates(&token, &history_shadow));
         let phrase_mode = phrase_candidates.iter().any(|candidate| candidate.segments.len() >= 2);
+        if phrase_mode {
+            phrase_candidates = merge_phrase_and_whole_candidates(&token, phrase_candidates, &legacy_items);
+        }
         let visible = if phrase_mode {
             phrase_candidates
                 .iter()
@@ -161,7 +193,7 @@ fn spawn_shadow_refinement(mut state: EditorSignals, value: String, token: Strin
         };
         let packs = personal_lexicon_packs(state.user_dictionary());
         let visible = if phrase_mode {
-            normalize_visible_suggestions(visible)
+            visible
         } else {
             normalize_visible_suggestions(Transliterator::merge_lexicon_packs(
                 &token,
@@ -172,7 +204,7 @@ fn spawn_shadow_refinement(mut state: EditorSignals, value: String, token: Strin
         };
         let user_items = Transliterator::lexicon_pack_exact_matches(&token, &packs);
         let (recommended_indices, roman_variant_hints) = if phrase_mode {
-            let hints = phrase_candidates
+            let mut hints = phrase_candidates
                 .iter()
                 .enumerate()
                 .map(|(index, candidate)| {
@@ -185,6 +217,7 @@ fn spawn_shadow_refinement(mut state: EditorSignals, value: String, token: Strin
                     (index, vec![roman])
                 })
                 .collect::<HashMap<_, _>>();
+            decorate_user_dictionary_hints(&visible, &user_items, &mut hints);
             (vec![0], hints)
         } else {
             let (recommended, mut hints) =
@@ -329,58 +362,6 @@ fn apply_candidate_results(
     apply_visible_candidates(state, items, preserve_selection);
 }
 
-async fn update_manual_candidates(
-    value: &str,
-    request_id: u64,
-    mut state: EditorSignals,
-    caret: usize,
-    token: String,
-    bounds_start: usize,
-) {
-    if token.trim().is_empty() {
-        state.clear_candidate_state_and_picker();
-        return;
-    }
-
-    state.shadow_debug.set(None);
-    state.segmented_session.set(None);
-    state.segmented_refine_mode.set(false);
-    state.phrase_candidates.set(Vec::new());
-    state.candidate_level.set(CandidateLevel::Flat);
-
-    let mut manual_state = match state.manual_typing_state() {
-        Some(existing) if existing.raw_roman == token => existing,
-        _ => super::ManualTypingState::new(token.clone()),
-    };
-    refresh_manual_state_candidates(&mut manual_state);
-    let (items, roman_variant_hints) = manual_state_visible_candidates(&manual_state);
-    let preserve_selection = preserve_transliteration_selection(state, &token);
-    let Some((popup_position, composition_mark)) = resolve_candidate_overlay(
-        state,
-        request_id,
-        value,
-        caret,
-        Some((bounds_start, &token)),
-        !items.is_empty(),
-    )
-    .await
-    else {
-        return;
-    };
-    state.manual_typing_state.set(Some(manual_state));
-    apply_candidate_results(
-        state,
-        CandidateMode::Transliteration,
-        token,
-        items,
-        popup_position,
-        composition_mark,
-        Vec::new(),
-        roman_variant_hints,
-        preserve_selection,
-    );
-}
-
 async fn update_next_word_candidates(value: &str, request_id: u64, mut state: EditorSignals, caret: usize) {
     if !state.engine_ready() {
         state.clear_candidate_state_and_picker();
@@ -506,11 +487,6 @@ pub(crate) async fn update_candidates(value: String, state: EditorSignals) {
 
     let bounds = Transliterator::token_bounds(&value, caret, false);
     let token = slice_chars(&value, bounds.clone());
-    if state.input_mode() == InputMode::ManualCharacterTyping {
-        update_manual_candidates(&value, request_id, state, caret, token, bounds.start).await;
-        return;
-    }
-
     if token.trim().is_empty() {
         update_next_word_candidates(&value, request_id, state, caret).await;
         return;
