@@ -228,6 +228,45 @@ button:focus-visible, input:focus-visible, textarea:focus-visible {
 }
 .theme-switch button.active { background: var(--surface-strong); color: var(--accent-strong); box-shadow: 0 0 0 1px var(--line); }
 
+.palette-switch {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 5px;
+  width: min(320px, 100%);
+}
+.palette-switch button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 36px;
+  padding: 6px 8px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--surface-muted);
+  color: var(--muted);
+  font-size: 0.72rem;
+  cursor: pointer;
+}
+.palette-switch button:hover { color: var(--ink); border-color: var(--line-strong); }
+.palette-switch button.active {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--ink);
+  box-shadow: 0 0 0 2px var(--focus-ring);
+}
+.palette-dot {
+  flex: 0 0 auto;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.12);
+}
+.palette-dot.default { background: #247f90; }
+.palette-dot.angkor { background: #a95132; }
+.palette-dot.lotus { background: #99547f; }
+.palette-dot.forest { background: #397655; }
+
 .font-stepper-group { display: inline-flex; align-items: center; gap: 7px; }
 .font-stepper {
   width: 68px;

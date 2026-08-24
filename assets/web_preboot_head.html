@@ -1,4 +1,21 @@
 <link rel="stylesheet" href="./assets/main.css">
+<script>
+    (() => {
+        try {
+            const root = document.documentElement;
+            const theme = localStorage.getItem("roman_lookup.theme");
+            const palette = localStorage.getItem("roman_lookup.palette");
+            root.dataset.theme = theme === "dark" ? "dark" : "light";
+            if (palette === "angkor" || palette === "lotus" || palette === "forest") {
+                root.dataset.palette = palette;
+            } else {
+                delete root.dataset.palette;
+            }
+        } catch (_) {
+            // Storage can be unavailable in privacy modes; CSS defaults remain valid.
+        }
+    })();
+</script>
 <style>
     @media (max-width: 900px) {
         body:not([data-app-shell-ready="1"]) #main {

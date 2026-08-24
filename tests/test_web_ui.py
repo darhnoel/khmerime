@@ -449,6 +449,28 @@ def test_web_ui_mobile_pretext_is_loaded_and_sets_layout_vars(web_server: str, m
     assert css["subtitle"].endswith("px")
 
 
+def test_web_ui_theme_palette_is_independent_and_persistent(web_server: str, page) -> None:
+    _goto_app(page, web_server)
+
+    expect(page.locator(":root")).to_have_attribute("data-theme", "light")
+    page.locator("[data-testid='toggle-settings']").last.click()
+    expect(page.locator("[data-testid='theme-system']")).to_have_count(0)
+    page.locator("[data-testid='theme-dark']").click()
+    page.locator("[data-testid='palette-angkor']").click()
+
+    expect(page.locator(":root")).to_have_attribute("data-theme", "dark")
+    expect(page.locator(":root")).to_have_attribute("data-palette", "angkor")
+    assert page.evaluate("localStorage.getItem('roman_lookup.theme')") == "dark"
+    assert page.evaluate("localStorage.getItem('roman_lookup.palette')") == "angkor"
+
+    page.reload(wait_until="domcontentloaded")
+    expect(page.locator(":root")).to_have_attribute("data-theme", "dark")
+    expect(page.locator(":root")).to_have_attribute("data-palette", "angkor")
+    page.locator("[data-testid='toggle-settings']").last.click()
+    expect(page.locator("[data-testid='theme-dark']")).to_have_class(re.compile(r".*active.*"))
+    expect(page.locator("[data-testid='palette-angkor']")).to_have_class(re.compile(r".*active.*"))
+
+
 @pytest.mark.slow
 def test_web_ui_add_pair_flick_save_and_normal_decode(web_server: str, page) -> None:
     _goto_app(page, web_server)

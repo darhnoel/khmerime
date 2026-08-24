@@ -20,7 +20,7 @@ The **Online Beta** began as a quick trial surface, but a full-bleed canvas left
 - Web candidates remain clickable in addition to the IMK keyboard controls. Clicking a phrase commits it; a pencil affordance on the selected phrase enters Segment Edit; clicking a segment candidate updates that segment without committing the phrase; and the Segment Edit header provides a quiet back control. Narrow screens retain the same caret-anchored surface rather than replacing it with a docked candidate strip.
 - Add-pair Khmer entry is specified by [ADR-0002](0002-direct-khmer-entry-uses-an-embedded-flick-keyboard.md), which supersedes the earlier Manual candidate-builder and keeps Flick input outside the Document.
 - A persistent footer shows hints appropriate to the active mode. It must never advertise a shortcut that the current mode disables.
-- The interface offers Light, Dark, and System themes, with System as the default. Both palettes use the same semantic tokens; core text and selectable candidates remain on opaque surfaces meeting WCAG AA contrast.
+- Brightness and color personality are independent appearance choices. Light and Dark control brightness; Default teal, Angkor sandstone, Lotus plum, and Forest green control coordinated grounds, surfaces, and accents. Both choices persist and apply before the loading screen paints, while core text and selectable candidates remain on opaque surfaces meeting WCAG AA contrast. System-following brightness is withheld until app-shell and preboot behavior can be made reliable together.
 - Khmer is the default interface language. Sidebar actions use icons plus labels; compact universal top-bar actions may use icons with Khmer tooltips and accessible labels.
 
 ## Document direction

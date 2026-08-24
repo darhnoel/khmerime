@@ -2,7 +2,7 @@ use dioxus::prelude::*;
 
 use crate::ui::components::SavedWordsPage;
 use crate::ui::editor::{update_candidates, EditorSignals};
-use crate::ui::storage::{save_enabled, save_font_size, save_sidebar_open, Theme};
+use crate::ui::storage::{save_enabled, save_font_size, save_sidebar_open, Palette, Theme};
 use crate::{EngineReadiness, MAX_FONT_SIZE, MIN_FONT_SIZE};
 
 #[component]
@@ -48,6 +48,7 @@ pub(crate) fn AppToolbar(
     show_guide: Signal<bool>,
     font_size: Signal<usize>,
     theme: Signal<Theme>,
+    palette: Signal<Palette>,
     sidebar_open: Signal<bool>,
 ) -> Element {
     let mut show_saved_dictionary = use_signal(|| false);
@@ -157,11 +158,27 @@ pub(crate) fn AppToolbar(
                 div { class: "settings-group",
                     h3 { "រូបរាង" }
                     div { class: "settings-row",
-                        span { class: "settings-label", "ពណ៌ផ្ទៃ" }
-                        div { class: "theme-switch", role: "group", aria_label: "ពណ៌ផ្ទៃ",
-                            button { class: if theme() == Theme::System { "active" } else { "" }, onclick: move |_| theme.set(Theme::System), "ប្រព័ន្ធ" }
-                            button { class: if theme() == Theme::Light { "active" } else { "" }, onclick: move |_| theme.set(Theme::Light), "ភ្លឺ" }
-                            button { class: if theme() == Theme::Dark { "active" } else { "" }, onclick: move |_| theme.set(Theme::Dark), "ងងឹត" }
+                        span { class: "settings-label", "ពន្លឺ" }
+                        div { class: "theme-switch", role: "group", aria_label: "ពន្លឺ",
+                            button { "data-testid": "theme-light", class: if theme() == Theme::Light { "active" } else { "" }, onclick: move |_| theme.set(Theme::Light), "ភ្លឺ" }
+                            button { "data-testid": "theme-dark", class: if theme() == Theme::Dark { "active" } else { "" }, onclick: move |_| theme.set(Theme::Dark), "ងងឹត" }
+                        }
+                    }
+                    div { class: "settings-row settings-palette-row",
+                        span { class: "settings-label", "ពណ៌" }
+                        div { class: "palette-switch", role: "group", aria_label: "ពណ៌",
+                            button { "data-testid": "palette-default", class: if palette() == Palette::Default { "active" } else { "" }, onclick: move |_| palette.set(Palette::Default),
+                                span { class: "palette-dot default", aria_hidden: "true" } span { "ដើម" }
+                            }
+                            button { "data-testid": "palette-angkor", class: if palette() == Palette::Angkor { "active" } else { "" }, onclick: move |_| palette.set(Palette::Angkor),
+                                span { class: "palette-dot angkor", aria_hidden: "true" } span { "អង្គរ" }
+                            }
+                            button { "data-testid": "palette-lotus", class: if palette() == Palette::Lotus { "active" } else { "" }, onclick: move |_| palette.set(Palette::Lotus),
+                                span { class: "palette-dot lotus", aria_hidden: "true" } span { "ផ្កាឈូក" }
+                            }
+                            button { "data-testid": "palette-forest", class: if palette() == Palette::Forest { "active" } else { "" }, onclick: move |_| palette.set(Palette::Forest),
+                                span { class: "palette-dot forest", aria_hidden: "true" } span { "ព្រៃឈើ" }
+                            }
                         }
                     }
                     div { class: "settings-row",

@@ -23,8 +23,8 @@ use self::ui::components::{AppToolbar, EditorCard, GuidePanel, WorkspaceBody};
 use self::ui::editor::{refresh_popup_position, CandidateLevel, CandidateMode, EditorSignals, SegmentedSession};
 use self::ui::platform::{mark_app_ready, mark_app_shell_ready, refresh_mobile_layout_density, set_editor_caret};
 use self::ui::storage::{
-    load_decoder_mode, load_editor_text, load_enabled, load_font_size, load_history, load_sidebar_open, load_theme,
-    load_user_dictionary, save_theme,
+    load_decoder_mode, load_editor_text, load_enabled, load_font_size, load_history, load_palette, load_sidebar_open,
+    load_theme, load_user_dictionary, save_palette, save_theme,
 };
 
 pub(crate) const EDITOR_ID: &str = "ime-editor";
@@ -83,16 +83,23 @@ fn App() -> Element {
     let decoder_mode = use_signal(load_decoder_mode);
     let font_size = use_signal(|| load_font_size(MIN_FONT_SIZE, MAX_FONT_SIZE, DEFAULT_FONT_SIZE));
     let theme = use_signal(load_theme);
-    // Apply + persist the theme by stamping data-theme on <html>. No attribute
-    // means System, so CSS can follow prefers-color-scheme.
+    let palette = use_signal(load_palette);
+    // Brightness and palette are independent root attributes. Brightness is
+    // explicit; missing data-palette selects the default teal.
     use_effect(move || {
         let selected = theme();
-        let attr = selected.data_attr();
+        let selected_palette = palette();
         save_theme(selected);
-        let script = match attr {
+        save_palette(selected_palette);
+        let theme_script = match selected.data_attr() {
             None => "document.documentElement.removeAttribute('data-theme');".to_string(),
             Some(attr) => format!("document.documentElement.setAttribute('data-theme', {attr:?});"),
         };
+        let palette_script = match selected_palette.data_attr() {
+            None => "document.documentElement.removeAttribute('data-palette');".to_string(),
+            Some(attr) => format!("document.documentElement.setAttribute('data-palette', {attr:?});"),
+        };
+        let script = format!("{theme_script}{palette_script}");
         let _ = dioxus::document::eval(&script);
     });
     let show_guide = use_signal(|| false);
@@ -240,6 +247,7 @@ fn App() -> Element {
                         show_guide,
                         font_size,
                         theme,
+                        palette,
                         sidebar_open,
                     }
                     WorkspaceBody {

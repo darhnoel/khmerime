@@ -174,3 +174,18 @@ def test_explicit_dark_theme_keeps_candidate_contrast(page):
     word = _rgba(_computed(page, ".suggestion-popup .suggestion-word", "color"))
     assert surface[3] == 1.0
     assert _contrast(word, surface) >= 4.5
+
+
+@pytest.mark.parametrize("theme", ["light", "dark"])
+@pytest.mark.parametrize("palette", ["angkor", "lotus", "forest"])
+def test_coordinated_palettes_keep_text_and_accent_contrast(page, theme, palette):
+    page.eval_on_selector(
+        ":root",
+        "(el, attrs) => { el.dataset.theme = attrs.theme; el.dataset.palette = attrs.palette; }",
+        {"theme": theme, "palette": palette},
+    )
+    surface = _hex_or_rgb(_token(page, "--surface-strong"))
+    ink = _hex_or_rgb(_token(page, "--ink"))
+    accent = _hex_or_rgb(_token(page, "--accent-strong"))
+    assert _contrast(ink, surface) >= 4.5
+    assert _contrast(accent, surface) >= 3.0
