@@ -3,6 +3,7 @@ use std::collections::HashMap;
 use dioxus::prelude::*;
 use roman_lookup::{DecodeCandidate, DecoderMode, SegmentedSession, ShadowObservation};
 
+use crate::ui::spellcheck::SpellReview;
 use crate::{CompositionMark, EngineReadiness, SuggestionPopup};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -53,8 +54,10 @@ pub(crate) struct EditorSignals {
     pub selection_started: Signal<bool>,
     pub selected: Signal<usize>,
     pub pending_caret: Signal<Option<usize>>,
+    pub pending_caret_no_focus: Signal<Option<usize>>,
     pub history: Signal<HashMap<String, usize>>,
     pub user_dictionary: Signal<HashMap<String, Vec<String>>>,
+    pub spell_review: Signal<SpellReview>,
 }
 
 impl EditorSignals {
@@ -160,6 +163,14 @@ impl EditorSignals {
 
     pub(crate) fn user_dictionary(self) -> HashMap<String, Vec<String>> {
         (self.user_dictionary)()
+    }
+
+    pub(crate) fn spell_review(self) -> SpellReview {
+        (self.spell_review)()
+    }
+
+    pub(crate) fn clear_spell_review(mut self) {
+        self.spell_review.set(SpellReview::default());
     }
 
     pub(crate) fn clear_candidate_state(mut self) {

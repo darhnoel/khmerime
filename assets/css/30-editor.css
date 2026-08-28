@@ -8,6 +8,49 @@
   grid-template-rows: minmax(calc(100dvh - 230px), auto) auto auto;
 }
 
+/* Floating copy-text button: top-right of the editor surface, above the text
+   layer, shown only when the document has text. */
+.editor-copy-button {
+  position: absolute;
+  top: 14px;
+  right: 16px;
+  z-index: 6;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 11px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--muted);
+  font-family: "Noto Sans Khmer", "IBM Plex Sans", sans-serif;
+  font-size: 0.8rem;
+  font-weight: 600;
+  line-height: 1;
+  cursor: pointer;
+  opacity: 0.85;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+  transition: opacity 120ms ease, color 120ms ease, border-color 120ms ease, background 120ms ease;
+}
+.editor-copy-button:hover {
+  opacity: 1;
+  color: var(--ink);
+  border-color: var(--line-strong);
+  background: var(--hover);
+}
+.editor-copy-button:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--focus-ring);
+}
+.editor-copy-button.is-copied {
+  opacity: 1;
+  color: var(--accent-strong);
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+.editor-copy-icon { font-size: 0.95rem; }
+.editor-copy-label { white-space: nowrap; }
+
 .editor {
   grid-column: 1;
   width: 100%;
@@ -30,6 +73,255 @@
 .editor:focus { outline: none; }
 .editor::placeholder { color: var(--muted); opacity: 0.72; }
 .editor-composing { caret-color: transparent; }
+.editor-spell-reviewed { padding-top: 108px; }
+.editor-spell-active {
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+}
+
+.spell-review-bar {
+  position: absolute;
+  z-index: 7;
+  top: 16px;
+  left: 28px;
+  right: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  min-height: 46px;
+  padding: 6px 9px 6px 13px;
+  border: 1px solid var(--line-strong);
+  border-radius: 13px;
+  background: var(--surface);
+  color: var(--ink);
+  font-family: "Noto Sans Khmer", "IBM Plex Sans", sans-serif;
+  font-size: 0.8rem;
+  font-weight: 650;
+}
+.spell-review-bar.has-issues { border-color: var(--line-strong); }
+.spell-review-bar.is-clear {
+  border-color: color-mix(in srgb, var(--accent) 22%, var(--line));
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+}
+.spell-review-summary, .spell-review-controls { display: flex; align-items: center; gap: 9px; }
+.spell-review-icon {
+  display: inline-grid;
+  width: 20px;
+  height: 20px;
+  place-items: center;
+  border-radius: 50%;
+  background: color-mix(in srgb, currentColor 12%, transparent);
+  color: inherit;
+  font-family: "IBM Plex Sans", sans-serif;
+  font-size: 0.78rem;
+  line-height: 1;
+}
+.spell-review-position { min-width: 42px; text-align: center; font-family: "IBM Plex Sans", sans-serif; }
+.spell-review-controls button {
+  appearance: none;
+  display: inline-grid;
+  width: 30px;
+  height: 30px;
+  place-items: center;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface-strong);
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 1.1rem;
+}
+.spell-review-bar.is-clear .spell-review-controls button {
+  border-color: color-mix(in srgb, var(--accent) 20%, var(--line));
+  color: var(--accent-strong);
+}
+.spell-review-controls button:hover { background: var(--hover); }
+.spell-review-controls button:disabled { cursor: default; opacity: 0.42; }
+
+.spell-overlay {
+  grid-column: 1;
+  grid-row: 1;
+  position: relative;
+  z-index: 2;
+  width: 100%;
+  min-width: 0;
+  min-height: calc(100dvh - 230px);
+  padding: 52px 60px 44px;
+  border: 0;
+  color: var(--ink);
+  pointer-events: none;
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+  font-family: "Noto Sans Khmer", "IBM Plex Sans", sans-serif;
+  font-weight: 400;
+  line-height: 1.8;
+}
+.spell-overlay.editor-spell-reviewed { padding-top: 108px; }
+.spell-segmentation-overlay { z-index: 2; }
+.spell-issue-overlay {
+  z-index: 3;
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+}
+.spell-segment {
+  pointer-events: auto;
+  cursor: default;
+  transition: color 100ms ease, -webkit-text-fill-color 100ms ease;
+}
+.spell-segment:hover {
+  color: var(--accent-strong);
+  -webkit-text-fill-color: var(--accent-strong);
+}
+.spell-match {
+  position: relative;
+  color: var(--ink);
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--danger) 9%, transparent);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--danger) 76%, transparent);
+  text-decoration: none;
+  pointer-events: auto;
+  cursor: pointer;
+  -webkit-text-fill-color: var(--ink);
+}
+.spell-match.active {
+  background: color-mix(in srgb, var(--danger) 13%, transparent);
+  box-shadow: 0 0 0 2px var(--danger);
+}
+.spell-match.warning {
+  background: var(--advisory-soft);
+  box-shadow: 0 0 0 1px var(--advisory-line);
+}
+.spell-match.warning.active {
+  background: color-mix(in srgb, var(--advisory) 14%, transparent);
+  box-shadow: 0 0 0 2px var(--advisory);
+}
+.spell-warning-detail { color: var(--ink); line-height: 1.55; }
+.spell-confidence { color: var(--muted); font-size: 0.72rem; }
+.detector-status {
+  margin-inline-start: 8px;
+  font-size: 0.7rem;
+  font-weight: 650;
+}
+.detector-status.connected { color: var(--accent); }
+.detector-status.unavailable { color: var(--danger); }
+.spell-popover {
+  --spell-shift-x: 0px;
+  position: absolute;
+  z-index: 24;
+  top: calc(100% + 14px);
+  left: -20px;
+  display: grid;
+  gap: 7px;
+  width: min(240px, calc(100vw - 32px));
+  padding: 10px;
+  border: 1px solid var(--line-strong);
+  border-radius: 12px;
+  background: var(--surface-strong);
+  color: var(--ink);
+  box-shadow: var(--shadow);
+  pointer-events: auto;
+  cursor: default;
+  -webkit-text-fill-color: var(--ink);
+  text-decoration: none;
+  white-space: normal;
+  font-family: "Noto Sans Khmer", "IBM Plex Sans", sans-serif;
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 1.5;
+  transform: translateX(var(--spell-shift-x));
+}
+.spell-popover.above { top: auto; bottom: calc(100% + 14px); }
+.spell-popover::before {
+  content: "";
+  position: absolute;
+  top: -7px;
+  left: clamp(16px, calc(28px - var(--spell-shift-x)), 212px);
+  width: 12px;
+  height: 12px;
+  transform: rotate(45deg);
+  border-top: 1px solid var(--line-strong);
+  border-left: 1px solid var(--line-strong);
+  background: var(--surface-strong);
+}
+.spell-popover.above::before {
+  top: auto;
+  bottom: -7px;
+  transform: rotate(225deg);
+}
+.spell-popover-label { color: var(--muted); font-size: 0.72rem; font-weight: 650; }
+.spell-primary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 38px;
+  padding: 5px 5px 5px 10px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+}
+.spell-primary-word {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: "Noto Sans Khmer", "IBM Plex Sans", sans-serif;
+  font-size: 1rem;
+  line-height: 1.45;
+}
+.spell-accept {
+  flex: 0 0 auto;
+  min-height: 28px;
+  padding: 3px 9px;
+  border: 0;
+  border-radius: 7px;
+  background: var(--primary-action);
+  color: var(--primary-action-text);
+  -webkit-text-fill-color: var(--primary-action-text);
+  cursor: pointer;
+  font-family: "Noto Sans Khmer", "IBM Plex Sans", sans-serif;
+  font-size: 0.74rem;
+  font-weight: 700;
+}
+.spell-accept:hover { background: var(--primary-action-hover); }
+.spell-accept:disabled {
+  background: var(--surface-elevated);
+  color: var(--muted);
+  -webkit-text-fill-color: var(--muted);
+  cursor: default;
+}
+.spell-alternatives-label {
+  color: var(--muted);
+  font-size: 0.68rem;
+  font-weight: 650;
+}
+.spell-alternatives { display: flex; flex-wrap: wrap; gap: 5px; }
+.spell-alternative {
+  min-height: 28px;
+  padding: 3px 8px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: var(--surface);
+  color: var(--ink);
+  cursor: pointer;
+  font-family: "Noto Sans Khmer", "IBM Plex Sans", sans-serif;
+  font-size: 0.78rem;
+}
+.spell-alternative:hover { border-color: var(--line-strong); background: var(--hover); }
+.spell-ignore {
+  justify-self: start;
+  padding: 2px 0;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  font-family: "Noto Sans Khmer", "IBM Plex Sans", sans-serif;
+  font-size: 0.7rem;
+}
+.spell-ignore:hover { color: var(--ink); text-decoration: underline; }
 
 .composition-mark {
   position: absolute;
@@ -229,6 +521,12 @@
   background: var(--surface-muted);
 }
 .add-pair-actions { display: flex; justify-content: flex-end; gap: 10px; }
+.add-pair-actions .mode-pill.active {
+  border-color: var(--primary-action);
+  background: var(--primary-action);
+  color: var(--primary-action-text);
+}
+.add-pair-actions .mode-pill.active:hover { background: var(--primary-action-hover); }
 .sidebar-add-pair {
   width: 100%;
   padding: 8px 10px;
@@ -302,13 +600,14 @@
   padding: 0;
   border: 0;
   border-radius: 50%;
-  background: var(--accent);
-  color: var(--accent-contrast);
+  background: var(--primary-action);
+  color: var(--primary-action-text);
   font-size: 1.35rem;
   line-height: 1;
   cursor: pointer;
   box-shadow: 0 6px 18px color-mix(in srgb, var(--accent) 24%, transparent);
 }
+.saved-words-add:hover { background: var(--primary-action-hover); }
 .saved-words-content { width: min(920px, calc(100% - 48px)); margin: 28px auto 56px; }
 .saved-words-search { display: block; margin-bottom: 16px; }
 .saved-words-search input {

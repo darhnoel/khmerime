@@ -21,7 +21,11 @@ use self::startup_fetch::start_engine_bootstrap;
 use self::startup_signals::StartupSignals;
 use self::ui::components::{AppToolbar, EditorCard, GuidePanel, WorkspaceBody};
 use self::ui::editor::{refresh_popup_position, CandidateLevel, CandidateMode, EditorSignals, SegmentedSession};
-use self::ui::platform::{mark_app_ready, mark_app_shell_ready, refresh_mobile_layout_density, set_editor_caret};
+use self::ui::platform::{
+    mark_app_ready, mark_app_shell_ready, refresh_mobile_layout_density, set_editor_caret,
+    set_editor_caret_no_focus,
+};
+use self::ui::spellcheck::SpellReview;
 use self::ui::storage::{
     load_decoder_mode, load_editor_text, load_enabled, load_font_size, load_history, load_palette, load_sidebar_open,
     load_theme, load_user_dictionary, save_palette, save_theme,
@@ -150,8 +154,12 @@ fn App() -> Element {
     let mut selection_started = use_signal(|| false);
     let selected = use_signal(|| 0usize);
     let mut pending_caret = use_signal(|| None::<usize>);
+    // Like pending_caret, but places the caret WITHOUT focusing/scrolling (spell
+    // accept: the user is in the review popover, not typing in the textarea).
+    let mut pending_caret_no_focus = use_signal(|| None::<usize>);
     let history = use_signal(load_history);
     let user_dictionary = use_signal(load_user_dictionary);
+    let spell_review = use_signal(SpellReview::default);
     let editor_state = EditorSignals {
         text,
         roman_enabled,
@@ -178,14 +186,23 @@ fn App() -> Element {
         selection_started,
         selected,
         pending_caret,
+        pending_caret_no_focus,
         history,
         user_dictionary,
+        spell_review,
     };
 
     use_effect(move || {
         if let Some(caret) = pending_caret() {
             set_editor_caret(caret);
             pending_caret.set(None);
+        }
+    });
+
+    use_effect(move || {
+        if let Some(caret) = pending_caret_no_focus() {
+            set_editor_caret_no_focus(caret);
+            pending_caret_no_focus.set(None);
         }
     });
 
@@ -239,7 +256,16 @@ fn App() -> Element {
     rsx! {
         // Embedded stylesheet (see APP_CSS) — injected inline so it always loads.
         style { {APP_CSS} }
-        div { class: "shell",
+        div {
+            class: "shell",
+            onclick: move |_| {
+                let mut review = editor_state.spell_review();
+                if review.open_index.is_some() {
+                    review.dismiss_interaction();
+                    let mut spell_review = editor_state.spell_review;
+                    spell_review.set(review);
+                }
+            },
             div { class: "board",
                 section { class: if sidebar_open() { "workspace sidebar-open" } else { "workspace sidebar-closed" },
                     AppToolbar {

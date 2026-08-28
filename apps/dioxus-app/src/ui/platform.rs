@@ -8,6 +8,16 @@ use web_sys::{window, CssStyleDeclaration, Document, Element, HtmlElement, HtmlT
 
 use crate::{CompositionMark, SuggestionPopup, EDITOR_ID};
 
+pub(crate) fn schedule_spell_popover_placement() {
+    let _ = dioxus::document::eval(
+        r#"
+        requestAnimationFrame(() => {
+            requestAnimationFrame(() => window.__khmerImePositionSpellPopover?.());
+        });
+        "#,
+    );
+}
+
 #[cfg(any(not(target_arch = "wasm32"), test))]
 const CHAR_WIDTH_DIVISOR: f64 = 0.62;
 #[cfg(any(not(target_arch = "wasm32"), test))]
@@ -365,6 +375,18 @@ pub(crate) fn set_editor_caret(caret: usize) {
     let _ = editor.set_selection_range(cursor, cursor);
 }
 
+/// Place the caret without focusing (so the view does not scroll/jump). Used by
+/// the spell-review accept path: the user is in the popover flow, not typing in
+/// the textarea, so stealing focus and scrolling to the caret is jarring.
+#[cfg(target_arch = "wasm32")]
+pub(crate) fn set_editor_caret_no_focus(caret: usize) {
+    let Some(editor) = editor_textarea() else {
+        return;
+    };
+    let cursor = char_index_to_utf16_index(&editor.value(), caret.min(editor.value().chars().count()));
+    let _ = editor.set_selection_range(cursor, cursor);
+}
+
 #[cfg(not(target_arch = "wasm32"))]
 pub(crate) fn set_editor_caret(caret: usize) {
     let script = format!(
@@ -379,6 +401,49 @@ pub(crate) fn set_editor_caret(caret: usize) {
         "#,
         editor_id = EDITOR_ID,
         caret = caret,
+    );
+    document::eval(&script);
+}
+
+/// Place the caret without focusing (see the wasm variant).
+#[cfg(not(target_arch = "wasm32"))]
+pub(crate) fn set_editor_caret_no_focus(caret: usize) {
+    let script = format!(
+        r#"
+            const el = document.getElementById({editor_id:?});
+            if (el && typeof el.setSelectionRange === "function") {{
+                el.setSelectionRange({caret}, {caret});
+            }}
+        "#,
+        editor_id = EDITOR_ID,
+        caret = caret,
+    );
+    document::eval(&script);
+}
+
+/// Copy `text` to the system clipboard via the async Clipboard API. Fire-and-forget:
+/// clipboard writes can reject (permission, insecure context) but the caller shows
+/// its own "copied" feedback optimistically; a failure just leaves the clipboard
+/// unchanged. Called from a user click, so the gesture requirement is satisfied.
+#[cfg(target_arch = "wasm32")]
+pub(crate) fn copy_to_clipboard(text: &str) {
+    let Some(clipboard) = window().map(|w| w.navigator().clipboard()) else {
+        return;
+    };
+    let _ = clipboard.write_text(text);
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+pub(crate) fn copy_to_clipboard(text: &str) {
+    // JSON-encode the text so quotes/newlines survive embedding in the script.
+    let payload = serde_json::to_string(text).unwrap_or_else(|_| "\"\"".to_owned());
+    let script = format!(
+        r#"
+            if (navigator.clipboard && navigator.clipboard.writeText) {{
+                navigator.clipboard.writeText({payload});
+            }}
+        "#,
+        payload = payload,
     );
     document::eval(&script);
 }

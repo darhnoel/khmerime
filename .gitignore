@@ -103,3 +103,6 @@ adapters/macos-imk/swift/**/*.xcuserstate
 # docs/handoff/ai-windows-linux-readiness.md.
 /adapters/windows-tsf/dist-ai/
 /adapters/linux-ibus/dist-ai/
+# Local evaluation-only linguistic packs. These may have redistribution terms
+# separate from the application source and must never enter the repository.
+apps/dioxus-app/local-data/*.kdict

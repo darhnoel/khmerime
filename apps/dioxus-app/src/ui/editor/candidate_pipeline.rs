@@ -487,7 +487,12 @@ pub(crate) async fn update_candidates(value: String, state: EditorSignals) {
 
     let bounds = Transliterator::token_bounds(&value, caret, false);
     let token = slice_chars(&value, bounds.clone());
-    if token.trim().is_empty() {
+    // A token with nothing transliterable — only punctuation like "!" — is not a
+    // roman token; the engine would just echo it back as a "(derived)" candidate.
+    // Treat it like whitespace (offer next-word candidates instead of a popup).
+    // Digits stay eligible (keycap/number sequences), so require any alphanumeric.
+    let has_transliterable = token.chars().any(|c| c.is_alphanumeric());
+    if token.trim().is_empty() || !has_transliterable {
         update_next_word_candidates(&value, request_id, state, caret).await;
         return;
     }

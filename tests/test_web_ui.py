@@ -548,6 +548,143 @@ def test_web_ui_add_pair_flick_save_and_normal_decode(web_server: str, page) -> 
 
 
 @pytest.mark.slow
+def test_web_ui_explicit_spell_review_replaces_joined_typo_and_clears_on_edit(web_server: str, page) -> None:
+    _goto_app(page, web_server)
+
+    editor = page.locator("[data-testid='editor-input']").last
+    expect(editor).to_be_visible(timeout=20_000)
+    expect(page.locator("[data-testid='engine-status']")).to_have_count(0, timeout=20_000)
+    tool_order = page.locator(".sidebar-section").last.locator(".sidebar-item").evaluate_all(
+        "items => items.map(item => item.dataset.testid)"
+    )
+    assert tool_order[:3] == ["check-spelling", "toggle-rules", "toggle-saved-mappings"]
+    editor.fill("សាលារាននៅក្បែរផ្ទះ")
+
+    page.locator("[data-testid='check-spelling']").last.click()
+    review_bar = page.locator("[data-testid='spell-review-bar']")
+    expect(review_bar).to_be_visible(timeout=20_000)
+    expect(review_bar).to_contain_text("ពិនិត្យអក្ខរាវិរុទ្ធ")
+    expect(review_bar).to_contain_text("1 / 1")
+    expect(review_bar).not_to_contain_text("Viterbi")
+    expect(review_bar).not_to_contain_text("khmer_segmenter")
+    segments = page.locator("[data-testid='spell-segment']")
+    expect(segments).to_have_count(5)
+    assert segments.evaluate_all("nodes => nodes.map(node => node.textContent)") == [
+        "សាលា",
+        "រាន",
+        "នៅ",
+        "ក្បែរ",
+        "ផ្ទះ",
+    ]
+    normal_segment = segments.nth(2)
+    assert normal_segment.evaluate("node => getComputedStyle(node).pointerEvents") == "auto"
+    resting_color = normal_segment.evaluate("node => getComputedStyle(node).color")
+    normal_segment.hover()
+    page.wait_for_timeout(150)
+    assert normal_segment.evaluate("node => getComputedStyle(node).color") != resting_color
+    _set_editor_caret(page, len("សាលារាននៅក្បែរផ្ទះ"))
+    normal_segment.click()
+    expect(normal_segment).not_to_have_class(re.compile("selected"))
+    assert _editor_caret(page) == len("សាលារាននៅក្បែរផ្ទះ")
+
+    issue = page.locator("[data-testid='spell-issue']").first
+    expect(issue).to_have_text(re.compile("សាលារាន"))
+    issue.click()
+    popover = page.locator("[data-testid='spell-popover']")
+    expect(popover).to_be_visible()
+    assert issue.evaluate("node => getComputedStyle(node).webkitTextFillColor") != "rgba(0, 0, 0, 0)"
+    review_bar.click(position={"x": 12, "y": 12})
+    expect(popover).to_have_count(0)
+    expect(page.locator("[data-testid='spell-issue']")).to_have_count(1)
+    expect(review_bar).to_contain_text("1 / 1")
+    issue.click()
+    expect(popover).to_be_visible()
+    expect(page.locator("[data-testid='spell-option']").first).to_contain_text("សាលារៀន")
+    accept = page.locator("[data-testid='spell-accept']")
+    assert accept.evaluate("node => getComputedStyle(node).webkitTextFillColor") == "rgb(255, 255, 255)"
+    assert accept.evaluate("node => getComputedStyle(node).backgroundColor") == "rgb(15, 93, 107)"
+    popover_box = popover.bounding_box()
+    card_box = page.locator(".editor-card").bounding_box()
+    assert popover_box is not None and card_box is not None
+    assert popover_box["x"] >= card_box["x"]
+    assert popover_box["x"] + popover_box["width"] <= card_box["x"] + card_box["width"]
+    editor.evaluate("(node, caret) => node.setSelectionRange(caret, caret)", len("សាលារាននៅក្បែរផ្ទះ"))
+    page.locator("[data-testid='spell-accept']").click()
+
+    expect(editor).to_have_value("សាលារៀននៅក្បែរផ្ទះ")
+    assert editor.evaluate("node => node.selectionStart") == len("សាលារៀននៅក្បែរផ្ទះ")
+    expect(page.locator("[data-testid='spell-issue']")).to_have_count(0)
+    expect(review_bar).to_have_count(0)
+
+    editor.fill("សាលារៀន")
+    page.locator("[data-testid='check-spelling']").last.click()
+    expect(review_bar).to_contain_text("រកមិនឃើញពាក្យដែលអាចកែបាន", timeout=20_000)
+    expect(review_bar).to_have_class(re.compile("is-clear"))
+    expect(review_bar).to_have_count(0, timeout=4_000)
+
+    editor.fill("សាលារៀណ")
+    page.locator("[data-testid='check-spelling']").last.click()
+    expect(review_bar).to_contain_text("1 / 1", timeout=20_000)
+    issue = page.locator("[data-testid='spell-issue']").first
+    expect(issue).to_have_text(re.compile("សាលារៀណ"))
+    issue.click()
+    expect(page.locator("[data-testid='spell-option']").first).to_contain_text("សាលារៀន")
+    page.locator("[data-testid='spell-accept']").click()
+    expect(editor).to_have_value("សាលារៀន")
+
+    editor.fill("តែនៅខ្វះពត៍មាន និង ការបង្ហាត់ ណែនាំ ប្រកបដោយវិជ្ជាជីវះ។ នេះក៏ជា កម្លាំងចិត្ត ក្នុងការបន្តការងារនេះ តទៅមុខ?")
+    page.locator("[data-testid='check-spelling']").last.click()
+    information_issue = page.locator("[data-testid='spell-issue']").filter(has_text="ពត៍មាន")
+    expect(information_issue).to_have_count(1, timeout=20_000)
+    information_issue.click()
+    expect(page.locator("[data-testid='spell-option']").first).to_contain_text("ព័ត៌មាន")
+
+    editor.fill("សាលារាននៅក្បែរផ្ទះ")
+    expect(review_bar).to_have_count(0)
+
+
+@pytest.mark.slow
+def test_web_ui_spell_popover_stays_inside_document_at_right_edge(web_server: str, page) -> None:
+    page.add_init_script("window.__khmerImeSpellPopoverPlacementInstalled = true")
+    _goto_app(page, web_server)
+    page.add_style_tag(
+        content="""
+        .editor, .spell-overlay {
+          font-family: monospace !important;
+          font-size: 24px !important;
+        }
+        """
+    )
+
+    editor = page.locator("[data-testid='editor-input']").last
+    editor.fill(f"សាលារៀណ {'W' * 32} សាលារៀណ")
+    page.locator("[data-testid='check-spelling']").last.click()
+    issues = page.locator("[data-testid='spell-issue']")
+    expect(issues).to_have_count(2, timeout=20_000)
+    edge_issue = issues.last
+
+    issue_box = edge_issue.bounding_box()
+    card_box = page.locator(".editor-card").bounding_box()
+    assert issue_box is not None and card_box is not None
+    assert issue_box["x"] + 240 > card_box["x"] + card_box["width"] - 12
+
+    issues.first.click()
+    page.locator("button[aria-label='មើលកន្លែងបន្ទាប់']").click()
+    expect(edge_issue).to_have_class(re.compile("active"))
+    popover = page.locator("[data-testid='spell-popover']")
+    expect(popover).to_be_visible()
+    page.wait_for_function(
+        """() => document.querySelector('[data-testid="spell-popover"]')
+          ?.style.getPropertyValue('--spell-shift-x') !== ''""",
+        timeout=3_000,
+    )
+    popover_box = popover.bounding_box()
+    assert popover_box is not None
+    assert popover_box["x"] >= card_box["x"] + 12
+    assert popover_box["x"] + popover_box["width"] <= card_box["x"] + card_box["width"] - 12
+
+
+@pytest.mark.slow
 def test_web_ui_flick_keyboard_treats_composed_key_as_one_backspace_unit(web_server: str, page) -> None:
     _goto_app(page, web_server)
 

@@ -5,7 +5,16 @@ ADDR="${ADDR:-0.0.0.0}"
 PORT="${PORT:-4173}"
 FEATURES="${DX_FEATURES:-}"
 VERBOSE="${DX_VERBOSE:-}"
-DIOXUS_CLI="${DIOXUS_CLI:-dx}"
+if [[ -n "${DIOXUS_CLI:-}" ]]; then
+  DIOXUS_CLI="$DIOXUS_CLI"
+else
+  CARGO_BIN_DIR="$(dirname "$(command -v cargo)")"
+  if [[ -x "$CARGO_BIN_DIR/dx" ]] && "$CARGO_BIN_DIR/dx" --version 2>/dev/null | grep -q '^dioxus '; then
+    DIOXUS_CLI="$CARGO_BIN_DIR/dx"
+  else
+    DIOXUS_CLI="dx"
+  fi
+fi
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 APP_DIR="$ROOT_DIR/apps/dioxus-app"

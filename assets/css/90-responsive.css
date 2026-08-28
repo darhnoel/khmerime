@@ -64,6 +64,14 @@ html::-webkit-scrollbar, body::-webkit-scrollbar { display: none; }
     padding: 30px 22px 34px;
     line-height: 1.8;
   }
+  .editor-spell-reviewed { padding-top: 96px; }
+  .spell-overlay { min-height: calc(100dvh - 210px); padding: 30px 22px 34px; }
+  .spell-overlay.editor-spell-reviewed { padding-top: 96px; }
+  .spell-review-bar { top: 12px; left: 14px; right: 14px; min-height: 46px; }
+  .spell-review-summary { min-width: 0; }
+  .spell-review-summary span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .spell-review-position { display: none; }
+  .spell-popover { left: -12px; }
   .add-pair-modal { inset: 8px; width: auto; max-height: calc(100dvh - 16px); transform: none; padding: 14px; }
   .add-pair-fields { grid-template-columns: 1fr; }
   .saved-words-head { min-height: 60px; padding: 10px 14px; }

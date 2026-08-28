@@ -3,7 +3,10 @@ use crate::ui::editor::{
     move_segment_focus, popup_style, select_segment_candidate, shortcut_index, shortcut_label, should_exit_number_pick,
     update_candidates, visible_page_start, CandidateLevel, CandidateMode, EditorSignals,
 };
-use crate::ui::platform::move_editor_caret;
+use crate::ui::platform::{copy_to_clipboard, move_editor_caret, schedule_spell_popover_placement};
+use crate::ui::spellcheck::{
+    ContextDetectorStatus, SpellIssue, SpellIssueKind, SpellReview, SpellSegment,
+};
 use crate::ui::storage::{save_editor_text, save_enabled};
 use crate::{EDITOR_ID, VISIBLE_SUGGESTIONS};
 use dioxus::html::Modifiers;
@@ -28,6 +31,315 @@ mod tests {
 fn roman_hint_label(variants: &[String]) -> String {
     // Show all variants if there are 3 or fewer, otherwise show the first 3 followed by ellipsis.
     format!("{}", variants.join(" / "))
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+enum SpellPiece {
+    Plain(String),
+    Issue { index: usize, text: String },
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+enum SegmentPiece {
+    Plain(String),
+    Segment { index: usize, text: String },
+}
+
+fn spell_pieces(text: &str, issues: &[SpellIssue]) -> Vec<SpellPiece> {
+    let mut pieces = Vec::new();
+    let mut cursor = 0;
+    for (index, issue) in issues.iter().enumerate() {
+        if issue.start > cursor {
+            pieces.push(SpellPiece::Plain(
+                text.chars().skip(cursor).take(issue.start - cursor).collect(),
+            ));
+        }
+        pieces.push(SpellPiece::Issue {
+            index,
+            text: text
+                .chars()
+                .skip(issue.start)
+                .take(issue.end.saturating_sub(issue.start))
+                .collect(),
+        });
+        cursor = issue.end;
+    }
+    if cursor < text.chars().count() {
+        pieces.push(SpellPiece::Plain(text.chars().skip(cursor).collect()));
+    }
+    pieces
+}
+
+fn segment_pieces(text: &str, segments: &[SpellSegment]) -> Vec<SegmentPiece> {
+    let mut pieces = Vec::new();
+    let mut cursor = 0;
+    for (index, segment) in segments.iter().enumerate() {
+        if segment.start > cursor {
+            pieces.push(SegmentPiece::Plain(
+                text.chars().skip(cursor).take(segment.start - cursor).collect(),
+            ));
+        }
+        pieces.push(SegmentPiece::Segment {
+            index,
+            text: text
+                .chars()
+                .skip(segment.start)
+                .take(segment.end.saturating_sub(segment.start))
+                .collect(),
+        });
+        cursor = segment.end;
+    }
+    if cursor < text.chars().count() {
+        pieces.push(SegmentPiece::Plain(text.chars().skip(cursor).collect()));
+    }
+    pieces
+}
+
+fn install_spell_popover_placement() {
+    let _ = dioxus::document::eval(
+        r#"
+        (() => {
+            if (window.__khmerImeSpellPopoverPlacementVersion === 2) return;
+            window.__khmerImeSpellPopoverPlacementVersion = 2;
+            window.__khmerImeSpellPopoverPlacementInstalled = true;
+
+            const position = (popover) => {
+                requestAnimationFrame(() => {
+                    if (!popover.isConnected) return;
+                    const target = popover.closest('[data-testid="spell-issue"]');
+                    const card = target?.closest('.editor-card');
+                    if (!target || !card) return;
+
+                    popover.classList.remove('above');
+                    popover.style.setProperty('--spell-shift-x', '0px');
+                    const cardRect = card.getBoundingClientRect();
+                    const popoverRect = popover.getBoundingClientRect();
+                    const safeLeft = Math.max(cardRect.left + 12, 12);
+                    const safeRight = Math.min(cardRect.right - 12, window.innerWidth - 12);
+                    let shiftX = 0;
+                    if (popoverRect.right > safeRight) shiftX -= popoverRect.right - safeRight;
+                    if (popoverRect.left + shiftX < safeLeft) {
+                        shiftX += safeLeft - (popoverRect.left + shiftX);
+                    }
+                    popover.style.setProperty('--spell-shift-x', shiftX + 'px');
+
+                    const targetRect = target.getBoundingClientRect();
+                    const shiftedRect = popover.getBoundingClientRect();
+                    const safeTop = Math.max(cardRect.top + 12, 12);
+                    const safeBottom = Math.min(cardRect.bottom - 12, window.innerHeight - 12);
+                    if (
+                        shiftedRect.bottom > safeBottom
+                        && targetRect.top - shiftedRect.height - 14 >= safeTop
+                    ) {
+                        popover.classList.add('above');
+                    }
+                });
+            };
+            window.__khmerImePositionSpellPopover = () => {
+                document.querySelectorAll('[data-testid="spell-popover"]').forEach(position);
+            };
+
+            const positionWithin = (node) => {
+                if (!(node instanceof Element)) return;
+                if (node.matches('[data-testid="spell-popover"]')) position(node);
+                node.querySelectorAll?.('[data-testid="spell-popover"]').forEach(position);
+            };
+
+            new MutationObserver((records) => {
+                records.forEach((record) => record.addedNodes.forEach(positionWithin));
+            }).observe(document.body, { childList: true, subtree: true });
+
+            window.addEventListener('resize', () => {
+                document.querySelectorAll('[data-testid="spell-popover"]').forEach(position);
+            }, { passive: true });
+            document.querySelectorAll('[data-testid="spell-popover"]').forEach(position);
+        })();
+        "#,
+    );
+}
+
+#[component]
+fn SpellIssueSpan(
+    index: usize,
+    text: String,
+    suggestions: Vec<String>,
+    kind: SpellIssueKind,
+    confidence_millis: Option<u16>,
+    active: bool,
+    open: bool,
+    choice_index: usize,
+    state: EditorSignals,
+) -> Element {
+    let chosen = suggestions.get(choice_index).cloned().unwrap_or_default();
+    let class = match (kind, active) {
+        (SpellIssueKind::Warning, true) => "spell-match warning active",
+        (SpellIssueKind::Warning, false) => "spell-match warning",
+        (SpellIssueKind::Error, true) => "spell-match active",
+        (SpellIssueKind::Error, false) => "spell-match",
+    };
+    rsx! {
+        span {
+            id: "spell-issue-{index}",
+            "data-testid": "spell-issue",
+            class,
+            "data-spell-kind": if kind == SpellIssueKind::Warning { "warning" } else { "error" },
+            onclick: move |event| {
+                event.stop_propagation();
+                let mut review = state.spell_review();
+                review.select(index, true);
+                state.spell_review.set(review);
+                schedule_spell_popover_placement();
+            },
+            "{text}"
+            if open {
+                span {
+                    class: "spell-popover",
+                    "data-testid": "spell-popover",
+                    onclick: move |event| event.stop_propagation(),
+                    if kind == SpellIssueKind::Warning {
+                        span { class: "spell-popover-label", "ត្រូវការពិនិត្យ" }
+                        span { class: "spell-warning-detail",
+                            "ពាក្យនេះមិនមានក្នុងវចនានុក្រម (ប្រហែលជាឈ្មោះ ឬពាក្យថ្មី)"
+                        }
+                        if let Some(confidence) = confidence_millis {
+                            span { class: "spell-confidence", "ទំនុកចិត្ត {confidence as f32 / 10.0:.1}%" }
+                        }
+                    } else {
+                        span { class: "spell-popover-label", "ប្រហែលជា" }
+                        span { class: "spell-primary",
+                            span {
+                                class: "spell-primary-word",
+                                "data-testid": "spell-option",
+                                "{chosen}"
+                            }
+                            button {
+                                class: "spell-accept",
+                                "data-testid": "spell-accept",
+                                disabled: chosen.is_empty(),
+                                onclick: move |event| {
+                                    event.stop_propagation();
+                                    let replacement = chosen.clone();
+                                    spawn(async move {
+                                        let current_text = state.text();
+                                        let mut review = state.spell_review();
+                                        if let Some((next_text, replacement_end)) =
+                                            review.accept(index, &replacement, &current_text)
+                                        {
+                                            save_editor_text(&next_text);
+                                            state.text.set(next_text);
+                                            if review.issues.is_empty() {
+                                                state.clear_spell_review();
+                                            } else {
+                                                state.spell_review.set(review);
+                                            }
+                                            // Land the caret right after the corrected word, WITHOUT
+                                            // focusing/scrolling — the user is in the review popover
+                                            // flow, so stealing focus makes the view jump. Via a
+                                            // pending signal so it runs AFTER the value re-renders
+                                            // (a synchronous set would be reset by the re-render).
+                                            state.pending_caret_no_focus.set(Some(replacement_end));
+                                            state.clear_candidate_state_and_picker();
+                                        }
+                                    });
+                                },
+                                "ប្ដូរ"
+                            }
+                        }
+                    }
+                    if kind == SpellIssueKind::Error && suggestions.len() > 1 {
+                        span { class: "spell-alternatives-label", "ផ្សេងទៀត" }
+                        span { class: "spell-alternatives",
+                            for (suggestion_index, suggestion) in suggestions.iter().enumerate() {
+                                if suggestion_index != choice_index {
+                                    button {
+                                        key: "spell-option-{suggestion_index}-{suggestion}",
+                                        class: "spell-alternative",
+                                        "data-testid": "spell-option",
+                                        onclick: move |event| {
+                                            event.stop_propagation();
+                                            let mut review = state.spell_review();
+                                            review.choose_suggestion(suggestion_index);
+                                            state.spell_review.set(review);
+                                        },
+                                        "{suggestion}"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    button {
+                        class: "spell-ignore",
+                        "data-testid": "spell-ignore",
+                        onclick: move |event| {
+                            event.stop_propagation();
+                            let mut review = state.spell_review();
+                            review.ignore(index);
+                            if review.issues.is_empty() {
+                                state.clear_spell_review();
+                            } else {
+                                state.spell_review.set(review);
+                            }
+                        },
+                        "មិនអើពើ"
+                    }
+                }
+            }
+        }
+    }
+}
+
+#[component]
+fn SpellOverlay(text: String, review: SpellReview, font_size: usize, state: EditorSignals) -> Element {
+    let issue_pieces = spell_pieces(&text, &review.issues);
+    let segmentation_pieces = segment_pieces(&text, &review.segments);
+    rsx! {
+        div {
+            class: "spell-overlay spell-segmentation-overlay editor-spell-reviewed",
+            "data-testid": "spell-segmentation-overlay",
+            aria_hidden: "true",
+            style: "font-size: {font_size}px;",
+            for piece in segmentation_pieces {
+                match piece {
+                    SegmentPiece::Plain(text) => rsx! { span { "{text}" } },
+                    SegmentPiece::Segment { index, text } => rsx! {
+                        span {
+                            class: "spell-segment",
+                            "data-testid": "spell-segment",
+                            "data-segment-index": "{index}",
+                            "{text}"
+                        }
+                    },
+                }
+            }
+        }
+        div {
+            class: "spell-overlay spell-issue-overlay editor-spell-reviewed",
+            "data-testid": "spell-overlay",
+            aria_hidden: "true",
+            style: "font-size: {font_size}px;",
+            for piece in issue_pieces {
+                match piece {
+                    SpellPiece::Plain(text) => rsx! { span { class: "spell-issue-plain", "{text}" } },
+                    SpellPiece::Issue { index, text } => {
+                        let issue = &review.issues[index];
+                        rsx! {
+                            SpellIssueSpan {
+                                index,
+                                text,
+                                suggestions: issue.suggestions.clone(),
+                                kind: issue.kind,
+                                confidence_millis: issue.confidence_millis,
+                                active: review.active_index == index,
+                                open: review.open_index == Some(index),
+                                choice_index: review.choice_index,
+                                state,
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
 }
 
 fn cycle_live_candidate(delta: isize, mut state: EditorSignals) -> bool {
@@ -128,6 +440,7 @@ fn apply_shortcut_selection(
 
 #[component]
 pub(crate) fn EditorCard(state: EditorSignals, font_size: Signal<usize>) -> Element {
+    use_effect(install_spell_popover_placement);
     let text_value = state.text();
     let suggestions = state.suggestions();
     let suggestion_total = suggestions.len();
@@ -153,27 +466,113 @@ pub(crate) fn EditorCard(state: EditorSignals, font_size: Signal<usize>) -> Elem
     let is_next_word = state.candidate_mode() == CandidateMode::NextWord;
     let show_candidate_list = has_suggestions && !is_next_word;
     let next_word_predictions = if is_next_word { suggestions.clone() } else { Vec::new() };
+    let spell_review = state.spell_review();
+    let spell_results_visible = spell_review.result_bar_visible();
+    let spell_has_issues = !spell_review.issues.is_empty();
+    // Floating copy-text button: shown only when the document has text; flips to a
+    // "copied" confirmation for a moment after a click.
+    let mut copied = use_signal(|| false);
+    let has_text = !text_value.trim().is_empty();
+    let editor_class = [
+        "editor",
+        state
+            .composition()
+            .is_some()
+            .then_some("editor-composing")
+            .unwrap_or(""),
+        spell_results_visible.then_some("editor-spell-reviewed").unwrap_or(""),
+        spell_has_issues.then_some("editor-spell-active").unwrap_or(""),
+    ]
+    .join(" ");
     rsx! {
         div { class: "editor-card",
             div { class: "editor-wrap",
+                if spell_results_visible {
+                    div {
+                        class: if spell_has_issues { "spell-review-bar has-issues" } else { "spell-review-bar is-clear" },
+                        "data-testid": "spell-review-bar",
+                        role: "status",
+                        div { class: "spell-review-summary",
+                            span {
+                                class: "spell-review-icon",
+                                aria_hidden: "true",
+                                "✓"
+                            }
+                            if spell_has_issues {
+                                span { "ពិនិត្យអក្ខរាវិរុទ្ធ" }
+                            } else {
+                                span { "រកមិនឃើញពាក្យដែលអាចកែបាន" }
+                            }
+                            span {
+                                class: if spell_review.detector_status == ContextDetectorStatus::Connected {
+                                    "detector-status connected"
+                                } else {
+                                    "detector-status unavailable"
+                                },
+                                "data-testid": "detector-status",
+                                if spell_review.detector_status == ContextDetectorStatus::Connected {
+                                    "ម៉ូដែលបរិបទបានភ្ជាប់"
+                                } else {
+                                    "ម៉ូដែលបរិបទមិនបានភ្ជាប់"
+                                }
+                            }
+                        }
+                        div { class: "spell-review-controls",
+                            if spell_has_issues {
+                                span { class: "spell-review-position", "{spell_review.active_index + 1} / {spell_review.issues.len()}" }
+                                button {
+                                    aria_label: "មើលកន្លែងមុន",
+                                    disabled: spell_review.issues.len() < 2,
+                                    onclick: move |_| {
+                                        let mut review = state.spell_review();
+                                        review.move_selection(-1);
+                                        state.spell_review.set(review);
+                                        schedule_spell_popover_placement();
+                                    },
+                                    "‹"
+                                }
+                                button {
+                                    aria_label: "មើលកន្លែងបន្ទាប់",
+                                    disabled: spell_review.issues.len() < 2,
+                                    onclick: move |_| {
+                                        let mut review = state.spell_review();
+                                        review.move_selection(1);
+                                        state.spell_review.set(review);
+                                        schedule_spell_popover_placement();
+                                    },
+                                    "›"
+                                }
+                            }
+                            button {
+                                aria_label: "បិទលទ្ធផលពិនិត្យ",
+                                onclick: move |_| state.clear_spell_review(),
+                                "×"
+                            }
+                        }
+                    }
+                }
                 textarea {
                     id: EDITOR_ID,
                     "data-testid": "editor-input",
-                    class: if state.composition().is_some() {
-                        "editor editor-composing"
-                    } else {
-                        "editor"
-                    },
+                    class: "{editor_class}",
                     style: "font-size: {font_size()}px;",
                     value: "{text_value}",
                     placeholder: "ចាប់ផ្ដើមសរសេរនៅទីនេះ…",
                     spellcheck: "false",
                     autocomplete: "off",
                     autocorrect: "off",
+                    onpointerdown: move |_| {
+                        let mut review = state.spell_review();
+                        if review.open_index.is_some() {
+                            review.dismiss_interaction();
+                            state.spell_review.set(review);
+                        }
+                    },
                     oninput: move |event| {
                         let value = event.value();
                         save_editor_text(&value);
                         state.text.set(value.clone());
+                        state.clear_spell_review();
                         // Start fresh after text changes so the next ArrowDown selects the first
                         // candidate for the current token instead of continuing stale selection.
                         state.number_pick_mode.set(false);
@@ -384,6 +783,39 @@ pub(crate) fn EditorCard(state: EditorSignals, font_size: Signal<usize>) -> Elem
                             _ => {}
                         }
                     },
+                }
+                if has_text {
+                    button {
+                        class: if copied() { "editor-copy-button is-copied" } else { "editor-copy-button" },
+                        "data-testid": "copy-text",
+                        r#type: "button",
+                        title: "ចម្លងអត្ថបទ",
+                        aria_label: "ចម្លងអត្ថបទ",
+                        onclick: move |event| {
+                            event.stop_propagation();
+                            copy_to_clipboard(&state.text());
+                            copied.set(true);
+                            spawn(async move {
+                                copied_reset_delay().await;
+                                copied.set(false);
+                            });
+                        },
+                        if copied() {
+                            span { class: "editor-copy-icon", aria_hidden: "true", "✓" }
+                            span { class: "editor-copy-label", "បានចម្លង" }
+                        } else {
+                            span { class: "editor-copy-icon", aria_hidden: "true", "⧉" }
+                            span { class: "editor-copy-label", "ចម្លង" }
+                        }
+                    }
+                }
+                if spell_has_issues {
+                    SpellOverlay {
+                        text: text_value.clone(),
+                        review: spell_review.clone(),
+                        font_size: font_size(),
+                        state,
+                    }
                 }
                 // Caret popup: transliteration candidates only. Next-word
                 // predictions render in the docked bar below (not here).
@@ -680,4 +1112,15 @@ pub(crate) fn EditorCard(state: EditorSignals, font_size: Signal<usize>) -> Elem
             }
         }
     }
+}
+
+/// How long the copy button shows its "បានចម្លង" confirmation before reverting.
+#[cfg(target_arch = "wasm32")]
+async fn copied_reset_delay() {
+    gloo_timers::future::TimeoutFuture::new(1_500).await;
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+async fn copied_reset_delay() {
+    tokio::time::sleep(std::time::Duration::from_millis(1_500)).await;
 }
