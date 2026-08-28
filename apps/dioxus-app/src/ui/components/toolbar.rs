@@ -1,10 +1,11 @@
 use dioxus::prelude::*;
 
-use crate::ui::components::SavedWordsPage;
+use crate::ui::components::{PersonalWordsPage, SavedWordsPage};
 use crate::ui::editor::{update_candidates, EditorSignals};
 use crate::ui::spellcheck::{
     check_text, check_via_api, mark_detector_unavailable,
-    wait_for_clear_confirmation, yield_before_check, SpellReview, SpellReviewStatus,
+    wait_for_clear_confirmation, yield_before_check, ContextDetectorStatus, SpellReview,
+    SpellReviewStatus,
 };
 use crate::ui::storage::{save_enabled, save_font_size, save_sidebar_open, Palette, Theme};
 use crate::{engine, EngineReadiness, MAX_FONT_SIZE, MIN_FONT_SIZE};
@@ -60,6 +61,7 @@ pub(crate) fn AppToolbar(
     sidebar_open: Signal<bool>,
 ) -> Element {
     let mut show_saved_dictionary = use_signal(|| false);
+    let mut show_personal_words = use_signal(|| false);
     let mut show_settings = use_signal(|| false);
     let mut saved_entries = state
         .user_dictionary()
@@ -70,6 +72,8 @@ pub(crate) fn AppToolbar(
     let spell_review = state.spell_review();
     let spell_checking = spell_review.status == SpellReviewStatus::Checking;
     let spell_issue_count = spell_review.issues.len();
+    let mut ignored_words = state.spell_ignore().into_iter().collect::<Vec<_>>();
+    ignored_words.sort();
 
     rsx! {
         header { class: "topbar",
@@ -163,6 +167,12 @@ pub(crate) fn AppToolbar(
                                     }
                                 };
                                 if state.text() == snapshot {
+                                    // Drop any issue whose word is on the session Ignore List.
+                                    let mut result = result;
+                                    let ignored = state.spell_ignore();
+                                    if !ignored.is_empty() {
+                                        result.issues.retain(|issue| !ignored.contains(&issue.source));
+                                    }
                                     let is_clear = result.issues.is_empty();
                                     state.spell_review.set(SpellReview::complete(result));
                                     if is_clear {
@@ -182,15 +192,29 @@ pub(crate) fn AppToolbar(
                         span {
                             if spell_checking { "កំពុងពិនិត្យ…" } else { "ពិនិត្យអក្ខរាវិរុទ្ធ" }
                         }
+                        // Small dot next to the label: the context model is connected
+                        // (replaces the old floating "ម៉ូដែលបរិបទបានភ្ជាប់" status bar).
+                        if spell_review.detector_status == ContextDetectorStatus::Connected {
+                            span {
+                                class: "spell-model-dot",
+                                title: "ម៉ូដែលបរិបទបានភ្ជាប់",
+                                aria_label: "ម៉ូដែលបរិបទបានភ្ជាប់",
+                            }
+                        }
                         if spell_issue_count > 0 {
                             span { class: "sidebar-count", "{spell_issue_count}" }
                         }
                     }
+                    // Personal words page (the session Ignore List): opens the
+                    // ពាក្យផ្ទាល់ខ្លួន page listing dismissed words, each un-ignorable.
                     button {
-                        class: if show_guide() { "sidebar-item active" } else { "sidebar-item" },
-                        "data-testid": "toggle-rules", aria_pressed: "{show_guide()}",
-                        onclick: move |_| show_guide.set(!show_guide()),
-                        Icon { name: "book" } span { "ក្បួន និងផ្លូវកាត់" }
+                        class: if show_personal_words() { "sidebar-item active" } else { "sidebar-item" },
+                        "data-testid": "toggle-personal-words",
+                        aria_pressed: "{show_personal_words()}",
+                        onclick: move |_| show_personal_words.set(true),
+                        Icon { name: "bookmark" } span { "ពាក្យផ្ទាល់ខ្លួន" }
+                        span { class: "sidebar-count", "{ignored_words.len()}" }
+                        span { class: "sidebar-chevron", aria_hidden: "true", "›" }
                     }
                     button {
                         class: if show_saved_dictionary() { "sidebar-item active" } else { "sidebar-item" },
@@ -199,6 +223,12 @@ pub(crate) fn AppToolbar(
                         Icon { name: "bookmark" } span { "ពាក្យរក្សាទុក" }
                         span { class: "sidebar-count", "{saved_entries.len()}" }
                         span { class: "sidebar-chevron", aria_hidden: "true", "›" }
+                    }
+                    button {
+                        class: if show_guide() { "sidebar-item active" } else { "sidebar-item" },
+                        "data-testid": "toggle-rules", aria_pressed: "{show_guide()}",
+                        onclick: move |_| show_guide.set(!show_guide()),
+                        Icon { name: "book" } span { "ក្បួននិងផ្លូវកាត់" }
                     }
                 }
             }
@@ -210,6 +240,9 @@ pub(crate) fn AppToolbar(
 
         if show_saved_dictionary() {
             SavedWordsPage { state, open: show_saved_dictionary }
+        }
+        if show_personal_words() {
+            PersonalWordsPage { state, open: show_personal_words }
         }
 
         if show_settings() {

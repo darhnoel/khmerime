@@ -160,6 +160,7 @@ fn App() -> Element {
     let history = use_signal(load_history);
     let user_dictionary = use_signal(load_user_dictionary);
     let spell_review = use_signal(SpellReview::default);
+    let spell_ignore = use_signal(std::collections::HashSet::<String>::new);
     let editor_state = EditorSignals {
         text,
         roman_enabled,
@@ -190,6 +191,7 @@ fn App() -> Element {
         history,
         user_dictionary,
         spell_review,
+        spell_ignore,
     };
 
     use_effect(move || {

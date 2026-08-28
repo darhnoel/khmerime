@@ -199,7 +199,13 @@ fn SpellIssueSpan(
                     if kind == SpellIssueKind::Warning {
                         span { class: "spell-popover-label", "ត្រូវការពិនិត្យ" }
                         span { class: "spell-warning-detail",
-                            "ពាក្យនេះមិនមានក្នុងវចនានុក្រម (ប្រហែលជាឈ្មោះ ឬពាក្យថ្មី)"
+                            // A subscript ្ត or ្ដ in an otherwise-unknown word is very
+                            // often the jeung-tor/jeung-dor confusion — hint at that.
+                            if text.contains("្ត") || text.contains("្ដ") {
+                                "ប្រហែលច្រឡំជើងតជាមួយជើងដ"
+                            } else {
+                                "ពាក្យនេះមិនមានក្នុងវចនានុក្រម (ប្រហែលជាឈ្មោះ ឬពាក្យថ្មី)"
+                            }
                         }
                         if let Some(confidence) = confidence_millis {
                             span { class: "spell-confidence", "ទំនុកចិត្ត {confidence as f32 / 10.0:.1}%" }
@@ -272,8 +278,18 @@ fn SpellIssueSpan(
                         "data-testid": "spell-ignore",
                         onclick: move |event| {
                             event.stop_propagation();
+                            // Ignore by the issue's SOURCE word (what the checker
+                            // flagged), not the rendered slice — the two can differ
+                            // (e.g. a ZWSP in the document), and suppression matches
+                            // on source. Dismiss every instance of it at once.
+                            let review_now = state.spell_review();
+                            let Some(word) = review_now.issues.get(index).map(|i| i.source.clone())
+                            else { return; };
+                            let mut ignore = state.spell_ignore();
+                            ignore.insert(word.clone());
+                            state.spell_ignore.set(ignore);
                             let mut review = state.spell_review();
-                            review.ignore(index);
+                            review.ignore_word(&word);
                             if review.issues.is_empty() {
                                 state.clear_spell_review();
                             } else {
@@ -472,6 +488,9 @@ pub(crate) fn EditorCard(state: EditorSignals, font_size: Signal<usize>) -> Elem
     // Floating copy-text button: shown only when the document has text; flips to a
     // "copied" confirmation for a moment after a click.
     let mut copied = use_signal(|| false);
+    // Clear button: two-tap confirm — first tap arms it ("បាទ?"), second clears the
+    // document. Reverts after a moment if not confirmed, so a mis-tap loses nothing.
+    let mut clear_armed = use_signal(|| false);
     let has_text = !text_value.trim().is_empty();
     let editor_class = [
         "editor",
@@ -487,70 +506,6 @@ pub(crate) fn EditorCard(state: EditorSignals, font_size: Signal<usize>) -> Elem
     rsx! {
         div { class: "editor-card",
             div { class: "editor-wrap",
-                if spell_results_visible {
-                    div {
-                        class: if spell_has_issues { "spell-review-bar has-issues" } else { "spell-review-bar is-clear" },
-                        "data-testid": "spell-review-bar",
-                        role: "status",
-                        div { class: "spell-review-summary",
-                            span {
-                                class: "spell-review-icon",
-                                aria_hidden: "true",
-                                "✓"
-                            }
-                            if spell_has_issues {
-                                span { "ពិនិត្យអក្ខរាវិរុទ្ធ" }
-                            } else {
-                                span { "រកមិនឃើញពាក្យដែលអាចកែបាន" }
-                            }
-                            span {
-                                class: if spell_review.detector_status == ContextDetectorStatus::Connected {
-                                    "detector-status connected"
-                                } else {
-                                    "detector-status unavailable"
-                                },
-                                "data-testid": "detector-status",
-                                if spell_review.detector_status == ContextDetectorStatus::Connected {
-                                    "ម៉ូដែលបរិបទបានភ្ជាប់"
-                                } else {
-                                    "ម៉ូដែលបរិបទមិនបានភ្ជាប់"
-                                }
-                            }
-                        }
-                        div { class: "spell-review-controls",
-                            if spell_has_issues {
-                                span { class: "spell-review-position", "{spell_review.active_index + 1} / {spell_review.issues.len()}" }
-                                button {
-                                    aria_label: "មើលកន្លែងមុន",
-                                    disabled: spell_review.issues.len() < 2,
-                                    onclick: move |_| {
-                                        let mut review = state.spell_review();
-                                        review.move_selection(-1);
-                                        state.spell_review.set(review);
-                                        schedule_spell_popover_placement();
-                                    },
-                                    "‹"
-                                }
-                                button {
-                                    aria_label: "មើលកន្លែងបន្ទាប់",
-                                    disabled: spell_review.issues.len() < 2,
-                                    onclick: move |_| {
-                                        let mut review = state.spell_review();
-                                        review.move_selection(1);
-                                        state.spell_review.set(review);
-                                        schedule_spell_popover_placement();
-                                    },
-                                    "›"
-                                }
-                            }
-                            button {
-                                aria_label: "បិទលទ្ធផលពិនិត្យ",
-                                onclick: move |_| state.clear_spell_review(),
-                                "×"
-                            }
-                        }
-                    }
-                }
                 textarea {
                     id: EDITOR_ID,
                     "data-testid": "editor-input",
@@ -597,6 +552,19 @@ pub(crate) fn EditorCard(state: EditorSignals, font_size: Signal<usize>) -> Elem
                             } else {
                                 spawn(update_candidates(state.text(), state));
                             }
+                            return;
+                        }
+
+                        // Spell-review navigation: while a review with issues is
+                        // active, ←/→ jump between flagged words (the popover
+                        // follows). Editing/clearing the text ends the review, so
+                        // arrows return to their normal caret/candidate role.
+                        if spell_has_issues && (key == "ArrowLeft" || key == "ArrowRight") {
+                            event.prevent_default();
+                            let mut review = state.spell_review();
+                            review.move_selection(if key == "ArrowLeft" { -1 } else { 1 });
+                            state.spell_review.set(review);
+                            schedule_spell_popover_placement();
                             return;
                         }
 
@@ -785,6 +753,39 @@ pub(crate) fn EditorCard(state: EditorSignals, font_size: Signal<usize>) -> Elem
                     },
                 }
                 if has_text {
+                    div { class: "editor-actions",
+                    button {
+                        class: if clear_armed() { "editor-clear-button is-armed" } else { "editor-clear-button" },
+                        "data-testid": "clear-text",
+                        r#type: "button",
+                        title: "លុបអត្ថបទទាំងអស់",
+                        aria_label: "លុបអត្ថបទទាំងអស់",
+                        onclick: move |event| {
+                            event.stop_propagation();
+                            if clear_armed() {
+                                // second tap: clear the document
+                                save_editor_text("");
+                                state.text.set(String::new());
+                                state.clear_spell_review();
+                                state.clear_candidate_state_and_picker();
+                                clear_armed.set(false);
+                            } else {
+                                // first tap: arm, auto-disarm if not confirmed
+                                clear_armed.set(true);
+                                spawn(async move {
+                                    clear_confirm_delay().await;
+                                    clear_armed.set(false);
+                                });
+                            }
+                        },
+                        if clear_armed() {
+                            span { class: "editor-clear-icon", aria_hidden: "true", "✕" }
+                            span { class: "editor-clear-label", "យល់ព្រម?" }
+                        } else {
+                            span { class: "editor-clear-icon", aria_hidden: "true", "✕" }
+                            span { class: "editor-clear-label", "លុប" }
+                        }
+                    }
                     button {
                         class: if copied() { "editor-copy-button is-copied" } else { "editor-copy-button" },
                         "data-testid": "copy-text",
@@ -793,11 +794,13 @@ pub(crate) fn EditorCard(state: EditorSignals, font_size: Signal<usize>) -> Elem
                         aria_label: "ចម្លងអត្ថបទ",
                         onclick: move |event| {
                             event.stop_propagation();
-                            copy_to_clipboard(&state.text());
-                            copied.set(true);
+                            let text = state.text();
                             spawn(async move {
-                                copied_reset_delay().await;
-                                copied.set(false);
+                                if copy_to_clipboard(&text).await {
+                                    copied.set(true);
+                                    copied_reset_delay().await;
+                                    copied.set(false);
+                                }
                             });
                         },
                         if copied() {
@@ -808,6 +811,7 @@ pub(crate) fn EditorCard(state: EditorSignals, font_size: Signal<usize>) -> Elem
                             span { class: "editor-copy-label", "ចម្លង" }
                         }
                     }
+                    }
                 }
                 if spell_has_issues {
                     SpellOverlay {
@@ -815,6 +819,14 @@ pub(crate) fn EditorCard(state: EditorSignals, font_size: Signal<usize>) -> Elem
                         review: spell_review.clone(),
                         font_size: font_size(),
                         state,
+                    }
+                }
+                // Clean-check celebration: review completed with no issues. Shows a
+                // brief centered 🎉 + message, then the flow auto-clears the review.
+                if spell_results_visible && !spell_has_issues {
+                    div { class: "spell-clean-celebration", aria_hidden: "true",
+                        span { class: "spell-clean-emoji", "🎉" }
+                        span { class: "spell-clean-text", "ម៉ាស៊ីនមិនអាចរកឃើញកំហុស" }
                     }
                 }
                 // Caret popup: transliteration candidates only. Next-word
@@ -1123,4 +1135,15 @@ async fn copied_reset_delay() {
 #[cfg(not(target_arch = "wasm32"))]
 async fn copied_reset_delay() {
     tokio::time::sleep(std::time::Duration::from_millis(1_500)).await;
+}
+
+/// How long the clear button stays armed ("បាទ?") awaiting a confirming second tap.
+#[cfg(target_arch = "wasm32")]
+async fn clear_confirm_delay() {
+    gloo_timers::future::TimeoutFuture::new(2_500).await;
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+async fn clear_confirm_delay() {
+    tokio::time::sleep(std::time::Duration::from_millis(2_500)).await;
 }

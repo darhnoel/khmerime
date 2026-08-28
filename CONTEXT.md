@@ -232,6 +232,10 @@ _Avoid_: សញ្ញាធ្មេញកណ្ដុរ, colon
 On a composing platform (Android), showing the raw roman key in the host field the instant it is pressed, before the transliteration decode returns — so typing never lags behind the finger. When the decode lands, the raw roman is replaced by the committed Khmer. Correct for composing letters; deliberately skipped for a standalone mapped **Single Keycap**, whose committed glyph differs from the raw key and would otherwise flash the Latin form before swapping to Khmer.
 _Avoid_: speculative insert, preview text (this is real inserted text, later corrected)
 
+**Ignore List**:
+The set of words the user has dismissed during the current **Spell Review** so they stop being flagged. Session-only — held in memory and cleared on reload, never persisted. Ignoring a word suppresses **every** flagged instance of that exact word in the document and keeps it un-flagged for the rest of the session; the user views the collected words on the ពាក្យផ្ទាល់ខ្លួន ("personal words") page and can un-ignore any of them. The user-facing label is Khmer ពាក្យផ្ទាល់ខ្លួន; "Ignore List" is the internal English term. Distinct from the **Lexicon Pack**'s personal pack (persistent, added to improve *input* candidates) and from **Learned History** (implicit usage counts) — the Ignore List is an ephemeral spell-review-only suppression and changes no ranking or candidate.
+_Avoid_: personal dictionary, user dictionary, ignore words (persistent connotation), whitelist
+
 ## Relationships
 
 - A **Lexicon** is built into one **SharedTransliteratorData** at startup

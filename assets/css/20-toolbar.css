@@ -292,3 +292,119 @@ button:focus-visible, input:focus-visible, textarea:focus-visible {
 }
 .mode-pill.active { background: var(--accent-soft); color: var(--accent-strong); border-color: color-mix(in srgb, var(--accent) 28%, transparent); }
 .ghost:hover, .mode-pill:hover { background: var(--hover); }
+
+/* Session Ignore List in the sidebar: words dismissed from the spell review,
+   each un-ignorable. Cleared on reload. */
+.sidebar-ignore-list {
+  margin: 2px 0 6px;
+  padding: 6px 8px 4px;
+  border-radius: 10px;
+  background: var(--hover);
+}
+.sidebar-ignore-head {
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: var(--muted);
+  margin-bottom: 4px;
+  padding-inline-start: 2px;
+}
+.sidebar-ignore-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  padding: 3px 4px 3px 6px;
+  border-radius: 7px;
+}
+.sidebar-ignore-row:hover { background: var(--surface); }
+.sidebar-ignore-word {
+  font-family: "Noto Sans Khmer", "IBM Plex Sans", sans-serif;
+  font-size: 0.82rem;
+  color: var(--ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sidebar-ignore-undo {
+  flex: none;
+  appearance: none;
+  width: 20px;
+  height: 20px;
+  display: inline-grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 1rem;
+  line-height: 1;
+}
+.sidebar-ignore-undo:hover { background: var(--surface-strong); color: var(--danger); }
+
+/* Personal words page (session Ignore List) — reuses .saved-words-page chrome. */
+.personal-words-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.personal-words-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+}
+.personal-words-row:hover { border-color: var(--line-strong); }
+.personal-words-word {
+  font-family: "Noto Sans Khmer", "IBM Plex Sans", sans-serif;
+  font-size: 1rem;
+  color: var(--ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.personal-words-remove {
+  flex: none;
+  appearance: none;
+  width: 28px;
+  height: 28px;
+  display: inline-grid;
+  place-items: center;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface-strong);
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 1.15rem;
+  line-height: 1;
+}
+.personal-words-remove:hover { color: var(--danger); border-color: color-mix(in srgb, var(--danger) 50%, var(--line)); }
+.personal-words-empty {
+  text-align: center;
+  padding: 48px 20px;
+  color: var(--muted);
+}
+.personal-words-empty-title {
+  font-family: "Noto Sans Khmer", "IBM Plex Sans", sans-serif;
+  font-size: 1rem;
+  font-weight: 650;
+  color: var(--ink);
+  margin-bottom: 8px;
+}
+.personal-words-empty-hint {
+  font-family: "Noto Sans Khmer", "IBM Plex Sans", sans-serif;
+  font-size: 0.85rem;
+  line-height: 1.6;
+  max-width: 30ch;
+  margin: 0 auto;
+}

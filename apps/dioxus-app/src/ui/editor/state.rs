@@ -58,6 +58,10 @@ pub(crate) struct EditorSignals {
     pub history: Signal<HashMap<String, usize>>,
     pub user_dictionary: Signal<HashMap<String, Vec<String>>>,
     pub spell_review: Signal<SpellReview>,
+    /// Words the user dismissed this session so the spell review stops flagging
+    /// them. Session-only (not persisted); cleared on reload. See CONTEXT.md
+    /// "Ignore List".
+    pub spell_ignore: Signal<std::collections::HashSet<String>>,
 }
 
 impl EditorSignals {
@@ -167,6 +171,10 @@ impl EditorSignals {
 
     pub(crate) fn spell_review(self) -> SpellReview {
         (self.spell_review)()
+    }
+
+    pub(crate) fn spell_ignore(self) -> std::collections::HashSet<String> {
+        (self.spell_ignore)()
     }
 
     pub(crate) fn clear_spell_review(mut self) {

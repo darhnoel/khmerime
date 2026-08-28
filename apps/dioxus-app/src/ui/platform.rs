@@ -421,31 +421,68 @@ pub(crate) fn set_editor_caret_no_focus(caret: usize) {
     document::eval(&script);
 }
 
-/// Copy `text` to the system clipboard via the async Clipboard API. Fire-and-forget:
-/// clipboard writes can reject (permission, insecure context) but the caller shows
-/// its own "copied" feedback optimistically; a failure just leaves the clipboard
-/// unchanged. Called from a user click, so the gesture requirement is satisfied.
-#[cfg(target_arch = "wasm32")]
-pub(crate) fn copy_to_clipboard(text: &str) {
-    let Some(clipboard) = window().map(|w| w.navigator().clipboard()) else {
-        return;
-    };
-    let _ = clipboard.write_text(text);
-}
-
-#[cfg(not(target_arch = "wasm32"))]
-pub(crate) fn copy_to_clipboard(text: &str) {
-    // JSON-encode the text so quotes/newlines survive embedding in the script.
+fn clipboard_copy_script(text: &str) -> String {
+    // JSON-encode the text so quotes and newlines survive embedding in JavaScript.
     let payload = serde_json::to_string(text).unwrap_or_else(|_| "\"\"".to_owned());
-    let script = format!(
+    format!(
         r#"
-            if (navigator.clipboard && navigator.clipboard.writeText) {{
-                navigator.clipboard.writeText({payload});
+            const text = {payload};
+            try {{
+                if (window.isSecureContext && navigator.clipboard?.writeText) {{
+                    await navigator.clipboard.writeText(text);
+                    return true;
+                }}
+            }} catch (_) {{
+                // Continue to the HTTP-compatible fallback below.
             }}
+
+            const editor = document.getElementById({editor_id:?});
+            const active = document.activeElement;
+            const selectionStart = editor?.selectionStart;
+            const selectionEnd = editor?.selectionEnd;
+            const editorScrollTop = editor?.scrollTop;
+            const editorScrollLeft = editor?.scrollLeft;
+            const pageX = window.scrollX;
+            const pageY = window.scrollY;
+            const probe = document.createElement('textarea');
+            probe.value = text;
+            probe.readOnly = true;
+            probe.setAttribute('aria-hidden', 'true');
+            probe.style.position = 'fixed';
+            probe.style.opacity = '0';
+            probe.style.pointerEvents = 'none';
+            probe.style.left = '-9999px';
+            document.body.appendChild(probe);
+            probe.focus({{ preventScroll: true }});
+            probe.select();
+
+            let copied = false;
+            try {{
+                copied = document.execCommand('copy');
+            }} finally {{
+                probe.remove();
+                active?.focus?.({{ preventScroll: true }});
+                if (editor && selectionStart != null && selectionEnd != null) {{
+                    editor.setSelectionRange(selectionStart, selectionEnd);
+                    editor.scrollTop = editorScrollTop;
+                    editor.scrollLeft = editorScrollLeft;
+                }}
+                window.scrollTo(pageX, pageY);
+            }}
+            return copied;
         "#,
         payload = payload,
-    );
-    document::eval(&script);
+        editor_id = EDITOR_ID,
+    )
+}
+
+/// Copy `text` to the system clipboard. LAN-hosted HTTP pages cannot access the
+/// modern Clipboard API, so retain a selection-preserving browser fallback.
+pub(crate) async fn copy_to_clipboard(text: &str) -> bool {
+    dioxus::document::eval(&clipboard_copy_script(text))
+        .join::<bool>()
+        .await
+        .unwrap_or(false)
 }
 
 #[cfg(target_arch = "wasm32")]
@@ -649,6 +686,16 @@ pub(crate) fn mark_app_ready() {}
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn clipboard_script_falls_back_and_restores_editor_selection() {
+        let script = clipboard_copy_script("សាកល្បង\nចម្លង");
+
+        assert!(script.contains("navigator.clipboard.writeText"));
+        assert!(script.contains("document.execCommand('copy')"));
+        assert!(script.contains("setSelectionRange(selectionStart, selectionEnd)"));
+        assert!(script.contains(r#"សាកល្បង\nចម្លង"#));
+    }
 
     #[test]
     fn estimates_popup_position_in_rust() {

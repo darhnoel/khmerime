@@ -214,6 +214,15 @@ impl SpellReview {
         self.choice_index = 0;
     }
 
+    /// Remove every current issue whose flagged word equals `word` (ignoring all
+    /// instances at once, for the session Ignore List).
+    pub(crate) fn ignore_word(&mut self, word: &str) {
+        self.issues.retain(|issue| issue.source != word);
+        self.active_index = self.active_index.min(self.issues.len().saturating_sub(1));
+        self.open_index = None;
+        self.choice_index = 0;
+    }
+
     pub(crate) fn accept(&mut self, index: usize, replacement: &str, text: &str) -> Option<(String, usize)> {
         let accepted = self.issues.get(index)?.clone();
         let new_text = replace_char_range(text, accepted.start, accepted.end, replacement);
@@ -832,13 +841,50 @@ fn slice_char_range(text: &str, start: usize, end: usize) -> String {
     text.chars().skip(start).take(end.saturating_sub(start)).collect()
 }
 
+fn resolve_service_endpoint(
+    configured: Option<&str>,
+    protocol: &str,
+    hostname: &str,
+    port: u16,
+    path: &str,
+) -> String {
+    if let Some(endpoint) = configured {
+        return endpoint.to_owned();
+    }
+    let host = if hostname.contains(':') {
+        format!("[{hostname}]")
+    } else {
+        hostname.to_owned()
+    };
+    format!("{protocol}//{host}:{port}{path}")
+}
+
+#[cfg(target_arch = "wasm32")]
+fn browser_service_endpoint(
+    configured: Option<&str>, port: u16, path: &str
+) -> Result<String, String> {
+    let window = web_sys::window().ok_or_else(|| "service endpoint has no window".to_owned())?;
+    let location = window.location();
+    let protocol = location
+        .protocol()
+        .map_err(|error| format!("read page protocol: {error:?}"))?;
+    let hostname = location
+        .hostname()
+        .map_err(|error| format!("read page hostname: {error:?}"))?;
+    Ok(resolve_service_endpoint(
+        configured, &protocol, &hostname, port, path,
+    ))
+}
+
 #[cfg(target_arch = "wasm32")]
 pub(crate) async fn detect_contextual_errors(text: &str) -> Result<Vec<DetectorSpan>, String> {
     use js_sys::wasm_bindgen::{JsCast, JsValue};
     use wasm_bindgen_futures::JsFuture;
     use web_sys::{Request, RequestInit, RequestMode, Response};
 
-    let endpoint = option_env!("KHMERIME_DETECTOR_URL").unwrap_or("http://127.0.0.1:8898/detect");
+    let endpoint = browser_service_endpoint(
+        option_env!("KHMERIME_DETECTOR_URL"), 8898, "/detect",
+    )?;
     let body = serde_json::to_string(&DetectorRequest {
         text,
         threshold: DETECTOR_THRESHOLD,
@@ -848,7 +894,7 @@ pub(crate) async fn detect_contextual_errors(text: &str) -> Result<Vec<DetectorS
     options.set_method("POST");
     options.set_mode(RequestMode::Cors);
     options.set_body(&JsValue::from_str(&body));
-    let request = Request::new_with_str_and_init(endpoint, &options)
+    let request = Request::new_with_str_and_init(&endpoint, &options)
         .map_err(|error| format!("create detector request: {error:?}"))?;
     request
         .headers()
@@ -893,14 +939,16 @@ pub(crate) async fn check_via_api(text: &str) -> Result<SpellCheckResult, String
     use wasm_bindgen_futures::JsFuture;
     use web_sys::{Request, RequestInit, RequestMode, Response};
 
-    let endpoint = option_env!("KHMERIME_SPELLCHECK_URL").unwrap_or("http://127.0.0.1:8901/check");
+    let endpoint = browser_service_endpoint(
+        option_env!("KHMERIME_SPELLCHECK_URL"), 8901, "/check",
+    )?;
     let body = serde_json::to_string(&ApiRequest { text })
         .map_err(|error| format!("serialize spellcheck request: {error}"))?;
     let options = RequestInit::new();
     options.set_method("POST");
     options.set_mode(RequestMode::Cors);
     options.set_body(&JsValue::from_str(&body));
-    let request = Request::new_with_str_and_init(endpoint, &options)
+    let request = Request::new_with_str_and_init(&endpoint, &options)
         .map_err(|error| format!("create spellcheck request: {error:?}"))?;
     request
         .headers()
@@ -1047,6 +1095,24 @@ pub(crate) async fn wait_for_clear_confirmation() {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn remote_service_endpoint_uses_page_hostname() {
+        assert_eq!(
+            resolve_service_endpoint(None, "http:", "192.168.40.240", 8901, "/check"),
+            "http://192.168.40.240:8901/check"
+        );
+        assert_eq!(
+            resolve_service_endpoint(
+                Some("http://model.local:8091/check"),
+                "http:",
+                "192.168.40.240",
+                8901,
+                "/check"
+            ),
+            "http://model.local:8091/check"
+        );
+    }
 
     fn entry(target: &str, frequency: u32) -> Entry {
         Entry {
