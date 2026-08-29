@@ -47,8 +47,16 @@
   transition: grid-template-columns 160ms ease;
 }
 
-.workspace.sidebar-closed { grid-template-columns: 0 minmax(0, 1fr); }
-.workspace.sidebar-closed .app-sidebar { visibility: hidden; opacity: 0; pointer-events: none; }
+/* Collapsed = a narrow ICON RAIL on desktop (never fully hidden): the sidebar
+   keeps its clickable icon buttons, only labels/headings are hidden. See the
+   .app-sidebar.is-rail rules in 20-toolbar.css. */
+.workspace.sidebar-closed { grid-template-columns: 56px minmax(0, 1fr); }
+/* Mobile: the sidebar overlays, so collapsing fully hides it (a rail would waste
+   the narrow width). */
+@media (max-width: 700px) {
+  .workspace.sidebar-closed { grid-template-columns: 0 minmax(0, 1fr); }
+  .workspace.sidebar-closed .app-sidebar { visibility: hidden; opacity: 0; pointer-events: none; }
+}
 
 .workspace-context {
   grid-area: context;

@@ -41,7 +41,7 @@ html::-webkit-scrollbar, body::-webkit-scrollbar { display: none; }
 
 @media (max-width: 700px) {
   .topbar { padding: 0 10px; }
-  .beta-badge { display: none; }
+  /* Keep the Beta badge on mobile — it carries the "មិនទាន់ប្រើ AI" notice. */
   .engine-status { max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
   .workspace-context {
@@ -134,6 +134,17 @@ html::-webkit-scrollbar, body::-webkit-scrollbar { display: none; }
     width: 100%;
     padding: 7px 12px calc(7px + env(safe-area-inset-bottom, 0px));
     background: var(--surface-muted);
+  }
+  /* While the soft keyboard is up, dock the candidate bar directly above it:
+     fixed to the viewport, lifted by the measured keyboard height (set on
+     <html> as --mobile-keyboard-offset by setMobileKeyboardOffset). Without
+     this the sticky bar hides behind the keyboard. */
+  html[data-mobile-editing="1"] .candidate-bar {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: var(--mobile-keyboard-offset, 0px);
+    z-index: 20;
   }
   .candidate-footer { display: grid; gap: 7px; }
   .desktop-candidate-hints { display: none !important; }

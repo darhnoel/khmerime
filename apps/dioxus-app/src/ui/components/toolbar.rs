@@ -3,9 +3,8 @@ use dioxus::prelude::*;
 use crate::ui::components::{PersonalWordsPage, SavedWordsPage};
 use crate::ui::editor::{update_candidates, EditorSignals};
 use crate::ui::spellcheck::{
-    check_text, check_via_api, mark_detector_unavailable,
-    wait_for_clear_confirmation, yield_before_check, ContextDetectorStatus, SpellReview,
-    SpellReviewStatus,
+    check_text, check_via_api, mark_detector_unavailable, wait_for_clear_confirmation, yield_before_check,
+    ContextDetectorStatus, SpellReview, SpellReviewStatus,
 };
 use crate::ui::storage::{save_enabled, save_font_size, save_sidebar_open, Palette, Theme};
 use crate::{engine, EngineReadiness, MAX_FONT_SIZE, MIN_FONT_SIZE};
@@ -31,6 +30,11 @@ fn Icon(name: &'static str) -> Element {
             path { d: "M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2Z" }
         },
         "bookmark" => rsx! { path { d: "M6 3h12v18l-6-4-6 4Z" } },
+        // Saved words: a bookmark with a check, distinct from the plain bookmark.
+        "save" => rsx! {
+            path { d: "M6 3h12v18l-6-4-6 4Z" }
+            path { d: "m9 9 2 2 4-4" }
+        },
         "check" => rsx! {
             circle { cx: "12", cy: "12", r: "9" }
             path { d: "m8 12 3 3 5-6" }
@@ -39,7 +43,6 @@ fn Icon(name: &'static str) -> Element {
             circle { cx: "12", cy: "12", r: "3" }
             path { d: "M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06-.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09A1.65 1.65 0 0 0 15 4.6a1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09A1.65 1.65 0 0 0 19.4 15Z" }
         },
-        "collapse" => rsx! { path { d: "m15 18-6-6 6-6" } },
         _ => rsx! {},
     };
     rsx! {
@@ -63,6 +66,9 @@ pub(crate) fn AppToolbar(
     let mut show_saved_dictionary = use_signal(|| false);
     let mut show_personal_words = use_signal(|| false);
     let mut show_settings = use_signal(|| false);
+    // The Beta badge doubles as a "មិនទាន់ប្រើ AI" affordance: this web build is the
+    // Standard engine (dictionary-only roman→Khmer), no AI provider yet.
+    let mut show_no_ai = use_signal(|| false);
     let mut saved_entries = state
         .user_dictionary()
         .into_iter()
@@ -91,6 +97,23 @@ pub(crate) fn AppToolbar(
                 }
                 span { class: "wordmark", "KhmerIME" }
                 span { class: "beta-badge", "Beta" }
+                // A separate ⓘ next to the Beta badge: this build is the Standard
+                // engine (dictionary-only roman→Khmer, no AI yet).
+                span { class: "beta-info",
+                    button {
+                        class: "beta-info-button",
+                        "data-testid": "no-ai-info",
+                        r#type: "button",
+                        title: "មិនទាន់ប្រើ AI",
+                        aria_label: "មិនទាន់ប្រើ AI",
+                        onclick: move |_| show_no_ai.set(!show_no_ai()),
+                        "ⓘ"
+                    }
+                    span {
+                        class: if show_no_ai() { "beta-info-popover is-open" } else { "beta-info-popover" },
+                        "មិនទាន់ប្រើ AI"
+                    }
+                }
             }
             div { class: "topbar-right",
                 if state.engine_readiness() == EngineReadiness::Booting {
@@ -121,7 +144,15 @@ pub(crate) fn AppToolbar(
                 section { class: "sidebar-section sidebar-behavior",
                     h2 { "ការបម្លែង" }
                     button {
-                        class: "sidebar-item sidebar-toggle-item", "data-testid": "toggle-live-edit",
+                        // .active when KhmerIME is on — so the pen icon glows even in
+                        // the collapsed rail where the toggle-switch is hidden.
+                        class: if state.roman_enabled() {
+                            "sidebar-item sidebar-toggle-item active"
+                        } else {
+                            "sidebar-item sidebar-toggle-item"
+                        },
+                        "data-testid": "toggle-live-edit",
+                        title: "ប្រើ KhmerIME",
                         aria_pressed: "{state.roman_enabled()}",
                         onclick: move |_| {
                             let next = !state.roman_enabled();
@@ -139,6 +170,7 @@ pub(crate) fn AppToolbar(
                     button {
                         class: if spell_review.result_bar_visible() { "sidebar-item active" } else { "sidebar-item" },
                         "data-testid": "check-spelling",
+                        title: "ពិនិត្យអក្ខរាវិរុទ្ធ",
                         aria_pressed: "{spell_review.result_bar_visible()}",
                         disabled: spell_checking,
                         onclick: move |_| {
@@ -210,6 +242,7 @@ pub(crate) fn AppToolbar(
                     button {
                         class: if show_personal_words() { "sidebar-item active" } else { "sidebar-item" },
                         "data-testid": "toggle-personal-words",
+                        title: "ពាក្យផ្ទាល់ខ្លួន",
                         aria_pressed: "{show_personal_words()}",
                         onclick: move |_| show_personal_words.set(true),
                         Icon { name: "bookmark" } span { "ពាក្យផ្ទាល់ខ្លួន" }
@@ -219,22 +252,28 @@ pub(crate) fn AppToolbar(
                     button {
                         class: if show_saved_dictionary() { "sidebar-item active" } else { "sidebar-item" },
                         "data-testid": "toggle-saved-mappings", aria_pressed: "{show_saved_dictionary()}",
+                        title: "ពាក្យរក្សាទុក",
                         onclick: move |_| show_saved_dictionary.set(true),
-                        Icon { name: "bookmark" } span { "ពាក្យរក្សាទុក" }
+                        Icon { name: "save" } span { "ពាក្យរក្សាទុក" }
                         span { class: "sidebar-count", "{saved_entries.len()}" }
                         span { class: "sidebar-chevron", aria_hidden: "true", "›" }
                     }
                     button {
                         class: if show_guide() { "sidebar-item active" } else { "sidebar-item" },
-                        "data-testid": "toggle-rules", aria_pressed: "{show_guide()}",
+                        "data-testid": "toggle-rules", title: "ក្បួននិងផ្លូវកាត់", aria_pressed: "{show_guide()}",
                         onclick: move |_| show_guide.set(!show_guide()),
                         Icon { name: "book" } span { "ក្បួននិងផ្លូវកាត់" }
                     }
                 }
             }
-            button { class: "sidebar-collapse", aria_label: "បង្រួមរបារចំហៀង",
-                onclick: move |_| { sidebar_open.set(false); save_sidebar_open(false); },
-                Icon { name: "collapse" } span { "បង្រួមរបារ" }
+            button { class: "sidebar-collapse",
+                aria_label: if sidebar_open() { "បង្រួមរបារចំហៀង" } else { "ពង្រីករបារចំហៀង" },
+                title: if sidebar_open() { "បង្រួមរបារ" } else { "ពង្រីករបារ" },
+                onclick: move |_| { let next = !sidebar_open(); sidebar_open.set(next); save_sidebar_open(next); },
+                span { class: "sidebar-collapse-chevron", aria_hidden: "true",
+                    if sidebar_open() { "‹" } else { "›" }
+                }
+                span { "បង្រួមរបារ" }
             }
         }
 

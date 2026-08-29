@@ -22,8 +22,7 @@ use self::startup_signals::StartupSignals;
 use self::ui::components::{AppToolbar, EditorCard, GuidePanel, WorkspaceBody};
 use self::ui::editor::{refresh_popup_position, CandidateLevel, CandidateMode, EditorSignals, SegmentedSession};
 use self::ui::platform::{
-    mark_app_ready, mark_app_shell_ready, refresh_mobile_layout_density, set_editor_caret,
-    set_editor_caret_no_focus,
+    mark_app_ready, mark_app_shell_ready, refresh_mobile_layout_density, set_editor_caret, set_editor_caret_no_focus,
 };
 use self::ui::spellcheck::SpellReview;
 use self::ui::storage::{

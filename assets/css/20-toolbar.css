@@ -35,6 +35,43 @@ button:focus-visible, input:focus-visible, textarea:focus-visible {
   letter-spacing: 0.04em;
   text-transform: uppercase;
 }
+/* A small ⓘ beside the Beta badge: hover (desktop) or tap (mobile) reveals
+   "មិនទាន់ប្រើ AI" (no AI yet). */
+.beta-info { position: relative; display: inline-flex; align-items: center; }
+.beta-info-button {
+  appearance: none;
+  border: 0;
+  padding: 0 2px;
+  background: transparent;
+  color: var(--muted);
+  opacity: 0.75;
+  cursor: pointer;
+  font-size: 0.9rem;
+  line-height: 1;
+}
+.beta-info-button:hover { opacity: 1; color: var(--ink); }
+.beta-info-popover.is-open { display: block; }
+/* Desktop (hover-capable): show on hover, no click needed. */
+@media (hover: hover) {
+  .beta-info:hover .beta-info-popover { display: block; }
+}
+.beta-info-popover {
+  display: none;
+  position: absolute;
+  top: calc(100% + 7px);
+  left: 0;
+  z-index: 20;
+  white-space: nowrap;
+  padding: 6px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--ink);
+  font-size: 0.78rem;
+  font-weight: 600;
+  font-family: "Noto Sans Khmer", "IBM Plex Sans", sans-serif;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.14);
+}
 .chrome-button {
   appearance: none;
   display: inline-grid;
@@ -115,6 +152,30 @@ button:focus-visible, input:focus-visible, textarea:focus-visible {
 .sidebar-item:hover, .sidebar-collapse:hover { color: var(--ink); background: var(--hover); }
 .sidebar-item.active { color: var(--accent-strong); background: var(--accent-soft); }
 .sidebar-item span:nth-child(2) { flex: 1; min-width: 0; }
+
+/* Collapsed icon rail (desktop): keep the sidebar and its clickable icons, hide
+   the labels, counts, chevrons and section headings; center each icon. */
+.workspace.sidebar-closed .app-sidebar .sidebar-nav { padding: 14px 8px; }
+.workspace.sidebar-closed .app-sidebar .sidebar-section h2 { display: none; }
+.workspace.sidebar-closed .app-sidebar .sidebar-item {
+  justify-content: center;
+  padding: 9px 0;
+  gap: 0;
+}
+.workspace.sidebar-closed .app-sidebar .sidebar-item > span,
+.workspace.sidebar-closed .app-sidebar .sidebar-count,
+.workspace.sidebar-closed .app-sidebar .sidebar-chevron,
+.workspace.sidebar-closed .app-sidebar .toggle-switch { display: none; }
+/* The collapse button itself shows only its icon in rail mode. */
+.workspace.sidebar-closed .app-sidebar .sidebar-collapse {
+  justify-content: center;
+  padding: 9px 0;
+  width: calc(100% - 16px);
+  margin: 8px 8px 12px;
+}
+/* In the rail keep the chevron, hide only the text label. */
+.workspace.sidebar-closed .app-sidebar .sidebar-collapse > span:not(.sidebar-collapse-chevron) { display: none; }
+.sidebar-collapse-chevron { font-size: 1.15rem; line-height: 1; }
 .sidebar-count {
   min-width: 22px;
   padding: 1px 6px;

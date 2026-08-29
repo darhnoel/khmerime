@@ -841,13 +841,7 @@ fn slice_char_range(text: &str, start: usize, end: usize) -> String {
     text.chars().skip(start).take(end.saturating_sub(start)).collect()
 }
 
-fn resolve_service_endpoint(
-    configured: Option<&str>,
-    protocol: &str,
-    hostname: &str,
-    port: u16,
-    path: &str,
-) -> String {
+fn resolve_service_endpoint(configured: Option<&str>, protocol: &str, hostname: &str, port: u16, path: &str) -> String {
     if let Some(endpoint) = configured {
         return endpoint.to_owned();
     }
@@ -860,9 +854,7 @@ fn resolve_service_endpoint(
 }
 
 #[cfg(target_arch = "wasm32")]
-fn browser_service_endpoint(
-    configured: Option<&str>, port: u16, path: &str
-) -> Result<String, String> {
+fn browser_service_endpoint(configured: Option<&str>, port: u16, path: &str) -> Result<String, String> {
     let window = web_sys::window().ok_or_else(|| "service endpoint has no window".to_owned())?;
     let location = window.location();
     let protocol = location
@@ -871,9 +863,7 @@ fn browser_service_endpoint(
     let hostname = location
         .hostname()
         .map_err(|error| format!("read page hostname: {error:?}"))?;
-    Ok(resolve_service_endpoint(
-        configured, &protocol, &hostname, port, path,
-    ))
+    Ok(resolve_service_endpoint(configured, &protocol, &hostname, port, path))
 }
 
 #[cfg(target_arch = "wasm32")]
@@ -882,9 +872,7 @@ pub(crate) async fn detect_contextual_errors(text: &str) -> Result<Vec<DetectorS
     use wasm_bindgen_futures::JsFuture;
     use web_sys::{Request, RequestInit, RequestMode, Response};
 
-    let endpoint = browser_service_endpoint(
-        option_env!("KHMERIME_DETECTOR_URL"), 8898, "/detect",
-    )?;
+    let endpoint = browser_service_endpoint(option_env!("KHMERIME_DETECTOR_URL"), 8898, "/detect")?;
     let body = serde_json::to_string(&DetectorRequest {
         text,
         threshold: DETECTOR_THRESHOLD,
@@ -939,9 +927,7 @@ pub(crate) async fn check_via_api(text: &str) -> Result<SpellCheckResult, String
     use wasm_bindgen_futures::JsFuture;
     use web_sys::{Request, RequestInit, RequestMode, Response};
 
-    let endpoint = browser_service_endpoint(
-        option_env!("KHMERIME_SPELLCHECK_URL"), 8901, "/check",
-    )?;
+    let endpoint = browser_service_endpoint(option_env!("KHMERIME_SPELLCHECK_URL"), 8901, "/check")?;
     let body = serde_json::to_string(&ApiRequest { text })
         .map_err(|error| format!("serialize spellcheck request: {error}"))?;
     let options = RequestInit::new();

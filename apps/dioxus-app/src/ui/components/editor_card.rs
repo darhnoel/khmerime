@@ -4,9 +4,7 @@ use crate::ui::editor::{
     update_candidates, visible_page_start, CandidateLevel, CandidateMode, EditorSignals,
 };
 use crate::ui::platform::{copy_to_clipboard, move_editor_caret, schedule_spell_popover_placement};
-use crate::ui::spellcheck::{
-    ContextDetectorStatus, SpellIssue, SpellIssueKind, SpellReview, SpellSegment,
-};
+use crate::ui::spellcheck::{ContextDetectorStatus, SpellIssue, SpellIssueKind, SpellReview, SpellSegment};
 use crate::ui::storage::{save_editor_text, save_enabled};
 use crate::{EDITOR_ID, VISIBLE_SUGGESTIONS};
 use dioxus::html::Modifiers;
@@ -528,6 +526,12 @@ pub(crate) fn EditorCard(state: EditorSignals, font_size: Signal<usize>) -> Elem
                         save_editor_text(&value);
                         state.text.set(value.clone());
                         state.clear_spell_review();
+                        // Clear the composition mark synchronously on every edit. The
+                        // async candidate update re-sets it if a live composition
+                        // remains, but if that request goes stale (rapid backspacing)
+                        // it returns early WITHOUT clearing — leaving a ghost preview
+                        // of the old word. Clearing here kills the ghost regardless.
+                        state.composition.set(None);
                         // Start fresh after text changes so the next ArrowDown selects the first
                         // candidate for the current token instead of continuing stale selection.
                         state.number_pick_mode.set(false);
@@ -957,7 +961,10 @@ pub(crate) fn EditorCard(state: EditorSignals, font_size: Signal<usize>) -> Elem
                 div {
                     class: if show_candidate_list { "candidate-bar" } else { "candidate-bar candidate-bar-empty" },
                     div { class: "candidate-track candidate-track-mobile",
-                        if show_candidate_list {
+                        // The mobile flat track lists suggestions only at Flat level.
+                        // Phrase/Segment results are shown by the popup (segment chips)
+                        // instead, so the track stays empty and does not duplicate them.
+                        if show_candidate_list && candidate_level == CandidateLevel::Flat {
                             ul { class: "suggestion-list candidate-list",
                                 for (index, item) in suggestions.iter()
                                     .enumerate()
