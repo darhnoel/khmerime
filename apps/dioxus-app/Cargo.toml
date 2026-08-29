@@ -12,6 +12,10 @@ fetch-data = ["roman_lookup/fetch-data"]
 [dependencies]
 roman_lookup = { path = "../.." }
 khmerime_linux_ibus = { path = "../../adapters/linux-ibus" }
+khmer_segmenter = { git = "https://github.com/Sovichea/khmer_segmenter", rev = "4fb87f1404b94c0afebbb46e0ee51b548f49f275", default-features = false }
+symspell_rs = "6.8.3"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 dioxus = { version = "0.7.4", default-features = false, features = ["desktop", "document", "signals", "hooks", "html", "macro", "asset", "launch"] }
@@ -21,9 +25,10 @@ tokio = { version = "1.48.0", features = ["time"] }
 console_error_panic_hook = "0.1.7"
 dioxus = { version = "0.7.4", default-features = false, features = ["web", "document", "signals", "hooks", "html", "macro", "asset", "launch"] }
 gloo-timers = { version = "0.3", features = ["futures"] }
+getrandom = { version = "0.3", features = ["wasm_js"] }
 js-sys = "0.3.77"
 wasm-bindgen-futures = "0.4"
-web-sys = { version = "0.3.77", features = ["console", "CssStyleDeclaration", "Document", "DomRect", "Element", "Headers", "HtmlElement", "HtmlTextAreaElement", "KeyboardEvent", "Location", "Node", "Performance", "Response", "Storage", "Window"] }
+web-sys = { version = "0.3.77", features = ["console", "Clipboard", "CssStyleDeclaration", "Document", "DomRect", "Element", "Headers", "HtmlElement", "HtmlTextAreaElement", "KeyboardEvent", "Location", "Navigator", "Node", "Performance", "Request", "RequestInit", "RequestMode", "Response", "Storage", "Window"] }
 
 [[bin]]
 name = "roman_lookup"

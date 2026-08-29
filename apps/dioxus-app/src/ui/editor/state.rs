@@ -1,24 +1,10 @@
 use std::collections::HashMap;
 
 use dioxus::prelude::*;
-use roman_lookup::{DecoderMode, ManualComposeCandidate, ManualComposeKind, SegmentedSession, ShadowObservation};
+use roman_lookup::{DecodeCandidate, DecoderMode, SegmentedSession, ShadowObservation};
 
+use crate::ui::spellcheck::SpellReview;
 use crate::{CompositionMark, EngineReadiness, SuggestionPopup};
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) enum InputMode {
-    NormalWordSuggestion,
-    ManualCharacterTyping,
-}
-
-impl InputMode {
-    pub(crate) fn label(self) -> &'static str {
-        match self {
-            InputMode::NormalWordSuggestion => "Word",
-            InputMode::ManualCharacterTyping => "Manual",
-        }
-    }
-}
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum CandidateMode {
@@ -27,65 +13,12 @@ pub(crate) enum CandidateMode {
     NextWord,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub(crate) struct ManualTypingState {
-    pub raw_roman: String,
-    pub consumed: usize,
-    pub composed_text: String,
-    pub expected_kind: ManualComposeKind,
-    pub kind_filter: ManualComposeKind,
-    pub last_selected_base_consonant: Option<String>,
-    pub context_fallback_key: Option<String>,
-    pub context_fallback_insert_text: Option<String>,
-    pub active_span: Option<std::ops::Range<usize>>,
-    pub candidates: Vec<ManualComposeCandidate>,
-    pub checkpoints: Vec<ManualTypingCheckpoint>,
-}
-
-impl ManualTypingState {
-    pub(crate) fn new(raw_roman: String) -> Self {
-        let mut state = Self {
-            raw_roman,
-            consumed: 0,
-            composed_text: String::new(),
-            expected_kind: ManualComposeKind::BaseConsonant,
-            kind_filter: ManualComposeKind::BaseConsonant,
-            last_selected_base_consonant: None,
-            context_fallback_key: None,
-            context_fallback_insert_text: None,
-            active_span: None,
-            candidates: Vec::new(),
-            checkpoints: Vec::new(),
-        };
-        super::manual_flow::refresh_manual_state_candidates(&mut state);
-        state
-    }
-
-    pub(crate) fn remaining_roman(&self) -> String {
-        slice_chars(&self.raw_roman, self.consumed..char_len(&self.raw_roman))
-    }
-
-    pub(crate) fn is_complete(&self) -> bool {
-        self.consumed >= char_len(&self.raw_roman) && !self.composed_text.is_empty()
-    }
-
-    pub(crate) fn checkpoint(&self) -> ManualTypingCheckpoint {
-        ManualTypingCheckpoint {
-            consumed: self.consumed,
-            composed_text: self.composed_text.clone(),
-            expected_kind: self.expected_kind,
-            kind_filter: self.kind_filter,
-            last_selected_base_consonant: self.last_selected_base_consonant.clone(),
-        }
-    }
-
-    pub(crate) fn restore_checkpoint(&mut self, checkpoint: ManualTypingCheckpoint) {
-        self.consumed = checkpoint.consumed;
-        self.composed_text = checkpoint.composed_text;
-        self.expected_kind = checkpoint.expected_kind;
-        self.kind_filter = checkpoint.kind_filter;
-        self.last_selected_base_consonant = checkpoint.last_selected_base_consonant;
-    }
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub(crate) enum CandidateLevel {
+    #[default]
+    Flat,
+    Phrase,
+    Segment,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -94,20 +27,10 @@ pub(crate) struct ManualSaveRequest {
     pub khmer: String,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub(crate) struct ManualTypingCheckpoint {
-    pub(crate) consumed: usize,
-    pub(crate) composed_text: String,
-    pub(crate) expected_kind: ManualComposeKind,
-    pub(crate) kind_filter: ManualComposeKind,
-    pub(crate) last_selected_base_consonant: Option<String>,
-}
-
 #[derive(Clone, Copy, PartialEq)]
 pub(crate) struct EditorSignals {
     pub text: Signal<String>,
     pub roman_enabled: Signal<bool>,
-    pub input_mode: Signal<InputMode>,
     pub decoder_mode: Signal<DecoderMode>,
     pub engine_readiness: Signal<EngineReadiness>,
     pub engine_ready: Signal<bool>,
@@ -118,6 +41,9 @@ pub(crate) struct EditorSignals {
     pub shadow_debug: Signal<Option<ShadowObservation>>,
     pub segmented_session: Signal<Option<SegmentedSession>>,
     pub segmented_refine_mode: Signal<bool>,
+    pub phrase_candidates: Signal<Vec<DecodeCandidate>>,
+    pub candidate_level: Signal<CandidateLevel>,
+    pub active_phrase_index: Signal<usize>,
     pub suggestion_loading: Signal<bool>,
     pub suggestion_request_id: Signal<u64>,
     pub candidate_mode: Signal<CandidateMode>,
@@ -128,10 +54,14 @@ pub(crate) struct EditorSignals {
     pub selection_started: Signal<bool>,
     pub selected: Signal<usize>,
     pub pending_caret: Signal<Option<usize>>,
+    pub pending_caret_no_focus: Signal<Option<usize>>,
     pub history: Signal<HashMap<String, usize>>,
-    pub manual_typing_state: Signal<Option<ManualTypingState>>,
-    pub manual_save_request: Signal<Option<ManualSaveRequest>>,
     pub user_dictionary: Signal<HashMap<String, Vec<String>>>,
+    pub spell_review: Signal<SpellReview>,
+    /// Words the user dismissed this session so the spell review stops flagging
+    /// them. Session-only (not persisted); cleared on reload. See CONTEXT.md
+    /// "Ignore List".
+    pub spell_ignore: Signal<std::collections::HashSet<String>>,
 }
 
 impl EditorSignals {
@@ -141,10 +71,6 @@ impl EditorSignals {
 
     pub(crate) fn roman_enabled(self) -> bool {
         (self.roman_enabled)()
-    }
-
-    pub(crate) fn input_mode(self) -> InputMode {
-        (self.input_mode)()
     }
 
     pub(crate) fn decoder_mode(self) -> DecoderMode {
@@ -187,6 +113,18 @@ impl EditorSignals {
         (self.segmented_refine_mode)()
     }
 
+    pub(crate) fn phrase_candidates(self) -> Vec<DecodeCandidate> {
+        (self.phrase_candidates)()
+    }
+
+    pub(crate) fn candidate_level(self) -> CandidateLevel {
+        (self.candidate_level)()
+    }
+
+    pub(crate) fn active_phrase_index(self) -> usize {
+        (self.active_phrase_index)()
+    }
+
     pub(crate) fn suggestion_loading(self) -> bool {
         (self.suggestion_loading)()
     }
@@ -227,16 +165,20 @@ impl EditorSignals {
         (self.history)()
     }
 
-    pub(crate) fn manual_typing_state(self) -> Option<ManualTypingState> {
-        (self.manual_typing_state)()
-    }
-
-    pub(crate) fn manual_save_request(self) -> Option<ManualSaveRequest> {
-        (self.manual_save_request)()
-    }
-
     pub(crate) fn user_dictionary(self) -> HashMap<String, Vec<String>> {
         (self.user_dictionary)()
+    }
+
+    pub(crate) fn spell_review(self) -> SpellReview {
+        (self.spell_review)()
+    }
+
+    pub(crate) fn spell_ignore(self) -> std::collections::HashSet<String> {
+        (self.spell_ignore)()
+    }
+
+    pub(crate) fn clear_spell_review(mut self) {
+        self.spell_review.set(SpellReview::default());
     }
 
     pub(crate) fn clear_candidate_state(mut self) {
@@ -246,6 +188,9 @@ impl EditorSignals {
         self.shadow_debug.set(None);
         self.segmented_session.set(None);
         self.segmented_refine_mode.set(false);
+        self.phrase_candidates.set(Vec::new());
+        self.candidate_level.set(CandidateLevel::Flat);
+        self.active_phrase_index.set(0);
         self.suggestion_loading.set(false);
         self.candidate_mode.set(CandidateMode::None);
         self.active_token.set(String::new());
@@ -253,7 +198,6 @@ impl EditorSignals {
         self.roman_variant_hints.set(HashMap::new());
         self.selection_started.set(false);
         self.selected.set(0);
-        self.manual_typing_state.set(None);
     }
 
     pub(crate) fn clear_candidate_state_and_picker(mut self) {

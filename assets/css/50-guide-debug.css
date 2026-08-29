@@ -23,7 +23,7 @@
   padding: 10px 12px;
   border: 1px solid var(--line);
   border-radius: 14px;
-  background: rgba(255, 255, 255, 0.055);
+  background: var(--surface-muted);
 }
 
 .debug-label {
@@ -51,11 +51,16 @@ code.debug-value {
   margin: 0;
   padding: 0;
   display: grid;
-  gap: 8px;
+  gap: 2px;
 }
 
 .candidate-list .suggestion {
   min-width: 0;
+  min-height: 34px;
+  display: flex;
+  align-items: stretch;
+  border-radius: 6px;
+  overflow: hidden;
 }
 
 /* Desktop-first dense horizontal candidate row using available width. */
@@ -71,20 +76,38 @@ code.debug-value {
   max-width: 220px;
 }
 
-.suggestion button {
-  width: 100%;
-  min-height: 32px;
-  padding: 4px 5px;
+.suggestion .candidate-choice {
+  min-width: 0;
+  flex: 1;
+  min-height: 34px;
+  padding: 5px 7px;
   display: flex;
   align-items: center;
   gap: 6px;
   text-align: left;
-  background: rgba(255, 255, 255, 0.055);
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: inherit;
 }
 
-.suggestion.active button {
-  background: var(--active);
-  border-color: rgba(233, 138, 78, 0.35);
+.suggestion:hover { background: var(--hover); }
+
+.suggestion.active {
+  background: var(--accent);
+  color: var(--accent-contrast);
+}
+
+.suggestion.active .suggestion-rank,
+.suggestion.active .suggestion-roman-hint {
+  color: currentColor;
+  opacity: 0.78;
+}
+
+.suggestion.active .suggestion-recommended {
+  border-color: color-mix(in srgb, currentColor 42%, transparent);
+  background: color-mix(in srgb, currentColor 14%, transparent);
+  color: currentColor;
 }
 
 .suggestion-rank {
@@ -122,9 +145,9 @@ code.debug-value {
 .suggestion-recommended {
   margin-left: 4px;
   padding: 1px 5px;
-  border: 1px solid rgba(233, 138, 78, 0.3);
+  border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
   border-radius: 7px;
-  background: rgba(233, 138, 78, 0.12);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
   color: var(--accent-strong);
   font-size: 0.64rem;
   font-weight: 700;
@@ -136,7 +159,7 @@ code.debug-value {
   padding: 16px;
   border: 1px dashed var(--line);
   border-radius: 18px;
-  background: rgba(255, 255, 255, 0.045);
+  background: var(--surface-muted);
 }
 
 .empty-state p {
@@ -153,52 +176,135 @@ code.debug-value {
 }
 
 .guide {
-  align-content: start;
-  position: relative;
-}
-
-.guide-open {
-  padding-left: 10px;
-}
-
-.guide-panel {
+  position: fixed;
+  z-index: 60;
+  inset: 0;
   display: grid;
-  gap: 18px;
+  grid-template-rows: auto minmax(0, 1fr);
+  width: 100%;
+  overflow: hidden;
+  background: var(--bg);
 }
 
-.guide-handle {
-  position: absolute;
-  z-index: 4;
-  width: 24px;
-  min-width: 24px;
-  height: 72px;
+.guide-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 68px;
+  padding: 12px max(24px, calc((100vw - 920px) / 2));
+  border-bottom: 1px solid var(--line);
+  background: var(--surface-strong);
+}
+
+.guide-header h2,
+.guide-header p,
+.guide-section-heading h3,
+.guide-section-heading p { margin: 0; }
+
+.guide-header h2 {
+  color: var(--ink);
+  font-size: 1.12rem;
+  line-height: 1.5;
+}
+
+.guide-header p,
+.guide-section-heading p {
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 0.72rem;
+  line-height: 1.4;
+}
+
+.guide-close {
+  display: grid;
+  flex: 0 0 auto;
+  width: 32px;
+  height: 32px;
+  place-items: center;
   padding: 0;
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  background: rgba(28, 22, 34, 0.96);
-  color: var(--accent-strong);
-  font-size: 1rem;
-  font-weight: 700;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 1.65rem;
   line-height: 1;
   cursor: pointer;
-  box-shadow: 0 12px 28px rgba(74, 43, 18, 0.12);
 }
 
-.guide-handle:hover {
-  border-color: rgba(233, 138, 78, 0.28);
-  background: var(--hover);
+.guide-close:hover { background: var(--hover); color: var(--ink); }
+
+.guide-scroll {
+  min-height: 0;
+  width: min(920px, calc(100% - 48px));
+  margin: 28px auto 56px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  padding: 2px 24px 48px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--surface-strong);
+  box-shadow: var(--document-shadow);
+  overscroll-behavior: contain;
+  scrollbar-width: none;
 }
 
-.guide-handle-collapsed {
-  top: 50%;
-  right: -12px;
-  transform: translateY(-50%);
+.guide-scroll::-webkit-scrollbar { display: none; }
+
+.guide-section {
+  padding: 22px 0;
+  border-bottom: 1px solid var(--line);
 }
 
-.guide-handle-open {
-  top: 50%;
-  left: -2px;
-  transform: translate(-50%, -50%);
+.guide-section:last-child { border-bottom: 0; }
+
+.guide-section-heading {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.guide-section-heading h3 {
+  color: var(--ink);
+  font-size: 0.96rem;
+  line-height: 1.5;
+}
+
+.guide-step {
+  flex: 0 0 auto;
+  margin-top: 3px;
+  color: var(--accent-strong);
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.68rem;
+  font-weight: 750;
+  letter-spacing: 0.04em;
+}
+
+.guide-shortcuts { display: grid; gap: 5px; }
+
+.guide-shortcut-row {
+  display: grid;
+  grid-template-columns: 116px minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+  min-height: 38px;
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.guide-shortcut-row kbd {
+  justify-self: start;
+  padding: 4px 8px;
+  border: 1px solid var(--line);
+  border-bottom-color: color-mix(in srgb, var(--line) 72%, var(--ink));
+  border-radius: 7px;
+  background: var(--surface-muted);
+  color: var(--ink);
+  box-shadow: 0 1px 0 var(--line);
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.7rem;
+  font-weight: 700;
+  white-space: nowrap;
 }
 
 .chip-grid {
@@ -213,11 +319,9 @@ code.debug-value {
   justify-content: space-between;
   gap: 10px;
   padding: 11px 12px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 14px;
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.075), rgba(255, 255, 255, 0.035)),
-    rgba(28, 22, 34, 0.72);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface-muted);
 }
 
 .chip-khmer,
@@ -227,23 +331,12 @@ code.debug-value {
 }
 
 .chip-arrow {
-  color: rgba(244, 166, 97, 0.78);
-}
-
-.rule-list {
-  margin: 12px 0 0;
-  padding-left: 18px;
-  color: var(--ink);
-}
-
-.rule-list li + li {
-  margin-top: 8px;
+  color: var(--accent-strong);
 }
 
 .example-list {
   display: grid;
-  gap: 10px;
-  margin-top: 12px;
+  gap: 8px;
 }
 
 .example-row {
@@ -252,11 +345,9 @@ code.debug-value {
   justify-content: space-between;
   gap: 12px;
   padding: 11px 12px;
-  border-radius: 14px;
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.075), rgba(255, 255, 255, 0.035)),
-    rgba(28, 22, 34, 0.72);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  background: var(--surface-muted);
+  border: 1px solid var(--line);
   color: var(--ink);
 }
 

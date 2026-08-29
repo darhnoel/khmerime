@@ -5,6 +5,16 @@ ADDR="${ADDR:-0.0.0.0}"
 PORT="${PORT:-4173}"
 FEATURES="${DX_FEATURES:-}"
 VERBOSE="${DX_VERBOSE:-}"
+if [[ -n "${DIOXUS_CLI:-}" ]]; then
+  DIOXUS_CLI="$DIOXUS_CLI"
+else
+  CARGO_BIN_DIR="$(dirname "$(command -v cargo)")"
+  if [[ -x "$CARGO_BIN_DIR/dx" ]] && "$CARGO_BIN_DIR/dx" --version 2>/dev/null | grep -q '^dioxus '; then
+    DIOXUS_CLI="$CARGO_BIN_DIR/dx"
+  else
+    DIOXUS_CLI="dx"
+  fi
+fi
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 APP_DIR="$ROOT_DIR/apps/dioxus-app"
@@ -66,7 +76,7 @@ watch_and_patch_shell() {
   done
 }
 
-DX_CMD=(dx serve --platform web --addr "$ADDR" --port "$PORT" --open false)
+DX_CMD=("$DIOXUS_CLI" serve --platform web --addr "$ADDR" --port "$PORT" --open false)
 if [[ -n "$FEATURES" ]]; then
   DX_CMD+=(--features "$FEATURES")
 fi

@@ -17,6 +17,149 @@ const STORAGE_HISTORY: &str = "roman_lookup.history";
 const STORAGE_USER_DICTIONARY: &str = "roman_lookup.user_dictionary";
 #[cfg(target_arch = "wasm32")]
 const STORAGE_FONT_SIZE: &str = "roman_lookup.font_size";
+#[cfg(target_arch = "wasm32")]
+const STORAGE_THEME: &str = "roman_lookup.theme";
+#[cfg(target_arch = "wasm32")]
+const STORAGE_PALETTE: &str = "roman_lookup.palette";
+#[cfg(target_arch = "wasm32")]
+const STORAGE_SIDEBAR_OPEN: &str = "roman_lookup.sidebar_open";
+
+/// The editor brightness mode. Keep it explicit until following browser/OS
+/// changes is reliable across both the app shell and preboot loading screen.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum Theme {
+    Light,
+    Dark,
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub(crate) enum Palette {
+    #[default]
+    Default,
+    Angkor,
+    Lotus,
+    Forest,
+}
+
+impl Palette {
+    pub(crate) fn data_attr(self) -> Option<&'static str> {
+        match self {
+            Palette::Default => None,
+            Palette::Angkor => Some("angkor"),
+            Palette::Lotus => Some("lotus"),
+            Palette::Forest => Some("forest"),
+        }
+    }
+
+    #[cfg(target_arch = "wasm32")]
+    fn storage_key(self) -> &'static str {
+        self.data_attr().unwrap_or("default")
+    }
+
+    #[cfg(target_arch = "wasm32")]
+    fn from_storage_key(value: &str) -> Option<Self> {
+        match value {
+            "default" => Some(Palette::Default),
+            "angkor" => Some(Palette::Angkor),
+            "lotus" => Some(Palette::Lotus),
+            "forest" => Some(Palette::Forest),
+            _ => None,
+        }
+    }
+}
+
+impl Theme {
+    pub(crate) fn data_attr(self) -> Option<&'static str> {
+        match self {
+            Theme::Light => Some("light"),
+            Theme::Dark => Some("dark"),
+        }
+    }
+
+    #[cfg(target_arch = "wasm32")]
+    fn storage_key(self) -> &'static str {
+        match self {
+            Theme::Light => "light",
+            Theme::Dark => "dark",
+        }
+    }
+
+    #[cfg(target_arch = "wasm32")]
+    fn from_storage_key(value: &str) -> Option<Self> {
+        match value {
+            "light" => Some(Theme::Light),
+            "dark" => Some(Theme::Dark),
+            _ => None,
+        }
+    }
+}
+
+#[cfg(target_arch = "wasm32")]
+pub(crate) fn load_theme() -> Theme {
+    storage_get_web(STORAGE_THEME)
+        .as_deref()
+        .and_then(Theme::from_storage_key)
+        .unwrap_or(Theme::Light)
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+pub(crate) fn load_theme() -> Theme {
+    Theme::Light
+}
+
+#[cfg(target_arch = "wasm32")]
+pub(crate) fn save_theme(theme: Theme) {
+    let _ = storage_set_web(STORAGE_THEME, theme.storage_key());
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+pub(crate) fn save_theme(_: Theme) {}
+
+#[cfg(target_arch = "wasm32")]
+pub(crate) fn load_palette() -> Palette {
+    storage_get_web(STORAGE_PALETTE)
+        .as_deref()
+        .and_then(Palette::from_storage_key)
+        .unwrap_or_default()
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+pub(crate) fn load_palette() -> Palette {
+    Palette::default()
+}
+
+#[cfg(target_arch = "wasm32")]
+pub(crate) fn save_palette(palette: Palette) {
+    let _ = storage_set_web(STORAGE_PALETTE, palette.storage_key());
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+pub(crate) fn save_palette(_: Palette) {}
+
+#[cfg(target_arch = "wasm32")]
+pub(crate) fn load_sidebar_open() -> bool {
+    if let Some(saved) = storage_get_web(STORAGE_SIDEBAR_OPEN) {
+        return saved != "0";
+    }
+    window()
+        .and_then(|window| window.inner_width().ok())
+        .and_then(|width| width.as_f64())
+        .map(|width| width >= 1280.0)
+        .unwrap_or(false)
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+pub(crate) fn load_sidebar_open() -> bool {
+    true
+}
+
+#[cfg(target_arch = "wasm32")]
+pub(crate) fn save_sidebar_open(open: bool) {
+    let _ = storage_set_web(STORAGE_SIDEBAR_OPEN, if open { "1" } else { "0" });
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+pub(crate) fn save_sidebar_open(_: bool) {}
 
 #[cfg(target_arch = "wasm32")]
 fn storage_get_web(key: &str) -> Option<String> {
@@ -181,3 +324,22 @@ pub(crate) fn save_font_size(value: usize, min_font_size: usize, max_font_size: 
 
 #[cfg(not(target_arch = "wasm32"))]
 pub(crate) fn save_font_size(_: usize, _: usize, _: usize) {}
+
+#[cfg(test)]
+mod tests {
+    use super::{Palette, Theme};
+
+    #[test]
+    fn explicit_themes_map_to_data_attributes() {
+        assert_eq!(Theme::Light.data_attr(), Some("light"));
+        assert_eq!(Theme::Dark.data_attr(), Some("dark"));
+    }
+
+    #[test]
+    fn palettes_map_to_independent_root_attributes() {
+        assert_eq!(Palette::Default.data_attr(), None);
+        assert_eq!(Palette::Angkor.data_attr(), Some("angkor"));
+        assert_eq!(Palette::Lotus.data_attr(), Some("lotus"));
+        assert_eq!(Palette::Forest.data_attr(), Some("forest"));
+    }
+}

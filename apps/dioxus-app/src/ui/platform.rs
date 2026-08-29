@@ -8,6 +8,16 @@ use web_sys::{window, CssStyleDeclaration, Document, Element, HtmlElement, HtmlT
 
 use crate::{CompositionMark, SuggestionPopup, EDITOR_ID};
 
+pub(crate) fn schedule_spell_popover_placement() {
+    let _ = dioxus::document::eval(
+        r#"
+        requestAnimationFrame(() => {
+            requestAnimationFrame(() => window.__khmerImePositionSpellPopover?.());
+        });
+        "#,
+    );
+}
+
 #[cfg(any(not(target_arch = "wasm32"), test))]
 const CHAR_WIDTH_DIVISOR: f64 = 0.62;
 #[cfg(any(not(target_arch = "wasm32"), test))]
@@ -15,8 +25,8 @@ const CHAR_WIDTH_MULTIPLIER: f64 = 0.58;
 const POPUP_HORIZONTAL_OFFSET: f64 = 18.0;
 const POPUP_VERTICAL_OFFSET: f64 = 10.0;
 const POPUP_SAFE_MARGIN: f64 = 8.0;
-const POPUP_WIDTH: f64 = 280.0;
-const POPUP_HEIGHT: f64 = 220.0;
+const POPUP_WIDTH: f64 = 360.0;
+const POPUP_HEIGHT: f64 = 280.0;
 #[cfg(any(not(target_arch = "wasm32"), test))]
 const COMPOSITION_MIN_WIDTH: f64 = 12.0;
 
@@ -311,6 +321,18 @@ pub(crate) async fn current_editor_caret() -> Option<usize> {
     Some(utf16_index_to_char_index(&editor.value(), utf16_index))
 }
 
+#[cfg(target_arch = "wasm32")]
+pub(crate) async fn current_editor_selection() -> Option<(usize, usize)> {
+    let editor = editor_textarea()?;
+    let value = editor.value();
+    let start = editor.selection_start().ok().flatten()?;
+    let end = editor.selection_end().ok().flatten()?;
+    Some((
+        utf16_index_to_char_index(&value, start),
+        utf16_index_to_char_index(&value, end),
+    ))
+}
+
 #[cfg(not(target_arch = "wasm32"))]
 pub(crate) async fn current_editor_caret() -> Option<usize> {
     let script = format!(
@@ -324,6 +346,25 @@ pub(crate) async fn current_editor_caret() -> Option<usize> {
     document::eval(&script).join::<usize>().await.ok()
 }
 
+#[cfg(not(target_arch = "wasm32"))]
+pub(crate) async fn current_editor_selection() -> Option<(usize, usize)> {
+    let script = format!(
+        r#"
+            const el = document.getElementById({editor_id:?});
+            if (!el) return "";
+            const utf16Start = typeof el.selectionStart === "number" ? el.selectionStart : 0;
+            const utf16End = typeof el.selectionEnd === "number" ? el.selectionEnd : utf16Start;
+            const start = Array.from(el.value.slice(0, utf16Start)).length;
+            const end = Array.from(el.value.slice(0, utf16End)).length;
+            return `${{start}},${{end}}`;
+        "#,
+        editor_id = EDITOR_ID,
+    );
+    let raw = document::eval(&script).join::<String>().await.ok()?;
+    let (start, end) = raw.split_once(',')?;
+    Some((start.parse().ok()?, end.parse().ok()?))
+}
+
 #[cfg(target_arch = "wasm32")]
 pub(crate) fn set_editor_caret(caret: usize) {
     let Some(editor) = editor_textarea() else {
@@ -331,6 +372,18 @@ pub(crate) fn set_editor_caret(caret: usize) {
     };
     let cursor = char_index_to_utf16_index(&editor.value(), caret.min(editor.value().chars().count()));
     let _ = editor.focus();
+    let _ = editor.set_selection_range(cursor, cursor);
+}
+
+/// Place the caret without focusing (so the view does not scroll/jump). Used by
+/// the spell-review accept path: the user is in the popover flow, not typing in
+/// the textarea, so stealing focus and scrolling to the caret is jarring.
+#[cfg(target_arch = "wasm32")]
+pub(crate) fn set_editor_caret_no_focus(caret: usize) {
+    let Some(editor) = editor_textarea() else {
+        return;
+    };
+    let cursor = char_index_to_utf16_index(&editor.value(), caret.min(editor.value().chars().count()));
     let _ = editor.set_selection_range(cursor, cursor);
 }
 
@@ -350,6 +403,86 @@ pub(crate) fn set_editor_caret(caret: usize) {
         caret = caret,
     );
     document::eval(&script);
+}
+
+/// Place the caret without focusing (see the wasm variant).
+#[cfg(not(target_arch = "wasm32"))]
+pub(crate) fn set_editor_caret_no_focus(caret: usize) {
+    let script = format!(
+        r#"
+            const el = document.getElementById({editor_id:?});
+            if (el && typeof el.setSelectionRange === "function") {{
+                el.setSelectionRange({caret}, {caret});
+            }}
+        "#,
+        editor_id = EDITOR_ID,
+        caret = caret,
+    );
+    document::eval(&script);
+}
+
+fn clipboard_copy_script(text: &str) -> String {
+    // JSON-encode the text so quotes and newlines survive embedding in JavaScript.
+    let payload = serde_json::to_string(text).unwrap_or_else(|_| "\"\"".to_owned());
+    format!(
+        r#"
+            const text = {payload};
+            try {{
+                if (window.isSecureContext && navigator.clipboard?.writeText) {{
+                    await navigator.clipboard.writeText(text);
+                    return true;
+                }}
+            }} catch (_) {{
+                // Continue to the HTTP-compatible fallback below.
+            }}
+
+            const editor = document.getElementById({editor_id:?});
+            const active = document.activeElement;
+            const selectionStart = editor?.selectionStart;
+            const selectionEnd = editor?.selectionEnd;
+            const editorScrollTop = editor?.scrollTop;
+            const editorScrollLeft = editor?.scrollLeft;
+            const pageX = window.scrollX;
+            const pageY = window.scrollY;
+            const probe = document.createElement('textarea');
+            probe.value = text;
+            probe.readOnly = true;
+            probe.setAttribute('aria-hidden', 'true');
+            probe.style.position = 'fixed';
+            probe.style.opacity = '0';
+            probe.style.pointerEvents = 'none';
+            probe.style.left = '-9999px';
+            document.body.appendChild(probe);
+            probe.focus({{ preventScroll: true }});
+            probe.select();
+
+            let copied = false;
+            try {{
+                copied = document.execCommand('copy');
+            }} finally {{
+                probe.remove();
+                active?.focus?.({{ preventScroll: true }});
+                if (editor && selectionStart != null && selectionEnd != null) {{
+                    editor.setSelectionRange(selectionStart, selectionEnd);
+                    editor.scrollTop = editorScrollTop;
+                    editor.scrollLeft = editorScrollLeft;
+                }}
+                window.scrollTo(pageX, pageY);
+            }}
+            return copied;
+        "#,
+        payload = payload,
+        editor_id = EDITOR_ID,
+    )
+}
+
+/// Copy `text` to the system clipboard. LAN-hosted HTTP pages cannot access the
+/// modern Clipboard API, so retain a selection-preserving browser fallback.
+pub(crate) async fn copy_to_clipboard(text: &str) -> bool {
+    dioxus::document::eval(&clipboard_copy_script(text))
+        .join::<bool>()
+        .await
+        .unwrap_or(false)
 }
 
 #[cfg(target_arch = "wasm32")]
@@ -555,6 +688,16 @@ mod tests {
     use super::*;
 
     #[test]
+    fn clipboard_script_falls_back_and_restores_editor_selection() {
+        let script = clipboard_copy_script("សាកល្បង\nចម្លង");
+
+        assert!(script.contains("navigator.clipboard.writeText"));
+        assert!(script.contains("document.execCommand('copy')"));
+        assert!(script.contains("setSelectionRange(selectionStart, selectionEnd)"));
+        assert!(script.contains(r#"សាកល្បង\nចម្លង"#));
+    }
+
+    #[test]
     fn estimates_popup_position_in_rust() {
         let popup = estimated_popup_position(12, 640.0, 480.0, 24.0, 36.0);
         assert!(popup.left >= POPUP_SAFE_MARGIN);
@@ -576,8 +719,8 @@ mod tests {
             client_width: 640.0,
             client_height: 480.0,
         });
-        assert_eq!(popup.left, 352.0);
-        assert_eq!(popup.top, 252.0);
+        assert_eq!(popup.left, 272.0);
+        assert_eq!(popup.top, 192.0);
     }
 
     #[test]
@@ -593,8 +736,8 @@ mod tests {
             client_width: 380.0,
             client_height: 320.0,
         });
-        // caret_top = 250, above = 20, below would overflow the viewport.
-        assert_eq!(popup.top, 20.0);
+        // caret_top = 250; the 280px panel flips above, then clamps to the safe margin.
+        assert_eq!(popup.top, 8.0);
     }
 
     #[test]

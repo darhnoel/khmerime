@@ -9,15 +9,12 @@ body {
   margin: 0;
   min-height: 100%;
   font-family: "Noto Sans Khmer", "IBM Plex Sans", sans-serif;
-  /* Silk Veil base: a solid deep-ink floor under soft ember/teal/plum glows. */
+  /* Flat ground — no gradients (polished direction). */
   background-color: var(--bg);
-  background-image:
-    radial-gradient(circle at top left, rgba(233, 138, 78, 0.12), transparent 30%),
-    radial-gradient(circle at top right, rgba(56, 198, 192, 0.07), transparent 28%),
-    radial-gradient(circle at bottom, rgba(120, 72, 140, 0.12), transparent 42%);
   color: var(--ink);
 }
 
 body {
   min-height: 100vh;
+  overflow-x: hidden;
 }

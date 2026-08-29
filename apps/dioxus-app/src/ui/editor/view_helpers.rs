@@ -3,8 +3,6 @@ use dioxus::prelude::*;
 use crate::ui::platform::{current_editor_caret, editor_composition_mark, editor_popup_position};
 use crate::{CompositionMark, SuggestionPopup, FALLBACK_POPUP_LEFT, FALLBACK_POPUP_TOP};
 
-use super::SegmentedSession;
-
 fn default_popup_position() -> SuggestionPopup {
     SuggestionPopup {
         left: FALLBACK_POPUP_LEFT,
@@ -53,32 +51,6 @@ pub(crate) fn composition_preview_style(mark: &CompositionMark, font_size: usize
         "left:{:.1}px; top:{:.1}px; width:{:.1}px; height:{:.1}px; font-size:{}px;",
         mark.left, mark.top, mark.width, mark.height, font_size
     )
-}
-
-pub(crate) fn segmented_composition_preview_style(mark: &CompositionMark, font_size: usize) -> String {
-    format!(
-        "left:{:.1}px; top:{:.1}px; min-width:{:.1}px; min-height:{:.1}px; font-size:{}px;",
-        mark.left, mark.top, mark.width, mark.height, font_size
-    )
-}
-
-pub(crate) fn segmented_preview_parts(session: &SegmentedSession) -> (String, String, String) {
-    let mut before = String::new();
-    let mut focused = String::new();
-    let mut after = String::new();
-
-    for (index, segment) in session.segments.iter().enumerate() {
-        let text = segment.selected_text();
-        if index < session.focused {
-            before.push_str(&text);
-        } else if index == session.focused {
-            focused = text;
-        } else {
-            after.push_str(&text);
-        }
-    }
-
-    (before, focused, after)
 }
 
 pub(crate) fn shortcut_index(key: &str) -> Option<usize> {

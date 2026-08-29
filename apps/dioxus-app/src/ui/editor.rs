@@ -1,45 +1,44 @@
 mod candidate_pipeline;
 mod commit_flow;
+mod flick;
 mod manual_flow;
 mod segmented_flow;
 mod state;
 mod view_helpers;
 
-pub(crate) use candidate_pipeline::{normalized_suggestion_key, update_candidates};
-pub(crate) use commit_flow::{click_candidate, commit_active_selection, switch_input_mode};
-pub(crate) use manual_flow::{
-    dismiss_manual_save_request, remove_user_dictionary_mapping, save_manual_save_request, set_manual_kind_filter,
-    skip_manual_roman_char, undo_manual_step,
-};
+pub(crate) use candidate_pipeline::update_candidates;
+pub(crate) use commit_flow::{click_candidate, commit_active_selection};
+pub(crate) use flick::{resolve, Direction, Key, Preedit, KEYMAP};
+pub(crate) use manual_flow::{remove_user_dictionary_mapping, replace_manual_save_request, save_manual_save_request};
 #[cfg(test)]
 pub(crate) use roman_lookup::SegmentedChoice;
 pub(crate) use roman_lookup::SegmentedSession;
-pub(crate) use segmented_flow::{move_segment_focus, select_segment_candidate};
-pub(crate) use state::{
-    char_len, slice_chars, CandidateMode, EditorSignals, InputMode, ManualSaveRequest, ManualTypingState,
-};
+pub(crate) use segmented_flow::{enter_segment_edit, exit_segment_edit, move_segment_focus, select_segment_candidate};
+pub(crate) use state::{char_len, slice_chars, CandidateLevel, CandidateMode, EditorSignals, ManualSaveRequest};
 pub(crate) use view_helpers::{
-    composition_preview_style, composition_style, is_space_key, popup_style, refresh_popup_position,
-    segmented_composition_preview_style, segmented_preview_parts, shortcut_index, shortcut_label,
+    composition_style, is_space_key, popup_style, refresh_popup_position, shortcut_index, shortcut_label,
     should_exit_number_pick, visible_page_start,
 };
 
 #[cfg(test)]
 use candidate_pipeline::{
-    choose_visible_suggestions, connect_khmer_display, next_word_boundary, next_word_context,
-    recommended_indices_and_roman_hints, request_matches_snapshot,
+    choose_visible_suggestions, connect_khmer_display, merge_phrase_and_whole_candidates, next_word_boundary,
+    next_word_context, phrase_surface_candidates, recommended_indices_and_roman_hints, request_matches_snapshot,
 };
 #[cfg(test)]
 use segmented_flow::{build_segmented_session, reflow_segmented_session_from_selection};
 
 #[cfg(test)]
 mod tests {
-    use roman_lookup::{DecodeSegment, DecoderMode, ShadowMismatch, ShadowObservation, Transliterator};
+    use roman_lookup::{
+        DecodeCandidate, DecodeSegment, DecoderConfig, DecoderMode, ShadowMismatch, ShadowObservation, Transliterator,
+    };
 
     use super::{
-        build_segmented_session, char_len, choose_visible_suggestions, connect_khmer_display, next_word_boundary,
-        next_word_context, recommended_indices_and_roman_hints, reflow_segmented_session_from_selection,
-        request_matches_snapshot, slice_chars, SegmentedChoice, SegmentedSession,
+        build_segmented_session, char_len, choose_visible_suggestions, connect_khmer_display,
+        merge_phrase_and_whole_candidates, next_word_boundary, next_word_context, phrase_surface_candidates,
+        recommended_indices_and_roman_hints, reflow_segmented_session_from_selection, request_matches_snapshot,
+        slice_chars, SegmentedChoice, SegmentedSession,
     };
 
     fn sample_observation() -> ShadowObservation {
@@ -76,6 +75,77 @@ mod tests {
             legacy_top_in_wfst: false,
             wfst_top_in_legacy: false,
         }
+    }
+
+    fn decode_candidate(text: &str, segments: Vec<(&str, &str)>, from_model: bool) -> DecodeCandidate {
+        DecodeCandidate {
+            text: text.to_owned(),
+            score_bps: None,
+            confidence_bps: None,
+            segments: segments
+                .into_iter()
+                .map(|(input, output)| DecodeSegment {
+                    input: input.to_owned(),
+                    output: output.to_owned(),
+                    weight_bps: 0,
+                })
+                .collect(),
+            from_model,
+            lexicon_verified: true,
+        }
+    }
+
+    #[test]
+    fn phrase_surface_keeps_whole_phrases_and_model_rescues_only() {
+        let candidates = phrase_surface_candidates(vec![
+            decode_candidate("ខ្ញុំ ទៅ", vec![("khnhom", "ខ្ញុំ"), ("tov", "ទៅ")], false),
+            decode_candidate("ខ្ញុំ", vec![("khnhom", "ខ្ញុំ")], false),
+            decode_candidate("ណូអែល", vec![("noel", "ណូអែល")], true),
+        ]);
+
+        assert_eq!(
+            candidates
+                .iter()
+                .map(|candidate| candidate.text.as_str())
+                .collect::<Vec<_>>(),
+            vec!["ខ្ញុំទៅ", "ណូអែល"]
+        );
+    }
+
+    #[test]
+    fn phrase_surface_keeps_missing_whole_input_and_saved_readings() {
+        let phrase_candidates = vec![decode_candidate("ចអណ្ឌា", vec![("chan", "ចអន"), ("da", "្ឌា")], false)];
+        let whole_input = vec!["ចអណ្ឌា".to_owned(), "ច័ន្ទដា".to_owned(), "ចន្ទា".to_owned()];
+
+        let merged = merge_phrase_and_whole_candidates("chanda", phrase_candidates, &whole_input);
+
+        assert_eq!(
+            merged
+                .iter()
+                .map(|candidate| candidate.text.as_str())
+                .collect::<Vec<_>>(),
+            vec!["ចអណ្ឌា", "ច័ន្ទដា", "ចន្ទា"]
+        );
+        assert_eq!(merged[1].segments.len(), 1);
+        assert_eq!(merged[1].segments[0].input, "chanda");
+        assert_eq!(merged[1].segments[0].output, "ច័ន្ទដា");
+    }
+
+    #[test]
+    fn exact_gumnit_does_not_enter_phrase_surface_for_a_lower_fragmented_candidate() {
+        let transliterator =
+            Transliterator::from_default_data_with_config(DecoderConfig::shadow_interactive().with_shadow_log(false))
+                .expect("embedded lexicon must load");
+        let raw_candidates = transliterator.phrase_candidates("gumnit", &std::collections::HashMap::new());
+
+        assert_eq!(
+            raw_candidates.first().map(|candidate| candidate.text.as_str()),
+            Some("គំនិត")
+        );
+        assert!(
+            phrase_surface_candidates(raw_candidates).is_empty(),
+            "an exact one-segment top candidate must keep the web popup in Flat mode"
+        );
     }
 
     fn assert_segment(segment: &SegmentedChoice, input: &str, start: usize, end: usize, selected_text: &str) {

@@ -41,11 +41,11 @@ The visible Khmer choices for the active **Composition** or focused **Segmented 
 _Avoid_: suggestions (too broad), inline candidates
 
 **Phrase Candidate**:
-One complete Khmer rendering of the *entire* **Composition** — a whole-phrase hypothesis carrying its own internal segmentation, not a single word. The decoder ranks several of these; the top-ranked one is the default **Strip** preview, and tapping another Phrase Candidate makes that selected phrase the **Strip** preview. Distinct from a **Candidate**, which is one Khmer choice for a *single* segment. Selecting a Phrase Candidate makes its segmentation the active **Segmented Session**.
+One complete Khmer rendering of the *entire* **Composition** — a whole-input hypothesis carrying one or more internal segments. Complete single-word readings and multi-word segmented readings coexist as Phrase Candidates; finding a segmentation never discards the whole-word alternatives. Distinct from a **Candidate**, which is one Khmer choice for a *single* focused segment.
 _Avoid_: sentence candidate, sequence, full-composition candidate, phrase suggestion, n-best (implementation term)
 
 **Candidate Surface**:
-The two-level candidate presentation for a **Segmented Session**: whole-phrase **Phrase Candidate**s are the default level, and the focused segment's word **Candidate List** is a second level reached on demand (Tab on desktop; a double-touch into **Phrase Edit** on mobile). Keeping the two levels separate stops a correct word alternative from looking like a wrong whole-phrase alternative. A flat, single-segment **Composition** has no second level and shows the ordinary **Candidate List**. This is *adapter presentation policy*, not new ranking — the shared engine still owns Phrase Candidates, **Segment Edit Mode**, selection, and commits; each adapter only chooses which existing level to expose and how to paint it. The **Phrase Wheel** is the mobile presentation of the phrase level; the desktop popup (macOS, Windows, Linux) is another. Enter commits the previewed **Composition** from either level.
+The two-level candidate presentation for a **Segmented Session**: complete **Phrase Candidate**s are the default level, and the focused segment's word **Candidate List** is a second level reached on demand (Tab on desktop; a double-touch into **Phrase Edit** on mobile). The phrase level merges complete interpretations without forcing single-segment or multi-segment readings to outrank the other; a flat **Composition** has no second level. This is *adapter presentation policy*, not new ranking — the shared engine still owns Phrase Candidates, **Segment Edit Mode**, selection, and commits.
 _Avoid_: candidate popup (too generic), suggestion box, phrase panel
 
 **Phrase Wheel**:
@@ -139,7 +139,7 @@ The shared, cross-platform per-user configuration read by the engine at runtime:
 _Avoid_: settings file, preferences, user dictionary
 
 **Standard / Smart Mode**:
-A user-selectable setting (not an `InputMode`) choosing whether the runtime model provider contributes candidates. **Standard** (the default) is the pure lookup + fuzzy engine over human-reviewed **Lexicon** data. **Smart** additionally enables the injected span-proposal provider (ADR-0016): the primary keystroke path stays Standard, and the model runs only as a debounced **Visible Refiner** off the hot path, its out-of-**Lexicon** output shown with a red ✦ (`lexicon_verified == false`). Smart is **inert without a registered provider** — in the OSS build the toggle has no visible effect and the engine stays Standard, so the setting is provider-agnostic and names no model. Persisted per-platform: Android `SharedPreferences`, iOS a shared **App Group** `UserDefaults` suite (so the host-app Settings toggle reaches the keyboard extension). The keyboard applies the saved choice via `set_model_mode` when its session is (re)created. On **macOS** there is no settings surface (the IMK app is an `LSUIElement` accessory), so Smart is **implicit**: it is on whenever a provider is armed and off otherwise — the AI build is Smart, the OSS build is Standard, with no per-user toggle. The user-facing label is Khmer បញ្ញាសិប្បនិម្មិត (AI); "Smart" is the internal English term for the mode.
+A user-selectable setting (not an `InputMode`) choosing whether the runtime model provider contributes candidates. **Standard** (the default) is the pure lookup + fuzzy engine over human-reviewed **Lexicon** data. **Smart** additionally enables the injected span-proposal provider (ADR-0016): the primary keystroke path stays Standard, and the model runs only as a debounced **Visible Refiner** off the hot path, its out-of-**Lexicon** output shown with a red ✦ (`lexicon_verified == false`). Smart is **inert without a registered provider** — in the OSS build the toggle has no visible effect and the engine stays Standard, so the setting is provider-agnostic and names no model. Persisted per-platform: Android `SharedPreferences`, iOS a shared **App Group** `UserDefaults` suite (so the host-app Settings toggle reaches the keyboard extension). The keyboard applies the saved choice via `set_model_mode` when its session is (re)created. On **macOS** there is no settings surface (the IMK app is an `LSUIElement` accessory), so Smart is **implicit**: it is on whenever a provider is armed and off otherwise — the AI build is Smart, the OSS build is Standard, with no per-user toggle. The user-facing label is Khmer បញ្ញាសិប្បនិម្មិត (AI); "Smart" is the internal English term for the mode. The **web app** is a Standard build (no registered provider), so its roman→Khmer transliteration is dictionary-only. Its top-bar Beta badge is tappable and reveals មិនទាន់ប្រើ AI ("not yet using AI") to set that expectation for the whole engine — a product-level note, not tied to any one feature like next-word prediction.
 _Avoid_: model mode (internal API term only), neural mode
 
 **CharPick Mode**:
@@ -165,11 +165,27 @@ The public KhmerIME page that helps users choose a platform download, try the **
 _Avoid_: homepage, product site
 
 **Online Beta**:
-The in-browser build of KhmerIME (the dioxus-app, deployed at the beta URL) where a visitor types romanized Khmer and sees candidates without installing anything. Reached from the **Download Landing Page** as its secondary trial path; a quick trial surface, not a replacement for the installed platform IMEs.
+The focused, in-browser Khmer writing workspace (the dioxus-app, deployed at the beta URL) where a user writes with KhmerIME without installing a platform IME. It is local-first and grows from one persistent writing surface into named **Document**s; it remains browser-sandboxed and does not replace installed platform IMEs.
 _Avoid_: playground, demo, web app
 
+**Document**:
+A manually titled body of plain Khmer or roman text in the **Online Beta**. A Document belongs to at most one **Collection**, may carry many **Tag**s, and has recoverable **Document Version**s.
+_Avoid_: note, file, editor text
+
+**Collection**:
+The single organizational home of a **Document** in the **Online Beta**. A Document without an explicitly chosen Collection belongs to Unfiled.
+_Avoid_: folder (implies filesystem semantics), group
+
+**Tag**:
+A reusable label that may classify many **Document**s, while each Document may carry many Tags. Tags complement Collections rather than replacing their single-home hierarchy.
+_Avoid_: category, label
+
+**Document Version**:
+A recoverable, persisted checkpoint of a **Document** across editing sessions. It is distinct from Undo/Redo, which only reverses edits in the current session.
+_Avoid_: undo history, autosave
+
 **Silk Veil**:
-The shared glassmorphic visual identity for KhmerIME's public web surfaces — the **Download Landing Page** and the **Online Beta**. A deep-ink / charcoal-plum base, soft translucent pearl-glass panes with white rim highlights, an ember-amber primary action, sparse peacock-teal accents, and warm ivory text — distinct from the previous light cream/terracotta web styling.
+The glassmorphic visual identity for KhmerIME's marketing surface, the **Download Landing Page**. A deep-ink / charcoal-plum base, soft translucent pearl-glass panes with white rim highlights, an ember-amber primary action, sparse peacock-teal accents, and warm ivory text; the focused **Online Beta** document workspace deliberately uses its own restrained light/dark interface.
 _Avoid_: Liquid Glass Theme, light download theme, glass accents
 
 **Companion App**:
@@ -215,6 +231,10 @@ _Avoid_: សញ្ញាធ្មេញកណ្ដុរ, colon
 **Optimistic Insert**:
 On a composing platform (Android), showing the raw roman key in the host field the instant it is pressed, before the transliteration decode returns — so typing never lags behind the finger. When the decode lands, the raw roman is replaced by the committed Khmer. Correct for composing letters; deliberately skipped for a standalone mapped **Single Keycap**, whose committed glyph differs from the raw key and would otherwise flash the Latin form before swapping to Khmer.
 _Avoid_: speculative insert, preview text (this is real inserted text, later corrected)
+
+**Ignore List**:
+The set of words the user has dismissed during the current **Spell Review** so they stop being flagged. Session-only — held in memory and cleared on reload, never persisted. Ignoring a word suppresses **every** flagged instance of that exact word in the document and keeps it un-flagged for the rest of the session; the user views the collected words on the ពាក្យផ្ទាល់ខ្លួន ("personal words") page and can un-ignore any of them. The user-facing label is Khmer ពាក្យផ្ទាល់ខ្លួន; "Ignore List" is the internal English term. Distinct from the **Lexicon Pack**'s personal pack (persistent, added to improve *input* candidates) and from **Learned History** (implicit usage counts) — the Ignore List is an ephemeral spell-review-only suppression and changes no ranking or candidate.
+_Avoid_: personal dictionary, user dictionary, ignore words (persistent connotation), whitelist
 
 ## Relationships
 

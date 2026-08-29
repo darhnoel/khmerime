@@ -1,10 +1,9 @@
-"""Silk Veil theme tests for the Online Beta (ADR-0010).
+"""Focused document theme tests for the Online Beta (ADR-0023).
 
 These run against a fast static harness (tests/theme/harness.html) that links the
 real assets/main.css — no WASM build — and assert *computed* styles via Playwright.
-The governing rule (ADR-0010): glass on chrome, solid behind text, with the text
-surfaces meeting WCAG AA contrast. The full-app tests/test_web_ui.py is the final
-integration gate; this file is the fast red-green loop.
+ADR-0023 keeps ADR-0010's load-bearing rule: candidate and preedit text stay on
+opaque surfaces meeting WCAG AA contrast in both light and dark themes.
 """
 
 import re
@@ -131,27 +130,23 @@ def _token(page, name: str) -> str:
 
 
 # --- behaviors ---------------------------------------------------------------
-def test_base_is_dark_and_opaque(page):
-    """The Online Beta sits on a solid deep-ink Silk Veil base, not the cream theme."""
+def test_system_default_is_opaque(page):
+    """System theme always resolves to an opaque workspace ground."""
     r, g, b, a = _rgba(_computed(page, "body", "backgroundColor"))
-    assert a == 1.0, f"base must be an opaque dark fill (a solid floor under any gradient), got alpha={a}"
-    assert _luminance(r, g, b) < 0.1, f"base must read as dark; luminance too high for ({r},{g},{b})"
+    assert a == 1.0, f"workspace ground must be opaque, got alpha={a}"
 
 
-def test_accent_is_ember_amber(page):
-    """The primary accent is bright ember-amber, not the old dark terracotta."""
+def test_accent_is_teal(page):
+    """The focused workspace uses the agreed teal accent."""
     r, g, b, _ = _hex_or_rgb(_token(page, "--accent"))
-    assert r > g > b, f"accent should be warm (r>g>b), got ({r},{g},{b})"
-    lum = _luminance(r, g, b)
-    assert lum > 0.25, f"accent should be bright ember-amber, not dark terracotta (lum={lum:.3f})"
+    assert g > r and b > r, f"accent should be teal (g and b > r), got ({r},{g},{b})"
 
 
-def test_candidate_text_is_legible_on_solid_dark_surface(page):
-    """Per ADR-0010: candidate text sits on a SOLID dark surface at >= AA 4.5:1."""
+def test_candidate_text_is_legible_on_solid_surface(page):
+    """Candidate text sits on an opaque surface at >= AA 4.5:1."""
     surface = _rgba(_computed(page, ".suggestion-popup", "backgroundColor"))
     word = _rgba(_computed(page, ".suggestion-popup .suggestion-word", "color"))
     assert surface[3] == 1.0, f"candidate surface must be opaque behind text, got alpha={surface[3]}"
-    assert _luminance(*surface[:3]) < 0.15, f"candidate surface must be a dark Silk Veil surface (lum={_luminance(*surface[:3]):.3f})"
     ratio = _contrast(word, surface)
     assert ratio >= 4.5, f"candidate text must meet WCAG AA 4.5:1, got {ratio:.2f}:1"
 
@@ -166,8 +161,31 @@ def test_preedit_focused_text_is_legible(page):
 
 
 def test_composition_caret_is_visible(page):
-    """The typing caret must stand out against the dark preedit surface (>=3:1, UI contrast)."""
+    """The typing caret must stand out against the preedit surface (>=3:1 UI contrast)."""
     caret = _rgba(_computed(page, ".composition-caret", "borderRightColor"))
     bg = _rgba(_computed(page, ".composition-preview", "backgroundColor"))
     ratio = _contrast(caret, bg)
     assert ratio >= 3.0, f"caret must be visible on the preedit surface (>=3:1), got {ratio:.2f}:1"
+
+
+def test_explicit_dark_theme_keeps_candidate_contrast(page):
+    page.eval_on_selector(":root", "el => el.setAttribute('data-theme', 'dark')")
+    surface = _rgba(_computed(page, ".suggestion-popup", "backgroundColor"))
+    word = _rgba(_computed(page, ".suggestion-popup .suggestion-word", "color"))
+    assert surface[3] == 1.0
+    assert _contrast(word, surface) >= 4.5
+
+
+@pytest.mark.parametrize("theme", ["light", "dark"])
+@pytest.mark.parametrize("palette", ["angkor", "lotus", "forest"])
+def test_coordinated_palettes_keep_text_and_accent_contrast(page, theme, palette):
+    page.eval_on_selector(
+        ":root",
+        "(el, attrs) => { el.dataset.theme = attrs.theme; el.dataset.palette = attrs.palette; }",
+        {"theme": theme, "palette": palette},
+    )
+    surface = _hex_or_rgb(_token(page, "--surface-strong"))
+    ink = _hex_or_rgb(_token(page, "--ink"))
+    accent = _hex_or_rgb(_token(page, "--accent-strong"))
+    assert _contrast(ink, surface) >= 4.5
+    assert _contrast(accent, surface) >= 3.0

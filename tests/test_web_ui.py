@@ -55,37 +55,6 @@ def _goto_app(page, url: str) -> None:
             continue
 
 
-def _manual_candidate_index(page, text: str) -> int:
-    popup = page.locator("[data-testid='suggestion-popup']").last
-    expect(popup).to_be_visible(timeout=15_000)
-    expect(popup.locator(".suggestion button").first).to_be_visible(timeout=15_000)
-
-    words = popup.locator(".suggestion .suggestion-word")
-    count = words.count()
-    for index in range(count):
-        if words.nth(index).inner_text().strip() == text:
-            return index
-    raise AssertionError(f"manual candidate not found: {text!r}")
-
-
-def _click_manual_candidate(page, text: str) -> None:
-    popup = page.locator("[data-testid='suggestion-popup']").last
-    index = _manual_candidate_index(page, text)
-    popup.locator(".suggestion button").nth(index).click()
-
-
-def _manual_active_candidate_word(page) -> str:
-    popup = page.locator("[data-testid='suggestion-popup']").last
-    expect(popup).to_be_visible(timeout=15_000)
-    return popup.locator(".suggestion.active .suggestion-word").last.inner_text().strip()
-
-
-def _manual_active_candidate_hint(page) -> str:
-    popup = page.locator("[data-testid='suggestion-popup']").last
-    expect(popup).to_be_visible(timeout=15_000)
-    return popup.locator(".suggestion.active .suggestion-roman-hint").last.inner_text().strip()
-
-
 def _set_editor_caret(page, caret: int) -> int:
     return page.eval_on_selector(
         "[data-testid='editor-input']",
@@ -203,7 +172,8 @@ def test_web_ui_desktop_popup_and_live_edit_toggle(web_server: str, page) -> Non
     for error in page_errors:
         print(f"PAGEERROR={error}")
     expect(popup).to_be_visible(timeout=15_000)
-    expect(page.locator(".composition-mark, .composition-preview").last).to_be_visible(timeout=15_000)
+    expect(page.locator(".composition-mark").last).to_be_visible(timeout=15_000)
+    expect(page.locator(".composition-preview")).to_have_count(0)
     expect(page.locator("[data-testid='suggestion-popup'] .suggestion button").first).to_be_visible()
     first_suggestion_text = page.locator("[data-testid='suggestion-popup'] .suggestion .suggestion-word").first
     expected_first = first_suggestion_text.inner_text()
@@ -213,13 +183,26 @@ def test_web_ui_desktop_popup_and_live_edit_toggle(web_server: str, page) -> Non
 
     editor.press("Control+A")
     editor.type("khnhomtov")
-    expect(page.locator("[data-testid='segment-preview']")).to_be_visible(timeout=15_000)
-    expect(page.locator(".segment-chip").nth(0)).to_contain_text("ខ្ញុំ")
-    expect(page.locator(".segment-chip").nth(1)).to_contain_text("ទៅ")
-    expect(page.locator("[data-testid='suggestion-popup'] .suggestion button").first).to_contain_text("ខ្ញុំទៅ")
+    expect(popup).to_have_attribute("data-candidate-level", "phrase", timeout=15_000)
+    expect(page.locator("[data-testid='segment-preview']")).to_have_count(0)
+    expect(editor).to_have_value("khnhomtov")
+    expect(page.locator(".composition-preview")).to_have_count(0)
+    expect(popup.locator(".candidate-choice").first).to_contain_text("ខ្ញុំទៅ")
+
+    # Phrase mode consumes horizontal arrows and never jumps into word-level
+    # suggestions. Segment Edit is an explicit Tab transition.
     editor.press("ArrowRight")
-    expect(page.locator(".segment-chip.active").last).to_contain_text("ទៅ")
-    expect(page.locator("[data-testid='suggestion-popup'] .suggestion button").first).to_contain_text("ទៅ")
+    expect(popup).to_have_attribute("data-candidate-level", "phrase")
+    editor.press("Tab")
+    expect(popup).to_have_attribute("data-candidate-level", "segment")
+    expect(popup.locator("[data-testid='segment-edit-header']")).to_be_visible()
+    expect(popup.locator(".candidate-segment.active")).to_contain_text("ខ្ញុំ")
+    expect(popup.locator(".candidate-choice").first).to_contain_text("ខ្ញុំ")
+    editor.press("ArrowRight")
+    expect(popup.locator(".candidate-segment.active")).to_contain_text("ទៅ")
+    expect(popup.locator(".candidate-choice").first).to_contain_text("ទៅ")
+    editor.press("Tab")
+    expect(popup).to_have_attribute("data-candidate-level", "phrase")
 
     live_edit_button = page.locator("[data-testid='toggle-live-edit']").last
     expect(live_edit_button).to_have_class(re.compile(r".*active.*"))
@@ -229,13 +212,7 @@ def test_web_ui_desktop_popup_and_live_edit_toggle(web_server: str, page) -> Non
     live_edit_button.click()
     expect(live_edit_button).to_have_class(re.compile(r".*active.*"))
 
-    rules_button = page.locator("[data-testid='toggle-rules']").last
-    rules_button.click()
-    expect(rules_button).to_have_class(re.compile(r".*active.*"))
-    expect(page.locator(".guide-panel")).to_be_visible(timeout=15_000)
-
-
-def test_web_ui_mobile_candidate_bar_prioritizes_candidates(web_server: str, mobile_page) -> None:
+def test_web_ui_mobile_keeps_caret_candidate_surface(web_server: str, mobile_page) -> None:
     _goto_app(mobile_page, web_server)
 
     editor = mobile_page.locator("[data-testid='editor-input']").last
@@ -244,16 +221,71 @@ def test_web_ui_mobile_candidate_bar_prioritizes_candidates(web_server: str, mob
     editor.type("tverkomnaebrae")
 
     candidate_bar = mobile_page.locator(".candidate-bar").last
+    popup = mobile_page.locator("[data-testid='suggestion-popup']").last
     expect(candidate_bar).to_be_visible(timeout=15_000)
-    expect(mobile_page.locator("[data-testid='suggestion-popup']")).to_be_hidden()
-    expect(candidate_bar.locator(".suggestion button").first).to_be_visible(timeout=15_000)
+    expect(popup).to_be_visible(timeout=15_000)
+    expect(popup.locator(".candidate-choice").first).to_be_visible(timeout=15_000)
     expect(candidate_bar.locator(".candidate-footer")).to_be_visible(timeout=15_000)
     expect(candidate_bar.locator("[data-testid='mobile-caret-left']")).to_be_visible(timeout=15_000)
     expect(candidate_bar.locator("[data-testid='mobile-caret-right']")).to_be_visible(timeout=15_000)
     expect(candidate_bar.locator("[data-testid='mobile-select-up']")).to_be_visible(timeout=15_000)
     expect(candidate_bar.locator("[data-testid='mobile-select-down']")).to_be_visible(timeout=15_000)
-    expect(mobile_page.locator("[data-testid='segment-preview']")).to_be_visible(timeout=15_000)
-    expect(candidate_bar.locator(".suggestion").nth(1)).to_be_visible()
+    expect(mobile_page.locator("[data-testid='segment-preview']")).to_have_count(0)
+    expect(mobile_page.locator(".candidate-track-mobile .suggestion")).to_have_count(0)
+
+
+def test_web_ui_exact_gumnit_stays_flat_and_ranks_correct_spelling_first(web_server: str, page) -> None:
+    _goto_app(page, web_server)
+
+    editor = page.locator("[data-testid='editor-input']").last
+    editor.click()
+    editor.type("gumnit")
+
+    popup = page.locator("[data-testid='suggestion-popup']").last
+    expect(popup).to_be_visible(timeout=15_000)
+    expect(popup).to_have_attribute("data-candidate-level", "flat")
+    expect(popup.locator(".candidate-choice .suggestion-word").first).to_have_text("គំនិត")
+
+
+def test_web_ui_mobile_rules_open_as_full_width_page(web_server: str, mobile_page) -> None:
+    _goto_app(mobile_page, web_server)
+
+    mobile_page.locator("[data-testid='toggle-sidebar']").last.click()
+    rules_button = mobile_page.locator("[data-testid='toggle-rules']").last
+    rules_button.click()
+    guide = mobile_page.locator("[data-testid='guide-sheet']").last
+    expect(guide).to_be_visible(timeout=15_000)
+
+    viewport_width = mobile_page.evaluate("window.innerWidth")
+    assert guide.bounding_box()["width"] == viewport_width
+    assert guide.bounding_box()["height"] == mobile_page.evaluate("window.innerHeight")
+    assert guide.locator(".guide-scroll").evaluate("node => node.scrollHeight > node.clientHeight")
+    expect(guide.locator(".guide-scroll")).to_have_css("scrollbar-width", "none")
+    expect(guide.locator(".guide-overflow-cue")).to_have_count(0)
+
+    mobile_page.keyboard.press("Escape")
+    expect(mobile_page.locator("[data-testid='guide-sheet']")).to_have_count(0)
+
+
+def test_web_ui_rules_open_as_dedicated_page(web_server: str, page) -> None:
+    _goto_app(page, web_server)
+
+    rules_button = page.locator("[data-testid='toggle-rules']").last
+    rules_button.click()
+    guide = page.locator("[data-testid='guide-sheet']").last
+    expect(guide).to_be_visible(timeout=15_000)
+    expect(guide).to_have_css("position", "fixed")
+    assert guide.bounding_box()["width"] == page.evaluate("window.innerWidth")
+    assert guide.bounding_box()["height"] == page.evaluate("window.innerHeight")
+
+    page.keyboard.press("Escape")
+    expect(guide).to_have_count(0)
+    expect(rules_button).not_to_have_class(re.compile(r".*active.*"))
+
+    rules_button.click()
+    expect(page.locator("[data-testid='guide-sheet']").last).to_be_visible(timeout=15_000)
+    page.locator("[data-testid='close-rules']").last.click()
+    expect(page.locator("[data-testid='guide-sheet']")).to_have_count(0)
 
 
 def test_web_ui_mobile_up_down_controls_cycle_candidates(web_server: str, mobile_page) -> None:
@@ -265,7 +297,7 @@ def test_web_ui_mobile_up_down_controls_cycle_candidates(web_server: str, mobile
     editor.type("preah")
     expect(mobile_page.locator(".candidate-bar").last).to_be_visible(timeout=15_000)
 
-    active = mobile_page.locator(".candidate-bar .suggestion.active .suggestion-word").last
+    active = mobile_page.locator("[data-testid='suggestion-popup'] .suggestion.active .suggestion-word").last
     mobile_page.locator("[data-testid='mobile-select-down']").last.click()
     first = active.inner_text().strip()
     assert first
@@ -342,7 +374,7 @@ def test_web_ui_mobile_initial_layout_keeps_candidate_strip_visible(web_server: 
     candidate_bar = mobile_page.locator(".candidate-bar").last
     expect(candidate_bar).to_be_visible(timeout=15_000)
     expect(candidate_bar).to_have_class(re.compile(r".*candidate-bar-empty.*"))
-    expect(candidate_bar.locator(".candidate-empty").last).to_be_visible(timeout=15_000)
+    expect(candidate_bar.locator("[data-testid='mobile-candidate-hints']").last).to_be_visible(timeout=15_000)
 
     layout = mobile_page.evaluate(
         """() => {
@@ -360,7 +392,38 @@ def test_web_ui_mobile_initial_layout_keeps_candidate_strip_visible(web_server: 
     )
     assert layout is not None
     assert layout["barHeight"] > 24
-    assert layout["editorHeight"] < (layout["viewportHeight"] * 0.75)
+    assert layout["editorHeight"] >= (layout["viewportHeight"] * 0.55)
+
+
+@pytest.mark.slow
+def test_next_word_predictions_use_only_the_dock_and_enter_inserts_newline(web_server: str, page) -> None:
+    _goto_app(page, web_server)
+
+    editor = page.locator("[data-testid='editor-input']").last
+    expect(editor).to_be_visible(timeout=20_000)
+    editor.fill("ខ្ញុំ ")
+
+    dock = page.locator("[data-testid='next-word-dock']").last
+    expect(dock).to_be_visible(timeout=15_000)
+    expect(page.locator("[data-testid='suggestion-popup']")).to_have_count(0)
+    expect(page.locator(".candidate-track-mobile .suggestion")).to_have_count(0)
+    expect(page.locator("[data-testid='candidate-hints']")).to_contain_text("Enter")
+
+    editor.press("Enter")
+    expect(editor).to_have_value("ខ្ញុំ \n")
+
+
+@pytest.mark.slow
+def test_mobile_next_word_predictions_are_not_duplicated_in_candidate_track(web_server: str, mobile_page) -> None:
+    _goto_app(mobile_page, web_server)
+
+    editor = mobile_page.locator("[data-testid='editor-input']").last
+    expect(editor).to_be_visible(timeout=20_000)
+    editor.fill("ខ្ញុំ ")
+
+    expect(mobile_page.locator("[data-testid='next-word-dock']").last).to_be_visible(timeout=15_000)
+    expect(mobile_page.locator(".candidate-track-mobile .suggestion")).to_have_count(0)
+    expect(mobile_page.locator("[data-testid='mobile-candidate-hints']")).to_contain_text("Enter")
 
 
 def test_web_ui_mobile_pretext_is_loaded_and_sets_layout_vars(web_server: str, mobile_page) -> None:
@@ -386,117 +449,253 @@ def test_web_ui_mobile_pretext_is_loaded_and_sets_layout_vars(web_server: str, m
     assert css["subtitle"].endswith("px")
 
 
+def test_web_ui_theme_palette_is_independent_and_persistent(web_server: str, page) -> None:
+    _goto_app(page, web_server)
+
+    expect(page.locator(":root")).to_have_attribute("data-theme", "light")
+    page.locator("[data-testid='toggle-settings']").last.click()
+    expect(page.locator("[data-testid='theme-system']")).to_have_count(0)
+    page.locator("[data-testid='theme-dark']").click()
+    page.locator("[data-testid='palette-angkor']").click()
+
+    expect(page.locator(":root")).to_have_attribute("data-theme", "dark")
+    expect(page.locator(":root")).to_have_attribute("data-palette", "angkor")
+    assert page.evaluate("localStorage.getItem('roman_lookup.theme')") == "dark"
+    assert page.evaluate("localStorage.getItem('roman_lookup.palette')") == "angkor"
+
+    page.reload(wait_until="domcontentloaded")
+    expect(page.locator(":root")).to_have_attribute("data-theme", "dark")
+    expect(page.locator(":root")).to_have_attribute("data-palette", "angkor")
+    page.locator("[data-testid='toggle-settings']").last.click()
+    expect(page.locator("[data-testid='theme-dark']")).to_have_class(re.compile(r".*active.*"))
+    expect(page.locator("[data-testid='palette-angkor']")).to_have_class(re.compile(r".*active.*"))
+
+
 @pytest.mark.slow
-def test_web_ui_manual_selection_lock_blocks_printable_typing(web_server: str, page) -> None:
+def test_web_ui_add_pair_flick_save_and_normal_decode(web_server: str, page) -> None:
     _goto_app(page, web_server)
 
     editor = page.locator("[data-testid='editor-input']").last
     expect(editor).to_be_visible(timeout=20_000)
-    page.locator("[data-testid='mode-manual']").last.click()
+    expect(page.locator("[data-testid='engine-status']")).to_have_count(0, timeout=20_000)
+    page.locator("[data-testid='toggle-saved-mappings']").last.click()
+    expect(page.locator("[data-testid='saved-words-page']")).to_be_visible()
+    page.locator("[data-testid='add-saved-mapping']").last.click()
 
-    editor.click()
-    editor.type("imsorida")
-    expect(page.locator("[data-testid='suggestion-popup']").last).to_be_visible(timeout=15_000)
+    modal = page.locator("[data-testid='add-pair-modal']")
+    expect(modal).to_be_visible()
+    roman_field = page.locator("[data-testid='add-pair-roman']")
+    khmer_field = page.locator("[data-testid='add-pair-khmer']")
+    expect(roman_field).to_have_attribute("placeholder", "ឧ. khnhom")
+    for field in (roman_field, khmer_field):
+        weight = int(field.evaluate("el => getComputedStyle(el).fontWeight"))
+        assert weight <= 500, "placeholder fields must not inherit the label's bold weight"
+    keyboard = page.locator("[data-testid='flick-keyboard']")
+    expect(keyboard).to_be_visible()
+    expect(editor).to_have_value("")
+    expect(page.locator("[data-testid='suggestion-popup']")).to_have_count(0)
+    roman_field.fill("zzqname")
 
-    editor.press("Space")
-    editor.press("x")
-    expect(editor).to_have_value("imsorida")
+    center_key = page.locator("[data-testid='flick-key-1-1']")
+    center_key.click()
+    expect(khmer_field).to_have_value("ក")
+    expect(editor).to_have_value("")
+
+    box = center_key.bounding_box()
+    assert box is not None
+    x = box["x"] + box["width"] / 2
+    y = box["y"] + box["height"] / 2
+    page.mouse.move(x, y)
+    page.mouse.down()
+    expect(page.locator(".flick-preview")).to_be_visible()
+    page.mouse.move(x, y + 24)
+    page.mouse.up()
+    expect(khmer_field).to_have_value("កគ")
+    page.locator("[data-testid='flick-backspace']").click()
+    expect(khmer_field).to_have_value("ក")
+
+    page.locator("[data-testid='add-pair-save']").click()
+    expect(modal).to_have_count(0)
+    row = page.locator(".saved-words-row")
+    expect(row).to_contain_text("zzqname")
+    expect(row).to_contain_text("ក")
+
+    search = page.locator("[data-testid='saved-words-search']")
+    search.fill("missing")
+    expect(page.locator(".saved-words-row")).to_have_count(0)
+    search.fill("ក")
+    expect(page.locator(".saved-words-row")).to_have_count(1)
+
+    page.locator("[data-testid='saved-word-menu-button']").click()
+    page.locator("[data-testid='edit-saved-word']").click()
+    expect(page.locator("[data-testid='add-pair-roman']")).to_have_value("zzqname")
+    expect(page.locator("[data-testid='add-pair-khmer']")).to_have_value("ក")
+    page.locator("[data-testid='add-pair-cancel']").click()
+
+    page.locator("[data-testid='saved-word-menu-button']").click()
+    page.locator("[data-testid='delete-saved-word']").click()
+    expect(page.locator(".saved-words-row")).to_have_count(0)
+    expect(page.locator("[data-testid='saved-words-toast']")).to_be_visible()
+    page.locator("[data-testid='undo-delete-saved-word']").click()
+    expect(page.locator(".saved-words-row")).to_have_count(1)
+
+    page.locator("[data-testid='saved-words-back']").click()
+
+    editor.fill("zzqname")
+    popup = page.locator("[data-testid='suggestion-popup']").last
+    expect(popup).to_be_visible(timeout=15_000)
+    expect(popup.locator(".suggestion-word").first).to_have_text("ក")
 
 
 @pytest.mark.slow
-def test_web_ui_manual_skip_undo_and_inline_preview_sync(web_server: str, page) -> None:
+def test_web_ui_explicit_spell_review_replaces_joined_typo_and_clears_on_edit(web_server: str, page) -> None:
     _goto_app(page, web_server)
 
     editor = page.locator("[data-testid='editor-input']").last
     expect(editor).to_be_visible(timeout=20_000)
-    page.locator("[data-testid='mode-manual']").last.click()
+    expect(page.locator("[data-testid='engine-status']")).to_have_count(0, timeout=20_000)
+    tool_order = page.locator(".sidebar-section").last.locator(".sidebar-item").evaluate_all(
+        "items => items.map(item => item.dataset.testid)"
+    )
+    assert tool_order[:3] == ["check-spelling", "toggle-rules", "toggle-saved-mappings"]
+    editor.fill("សាលារាននៅក្បែរផ្ទះ")
 
-    editor.click()
-    editor.type("imsorida")
-    expect(page.locator("[data-testid='suggestion-popup']").last).to_be_visible(timeout=15_000)
+    page.locator("[data-testid='check-spelling']").last.click()
+    review_bar = page.locator("[data-testid='spell-review-bar']")
+    expect(review_bar).to_be_visible(timeout=20_000)
+    expect(review_bar).to_contain_text("ពិនិត្យអក្ខរាវិរុទ្ធ")
+    expect(review_bar).to_contain_text("1 / 1")
+    expect(review_bar).not_to_contain_text("Viterbi")
+    expect(review_bar).not_to_contain_text("khmer_segmenter")
+    segments = page.locator("[data-testid='spell-segment']")
+    expect(segments).to_have_count(5)
+    assert segments.evaluate_all("nodes => nodes.map(node => node.textContent)") == [
+        "សាលា",
+        "រាន",
+        "នៅ",
+        "ក្បែរ",
+        "ផ្ទះ",
+    ]
+    normal_segment = segments.nth(2)
+    assert normal_segment.evaluate("node => getComputedStyle(node).pointerEvents") == "auto"
+    resting_color = normal_segment.evaluate("node => getComputedStyle(node).color")
+    normal_segment.hover()
+    page.wait_for_timeout(150)
+    assert normal_segment.evaluate("node => getComputedStyle(node).color") != resting_color
+    _set_editor_caret(page, len("សាលារាននៅក្បែរផ្ទះ"))
+    normal_segment.click()
+    expect(normal_segment).not_to_have_class(re.compile("selected"))
+    assert _editor_caret(page) == len("សាលារាននៅក្បែរផ្ទះ")
 
-    editor.press("Space")
+    issue = page.locator("[data-testid='spell-issue']").first
+    expect(issue).to_have_text(re.compile("សាលារាន"))
+    issue.click()
+    popover = page.locator("[data-testid='spell-popover']")
+    expect(popover).to_be_visible()
+    assert issue.evaluate("node => getComputedStyle(node).webkitTextFillColor") != "rgba(0, 0, 0, 0)"
+    review_bar.click(position={"x": 12, "y": 12})
+    expect(popover).to_have_count(0)
+    expect(page.locator("[data-testid='spell-issue']")).to_have_count(1)
+    expect(review_bar).to_contain_text("1 / 1")
+    issue.click()
+    expect(popover).to_be_visible()
+    expect(page.locator("[data-testid='spell-option']").first).to_contain_text("សាលារៀន")
+    accept = page.locator("[data-testid='spell-accept']")
+    assert accept.evaluate("node => getComputedStyle(node).webkitTextFillColor") == "rgb(255, 255, 255)"
+    assert accept.evaluate("node => getComputedStyle(node).backgroundColor") == "rgb(15, 93, 107)"
+    popover_box = popover.bounding_box()
+    card_box = page.locator(".editor-card").bounding_box()
+    assert popover_box is not None and card_box is not None
+    assert popover_box["x"] >= card_box["x"]
+    assert popover_box["x"] + popover_box["width"] <= card_box["x"] + card_box["width"]
+    editor.evaluate("(node, caret) => node.setSelectionRange(caret, caret)", len("សាលារាននៅក្បែរផ្ទះ"))
+    page.locator("[data-testid='spell-accept']").click()
 
-    manual_preview = page.locator("[data-testid='manual-preview']")
-    expect(manual_preview).to_be_visible(timeout=15_000)
+    expect(editor).to_have_value("សាលារៀននៅក្បែរផ្ទះ")
+    assert editor.evaluate("node => node.selectionStart") == len("សាលារៀននៅក្បែរផ្ទះ")
+    expect(page.locator("[data-testid='spell-issue']")).to_have_count(0)
+    expect(review_bar).to_have_count(0)
 
-    remaining_node = manual_preview.locator(".segment-chip .segment-chip-output").last
-    remaining_before = remaining_node.inner_text().strip()
-    editor.press("s")
-    remaining_after_skip = remaining_node.inner_text().strip()
-    assert remaining_after_skip != remaining_before
-    assert len(remaining_after_skip) < len(remaining_before)
-    expect(editor).to_have_value("imsorida")
+    editor.fill("សាលារៀន")
+    page.locator("[data-testid='check-spelling']").last.click()
+    expect(review_bar).to_contain_text("រកមិនឃើញពាក្យដែលអាចកែបាន", timeout=20_000)
+    expect(review_bar).to_have_class(re.compile("is-clear"))
+    expect(review_bar).to_have_count(0, timeout=4_000)
 
-    editor.press("u")
-    expect(remaining_node).to_have_text(remaining_before)
-    expect(editor).to_have_value("imsorida")
+    editor.fill("សាលារៀណ")
+    page.locator("[data-testid='check-spelling']").last.click()
+    expect(review_bar).to_contain_text("1 / 1", timeout=20_000)
+    issue = page.locator("[data-testid='spell-issue']").first
+    expect(issue).to_have_text(re.compile("សាលារៀណ"))
+    issue.click()
+    expect(page.locator("[data-testid='spell-option']").first).to_contain_text("សាលារៀន")
+    page.locator("[data-testid='spell-accept']").click()
+    expect(editor).to_have_value("សាលារៀន")
 
-    editor.press("Enter")
+    editor.fill("តែនៅខ្វះពត៍មាន និង ការបង្ហាត់ ណែនាំ ប្រកបដោយវិជ្ជាជីវះ។ នេះក៏ជា កម្លាំងចិត្ត ក្នុងការបន្តការងារនេះ តទៅមុខ?")
+    page.locator("[data-testid='check-spelling']").last.click()
+    information_issue = page.locator("[data-testid='spell-issue']").filter(has_text="ពត៍មាន")
+    expect(information_issue).to_have_count(1, timeout=20_000)
+    information_issue.click()
+    expect(page.locator("[data-testid='spell-option']").first).to_contain_text("ព័ត៌មាន")
 
-    built_text_node = manual_preview.locator(".segment-chip.active .segment-chip-output").last
-    expect(built_text_node).to_be_visible(timeout=15_000)
-    built_text = built_text_node.inner_text().strip()
-    assert built_text, "manual built text should not be empty after selecting a candidate"
-
-    inline_preview_text = page.locator(".composition-preview .composition-preview-text").last
-    expect(inline_preview_text).to_have_text(built_text)
+    editor.fill("សាលារាននៅក្បែរផ្ទះ")
+    expect(review_bar).to_have_count(0)
 
 
 @pytest.mark.slow
-def test_web_ui_manual_sambath_shows_context_subscript_fallback(web_server: str, page) -> None:
+def test_web_ui_spell_popover_stays_inside_document_at_right_edge(web_server: str, page) -> None:
+    page.add_init_script("window.__khmerImeSpellPopoverPlacementInstalled = true")
     _goto_app(page, web_server)
+    page.add_style_tag(
+        content="""
+        .editor, .spell-overlay {
+          font-family: monospace !important;
+          font-size: 24px !important;
+        }
+        """
+    )
 
     editor = page.locator("[data-testid='editor-input']").last
-    expect(editor).to_be_visible(timeout=20_000)
-    page.locator("[data-testid='mode-manual']").last.click()
+    editor.fill(f"សាលារៀណ {'W' * 32} សាលារៀណ")
+    page.locator("[data-testid='check-spelling']").last.click()
+    issues = page.locator("[data-testid='spell-issue']")
+    expect(issues).to_have_count(2, timeout=20_000)
+    edge_issue = issues.last
 
-    editor.click()
-    editor.type("sambath")
-    expect(page.locator("[data-testid='suggestion-popup']").last).to_be_visible(timeout=15_000)
+    issue_box = edge_issue.bounding_box()
+    card_box = page.locator(".editor-card").bounding_box()
+    assert issue_box is not None and card_box is not None
+    assert issue_box["x"] + 240 > card_box["x"] + card_box["width"] - 12
 
-    editor.press("Space")
-    for _ in range(5):
-        editor.press("s")
-    _click_manual_candidate(page, "ត")
-
-    max_cycles = 64
-    for _ in range(max_cycles):
-        if _manual_active_candidate_word(page) == "្ត":
-            break
-        editor.press("Space")
-    else:
-        raise AssertionError("manual context fallback candidate '្ត' did not appear while cycling")
-
-    hint = _manual_active_candidate_hint(page)
-    assert "subscript" in hint
-    assert "context repeat" in hint
-    assert "no-consume" in hint
+    issues.first.click()
+    page.locator("button[aria-label='មើលកន្លែងបន្ទាប់']").click()
+    expect(edge_issue).to_have_class(re.compile("active"))
+    popover = page.locator("[data-testid='spell-popover']")
+    expect(popover).to_be_visible()
+    page.wait_for_function(
+        """() => document.querySelector('[data-testid="spell-popover"]')
+          ?.style.getPropertyValue('--spell-shift-x') !== ''""",
+        timeout=3_000,
+    )
+    popover_box = popover.bounding_box()
+    assert popover_box is not None
+    assert popover_box["x"] >= card_box["x"] + 12
+    assert popover_box["x"] + popover_box["width"] <= card_box["x"] + card_box["width"] - 12
 
 
 @pytest.mark.slow
-def test_web_ui_manual_sambath2_space_s_skips_without_text_mutation(web_server: str, page) -> None:
+def test_web_ui_flick_keyboard_treats_composed_key_as_one_backspace_unit(web_server: str, page) -> None:
     _goto_app(page, web_server)
 
     editor = page.locator("[data-testid='editor-input']").last
-    expect(editor).to_be_visible(timeout=20_000)
-    page.locator("[data-testid='mode-manual']").last.click()
+    page.locator("[data-testid='toggle-saved-mappings']").last.click()
+    page.locator("[data-testid='add-saved-mapping']").last.click()
 
-    editor.click()
-    editor.type("sambath")
-    expect(page.locator("[data-testid='suggestion-popup']").last).to_be_visible(timeout=15_000)
-
-    editor.press("Space")
-    manual_preview = page.locator("[data-testid='manual-preview']")
-    expect(manual_preview).to_be_visible(timeout=15_000)
-    remaining_node = manual_preview.locator(".segment-chip .segment-chip-output").last
-    remaining_before = remaining_node.inner_text().strip()
-
-    editor.press("s")
-
-    expect(editor).to_have_value("sambath")
-    remaining_after = remaining_node.inner_text().strip()
-    assert remaining_after != remaining_before
-    assert len(remaining_after) < len(remaining_before)
-    expect(page.locator("[data-testid='suggestion-popup']").last).to_be_visible(timeout=15_000)
-    expect(manual_preview).to_be_visible(timeout=15_000)
+    page.locator("[data-testid='flick-key-3-1']").click()
+    expect(page.locator("[data-testid='add-pair-khmer']")).to_have_value("ឲ្យ")
+    expect(editor).to_have_value("")
+    page.locator("[data-testid='flick-backspace']").click()
+    expect(page.locator("[data-testid='add-pair-khmer']")).to_have_value("")
+    expect(page.locator("[data-testid='flick-space']")).to_have_count(0)
+    expect(page.locator("[data-testid='flick-enter']")).to_have_count(0)

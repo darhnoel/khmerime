@@ -6,7 +6,6 @@
 
 use std::collections::HashMap;
 
-use dioxus::document;
 use dioxus::prelude::*;
 use roman_lookup::ShadowObservation;
 
@@ -21,16 +20,33 @@ use self::engine_registry::current_engine_readiness;
 use self::startup_fetch::start_engine_bootstrap;
 use self::startup_signals::StartupSignals;
 use self::ui::components::{AppToolbar, EditorCard, GuidePanel, WorkspaceBody};
-use self::ui::editor::{
-    refresh_popup_position, CandidateMode, EditorSignals, InputMode, ManualSaveRequest, ManualTypingState,
-    SegmentedSession,
+use self::ui::editor::{refresh_popup_position, CandidateLevel, CandidateMode, EditorSignals, SegmentedSession};
+use self::ui::platform::{
+    mark_app_ready, mark_app_shell_ready, refresh_mobile_layout_density, set_editor_caret, set_editor_caret_no_focus,
 };
-use self::ui::platform::{mark_app_ready, mark_app_shell_ready, refresh_mobile_layout_density, set_editor_caret};
+use self::ui::spellcheck::SpellReview;
 use self::ui::storage::{
-    load_decoder_mode, load_editor_text, load_enabled, load_font_size, load_history, load_user_dictionary,
+    load_decoder_mode, load_editor_text, load_enabled, load_font_size, load_history, load_palette, load_sidebar_open,
+    load_theme, load_user_dictionary, save_palette, save_theme,
 };
 
 pub(crate) const EDITOR_ID: &str = "ime-editor";
+// The stylesheet is EMBEDDED, not fetched. dx serve does not statically serve
+// asset_dir files, so an external `href: "/assets/main.css"` 404s to the SPA
+// index and no styles load (doubled toolbar labels, no spacing). Inline the
+// ordered partials via include_str! so the CSS ships in the binary. Keep this
+// list in sync with the @imports in assets/main.css.
+const APP_CSS: &str = concat!(
+    include_str!("../../../assets/css/00-tokens.css"),
+    include_str!("../../../assets/css/01-base.css"),
+    include_str!("../../../assets/css/10-layout.css"),
+    include_str!("../../../assets/css/20-toolbar.css"),
+    include_str!("../../../assets/css/30-editor.css"),
+    include_str!("../../../assets/css/40-candidates.css"),
+    include_str!("../../../assets/css/50-guide-debug.css"),
+    include_str!("../../../assets/css/90-responsive.css"),
+);
+
 const DEFAULT_FONT_SIZE: usize = 24;
 pub(crate) const MIN_FONT_SIZE: usize = 18;
 pub(crate) const MAX_FONT_SIZE: usize = 38;
@@ -67,16 +83,66 @@ fn App() -> Element {
     let mut startup_started = use_signal(|| false);
     let text = use_signal(load_editor_text);
     let roman_enabled = use_signal(load_enabled);
-    let input_mode = use_signal(|| InputMode::NormalWordSuggestion);
     let decoder_mode = use_signal(load_decoder_mode);
     let font_size = use_signal(|| load_font_size(MIN_FONT_SIZE, MAX_FONT_SIZE, DEFAULT_FONT_SIZE));
+    let theme = use_signal(load_theme);
+    let palette = use_signal(load_palette);
+    // Brightness and palette are independent root attributes. Brightness is
+    // explicit; missing data-palette selects the default teal.
+    use_effect(move || {
+        let selected = theme();
+        let selected_palette = palette();
+        save_theme(selected);
+        save_palette(selected_palette);
+        let theme_script = match selected.data_attr() {
+            None => "document.documentElement.removeAttribute('data-theme');".to_string(),
+            Some(attr) => format!("document.documentElement.setAttribute('data-theme', {attr:?});"),
+        };
+        let palette_script = match selected_palette.data_attr() {
+            None => "document.documentElement.removeAttribute('data-palette');".to_string(),
+            Some(attr) => format!("document.documentElement.setAttribute('data-palette', {attr:?});"),
+        };
+        let script = format!("{theme_script}{palette_script}");
+        let _ = dioxus::document::eval(&script);
+    });
     let show_guide = use_signal(|| false);
+    let sidebar_open = use_signal(load_sidebar_open);
+
+    use_effect(move || {
+        let _ = dioxus::document::eval(
+            r#"
+            (() => {
+                if (window.__khmerImeGuideEscapeInstalled) return;
+                window.__khmerImeGuideEscapeInstalled = true;
+                document.addEventListener("keydown", (event) => {
+                    if (event.key === "Escape") {
+                        document.querySelector('[data-testid="close-rules"]')?.click();
+                    }
+                });
+            })();
+            "#,
+        );
+    });
+
+    use_effect(move || {
+        let script = r#"
+            requestAnimationFrame(() => {
+                const root = document.documentElement;
+                root.dataset.scrollCue = root.scrollHeight > window.innerHeight + 24 ? '1' : '0';
+                window.addEventListener('scroll', () => { root.dataset.scrollCue = '0'; }, { once: true, passive: true });
+            });
+        "#;
+        let _ = dioxus::document::eval(script);
+    });
     let suggestions = use_signal(Vec::<String>::new);
     let mut popup = use_signal(|| None::<SuggestionPopup>);
     let composition = use_signal(|| None::<CompositionMark>);
     let shadow_debug = use_signal(|| None::<ShadowObservation>);
     let segmented_session = use_signal(|| None::<SegmentedSession>);
     let segmented_refine_mode = use_signal(|| false);
+    let phrase_candidates = use_signal(Vec::<roman_lookup::DecodeCandidate>::new);
+    let candidate_level = use_signal(CandidateLevel::default);
+    let active_phrase_index = use_signal(|| 0usize);
     let suggestion_loading = use_signal(|| false);
     let suggestion_request_id = use_signal(|| 0u64);
     let candidate_mode = use_signal(|| CandidateMode::None);
@@ -87,14 +153,16 @@ fn App() -> Element {
     let mut selection_started = use_signal(|| false);
     let selected = use_signal(|| 0usize);
     let mut pending_caret = use_signal(|| None::<usize>);
+    // Like pending_caret, but places the caret WITHOUT focusing/scrolling (spell
+    // accept: the user is in the review popover, not typing in the textarea).
+    let mut pending_caret_no_focus = use_signal(|| None::<usize>);
     let history = use_signal(load_history);
-    let manual_typing_state = use_signal(|| None::<ManualTypingState>);
-    let manual_save_request = use_signal(|| None::<ManualSaveRequest>);
     let user_dictionary = use_signal(load_user_dictionary);
+    let spell_review = use_signal(SpellReview::default);
+    let spell_ignore = use_signal(std::collections::HashSet::<String>::new);
     let editor_state = EditorSignals {
         text,
         roman_enabled,
-        input_mode,
         decoder_mode,
         engine_readiness,
         engine_ready,
@@ -105,6 +173,9 @@ fn App() -> Element {
         shadow_debug,
         segmented_session,
         segmented_refine_mode,
+        phrase_candidates,
+        candidate_level,
+        active_phrase_index,
         suggestion_loading,
         suggestion_request_id,
         candidate_mode,
@@ -115,16 +186,24 @@ fn App() -> Element {
         selection_started,
         selected,
         pending_caret,
+        pending_caret_no_focus,
         history,
-        manual_typing_state,
-        manual_save_request,
         user_dictionary,
+        spell_review,
+        spell_ignore,
     };
 
     use_effect(move || {
         if let Some(caret) = pending_caret() {
             set_editor_caret(caret);
             pending_caret.set(None);
+        }
+    });
+
+    use_effect(move || {
+        if let Some(caret) = pending_caret_no_focus() {
+            set_editor_caret_no_focus(caret);
+            pending_caret_no_focus.set(None);
         }
     });
 
@@ -154,16 +233,13 @@ fn App() -> Element {
 
     use_effect(move || {
         let _ = suggestions().len();
-        let _ = input_mode();
         let _ = font_size();
         let _ = segmented_refine_mode();
         refresh_mobile_layout_density();
     });
 
     use_effect(move || {
-        if editor_state.roman_enabled()
-            && (editor_state.engine_ready() || editor_state.input_mode() == InputMode::ManualCharacterTyping)
-        {
+        if editor_state.roman_enabled() && editor_state.engine_ready() {
             spawn(ui::editor::update_candidates(editor_state.text(), editor_state));
         }
     });
@@ -179,14 +255,27 @@ fn App() -> Element {
     });
 
     rsx! {
-        document::Stylesheet { href: "./assets/main.css" }
-        div { class: "shell",
-            div { class: if show_guide() { "board" } else { "board board-wide" },
-                section { class: "workspace",
+        // Embedded stylesheet (see APP_CSS) — injected inline so it always loads.
+        style { {APP_CSS} }
+        div {
+            class: "shell",
+            onclick: move |_| {
+                let mut review = editor_state.spell_review();
+                if review.open_index.is_some() {
+                    review.dismiss_interaction();
+                    let mut spell_review = editor_state.spell_review;
+                    spell_review.set(review);
+                }
+            },
+            div { class: "board",
+                section { class: if sidebar_open() { "workspace sidebar-open" } else { "workspace sidebar-closed" },
                     AppToolbar {
                         state: editor_state,
                         show_guide,
                         font_size,
+                        theme,
+                        palette,
+                        sidebar_open,
                     }
                     WorkspaceBody {
                         roman_enabled: editor_state.roman_enabled(),
@@ -201,6 +290,10 @@ fn App() -> Element {
                     }
                 }
                 GuidePanel { show_guide }
+            }
+            div { class: "scroll-cue", aria_hidden: "true",
+                span { "⌄" }
+                span { "រំកិលចុះ" }
             }
         }
     }
