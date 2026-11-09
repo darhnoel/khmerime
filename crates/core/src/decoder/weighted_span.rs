@@ -1,5 +1,5 @@
 use std::collections::{HashMap, HashSet};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 use crate::roman_lookup::{char_ngrams, roman_search_variants, LegacyData, RankedEntryView};
 
@@ -111,7 +111,17 @@ pub(crate) struct WeightedSpanDecoder {
     span_proposer: Option<std::sync::Arc<dyn SpanProposalProvider>>,
     data: Arc<LegacyData>,
     config: DecoderConfig,
+    // Proposals the provider already returned, keyed by request. One refine reaches the same span
+    // up to four times (two decodes, two call sites each), and a model call costs ~125 ms.
+    span_proposal_memo: Mutex<HashMap<SpanProposalKey, Vec<SpanProposal>>>,
 }
+
+/// (full_input, span, start, end) — every field of a `SpanProposalRequest`.
+type SpanProposalKey = (String, String, usize, usize);
+
+/// Bound on remembered requests; the memo is cleared when full. Typing produces a new composition
+/// per keystroke, so only the latest few are ever looked up again.
+const SPAN_PROPOSAL_MEMO_CAPACITY: usize = 64;
 
 impl WeightedSpanDecoder {
     pub(crate) fn new(data: Arc<LegacyData>, config: DecoderConfig) -> Self {
@@ -120,7 +130,47 @@ impl WeightedSpanDecoder {
             data,
             config,
             span_proposer,
+            span_proposal_memo: Mutex::new(HashMap::new()),
         }
+    }
+
+    // The provider runs outside the lock: a model call is slow, and a rare duplicate computation
+    // under concurrent refines is cheaper than serializing them. Empty answers are not remembered,
+    // so a provider that failed to load its model is asked again next time.
+    fn memoized_proposals(
+        &self,
+        provider: &dyn SpanProposalProvider,
+        request: &SpanProposalRequest<'_>,
+    ) -> Vec<SpanProposal> {
+        let key = (
+            request.full_input.to_owned(),
+            request.span.to_owned(),
+            request.start,
+            request.end,
+        );
+        if let Some(hit) = self
+            .span_proposal_memo
+            .lock()
+            .ok()
+            .and_then(|memo| memo.get(&key).cloned())
+        {
+            return hit;
+        }
+        let proposals = provider.propose(request);
+        if !proposals.is_empty() {
+            if let Ok(mut memo) = self.span_proposal_memo.lock() {
+                if memo.len() >= SPAN_PROPOSAL_MEMO_CAPACITY {
+                    memo.clear();
+                }
+                memo.insert(key, proposals.clone());
+            }
+        }
+        proposals
+    }
+
+    #[cfg(test)]
+    pub(crate) fn set_span_proposer_for_tests(&mut self, provider: Arc<dyn SpanProposalProvider>) {
+        self.span_proposer = Some(provider);
     }
 
     fn decode_with_beam(&self, request: &DecodeRequest<'_>, started_at: super::DecodeTimer) -> Vec<BeamItem> {
@@ -891,13 +941,13 @@ impl WeightedSpanDecoder {
         let Some(provider) = &self.span_proposer else {
             return Vec::new();
         };
-        provider
-            .propose(&SpanProposalRequest {
-                full_input,
-                span,
-                start,
-                end,
-            })
+        let request = SpanProposalRequest {
+            full_input,
+            span,
+            start,
+            end,
+        };
+        self.memoized_proposals(provider.as_ref(), &request)
             .into_iter()
             .filter_map(|proposal| self.span_candidate_from_proposal(start, end, span, proposal))
             .collect()
@@ -1382,6 +1432,56 @@ mod tests {
     use super::{beam_item_to_candidate, context_delta, pos_delta, BeamItem, SpanCandidate, WeightedSpanDecoder};
     use crate::decoder::{DecoderConfig, DecoderMode};
     use crate::roman_lookup::{LegacyData, RankedLexicon, Transliterator};
+
+    /// Answers every whole-input span with one fixed word and counts how often it was asked.
+    #[derive(Default)]
+    struct CountingProvider {
+        calls: std::sync::atomic::AtomicUsize,
+    }
+
+    impl crate::decoder::SpanProposalProvider for CountingProvider {
+        fn candidate_ends(&self, _full_input: &str, start: usize, chars: &[char]) -> Vec<usize> {
+            if start == 0 && chars.len() >= 2 {
+                vec![chars.len()]
+            } else {
+                Vec::new()
+            }
+        }
+
+        fn propose(&self, request: &crate::decoder::SpanProposalRequest<'_>) -> Vec<crate::decoder::SpanProposal> {
+            self.calls.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+            vec![crate::decoder::SpanProposal {
+                output: "អនាគត".to_owned(),
+                recovered_roman: request.span.to_owned(),
+                confidence_bps: 9_000,
+                source: "counting-test",
+            }]
+        }
+    }
+
+    #[test]
+    fn a_refine_runs_the_provider_once_per_span() {
+        // The debounced refine decodes the same composition through phrase_candidates and
+        // suggest, and each decode reaches the whole-input span from two places. A real model
+        // costs ~125 ms per call, so every repeat is felt; the provider must run once.
+        let mut config = DecoderConfig::shadow_interactive()
+            .with_mode(DecoderMode::Hybrid)
+            .with_span_proposal_mode(crate::decoder::SpanProposalMode::Model);
+        config.wfst_max_latency_ms = 60_000;
+        let mut transliterator = Transliterator::from_default_data_with_config(config).unwrap();
+        let provider = Arc::new(CountingProvider::default());
+        transliterator.set_span_proposer_for_tests(provider.clone());
+
+        let history = HashMap::new();
+        let phrases = transliterator.phrase_candidates("aknagot", &history);
+        let _ = transliterator.suggest("aknagot", &history);
+
+        assert!(
+            phrases.iter().any(|candidate| candidate.from_model),
+            "the provider's word must still reach the phrase candidates"
+        );
+        assert_eq!(provider.calls.load(std::sync::atomic::Ordering::Relaxed), 1);
+    }
 
     fn weighted_span() -> &'static Transliterator {
         static TRANSLITERATOR: OnceLock<Transliterator> = OnceLock::new();

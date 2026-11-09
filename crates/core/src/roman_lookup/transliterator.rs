@@ -32,6 +32,13 @@ fn default_dictionary_image() -> Result<DictionaryImageView<'static>> {
 }
 
 impl Transliterator {
+    /// Test seam: swap in a span-proposal provider without touching the process-wide registry
+    /// (first registration wins there, and other tests rely on it staying empty).
+    #[cfg(test)]
+    pub(crate) fn set_span_proposer_for_tests(&mut self, provider: Arc<dyn crate::decoder::SpanProposalProvider>) {
+        self.decoder.set_span_proposer_for_tests(provider);
+    }
+
     #[cfg(not(all(target_arch = "wasm32", feature = "fetch-data")))]
     pub fn from_default_data() -> Result<Self> {
         Self::from_default_data_with_config(DecoderConfig::default())
