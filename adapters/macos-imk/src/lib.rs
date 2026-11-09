@@ -109,12 +109,23 @@ pub fn macos_live_decoder_config() -> DecoderConfig {
     config
 }
 
+/// Budget for a model-carrying visible refine. Same value as iOS, Android, Windows TSF and IBus.
+const MODEL_REFINE_MAX_LATENCY_MS: u64 = 2_000;
+
 // Debounced visible refiner config — runs the heavier model off the keystroke hot path.
-fn macos_visible_refiner_config() -> DecoderConfig {
+// `span_env` is the KHMERIME_SPAN_PROPOSALS value; taken as a parameter so tests need not
+// mutate the process environment.
+pub fn macos_visible_refiner_config(span_env: Option<&str>) -> DecoderConfig {
     let mut config = DecoderConfig::shadow_interactive().with_mode(DecoderMode::Hybrid);
     config.wfst_max_latency_ms = 250;
-    match std::env::var("KHMERIME_SPAN_PROPOSALS").ok().as_deref() {
-        Some("model") => config = config.with_span_proposal_mode(SpanProposalMode::Model),
+    match span_env {
+        Some("model") => {
+            config = config.with_span_proposal_mode(SpanProposalMode::Model);
+            // A warm model decode takes ~245-320 ms, and the latency guard discards a decode that
+            // finishes past the budget, so 250 ms threw most model results away. This refine is
+            // debounced and runs off the main thread and the session lock: the headroom is free.
+            config.wfst_max_latency_ms = MODEL_REFINE_MAX_LATENCY_MS;
+        }
         Some("static-test") => config = config.with_static_span_proposals(),
         _ => {}
     }
@@ -350,8 +361,10 @@ impl MacosIMKSession {
                 std::env::var("KHMERIME_SPAN_PROPOSALS").ok()
             ));
             if provider_on {
-                let visible_refiner = Transliterator::from_default_data_with_config(macos_visible_refiner_config())
-                    .expect("compiled-in lexicon data must be valid");
+                let visible_refiner = Transliterator::from_default_data_with_config(macos_visible_refiner_config(
+                    std::env::var("KHMERIME_SPAN_PROPOSALS").ok().as_deref(),
+                ))
+                .expect("compiled-in lexicon data must be valid");
                 builder = builder.visible_refiner(visible_refiner);
             }
             let ime = builder.build();

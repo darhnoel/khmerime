@@ -667,6 +667,21 @@ fn live_keystroke_path_carries_a_latency_budget() {
 }
 
 #[test]
+fn armed_visible_refiner_budget_fits_model_inference() {
+    // The latency guard discards a finished decode wholesale once it runs past the budget.
+    // A warm model decode measured 245-320 ms on Apple Silicon, so the old 250 ms budget threw
+    // away most model results: the ✦ row mostly never appeared. The refine is debounced and runs
+    // off the main thread and off the session lock, so the headroom costs no keystroke latency.
+    // Matches the 2 s budget on iOS, Android, Windows TSF and Linux IBus.
+    let config = khmerime_macos_imk::macos_visible_refiner_config(Some("model"));
+    assert!(
+        config.wfst_max_latency_ms >= 2_000,
+        "armed refiner budget too tight for model inference: {}ms",
+        config.wfst_max_latency_ms
+    );
+}
+
+#[test]
 fn refresh_segmented_preview_surfaces_model_marker() {
     // Part 2 debounces refreshSegmentedPreview (not refine_composition). Verify THAT method
     // surfaces the model-rescued word with from_model — the macOS segmented refine path.
