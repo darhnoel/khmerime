@@ -205,12 +205,6 @@ pub(crate) struct RankedLexicon {
     pub tag_bigrams: HashMap<(String, String), u32>,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) enum RankedLookupIndexMode {
-    BuildRetrievalIndexes,
-    SkipExactAliasAndGram,
-}
-
 #[derive(Serialize, Deserialize)]
 pub(crate) struct LegacyData {
     pub(super) entries: Vec<Entry>,

@@ -214,31 +214,18 @@ impl LegacyData {
         log_stage("next_word_context", elapsed_stage_ms(started));
 
         let started = start_stage_timer();
-        let index_mode = if dictionary_image.is_some() {
-            RankedLookupIndexMode::SkipExactAliasAndGram
+        // With the image present the decoder reads ranked entries and every count section from
+        // the image (ADR-0004), so a heap RankedLexicon would be built only to be emptied: ~300 ms
+        // and a ~25 MB allocation spike at session start, which the iOS extension cap feels.
+        // `corpus_stats` feeds nothing else on this path.
+        let ranked = if dictionary_image.is_some() {
+            drop(corpus_stats);
+            RankedLexicon::default()
         } else {
-            RankedLookupIndexMode::BuildRetrievalIndexes
-        };
-        let mut ranked = RankedLexicon::from_entries_with_stage_logger_and_index_mode(
-            &entries,
-            corpus_stats,
-            index_mode,
-            |stage, elapsed_ms| {
+            RankedLexicon::from_entries_with_stage_logger(&entries, corpus_stats, |stage, elapsed_ms| {
                 log_stage(&format!("ranked_lexicon.{stage}"), elapsed_ms);
-            },
-        );
-        // With the image present the decoder reads entries and count sections from
-        // the image, so the corresponding heap tables are redundant.
-        if dictionary_image.is_some() {
-            ranked.entries = Vec::new();
-            ranked.word_unigrams = HashMap::new();
-            ranked.word_bigrams = HashMap::new();
-            ranked.corpus_word_unigrams = HashMap::new();
-            ranked.corpus_word_bigrams = HashMap::new();
-            ranked.corpus_surface_unigrams = HashMap::new();
-            ranked.tag_unigrams = HashMap::new();
-            ranked.tag_bigrams = HashMap::new();
-        }
+            })
+        };
         log_stage("ranked_lexicon", elapsed_stage_ms(started));
 
         let started = start_stage_timer();

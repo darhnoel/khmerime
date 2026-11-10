@@ -121,10 +121,6 @@ impl Transliterator {
         log_stage("parse_lexicon", elapsed_stage_ms(started));
 
         let started = start_stage_timer();
-        let corpus_stats = parse_compiled_khpos_stats(DEFAULT_COMPILED_KHPOS_STATS)?;
-        log_stage("parse_khpos", elapsed_stage_ms(started));
-
-        let started = start_stage_timer();
         let next_word = parse_compiled_next_word_stats(DEFAULT_COMPILED_NEXT_WORD_STATS)?;
         log_stage("parse_next_word", elapsed_stage_ms(started));
 
@@ -132,9 +128,12 @@ impl Transliterator {
         let dictionary_image = default_dictionary_image()?;
         log_stage("parse_dictionary_image", elapsed_stage_ms(started));
 
+        // The khPOS corpus stats are not parsed here: with the dictionary image attached the
+        // decoder reads every corpus count from the image, and the heap copy (~16 MB) would only
+        // feed the ranked-lexicon build that the image path skips.
         let shared = Self::shared_data_from_entries_with_stage_logger_and_dictionary_image(
             entries,
-            corpus_stats,
+            CorpusStats::default(),
             next_word,
             Some(dictionary_image),
             &mut log_stage,
