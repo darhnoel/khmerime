@@ -261,6 +261,20 @@ final class KeyboardInputHandlerTests: XCTestCase {
             "tapping segment 1 must move focus there")
     }
 
+    // Tap word 2, tap it again: edit mode must open on word 2, not on word 1.
+    func test_chipTapped_laterSegmentTwice_editsThatSegment() {
+        let (handler, _) = makeHandler()
+        type("khnhomtov", into: handler)
+
+        handler.chipTapped(at: 1)
+        handler.chipTapped(at: 1)
+
+        XCTAssertEqual(handler.lastState?.segmentEditActive, true,
+            "the second tap on word 2 must enter Segment Edit Mode")
+        XCTAssertEqual(handler.lastState?.segmentEditIndex.map { Int($0) }, 1,
+            "edit mode must be on word 2")
+    }
+
     func test_chipTapped_onAlreadyFocusedSegment_entersInlineEditMode() {
         let (handler, _) = makeHandler()
         type("khnhomtov", into: handler)   // multi-word phrase, focus starts at segment 0
