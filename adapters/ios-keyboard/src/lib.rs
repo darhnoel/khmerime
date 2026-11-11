@@ -285,6 +285,15 @@ impl KhmerIMESession {
         render_state(&s.snapshot(), &result)
     }
 
+    /// Focus segment `index` WITHOUT entering edit mode: the touch keyboard's first-tap primitive.
+    /// Arrows only move focus inside edit mode, so a tap must not be simulated with them.
+    /// Mirrors Android's `nativeFocusSegment`; see `ImeSession::focus_segment`.
+    pub fn focus_segment(&self, index: u32) -> IosRenderState {
+        let mut s = self.inner.lock().unwrap();
+        let result = s.focus_segment(index as usize);
+        render_state(&s.snapshot(), &result)
+    }
+
     /// Toggle Segment Edit Mode on the focused segment.
     /// First call enters edit mode (next printable replaces segment roman input).
     /// Second call exits edit mode.
@@ -767,6 +776,25 @@ mod tests {
             state.segment_edit_index, state.focused_segment_index,
             "segment_edit_index must match focused_segment_index on tab entry"
         );
+    }
+
+    // Tapping the 2nd word then tapping it again must edit the 2nd word. chipTapped used to move
+    // focus with process_right, which the session ignores outside edit mode, so a tap could only
+    // ever edit the first word.
+    #[test]
+    fn tapping_a_later_word_twice_edits_that_word() {
+        let s = new_session();
+        s.focus_in();
+        let typed = type_str(&s, "khnhomtov");
+        assert!(typed.segments.len() >= 2, "khnhomtov must segment into ≥2 words");
+
+        let focused = s.focus_segment(1);
+        assert_eq!(focused.focused_segment_index, Some(1u64), "first tap focuses word 2");
+        assert!(!focused.segment_edit_active, "first tap only focuses; it does not edit");
+
+        let editing = s.process_tab();
+        assert!(editing.segment_edit_active, "second tap enters edit mode");
+        assert_eq!(editing.segment_edit_index, Some(1u64), "edit mode is on word 2");
     }
 
     #[test]

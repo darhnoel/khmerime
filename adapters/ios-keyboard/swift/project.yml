@@ -1,5 +1,8 @@
 name: KhmerIME
 options:
+  # Several targets list single files from KhmerIMEKeyboard/Input; without one shared
+  # group hierarchy xcodegen emits "Input" twice and Xcode 27 refuses to open the project.
+  createIntermediateGroups: true
   bundleIdPrefix: com.khmerime
   developmentLanguage: km
   deploymentTarget:

@@ -519,12 +519,12 @@ final class KeyboardInputHandler {
             }
             return
         }
-        let diff = index - focused
+        // Focus-only, like Android's focusSegment. Arrow keys are inert outside Segment Edit
+        // Mode, so simulating them here left focus on word 1 and a later word could never be
+        // edited by tapping.
         dispatcher.onSession { [weak self] in
             guard let self else { return }
-            var state = current
-            if diff > 0      { for _ in 0..<diff    { state = self.session.sendRight() } }
-            else if diff < 0 { for _ in 0..<(-diff) { state = self.session.sendLeft()  } }
+            let state = self.session.focusSegment(at: index)
             self.dispatcher.onMain { [weak self] in self?.render(state) }
         }
     }

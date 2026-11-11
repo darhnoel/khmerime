@@ -21,6 +21,8 @@ pub struct SpanProposal {
 
 pub trait SpanProposalProvider: Send + Sync {
     fn candidate_ends(&self, full_input: &str, start: usize, chars: &[char]) -> Vec<usize>;
+    /// Must return the same proposals for the same request: the decoder remembers non-empty
+    /// answers per request and does not ask again.
     fn propose(&self, request: &SpanProposalRequest<'_>) -> Vec<SpanProposal>;
 }
 

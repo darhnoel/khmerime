@@ -75,7 +75,13 @@ final class KeyboardSession {
     // Second call: exits edit mode and pins the segment.
     func sendTab() -> IosRenderState { inner.processTab() }
 
-    // Moves segment focus one step left / right within a segmented composition.
+    // Focuses segment `index` without entering edit mode: the first-tap primitive.
+    // Arrows only move focus inside edit mode, so taps must not use sendLeft/sendRight.
+    func focusSegment(at index: Int) -> IosRenderState {
+        inner.focusSegment(index: UInt32(index))
+    }
+
+    // Moves segment focus one step left / right within Segment Edit Mode.
     func sendLeft()  -> IosRenderState { inner.processLeft() }
     func sendRight() -> IosRenderState { inner.processRight() }
 

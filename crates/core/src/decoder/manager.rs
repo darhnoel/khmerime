@@ -39,6 +39,13 @@ impl DecoderManager {
         }
     }
 
+    #[cfg(test)]
+    pub(crate) fn set_span_proposer_for_tests(&mut self, provider: Arc<dyn super::SpanProposalProvider>) {
+        if let Some(weighted_span) = self.weighted_span.as_mut() {
+            weighted_span.set_span_proposer_for_tests(provider);
+        }
+    }
+
     pub(crate) fn suggest(&self, input: &str, history: &HashMap<String, usize>) -> Vec<String> {
         let composer = self.composer.analyze(input);
         let request = DecodeRequest {
