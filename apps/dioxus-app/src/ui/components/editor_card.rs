@@ -827,10 +827,19 @@ pub(crate) fn EditorCard(state: EditorSignals, font_size: Signal<usize>) -> Elem
                 }
                 // Clean-check celebration: review completed with no issues. Shows a
                 // brief centered 🎉 + message, then the flow auto-clears the review.
+                // A check that could not run at all (server down, no local dictionary
+                // built in) says so instead: no issues there is not a clean result.
                 if spell_results_visible && !spell_has_issues {
-                    div { class: "spell-clean-celebration", aria_hidden: "true",
-                        span { class: "spell-clean-emoji", "🎉" }
-                        span { class: "spell-clean-text", "ម៉ាស៊ីនមិនអាចរកឃើញកំហុស" }
+                    if spell_review.unavailable {
+                        div { class: "spell-clean-celebration", role: "status",
+                            span { class: "spell-clean-emoji", "⚠️" }
+                            span { class: "spell-clean-text", "មិនអាចពិនិត្យអក្ខរាវិរុទ្ធបានទេ" }
+                        }
+                    } else {
+                        div { class: "spell-clean-celebration", aria_hidden: "true",
+                            span { class: "spell-clean-emoji", "🎉" }
+                            span { class: "spell-clean-text", "ម៉ាស៊ីនមិនអាចរកឃើញកំហុស" }
+                        }
                     }
                 }
                 // Caret popup: transliteration candidates only. Next-word
