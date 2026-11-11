@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
+import hashlib
 import json
 import re
 import shutil
@@ -10,8 +11,14 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 SOURCE_DIR = ROOT / "site" / "download"
-OUT_DIR = ROOT / "dist" / "download-page"
+OUT_DIR = Path(os.environ.get("KHMERIME_DOWNLOAD_PAGE_OUT", ROOT / "dist" / "download-page"))
 CONFIG_FILE = SOURCE_DIR / "site.config.json"
+
+# Stable installer names under <base>/latest/. The release upload keeps a copy of
+# each installer under these names, so the page never needs rebuilding when a new
+# installer is published.
+LATEST_WINDOWS_FILE = "KhmerIME-windows-x64.msi"
+LATEST_LINUX_FILE = "khmerime-linux-amd64.deb"
 
 
 def package_version() -> str:
@@ -55,34 +62,64 @@ def main() -> None:
     )
     windows_src = Path(os.environ.get("KHMERIME_WINDOWS_MSI", ROOT / "dist" / "windows" / windows_file))
     linux_src = Path(os.environ.get("KHMERIME_LINUX_DEB", ROOT / "dist" / "linux" / linux_file))
+    # Set when installers are served from a separate download host; the page then
+    # links to <base>/latest/<stable name> and carries no installers itself.
+    download_base_url = os.environ.get("KHMERIME_DOWNLOAD_BASE_URL", "").rstrip("/")
+
+    if download_base_url:
+        windows_url = f"{download_base_url}/latest/{LATEST_WINDOWS_FILE}"
+        linux_url = f"{download_base_url}/latest/{LATEST_LINUX_FILE}"
+    else:
+        windows_url = f"downloads/windows/{windows_file}"
+        linux_url = f"downloads/linux/{linux_file}"
+
+    # Download buttons stay hidden until installers are published somewhere public.
+    downloads_enabled = os.environ.get("KHMERIME_DOWNLOADS_ENABLED", config.get("downloads_enabled", "true"))
+    downloads = "on" if downloads_enabled.strip().lower() in ("1", "true", "yes", "on") else "off"
 
     OUT_DIR.mkdir(parents=True, exist_ok=True)
-    (OUT_DIR / "downloads" / "windows").mkdir(parents=True, exist_ok=True)
-    (OUT_DIR / "downloads" / "linux").mkdir(parents=True, exist_ok=True)
+
+    # A short fingerprint of the demo videos, added to their URLs, so a browser
+    # never keeps playing an old copy after they are re-rendered.
+    demo_dir = SOURCE_DIR / "assets" / "demo"
+    digest = hashlib.sha256()
+    for demo_file in sorted(demo_dir.glob("*")) if demo_dir.is_dir() else []:
+        digest.update(demo_file.read_bytes())
+    demo_version = digest.hexdigest()[:10]
 
     tokens = {
+        "@DEMO_V@": demo_version,
+        "@DOWNLOADS@": downloads,
         "@VERSION@": version,
         "@WINDOWS_FILE@": windows_file,
         "@LINUX_FILE@": linux_file,
+        "@WINDOWS_URL@": windows_url,
+        "@LINUX_URL@": linux_url,
         "@ONLINE_BETA_URL@": online_beta_url,
     }
     copy_with_tokens(SOURCE_DIR / "index.html", OUT_DIR / "index.html", tokens)
+    copy_with_tokens(SOURCE_DIR / "privacy.html", OUT_DIR / "privacy.html", tokens)
     shutil.copy2(SOURCE_DIR / "styles.css", OUT_DIR / "styles.css")
-    shutil.copy2(SOURCE_DIR / "download-detect.js", OUT_DIR / "download-detect.js")
+    copy_with_tokens(SOURCE_DIR / "download-detect.js", OUT_DIR / "download-detect.js", tokens)
     assets_dir = SOURCE_DIR / "assets"
     if assets_dir.is_dir():
         shutil.copytree(assets_dir, OUT_DIR / "assets", dirs_exist_ok=True)
-    if windows_src.is_file():
-        shutil.copy2(windows_src, OUT_DIR / "downloads" / "windows" / windows_file)
+
+    if download_base_url:
+        print(f"[khmerime] Installer links point at {download_base_url}/latest/")
     else:
-        print(f"[khmerime] Windows MSI not copied. Upload manually to: downloads/windows/{windows_file}")
-    if linux_src.is_file():
-        shutil.copy2(linux_src, OUT_DIR / "downloads" / "linux" / linux_file)
-    else:
-        print(f"[khmerime] Linux .deb not copied. Upload manually to: downloads/linux/{linux_file}")
+        (OUT_DIR / "downloads" / "windows").mkdir(parents=True, exist_ok=True)
+        (OUT_DIR / "downloads" / "linux").mkdir(parents=True, exist_ok=True)
+        if windows_src.is_file():
+            shutil.copy2(windows_src, OUT_DIR / "downloads" / "windows" / windows_file)
+        else:
+            print(f"[khmerime] Windows MSI not copied. Upload manually to: downloads/windows/{windows_file}")
+        if linux_src.is_file():
+            shutil.copy2(linux_src, OUT_DIR / "downloads" / "linux" / linux_file)
+        else:
+            print(f"[khmerime] Linux .deb not copied. Upload manually to: downloads/linux/{linux_file}")
 
     print(f"[khmerime] Download page written to: {OUT_DIR}")
-    print("[khmerime] Upload the contents of this folder to cPanel.")
 
 
 if __name__ == "__main__":
