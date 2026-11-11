@@ -97,12 +97,15 @@ Derive a **surface mode** from the snapshot (same rule as macOS's `CandidateSurf
 
 Then:
 
-- **Phrase mode:** each whole-phrase row shows that candidate's own canonical Lexicon romanization,
-  for example `តម្រា (tamrea / tomrea)`. For a multi-segment reading, join the segments with ` · `.
-  This is candidate metadata, not a repetition of the composition's shared typed input. An
-  out-of-Lexicon model result has no invented canonical pair and may fall back to its consumed input.
-  Render at most the top five eligible Phrase Candidates in decoder order. Model-assisted rows count
-  toward that same five-row total; they do not create extra rows.
+- **Phrase mode:** while the segment preview is on screen (`segmented_active` with a non-empty
+  `segment_preview`), whole-phrase rows are **Khmer-only**: the aux text already reads
+  `ខ្ញុំ(knhom) | ⟦ទៅ(tov)⟧`, and repeating `(knhom · tov)` on every row only echoed it. This matches
+  macOS (ADR-0004) and Windows (windows-tsf ADR-0003); the `✦` model marker stays. *(Amended
+  2026-11-11; this bullet originally kept each row's canonical roman.)* When no segment preview is
+  shown — a single word's model rescue before segmentation — rows keep their canonical roman, e.g.
+  `តម្រា (tamrea / tomrea)` (segments joined with ` · `), because they are then the only place the
+  roman appears, as in Flat mode. Render at most the top five eligible Phrase Candidates in decoder
+  order. Model-assisted rows count toward that same five-row total; they do not create extra rows.
 - **Segment mode:** candidate rows remain **Khmer-only**. The focused segment's roman input lives in
   the segment preview (aux text). Keep the `≈` derived marker and `✓` recommended marker as today.
 - **Flat mode:** keep the per-row roman hint (`output (hint)`) — there is no header carrying it, so it
@@ -114,9 +117,9 @@ Then:
 ## IBus-specific decisions (the "practical, not pixel-identical" calls)
 
 - **No two-row aligned chip header.** IBus aux text is a single line. Keep the existing
-  ` | `-separated `output(input)` preview as the active segmentation line. Phrase rows additionally
-  show their own canonical roman pairs because alternative readings can have different Lexicon
-  spellings. Do not try to fake column alignment in aux text.
+  ` | `-separated `output(input)` preview as the active segmentation line; it is the one place the
+  roman shows while segmented, so phrase rows stay Khmer-only (see Phrase mode above). Do not try to
+  fake column alignment in aux text.
 - **No dynamic panel width / horizontal scroll.** IBus owns the lookup-table geometry; the macOS width
   clamp and truncation are panel concerns that do not exist here. Skip them.
 - **Overflow:** IBus's lookup table already handles long rows its own way; nothing to add.

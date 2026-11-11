@@ -79,6 +79,15 @@ def phrase_rows(snapshot: Any) -> tuple[list[str], list[int], Any]:
     indices: list[int] = []
     raw_preedit = str(snapshot.get("raw_preedit", ""))
     model_rows: list[bool] = []
+    # When the segment preview is shown as auxiliary text it already carries each
+    # segment's roman (`output(input)`), so rows stay Khmer-only rather than
+    # repeating it on every row — the macOS (ADR-0004) / Windows (ADR-0003) layout.
+    # Same condition the engine uses to show that aux text. Without it (a single
+    # word's model rescue before segmentation) the rows are the only place the roman
+    # appears, so they keep it, like a flat Candidate List.
+    header_carries_roman = bool(snapshot.get("segmented_active", False)) and bool(
+        snapshot.get("segment_preview")
+    )
     for index, entry in enumerate(entries):
         if not isinstance(entry, dict):
             continue
@@ -124,7 +133,8 @@ def phrase_rows(snapshot: Any) -> tuple[list[str], list[int], Any]:
             else:
                 roman_parts.append(input_roman)
         if (
-            len(roman_parts) == segment_count
+            not header_carries_roman
+            and len(roman_parts) == segment_count
             and all(roman_parts)
             and (
                 has_lexicon_hints

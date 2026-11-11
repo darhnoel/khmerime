@@ -134,6 +134,35 @@ def test_phrase_rows_show_each_candidates_complete_roman_pair():
     assert indices == [0, 1, 2]
 
 
+def test_phrase_rows_are_khmer_only_while_the_segment_header_shows_the_roman():
+    # macOS ADR-0004 / windows-tsf ADR-0003: with a segment preview on screen the aux text
+    # already reads ខ្ញុំ(knhom) | ⟦ទៅ(tov)⟧, so repeating "(knhom · tov)" on every row is noise.
+    def seg(output, roman):
+        return {"output": output, "input": roman, "roman_hints": [roman]}
+
+    snapshot = {
+        "raw_preedit": "knhomtov",
+        "segmented_active": True,
+        "segment_preview": [
+            {"output": "ខ្ញុំ", "input": "knhom", "focused": False},
+            {"output": "ទៅ", "input": "tov", "focused": True},
+        ],
+        "phrase_candidates": [
+            {"text": "ខ្ញុំទៅ", "segments": [seg("ខ្ញុំ", "knhom"), seg("ទៅ", "tov")]},
+            {
+                "text": "ខ្ញុំតៅ",
+                "segments": [seg("ខ្ញុំ", "knhom"), seg("តៅ", "tau")],
+                "from_model": True,
+            },
+        ],
+    }
+
+    rows, indices, _ = phrase_rows(snapshot)
+
+    assert rows == ["ខ្ញុំទៅ", "✦ ខ្ញុំតៅ"]
+    assert indices == [0, 1]
+
+
 def test_phrase_rows_show_only_top_five_total_including_model_results():
     snapshot = {
         "segmented_active": True,
