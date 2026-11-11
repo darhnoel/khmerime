@@ -341,7 +341,7 @@ details p {
   display: block;
 }
 
-[data-downloads="off"] .cta {
+[data-downloads="off"]:not(.store) .cta {
   display: none;
 }
 

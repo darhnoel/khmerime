@@ -71,7 +71,15 @@
   show(os || "windows");
   var button = document.getElementById("primary");
   var downloadsOn = document.documentElement.dataset.downloads !== "off";
-  if (!downloadsOn) {
+  if (os === "ios") {
+    // iOS installs from the App Store, so this works even while downloads are off.
+    document.documentElement.classList.add("store");
+    button.href = button.dataset.ios;
+    button.removeAttribute("download");
+    button.target = "_blank";
+    button.rel = "noopener";
+    button.innerHTML = 'ទាញយកពី <span lang="en">App Store</span>';
+  } else if (!downloadsOn) {
     button.parentNode.hidden = true;
   } else if (os === "linux") {
     button.href = button.dataset.linux;
