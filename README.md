@@ -17,63 +17,19 @@ selection — lives in:
 - [crates/core/](crates/core) — the transliteration engine
 - [crates/session/](crates/session) — the platform-neutral session contract
 
-Platform integrations such as IBus, Windows TSF, macOS IMK, iOS keyboard, Android
-IME, and the desktop/mobile scaffolds are intentionally thin. Their responsibility
-is to translate native key events, lifecycle events, and platform behavior into
-the shared session contract.
+Platform integrations such as IBus, Windows TSF, macOS IMK, iOS keyboard, and
+Android IME are intentionally thin. Their responsibility is to translate native key
+events, lifecycle events, and platform behavior into the shared session contract.
+The Dioxus app (web and desktop) is the exception today: it calls the
+`Transliterator` directly and keeps its own editor flow in `apps/dioxus-app/src/ui/editor/`.
 
 This architecture keeps the typing experience consistent across platforms while
 allowing platform-specific development to move independently.
 
-```mermaid
-flowchart TB
-    classDef host fill:#2d1b3d,stroke:#ffffff40,color:#f5e8d8
-    classDef adapter fill:#1f8a7a,stroke:#ffffff40,color:#f5e8d8
-    classDef engine fill:#d97736,stroke:#ffffff50,color:#1a1220
-
-    subgraph Hosts["Host IME frameworks"]
-        IBus["IBus (Linux)"]
-        TSF["TSF (Windows)"]
-        IMK["IMK (macOS)"]
-        iOS["iOS keyboard"]
-        Android["Android IME"]
-        Web["Dioxus app (web/desktop)"]
-    end
-
-    subgraph Adapters["adapters/ + apps/ — thin native integration"]
-        A_IBus["linux-ibus"]
-        A_TSF["windows-tsf"]
-        A_IMK["macos-imk"]
-        A_iOS["ios-keyboard"]
-        A_Android["android-ime"]
-        A_Web["dioxus-app"]
-    end
-
-    Session["crates/session::ImeSession<br/>(session contract + state machine)"]
-    Core["crates/core::Transliterator<br/>(decode, rank, segment, select)"]
-    Data["data/<br/>(CSV lexicon + compiled sources)"]
-
-    IBus --> A_IBus
-    TSF --> A_TSF
-    IMK --> A_IMK
-    iOS --> A_iOS
-    Android --> A_Android
-    Web --> A_Web
-
-    A_IBus --> Session
-    A_TSF --> Session
-    A_IMK --> Session
-    A_iOS --> Session
-    A_Android --> Session
-    A_Web --> Session
-
-    Session --> Core
-    Core --> Data
-
-    class IBus,TSF,IMK,iOS,Android,Web host
-    class A_IBus,A_TSF,A_IMK,A_iOS,A_Android,A_Web adapter
-    class Session,Core,Data engine
-```
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/diagrams/system_architecture.png">
+  <img alt="KhmerIME system architecture: desktop IMEs and mobile keyboards send key events to ImeSession, which calls the Transliterator; the Dioxus app calls the Transliterator directly; the Transliterator reads the dictionary image and the Config Store; an optional model provider proposes spans." src="docs/diagrams/system_architecture-light.png">
+</picture>
 
 In short:
 
@@ -116,8 +72,8 @@ docs/              Development, architecture, platform, and design documentation
 
 ## How a keystroke flows
 
-Every platform adapter receives key events from its host IME framework and routes
-them into the shared `ImeSession`. The session drives the `Transliterator` core,
+Every native platform adapter receives key events from its host IME framework and
+routes them into the shared `ImeSession`. The session drives the `Transliterator` core,
 which decodes roman input, ranks candidates, and segments phrases. The result
 flows back through the adapter to update the preedit or commit text in the
 application. The adapter and the bridge mechanism differ per platform (see
@@ -137,20 +93,10 @@ as such.
 If ambiguous-script input interests you, that seam is an open invitation:
 **[docs/model-provider-challenge.md](docs/model-provider-challenge.md)**.
 
-```mermaid
-sequenceDiagram
-    participant User
-    participant Adapter as Platform Adapter
-    participant Sess as ImeSession
-    participant Core as Transliterator
-
-    User->>Adapter: key event
-    Adapter->>Sess: process_key_event(...)
-    Sess->>Core: decode / suggest / refine
-    Core-->>Sess: candidates / segments
-    Sess-->>Adapter: SessionResult + SessionSnapshot
-    Adapter-->>User: update preedit / commit text
-```
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/diagrams/keystroke_flow.png">
+  <img alt="How a keystroke flows: every keystroke is decoded by the live Transliterator; after a pause the visible refiner re-decodes and may ask the model provider for spans; on Enter the commit refiner produces the commit text." src="docs/diagrams/keystroke_flow-light.png">
+</picture>
 
 ## Docs
 
