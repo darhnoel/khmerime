@@ -104,12 +104,14 @@ def test_whole_word_model_surface_keeps_non_model_alternatives():
     engine = _recording_engine([_response(before_selection), _response(after_selection)])
 
     engine.do_process_key_event(ord("v"), 0, 0)
-    expected_rows = ["ដំរី (domra)", f"{MODEL_MARK} តម្រា (domra)", "ដំរ៉ា (domra)"]
-    assert _painted_rows(engine) == expected_rows
+    # Not yet segmented: no segment header, so each row carries its roman.
+    assert _painted_rows(engine) == ["ដំរី (domra)", f"{MODEL_MARK} តម្រា (domra)", "ដំរ៉ា (domra)"]
 
     engine.do_process_key_event(KEY_SPACE, 0, 0)
 
-    assert _painted_rows(engine) == expected_rows
+    # Selecting segments the composition; the same three readings stay (the model row does
+    # not collapse the list), and the roman moves to the segment header as on macOS/Windows.
+    assert _painted_rows(engine) == ["ដំរី", f"{MODEL_MARK} តម្រា", "ដំរ៉ា"]
     assert _sent_commands(engine)[-1] == {"cmd": "select_phrase", "index": 1}
 
 

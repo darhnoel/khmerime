@@ -80,6 +80,11 @@ canonical spelling per segment in reading order; a single-segment phrase carries
 the same word would carry in a flat **Candidate List**, so a word reads identically whether or not
 the composition happened to segment. When any segment has no exact hint the whole row has none —
 a partial hint would be an invented one.
+On the desktop two-level **Candidate Surface** (macOS, Windows, Linux IBus), the phrase and word
+levels do not display Roman Hints on their rows while a segment header is shown: the roman appears
+once, with each segment in the header, and the rows are Khmer-only (so they carry no derived marker
+either). Rows with no segment header — the flat **Candidate List** — display per-row Roman Hints.
+See macos-imk ADR-0004, windows-tsf ADR-0003 and linux-ibus ADR-0001.
 _Avoid_: invented hint, transliteration label, candidate subtitle
 
 **Pronunciation Variant**:
