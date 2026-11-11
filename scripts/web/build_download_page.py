@@ -90,6 +90,7 @@ def main() -> None:
     tokens = {
         "@DEMO_V@": demo_version,
         "@DOWNLOADS@": downloads,
+        "@IOS_APP_URL@": config.get("ios_app_url", "https://apps.apple.com/app/khmerime/id6781253596"),
         "@VERSION@": version,
         "@WINDOWS_FILE@": windows_file,
         "@LINUX_FILE@": linux_file,
