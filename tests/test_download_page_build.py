@@ -46,6 +46,11 @@ class DownloadPageBuildTest(unittest.TestCase):
         self.assertIn(f'href="downloads/windows/KhmerIME-{version}-x64.msi"', html)
         self.assertIn(f'href="downloads/linux/khmerime_{version}_amd64.deb"', html)
 
+    def test_ios_links_to_the_app_store(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            html = build(Path(tmp) / "site")
+        self.assertIn('href="https://apps.apple.com/app/khmerime/id6781253596"', html)
+
     def test_downloads_switch_reaches_the_page(self):
         with tempfile.TemporaryDirectory() as tmp:
             off = build(Path(tmp) / "off", KHMERIME_DOWNLOADS_ENABLED="false")
