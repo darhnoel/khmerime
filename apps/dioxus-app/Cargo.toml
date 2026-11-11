@@ -8,6 +8,11 @@ default-run = "roman_lookup"
 default = []
 wfst-decoder = ["roman_lookup/wfst-decoder"]
 fetch-data = ["roman_lookup/fetch-data"]
+# Embed apps/dioxus-app/local-data/khmer_dictionary.kdict for the local spell-check
+# fallback (used when the spell-check server is unreachable). Off by default: the file is
+# gitignored (its redistribution terms are separate from the app source), so a clean
+# checkout and CI must build without it, and a build with it embeds the file in the wasm.
+local-spell-dictionary = []
 
 [dependencies]
 roman_lookup = { path = "../.." }

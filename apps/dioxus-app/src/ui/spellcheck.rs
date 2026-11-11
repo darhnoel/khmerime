@@ -6,9 +6,12 @@
 //! Results are possible alternatives, never automatic corrections.
 
 use std::collections::{HashMap, HashSet};
+#[cfg(feature = "local-spell-dictionary")]
 use std::sync::OnceLock;
 
-use khmer_segmenter::{KhmerSegmenter, SegmenterConfig};
+use khmer_segmenter::KhmerSegmenter;
+#[cfg(feature = "local-spell-dictionary")]
+use khmer_segmenter::SegmenterConfig;
 use roman_lookup::Entry;
 use serde::{Deserialize, Serialize};
 use symspell_rs::{Suggestion, SymSpell, Verbosity};
@@ -29,14 +32,21 @@ const MODEL_MIN_FREQUENCY: usize = 10;
 const MODEL_UNIQUE_SOURCE_CHARS: usize = 8;
 const DETECTOR_THRESHOLD: f32 = 0.35;
 const DETECTOR_WARNING_THRESHOLD: f32 = 0.5;
-const KHMER_SEGMENTER_DATA: &[u8] = include_bytes!("../../local-data/khmer_dictionary.kdict");
-
-fn khmer_segmenter() -> &'static KhmerSegmenter {
+/// The local segmenter for the offline fallback, or `None` when the app was built without
+/// the `local-spell-dictionary` feature (the default — the KDIC is gitignored, see Cargo.toml).
+#[cfg(feature = "local-spell-dictionary")]
+fn khmer_segmenter() -> Option<&'static KhmerSegmenter> {
+    const KHMER_SEGMENTER_DATA: &[u8] = include_bytes!("../../local-data/khmer_dictionary.kdict");
     static SEGMENTER: OnceLock<KhmerSegmenter> = OnceLock::new();
-    SEGMENTER.get_or_init(|| {
+    Some(SEGMENTER.get_or_init(|| {
         KhmerSegmenter::from_bytes(KHMER_SEGMENTER_DATA.to_vec(), SegmenterConfig::default())
             .expect("the local evaluation KDIC must be valid")
-    })
+    }))
+}
+
+#[cfg(not(feature = "local-spell-dictionary"))]
+fn khmer_segmenter() -> Option<&'static KhmerSegmenter> {
+    None
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -124,6 +134,9 @@ pub(crate) struct SpellCheckResult {
     pub issues: Vec<SpellIssue>,
     pub segments: Vec<SpellSegment>,
     pub detector_status: ContextDetectorStatus,
+    /// The text could not be checked at all (server unreachable and no local dictionary
+    /// built in). No issues then means "not checked", never "no mistakes".
+    pub unavailable: bool,
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -143,6 +156,8 @@ pub(crate) struct SpellReview {
     pub open_index: Option<usize>,
     pub choice_index: usize,
     pub detector_status: ContextDetectorStatus,
+    /// See [`SpellCheckResult::unavailable`].
+    pub unavailable: bool,
 }
 
 impl SpellReview {
@@ -162,6 +177,7 @@ impl SpellReview {
             open_index: None,
             choice_index: 0,
             detector_status: result.detector_status,
+            unavailable: result.unavailable,
         }
     }
 
@@ -276,6 +292,14 @@ pub(crate) fn check_text(
     entries: &[Entry],
     user_dictionary: &HashMap<String, Vec<String>>,
 ) -> SpellCheckResult {
+    // The local check segments the text with the embedded dictionary; without it nothing can
+    // be checked, which must not read as a clean result.
+    let Some(segmenter) = khmer_segmenter() else {
+        return SpellCheckResult {
+            unavailable: true,
+            ..SpellCheckResult::default()
+        };
+    };
     let frequencies = target_frequencies(entries, user_dictionary);
     if frequencies.is_empty() {
         return SpellCheckResult::default();
@@ -289,7 +313,7 @@ pub(crate) fn check_text(
     let mut ranked = Vec::new();
     let mut segments = Vec::new();
     for (run_start, run) in khmer_runs(text) {
-        let Ok(segmentation) = khmer_segmenter().segment_detailed(run) else {
+        let Ok(segmentation) = segmenter.segment_detailed(run) else {
             continue;
         };
         let tokens = segmentation.tokens().map(str::to_owned).collect::<Vec<_>>();
@@ -328,6 +352,7 @@ pub(crate) fn check_text(
         issues: selected,
         segments,
         detector_status: ContextDetectorStatus::NotChecked,
+        unavailable: false,
     }
 }
 
@@ -988,6 +1013,7 @@ pub(crate) async fn check_via_api(text: &str) -> Result<SpellCheckResult, String
         issues,
         segments: Vec::new(),
         detector_status: ContextDetectorStatus::Connected,
+        unavailable: false,
     })
 }
 
@@ -1120,6 +1146,19 @@ mod tests {
         ]
     }
 
+    #[cfg(not(feature = "local-spell-dictionary"))]
+    #[test]
+    fn without_the_local_dictionary_the_check_is_unavailable_not_clean() {
+        // A clean checkout has no KDIC: the local fallback cannot segment, so it must report
+        // "could not check" rather than an empty, all-clear result.
+        let result = check_text("សាលារាននៅក្បែរផ្ទះ", &school_entries(), &HashMap::new());
+        assert!(result.unavailable);
+        assert!(result.issues.is_empty());
+        assert!(SpellReview::complete(result).unavailable);
+    }
+
+    // Needs real segmentation: only with the embedded local dictionary.
+    #[cfg(feature = "local-spell-dictionary")]
     #[test]
     fn overlapping_tokens_surface_longer_one_edit_word() {
         let result = check_text("សាលារាននៅក្បែរផ្ទះ", &school_entries(), &HashMap::new());
@@ -1132,6 +1171,8 @@ mod tests {
         assert_eq!(result.segments.len(), 5);
     }
 
+    // Needs real segmentation: only with the embedded local dictionary.
+    #[cfg(feature = "local-spell-dictionary")]
     #[test]
     fn unknown_single_token_surfaces_one_edit_word() {
         let result = check_text("សាលារៀណ", &school_entries(), &HashMap::new());
@@ -1143,12 +1184,16 @@ mod tests {
         );
     }
 
+    // Needs real segmentation: only with the embedded local dictionary.
+    #[cfg(feature = "local-spell-dictionary")]
     #[test]
     fn correct_long_word_is_not_flagged() {
         let result = check_text("សាលារៀននៅក្បែរផ្ទះ", &school_entries(), &HashMap::new());
         assert!(result.issues.is_empty());
     }
 
+    // Needs real segmentation: only with the embedded local dictionary.
+    #[cfg(feature = "local-spell-dictionary")]
     #[test]
     fn reconstructed_long_typo_can_use_a_guarded_two_edit_lookup() {
         let entries = crate::engine(roman_lookup::DecoderMode::Legacy).entries();
@@ -1164,6 +1209,8 @@ mod tests {
         assert!(clean.issues.iter().all(|issue| issue.source != "ព័ត៌មាន"));
     }
 
+    // Needs real segmentation: only with the embedded local dictionary.
+    #[cfg(feature = "local-spell-dictionary")]
     #[test]
     fn saved_word_suppresses_possible_correction() {
         let saved = HashMap::from([("salaran".to_owned(), vec!["សាលារាន".to_owned()])]);
@@ -1194,6 +1241,7 @@ mod tests {
             ],
             segments: vec![SpellSegment { start: 0, end: 2 }, SpellSegment { start: 3, end: 5 }],
             detector_status: ContextDetectorStatus::NotChecked,
+            unavailable: false,
         });
         let (text, caret) = review.accept(0, "កខគ", "កខ ឃង").unwrap();
         assert_eq!(text, "កខគ ឃង");
@@ -1217,6 +1265,7 @@ mod tests {
             issues: Vec::new(),
             segments: vec![SpellSegment { start: 0, end: 2 }, SpellSegment { start: 2, end: 3 }],
             detector_status: ContextDetectorStatus::NotChecked,
+            unavailable: false,
         };
         let result = combine_detector_result(
             "របស",
@@ -1241,6 +1290,7 @@ mod tests {
             issues: Vec::new(),
             segments: vec![SpellSegment { start: 0, end: 3 }],
             detector_status: ContextDetectorStatus::NotChecked,
+            unavailable: false,
         };
         let result = combine_detector_result(
             "មនោ",
@@ -1259,6 +1309,8 @@ mod tests {
         assert_eq!(result.issues[0].kind, SpellIssueKind::Warning);
     }
 
+    // Needs real segmentation: only with the embedded local dictionary.
+    #[cfg(feature = "local-spell-dictionary")]
     #[test]
     fn real_lexicon_confirms_missing_sign_in_rbos() {
         let entries = crate::engine(roman_lookup::DecoderMode::Legacy).entries();
@@ -1280,6 +1332,8 @@ mod tests {
         assert_eq!(result.issues[0].kind, SpellIssueKind::Error);
     }
 
+    // Needs real segmentation: only with the embedded local dictionary.
+    #[cfg(feature = "local-spell-dictionary")]
     #[test]
     fn low_confidence_short_typo_requires_a_confirmed_repair() {
         let entries = crate::engine(roman_lookup::DecoderMode::Legacy).entries();
@@ -1301,6 +1355,8 @@ mod tests {
         assert_eq!(result.issues[0].kind, SpellIssueKind::Warning);
     }
 
+    // Needs real segmentation: only with the embedded local dictionary.
+    #[cfg(feature = "local-spell-dictionary")]
     #[test]
     fn low_confidence_long_typo_uses_edit_location_to_confirm_repair() {
         let entries = crate::engine(roman_lookup::DecoderMode::Legacy).entries();
@@ -1326,6 +1382,8 @@ mod tests {
         assert_eq!(result.issues[0].kind, SpellIssueKind::Error);
     }
 
+    // Needs real segmentation: only with the embedded local dictionary.
+    #[cfg(feature = "local-spell-dictionary")]
     #[test]
     fn model_hotspot_recovers_word_boundary_inside_merged_prefix_segment() {
         let entries = crate::engine(roman_lookup::DecoderMode::Legacy).entries();
