@@ -1,6 +1,6 @@
 name: Publish site to GitHub Pages
 
-# Publishes site/download/ — the download landing page and the privacy policy the
+# Builds and publishes site/download/ — the download landing page and the privacy policy the
 # App Store and Play Console require a public URL for.
 #
 # One-time setup: repo Settings > Pages > Source = "GitHub Actions".
@@ -10,6 +10,7 @@ on:
     branches: [main]
     paths:
       - "site/download/**"
+      - "scripts/web/build_download_page.py"
       - ".github/workflows/pages.yml"
   workflow_dispatch:
 
@@ -34,9 +35,17 @@ jobs:
 
       - uses: actions/configure-pages@v5
 
+      # The page is a template (@VERSION@, @WINDOWS_URL@, ...); build it first.
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Build the download page
+        run: python3 scripts/web/build_download_page.py
+
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: site/download
+          path: dist/download-page
 
       - id: deployment
         uses: actions/deploy-pages@v4

@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
+import hashlib
 import json
 import re
 import shutil
@@ -72,9 +73,23 @@ def main() -> None:
         windows_url = f"downloads/windows/{windows_file}"
         linux_url = f"downloads/linux/{linux_file}"
 
+    # Download buttons stay hidden until installers are published somewhere public.
+    downloads_enabled = os.environ.get("KHMERIME_DOWNLOADS_ENABLED", config.get("downloads_enabled", "true"))
+    downloads = "on" if downloads_enabled.strip().lower() in ("1", "true", "yes", "on") else "off"
+
     OUT_DIR.mkdir(parents=True, exist_ok=True)
 
+    # A short fingerprint of the demo videos, added to their URLs, so a browser
+    # never keeps playing an old copy after they are re-rendered.
+    demo_dir = SOURCE_DIR / "assets" / "demo"
+    digest = hashlib.sha256()
+    for demo_file in sorted(demo_dir.glob("*")) if demo_dir.is_dir() else []:
+        digest.update(demo_file.read_bytes())
+    demo_version = digest.hexdigest()[:10]
+
     tokens = {
+        "@DEMO_V@": demo_version,
+        "@DOWNLOADS@": downloads,
         "@VERSION@": version,
         "@WINDOWS_FILE@": windows_file,
         "@LINUX_FILE@": linux_file,
@@ -85,7 +100,7 @@ def main() -> None:
     copy_with_tokens(SOURCE_DIR / "index.html", OUT_DIR / "index.html", tokens)
     copy_with_tokens(SOURCE_DIR / "privacy.html", OUT_DIR / "privacy.html", tokens)
     shutil.copy2(SOURCE_DIR / "styles.css", OUT_DIR / "styles.css")
-    shutil.copy2(SOURCE_DIR / "download-detect.js", OUT_DIR / "download-detect.js")
+    copy_with_tokens(SOURCE_DIR / "download-detect.js", OUT_DIR / "download-detect.js", tokens)
     assets_dir = SOURCE_DIR / "assets"
     if assets_dir.is_dir():
         shutil.copytree(assets_dir, OUT_DIR / "assets", dirs_exist_ok=True)

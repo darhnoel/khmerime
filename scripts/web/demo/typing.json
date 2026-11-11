@@ -1,0 +1,315 @@
+{
+ "source": "lookup_cli suggest / segmented, khmerime dev e2e6a52b, 2026-11-11",
+ "commit": "ខ្ញុំស្រលាញ់ខ្មែរ",
+ "keystrokes": [
+  {
+   "roman": "k",
+   "candidates": [
+    "ក៏",
+    "កំពុង",
+    "កំពង់",
+    "ក"
+   ],
+   "segments": []
+  },
+  {
+   "roman": "kh",
+   "candidates": [
+    "ឃើញ",
+    "ខ",
+    "ខៗ",
+    "ខែ"
+   ],
+   "segments": []
+  },
+  {
+   "roman": "khn",
+   "candidates": [
+    "ឃើញនូវ",
+    "ឃើញន",
+    "ឃើញហ្ន៎",
+    "ខៗនូវ"
+   ],
+   "segments": [
+    [
+     "kh",
+     "ឃើញ"
+    ],
+    [
+     "n",
+     "នូវ"
+    ]
+   ]
+  },
+  {
+   "roman": "khnh",
+   "candidates": [
+    "ឃើញខ្ញុំ",
+    "ឃើញញ",
+    "ខៗខ្ញុំ",
+    "ខៗញ"
+   ],
+   "segments": [
+    [
+     "kh",
+     "ឃើញ"
+    ],
+    [
+     "nh",
+     "ខ្ញុំ"
+    ]
+   ]
+  },
+  {
+   "roman": "khnho",
+   "candidates": [
+    "ខ្ញី",
+    "ខ្ញក",
+    "ខ្ញម",
+    "ខ្ញែ"
+   ],
+   "segments": [
+    [
+     "khn",
+     "ខ្នើយ"
+    ],
+    [
+     "ho",
+     "ហូរ"
+    ]
+   ]
+  },
+  {
+   "roman": "khnhom",
+   "candidates": [
+    "ខ្ញុំ",
+    "ខ្ញម",
+    "ខំ",
+    "ខម"
+   ],
+   "segments": []
+  },
+  {
+   "roman": "khnhoms",
+   "candidates": [
+    "ខ្ញម",
+    "ខ្ញក",
+    "ខ្ញែ",
+    "ខ្ញុំ"
+   ],
+   "segments": []
+  },
+  {
+   "roman": "khnhomsr",
+   "candidates": [
+    "ខ្ញុំស្រលាញ់",
+    "ខ្ញុំស្រឡាញ់",
+    "ខ្ញមស្រលាញ់",
+    "ខ្ញមស្រឡាញ់"
+   ],
+   "segments": [
+    [
+     "khnhom",
+     "ខ្ញុំ"
+    ],
+    [
+     "sr",
+     "ស្រលាញ់"
+    ]
+   ]
+  },
+  {
+   "roman": "khnhomsro",
+   "candidates": [
+    "ខ្ញម",
+    "ខ្ញក",
+    "ខ្ញុំ",
+    "ខ្ញាំ"
+   ],
+   "segments": [
+    [
+     "khnhom",
+     "ខ្ញុំ"
+    ],
+    [
+     "sro",
+     "ស្រូវ"
+    ]
+   ]
+  },
+  {
+   "roman": "khnhomsrol",
+   "candidates": [
+    "ខ្ញុំស្រល់",
+    "ខ្ញមស្រល់",
+    "ខ្ញម",
+    "ខ្ញក"
+   ],
+   "segments": [
+    [
+     "khnhom",
+     "ខ្ញុំ"
+    ],
+    [
+     "srol",
+     "ស្រល់"
+    ]
+   ]
+  },
+  {
+   "roman": "khnhomsrola",
+   "candidates": [
+    "ខ្ញម",
+    "ខ្ញក",
+    "ក្រឡា",
+    "ខ្ញុំ"
+   ],
+   "segments": [
+    [
+     "khnhom",
+     "ខ្ញុំ"
+    ],
+    [
+     "srola",
+     "ស្រួល"
+    ]
+   ]
+  },
+  {
+   "roman": "khnhomsrolan",
+   "candidates": [
+    "ខ្ញម",
+    "ខ្ញក",
+    "ខ្ញុំ",
+    "ខ្ញង់"
+   ],
+   "segments": [
+    [
+     "khnhom",
+     "ខ្ញុំ"
+    ],
+    [
+     "srolan",
+     "ស្រលាញ់"
+    ]
+   ]
+  },
+  {
+   "roman": "khnhomsrolanh",
+   "candidates": [
+    "ខ្ញុំស្រលាញ់",
+    "ខ្ញុំស្រឡាញ់",
+    "ខ្ញមស្រលាញ់",
+    "ខ្ញមស្រឡាញ់"
+   ],
+   "segments": [
+    [
+     "khnhom",
+     "ខ្ញុំ"
+    ],
+    [
+     "srolanh",
+     "ស្រលាញ់"
+    ]
+   ]
+  },
+  {
+   "roman": "khnhomsrolanhk",
+   "candidates": [
+    "ខ្ញម",
+    "ខ្ញក",
+    "រឡាញ",
+    "ខ្ញុំ"
+   ],
+   "segments": [
+    [
+     "khnhom",
+     "ខ្ញុំ"
+    ],
+    [
+     "srolanhk",
+     "ស្រីលង្កា"
+    ]
+   ]
+  },
+  {
+   "roman": "khnhomsrolanhkh",
+   "candidates": [
+    "ខ្ញម",
+    "ខ្ញក",
+    "រឡាញ",
+    "ខ្ញុំ"
+   ],
+   "segments": [
+    [
+     "khnhom",
+     "ខ្ញុំ"
+    ],
+    [
+     "srolanh",
+     "ស្រលាញ់"
+    ],
+    [
+     "kh",
+     "ឃើញ"
+    ]
+   ]
+  },
+  {
+   "roman": "khnhomsrolanhkhm",
+   "candidates": [
+    "ខ្ញម",
+    "ខ្ញក",
+    "រឡាញ",
+    "ខ្ញុំ"
+   ],
+   "segments": []
+  },
+  {
+   "roman": "khnhomsrolanhkhme",
+   "candidates": [
+    "ខ្ញុំស្រលាញ់ខ្មេរ",
+    "ខ្ញុំស្រឡាញ់ខ្មេរ",
+    "ខ្ញមស្រលាញ់ខ្មេរ",
+    "ខ្ញមស្រឡាញ់ខ្មេរ"
+   ],
+   "segments": [
+    [
+     "khnhom",
+     "ខ្ញុំ"
+    ],
+    [
+     "srolanh",
+     "ស្រលាញ់"
+    ],
+    [
+     "khme",
+     "ខ្មេរ"
+    ]
+   ]
+  },
+  {
+   "roman": "khnhomsrolanhkhmer",
+   "candidates": [
+    "ខ្ញុំស្រលាញ់ខ្មែរ",
+    "ខ្ញុំស្រឡាញ់ខ្មែរ",
+    "ខ្ញមស្រលាញ់ខ្មែរ",
+    "ខ្ញមស្រឡាញ់ខ្មែរ"
+   ],
+   "segments": [
+    [
+     "khnhom",
+     "ខ្ញុំ"
+    ],
+    [
+     "srolanh",
+     "ស្រលាញ់"
+    ],
+    [
+     "khmer",
+     "ខ្មែរ"
+    ]
+   ]
+  }
+ ]
+}

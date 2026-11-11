@@ -46,6 +46,13 @@ class DownloadPageBuildTest(unittest.TestCase):
         self.assertIn(f'href="downloads/windows/KhmerIME-{version}-x64.msi"', html)
         self.assertIn(f'href="downloads/linux/khmerime_{version}_amd64.deb"', html)
 
+    def test_downloads_switch_reaches_the_page(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            off = build(Path(tmp) / "off", KHMERIME_DOWNLOADS_ENABLED="false")
+            on = build(Path(tmp) / "on", KHMERIME_DOWNLOADS_ENABLED="true")
+        self.assertIn('data-downloads="off"', off)
+        self.assertIn('data-downloads="on"', on)
+
     def test_download_base_url_links_to_stable_latest_objects(self):
         with tempfile.TemporaryDirectory() as tmp:
             out = Path(tmp) / "site"
