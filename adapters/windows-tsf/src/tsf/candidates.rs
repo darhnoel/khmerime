@@ -1,27 +1,42 @@
 //! Candidate popup window and inline-preview helpers.
+//!
+//! The popup is a Windows 11 style vertical list. What it shows
+//! (page, numbering, marks, sizes at a DPI) is decided in `render::candidate_popup`; this file
+//! only measures text and paints.
 
+use std::ffi::c_void;
 use std::sync::OnceLock;
 
 use windows::core::{w, Result, PCWSTR};
-use windows::Win32::Foundation::{COLORREF, HWND, LPARAM, LRESULT, POINT, RECT, SIZE, WPARAM};
-use windows::Win32::Graphics::Gdi::{
-    BeginPaint, CreateFontW, CreatePen, CreateRoundRectRgn, CreateSolidBrush, DeleteObject, EndPaint, FillRect, GetDC,
-    GetMonitorInfoW, GetSysColor, GetSysColorBrush, GetTextExtentPoint32W, InvalidateRect, MonitorFromPoint, ReleaseDC,
-    RoundRect, SelectObject, SetBkMode, SetTextColor, SetWindowRgn, TextOutW, UpdateWindow, COLOR_HIGHLIGHT,
-    COLOR_HIGHLIGHTTEXT, COLOR_WINDOW, COLOR_WINDOWTEXT, MONITORINFO, MONITOR_DEFAULTTONEAREST, PAINTSTRUCT, PS_SOLID,
-    TRANSPARENT,
+use windows::Win32::Foundation::{COLORREF, ERROR_SUCCESS, HWND, LPARAM, LRESULT, POINT, RECT, SIZE, WPARAM};
+use windows::Win32::Graphics::Dwm::{
+    DwmSetWindowAttribute, DWMWA_BORDER_COLOR, DWMWA_WINDOW_CORNER_PREFERENCE, DWMWCP_ROUND,
+    DWM_WINDOW_CORNER_PREFERENCE,
 };
+use windows::Win32::Graphics::Gdi::{
+    BeginPaint, BitBlt, CreateCompatibleBitmap, CreateCompatibleDC, CreateFontW, CreatePen, CreateRoundRectRgn,
+    CreateSolidBrush, DeleteDC, DeleteObject, DrawTextW, EndPaint, FillRect, GetDC, GetMonitorInfoW, GetSysColor,
+    GetTextExtentPoint32W, InvalidateRect, MonitorFromPoint, ReleaseDC, RoundRect, SelectObject, SetBkMode,
+    SetTextColor, SetWindowRgn, UpdateWindow, COLOR_HIGHLIGHT, COLOR_HIGHLIGHTTEXT, COLOR_WINDOW, COLOR_WINDOWTEXT,
+    DRAW_TEXT_FORMAT, DT_CENTER, DT_END_ELLIPSIS, DT_LEFT, DT_NOPREFIX, DT_RIGHT, DT_SINGLELINE, DT_VCENTER, HDC,
+    HFONT, MONITORINFO, MONITOR_DEFAULTTONEAREST, PAINTSTRUCT, PS_SOLID, SRCCOPY, TRANSPARENT,
+};
+use windows::Win32::System::Registry::{RegGetValueW, HKEY_CURRENT_USER, RRF_RT_REG_DWORD};
+use windows::Win32::UI::Accessibility::{HCF_HIGHCONTRASTON, HIGHCONTRASTW};
+use windows::Win32::UI::HiDpi::GetDpiForWindow;
 use windows::Win32::UI::WindowsAndMessaging::{
     CreateWindowExW, DefWindowProcW, DestroyWindow, GetSystemMetrics, GetWindowLongPtrW, RegisterClassExW,
-    SetWindowLongPtrW, SetWindowPos, ShowWindow, CS_HREDRAW, CS_VREDRAW, GWLP_USERDATA, HMENU, HWND_TOPMOST,
-    SM_CXSCREEN, SM_CYSCREEN, SWP_NOACTIVATE, SWP_SHOWWINDOW, SW_HIDE, WM_APP, WM_NCHITTEST, WM_PAINT, WNDCLASSEXW,
-    WS_EX_NOACTIVATE, WS_EX_TOOLWINDOW, WS_EX_TOPMOST, WS_POPUP,
+    SetWindowLongPtrW, SetWindowPos, ShowWindow, SystemParametersInfoW, CS_DROPSHADOW, GWLP_USERDATA, HMENU,
+    HWND_TOPMOST, SM_CXSCREEN, SM_CYSCREEN, SPI_GETHIGHCONTRAST, SWP_NOACTIVATE, SWP_NOSIZE, SWP_NOZORDER,
+    SWP_SHOWWINDOW, SW_HIDE, SYSTEM_PARAMETERS_INFO_UPDATE_FLAGS, WM_APP, WM_ERASEBKGND, WM_NCHITTEST, WM_PAINT,
+    WNDCLASSEXW, WS_EX_NOACTIVATE, WS_EX_TOOLWINDOW, WS_EX_TOPMOST, WS_POPUP,
 };
 
-use khmerime_session::{CandidateDisplayEntry, CursorLocation, SegmentPreviewEntry};
+use khmerime_session::{CursorLocation, SegmentPreviewEntry};
 
 use crate::com::dll_module::module_instance;
 use crate::diagnostics::log;
+use crate::render::candidate_popup::{page_size, popup_model, row_parts, Header, PopupMetrics, PopupModel, RowMark};
 use crate::render::candidate_surface::{CandidateSurface, CandidateSurfaceMode};
 use crate::WindowsRenderState;
 
@@ -34,36 +49,214 @@ pub const CANDIDATE_SOURCE_FIELDS: &[&str] = &[
 // Window class name — registered once per process.
 const WCLASS: PCWSTR = w!("KhmerIMECandidates");
 
-const MIN_WIN_W: i32 = 300;
-const MAX_WIN_W: i32 = 720;
-const ROW_H: i32 = 32;
-const PAD_X: i32 = 10;
-const PAD_Y: i32 = 6;
-const FONT_HEIGHT: i32 = 22;
-const MAX_ROWS: usize = 9;
 const ANCHOR_GAP: i32 = 2;
-const OUTER_RADIUS: i32 = 8;
-const SELECT_RADIUS: i32 = 6;
-const SELECT_INSET_X: i32 = 4;
-const TEXT_GAP: i32 = 12;
-const RECOMMENDED_MARK: &str = "\u{2713}";
-const DERIVED_MARK: &str = "~";
-/// Marks a candidate a span-proposal provider contributed. Same glyph the IBus and macOS
-/// adapters use, so the three desktop surfaces read alike.
-const MODEL_MARK: &str = "\u{2726}";
 const SEGMENT_SEPARATOR: &str = " | ";
 
+const KHMER_FACE: PCWSTR = w!("Khmer UI");
+const UI_FACE: PCWSTR = w!("Segoe UI");
+const SYMBOL_FACE: PCWSTR = w!("Segoe UI Symbol");
+
 static CLASS_REGISTERED: OnceLock<()> = OnceLock::new();
+
+// ---------------------------------------------------------------------------
+// Colours
+// ---------------------------------------------------------------------------
+
+const fn rgb(r: u8, g: u8, b: u8) -> COLORREF {
+    COLORREF(r as u32 | (g as u32) << 8 | (b as u32) << 16)
+}
+
+/// The popup's colours for the user's current Windows theme.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct Palette {
+    bg: COLORREF,
+    border: COLORREF,
+    text: COLORREF,
+    muted: COLORREF,
+    faint: COLORREF,
+    accent: COLORREF,
+    selected_fill: COLORREF,
+    /// High contrast fills the selected row with the highlight colour, so every glyph on it
+    /// must switch to the highlight-text colour instead of keeping its own colour.
+    selected_text: Option<COLORREF>,
+    /// Draw the accent bar at the selected row's left edge.
+    selection_bar: bool,
+    recommended: COLORREF,
+    model: COLORREF,
+    derived: COLORREF,
+}
+
+// Windows 11 light/dark flyout colours; the selected fill is the accent at 10% / 14% over the
+// background, precomputed because GDI has no alpha.
+const LIGHT: Palette = Palette {
+    bg: rgb(0xfc, 0xfc, 0xfc),
+    border: rgb(0xe5, 0xe5, 0xe5),
+    text: rgb(0x1b, 0x1b, 0x1b),
+    muted: rgb(0x61, 0x61, 0x61),
+    faint: rgb(0x8a, 0x8a, 0x8a),
+    accent: rgb(0x00, 0x5f, 0xb8),
+    selected_fill: rgb(0xe3, 0xec, 0xf5),
+    selected_text: None,
+    selection_bar: true,
+    recommended: rgb(0x0f, 0x7b, 0x0f),
+    model: rgb(0x8a, 0x3f, 0xfc),
+    derived: rgb(0x9d, 0x5d, 0x00),
+};
+
+const DARK: Palette = Palette {
+    bg: rgb(0x2c, 0x2c, 0x2c),
+    border: rgb(0x3e, 0x3e, 0x3e),
+    text: rgb(0xff, 0xff, 0xff),
+    muted: rgb(0xc5, 0xc5, 0xc5),
+    faint: rgb(0x9a, 0x9a, 0x9a),
+    accent: rgb(0x60, 0xcd, 0xff),
+    selected_fill: rgb(0x33, 0x43, 0x4a),
+    selected_text: None,
+    selection_bar: true,
+    recommended: rgb(0x6c, 0xcb, 0x5f),
+    model: rgb(0xc3, 0xa3, 0xff),
+    derived: rgb(0xfc, 0xe1, 0x00),
+};
+
+impl Palette {
+    fn current() -> Self {
+        if high_contrast_on() {
+            Self::high_contrast()
+        } else if apps_use_light_theme() {
+            LIGHT
+        } else {
+            DARK
+        }
+    }
+
+    /// High contrast follows the user's chosen system colours exactly.
+    fn high_contrast() -> Self {
+        let sys = |index| COLORREF(unsafe { GetSysColor(index) });
+        let text = sys(COLOR_WINDOWTEXT);
+        Palette {
+            bg: sys(COLOR_WINDOW),
+            border: text,
+            text,
+            muted: text,
+            faint: text,
+            accent: sys(COLOR_HIGHLIGHT),
+            selected_fill: sys(COLOR_HIGHLIGHT),
+            selected_text: Some(sys(COLOR_HIGHLIGHTTEXT)),
+            selection_bar: false,
+            recommended: text,
+            model: text,
+            derived: text,
+        }
+    }
+
+    fn mark(&self, mark: RowMark) -> COLORREF {
+        match mark {
+            RowMark::Model => self.model,
+            RowMark::Recommended => self.recommended,
+            RowMark::Derived => self.derived,
+        }
+    }
+}
+
+fn high_contrast_on() -> bool {
+    let mut hc = HIGHCONTRASTW {
+        cbSize: std::mem::size_of::<HIGHCONTRASTW>() as u32,
+        ..HIGHCONTRASTW::default()
+    };
+    let ok = unsafe {
+        SystemParametersInfoW(
+            SPI_GETHIGHCONTRAST,
+            hc.cbSize,
+            Some(&mut hc as *mut HIGHCONTRASTW as *mut c_void),
+            SYSTEM_PARAMETERS_INFO_UPDATE_FLAGS(0),
+        )
+    };
+    ok.is_ok() && (hc.dwFlags.0 & HCF_HIGHCONTRASTON.0) != 0
+}
+
+/// Windows' app light/dark setting. Missing or unreadable means light (the Windows default).
+fn apps_use_light_theme() -> bool {
+    let mut value: u32 = 1;
+    let mut size = std::mem::size_of::<u32>() as u32;
+    let status = unsafe {
+        RegGetValueW(
+            HKEY_CURRENT_USER,
+            w!("Software\\Microsoft\\Windows\\CurrentVersion\\Themes\\Personalize"),
+            w!("AppsUseLightTheme"),
+            RRF_RT_REG_DWORD,
+            None,
+            Some(&mut value as *mut u32 as *mut c_void),
+            Some(&mut size),
+        )
+    };
+    status != ERROR_SUCCESS || value != 0
+}
+
+// ---------------------------------------------------------------------------
+// Fonts
+// ---------------------------------------------------------------------------
+
+/// Every font the popup uses at one DPI. Deleted on drop.
+struct Fonts {
+    word: HFONT,
+    small: HFONT,
+    small_bold: HFONT,
+    mark: HFONT,
+    footer: HFONT,
+    header_khmer: HFONT,
+    header_roman: HFONT,
+}
+
+impl Fonts {
+    fn new(m: &PopupMetrics) -> Self {
+        Self {
+            word: font(m.word_font, 400, KHMER_FACE),
+            small: font(m.small_font, 400, UI_FACE),
+            small_bold: font(m.small_font, 600, UI_FACE),
+            mark: font(m.small_font, 400, SYMBOL_FACE),
+            footer: font(m.footer_font, 400, UI_FACE),
+            header_khmer: font(m.header_khmer_font, 400, KHMER_FACE),
+            header_roman: font(m.header_roman_font, 400, UI_FACE),
+        }
+    }
+}
+
+impl Drop for Fonts {
+    fn drop(&mut self) {
+        for f in [
+            self.word,
+            self.small,
+            self.small_bold,
+            self.mark,
+            self.footer,
+            self.header_khmer,
+            self.header_roman,
+        ] {
+            unsafe {
+                let _ = DeleteObject(f);
+            }
+        }
+    }
+}
+
+fn font(px: i32, weight: i32, face: PCWSTR) -> HFONT {
+    // DEFAULT_CHARSET (1), CLEARTYPE_QUALITY (5).
+    unsafe { CreateFontW(-px, 0, 0, 0, weight, 0, 0, 0, 1, 0, 0, 5, 0, face) }
+}
 
 // ---------------------------------------------------------------------------
 // Per-window paint data — stored in GWLP_USERDATA as a raw Box pointer.
 // ---------------------------------------------------------------------------
 
 struct CandidateData {
-    // Each entry is the display string and whether that row is selected.
-    rows: Vec<(String, bool)>,
+    model: PopupModel,
+    metrics: PopupMetrics,
+    palette: Palette,
     width: i32,
     height: i32,
+    /// DWM rounds the corners and draws the border (Windows 11); otherwise the window region
+    /// rounds them and the paint routine draws the border.
+    dwm_frame: bool,
 }
 
 // ---------------------------------------------------------------------------
@@ -74,6 +267,7 @@ struct CandidateData {
 /// Never activates (WS_EX_NOACTIVATE) so focus stays in the host application.
 pub struct CandidateWindow {
     hwnd: HWND,
+    dwm_frame: bool,
 }
 
 impl CandidateWindow {
@@ -93,8 +287,8 @@ impl CandidateWindow {
                 WS_POPUP,
                 0,
                 0,
-                MIN_WIN_W,
-                ROW_H,
+                1,
+                1,
                 HWND::default(),
                 HMENU::default(),
                 module_instance(),
@@ -102,11 +296,22 @@ impl CandidateWindow {
             )?
         };
 
-        Ok(Self { hwnd })
+        // Windows 11 rounds the popup and draws a hairline border itself; earlier Windows
+        // rejects the attribute and we fall back to a window region.
+        let corner: DWM_WINDOW_CORNER_PREFERENCE = DWMWCP_ROUND;
+        let dwm_frame = unsafe {
+            DwmSetWindowAttribute(
+                hwnd,
+                DWMWA_WINDOW_CORNER_PREFERENCE,
+                &corner as *const DWM_WINDOW_CORNER_PREFERENCE as *const c_void,
+                std::mem::size_of::<DWM_WINDOW_CORNER_PREFERENCE>() as u32,
+            )
+        }
+        .is_ok();
+
+        Ok(Self { hwnd, dwm_frame })
     }
 
-    /// Refresh the candidate list and show the window next to `location`.
-    /// Hides the window if `candidates` is empty.
     /// Raw window handle, for posting [`WM_KHMERIME_REFINE_READY`] from a worker thread.
     ///
     /// `HWND` is not `Send`, so callers pass the raw value across the thread boundary and
@@ -116,30 +321,36 @@ impl CandidateWindow {
         self.hwnd.0 as isize
     }
 
+    /// Refresh the candidate list and show the window next to `location`.
+    /// Hides the window if there are no candidates.
     pub fn update(&self, surface: &CandidateSurface, location: &CursorLocation) {
         if surface.rows().is_empty() {
             self.hide();
             return;
         }
 
-        let display = display_candidate_rows(surface);
-        let mut rows: Vec<(String, bool)> = Vec::new();
-        if let Some(preview) = segment_preview_text(surface.context()) {
-            rows.push((preview, false));
-        }
-        rows.extend(
-            surface
-                .rows()
-                .iter()
-                .zip(display.iter())
-                .take(MAX_ROWS)
-                .enumerate()
-                .map(|(i, (_candidate, label))| (format!("{}  {}", i + 1, label), Some(i) == surface.selected_index())),
-        );
-
+        let model = popup_model(surface, page_size());
         let work_area = monitor_work_area_for_location(location);
-        let width = self.measure_window_width(&rows, work_area);
-        let height = candidate_window_height(rows.len());
+
+        unsafe {
+            // Move onto the caret's monitor before measuring, so the DPI we size for is the DPI
+            // the popup will be shown at (per-monitor-aware hosts report it per monitor).
+            let _ = SetWindowPos(
+                self.hwnd,
+                HWND::default(),
+                location.x,
+                location.y + location.height.max(0),
+                0,
+                0,
+                SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE,
+            );
+        }
+        let metrics = PopupMetrics::for_dpi(unsafe { GetDpiForWindow(self.hwnd) });
+        let palette = Palette::current();
+
+        let (widest_row, header_w) = self.measure(&model, &metrics);
+        let width = metrics.width(widest_row, header_w, work_area_width(work_area));
+        let height = metrics.height(&model);
         let placement = candidate_window_placement(location, width, height, work_area);
 
         unsafe {
@@ -148,17 +359,29 @@ impl CandidateWindow {
             if !old.is_null() {
                 drop(Box::from_raw(old));
             }
-            let data = Box::new(CandidateData { rows, width, height });
+            let data = Box::new(CandidateData {
+                model,
+                metrics,
+                palette,
+                width,
+                height,
+                dwm_frame: self.dwm_frame,
+            });
             SetWindowLongPtrW(self.hwnd, GWLP_USERDATA, Box::into_raw(data) as isize);
-            let region = CreateRoundRectRgn(
-                0,
-                0,
-                placement.width + 1,
-                placement.height + 1,
-                OUTER_RADIUS,
-                OUTER_RADIUS,
-            );
-            let _ = SetWindowRgn(self.hwnd, region, true);
+
+            if self.dwm_frame {
+                let border = palette.border;
+                let _ = DwmSetWindowAttribute(
+                    self.hwnd,
+                    DWMWA_BORDER_COLOR,
+                    &border as *const COLORREF as *const c_void,
+                    std::mem::size_of::<COLORREF>() as u32,
+                );
+            } else {
+                let r = metrics.corner_radius;
+                let region = CreateRoundRectRgn(0, 0, placement.width + 1, placement.height + 1, r, r);
+                let _ = SetWindowRgn(self.hwnd, region, true);
+            }
 
             let _ = SetWindowPos(
                 self.hwnd,
@@ -169,30 +392,38 @@ impl CandidateWindow {
                 placement.height,
                 SWP_NOACTIVATE | SWP_SHOWWINDOW,
             );
-            let _ = InvalidateRect(self.hwnd, None, true);
+            let _ = InvalidateRect(self.hwnd, None, false);
             let _ = UpdateWindow(self.hwnd);
         }
     }
 
-    fn measure_window_width(&self, rows: &[(String, bool)], work_area: RECT) -> i32 {
+    /// Measured content width of the widest row and of the segment header.
+    fn measure(&self, model: &PopupModel, metrics: &PopupMetrics) -> (i32, i32) {
         let hdc = unsafe { GetDC(self.hwnd) };
         if hdc.is_invalid() {
-            return candidate_window_width_for_text_width(0, work_area_width(work_area));
+            return (0, 0);
         }
-
-        let hfont = unsafe { CreateFontW(-FONT_HEIGHT, 0, 0, 0, 400, 0, 0, 0, 1, 0, 0, 5, 34, w!("Khmer UI")) };
-        let old_font = unsafe { SelectObject(hdc, hfont) };
-        let max_text_width = rows
+        let fonts = Fonts::new(metrics);
+        let widest = model
+            .rows
             .iter()
-            .map(|(text, _)| measure_text_width(hdc, text))
+            .map(|row| {
+                let word = text_width(hdc, fonts.word, &row.word);
+                let roman = text_width(hdc, fonts.small, &row.roman);
+                metrics.row_content_width(word, roman)
+            })
             .max()
             .unwrap_or(0);
+        let header = model
+            .header
+            .as_ref()
+            .map(|header| metrics.header_content_width(&header_column_widths(hdc, &fonts, metrics, header)))
+            .unwrap_or(0);
+        drop(fonts);
         unsafe {
-            SelectObject(hdc, old_font);
-            let _ = DeleteObject(hfont);
             let _ = ReleaseDC(self.hwnd, hdc);
         }
-        candidate_window_width_for_text_width(max_text_width, work_area_width(work_area))
+        (widest, header)
     }
 
     pub fn hide(&self) {
@@ -208,17 +439,6 @@ struct CandidateWindowPlacement {
     y: i32,
     width: i32,
     height: i32,
-}
-
-fn candidate_window_height(row_count: usize) -> i32 {
-    PAD_Y * 2 + row_count as i32 * ROW_H
-}
-
-fn candidate_window_width_for_text_width(text_width: i32, work_area_width: i32) -> i32 {
-    let work_area_width = work_area_width.max(1);
-    let min_width = MIN_WIN_W.min(work_area_width);
-    let max_width = MAX_WIN_W.min(work_area_width).max(min_width);
-    (text_width + PAD_X * 2 + TEXT_GAP).clamp(min_width, max_width)
 }
 
 fn work_area_width(work_area: RECT) -> i32 {
@@ -302,11 +522,12 @@ impl Drop for CandidateWindow {
 fn register_class() -> Result<()> {
     let mut wc = unsafe { std::mem::zeroed::<WNDCLASSEXW>() };
     wc.cbSize = std::mem::size_of::<WNDCLASSEXW>() as u32;
-    wc.style = CS_HREDRAW | CS_VREDRAW;
+    // The paint routine covers every pixel, so no background brush and no CS_*REDRAW
+    // (update() invalidates explicitly). CS_DROPSHADOW lifts the popup off the document.
+    wc.style = CS_DROPSHADOW;
     wc.lpfnWndProc = Some(candidate_wnd_proc);
     wc.hInstance = module_instance();
     wc.lpszClassName = WCLASS;
-    wc.hbrBackground = unsafe { GetSysColorBrush(COLOR_WINDOW) };
 
     let atom = unsafe { RegisterClassExW(&wc) };
     if atom == 0 {
@@ -337,69 +558,15 @@ unsafe extern "system" fn candidate_wnd_proc(hwnd: HWND, msg: u32, wparam: WPARA
             let data_ptr = GetWindowLongPtrW(hwnd, GWLP_USERDATA) as *const CandidateData;
             let mut ps = std::mem::zeroed::<PAINTSTRUCT>();
             let hdc = BeginPaint(hwnd, &mut ps);
-
             if !data_ptr.is_null() {
-                let data = &*data_ptr;
-                let hfont = CreateFontW(-FONT_HEIGHT, 0, 0, 0, 400, 0, 0, 0, 1, 0, 0, 5, 34, w!("Khmer UI"));
-                let old_font = SelectObject(hdc, hfont);
-                SetBkMode(hdc, TRANSPARENT);
-
-                let bg_brush = CreateSolidBrush(COLORREF(GetSysColor(COLOR_WINDOW)));
-                let border_pen = CreatePen(PS_SOLID, 1, COLORREF(GetSysColor(COLOR_WINDOWTEXT)));
-                let old_brush = SelectObject(hdc, bg_brush);
-                let old_pen = SelectObject(hdc, border_pen);
-                let _ = RoundRect(hdc, 0, 0, data.width, data.height, OUTER_RADIUS, OUTER_RADIUS);
-                SelectObject(hdc, old_pen);
-                SelectObject(hdc, old_brush);
-                let _ = DeleteObject(border_pen);
-                let _ = DeleteObject(bg_brush);
-
-                for (i, (text, is_selected)) in data.rows.iter().enumerate() {
-                    let row_top = PAD_Y + i as i32 * ROW_H;
-                    let row_rect = RECT {
-                        left: SELECT_INSET_X,
-                        top: row_top,
-                        right: data.width - SELECT_INSET_X,
-                        bottom: row_top + ROW_H,
-                    };
-
-                    if *is_selected {
-                        let selected_brush = CreateSolidBrush(COLORREF(GetSysColor(COLOR_HIGHLIGHT)));
-                        let selected_pen = CreatePen(PS_SOLID, 1, COLORREF(GetSysColor(COLOR_HIGHLIGHT)));
-                        let old_brush = SelectObject(hdc, selected_brush);
-                        let old_pen = SelectObject(hdc, selected_pen);
-                        let _ = RoundRect(
-                            hdc,
-                            row_rect.left,
-                            row_rect.top,
-                            row_rect.right,
-                            row_rect.bottom,
-                            SELECT_RADIUS,
-                            SELECT_RADIUS,
-                        );
-                        SelectObject(hdc, old_pen);
-                        SelectObject(hdc, old_brush);
-                        let _ = DeleteObject(selected_pen);
-                        let _ = DeleteObject(selected_brush);
-                        SetTextColor(hdc, COLORREF(GetSysColor(COLOR_HIGHLIGHTTEXT)));
-                    } else {
-                        FillRect(hdc, &row_rect, GetSysColorBrush(COLOR_WINDOW));
-                        SetTextColor(hdc, COLORREF(GetSysColor(COLOR_WINDOWTEXT)));
-                    }
-
-                    let available_width = data.width - PAD_X * 2;
-                    let row_text = ellipsize_text(hdc, text, available_width.max(0));
-                    let utf16: Vec<u16> = row_text.encode_utf16().collect();
-                    let _ = TextOutW(hdc, PAD_X, row_top + (ROW_H - FONT_HEIGHT) / 2, &utf16);
-                }
-
-                SelectObject(hdc, old_font);
-                let _ = DeleteObject(hfont);
+                paint_buffered(hdc, &*data_ptr);
             }
-
             let _ = EndPaint(hwnd, &ps);
             LRESULT(0)
         }
+        // Painting is double-buffered and covers the whole client area; erasing first would
+        // only flash the background.
+        WM_ERASEBKGND => LRESULT(1),
         WM_NCHITTEST => {
             // Pass all mouse events through to the host application so focus
             // is never stolen.  Equivalent to HTTRANSPARENT (-1).
@@ -409,42 +576,255 @@ unsafe extern "system" fn candidate_wnd_proc(hwnd: HWND, msg: u32, wparam: WPARA
     }
 }
 
-fn measure_text_width(hdc: windows::Win32::Graphics::Gdi::HDC, text: &str) -> i32 {
+/// Paint into an off-screen bitmap, then copy it to the window in one blit (no flicker).
+unsafe fn paint_buffered(hdc: HDC, data: &CandidateData) {
+    let mem = CreateCompatibleDC(hdc);
+    let bitmap = CreateCompatibleBitmap(hdc, data.width, data.height);
+    let old_bitmap = SelectObject(mem, bitmap);
+    paint(mem, data);
+    let _ = BitBlt(hdc, 0, 0, data.width, data.height, mem, 0, 0, SRCCOPY);
+    SelectObject(mem, old_bitmap);
+    let _ = DeleteObject(bitmap);
+    let _ = DeleteDC(mem);
+}
+
+unsafe fn paint(hdc: HDC, data: &CandidateData) {
+    let m = &data.metrics;
+    let p = &data.palette;
+    let fonts = Fonts::new(m);
+    SetBkMode(hdc, TRANSPARENT);
+
+    // Background (and the border, when DWM is not drawing one).
+    fill_rect(hdc, rect(0, 0, data.width, data.height), p.bg);
+    if !data.dwm_frame {
+        round_rect(
+            hdc,
+            rect(0, 0, data.width, data.height),
+            m.corner_radius,
+            p.bg,
+            p.border,
+        );
+    }
+
+    let left = m.outer_pad;
+    let right = data.width - m.outer_pad;
+    let mut y = m.outer_pad;
+
+    if let Some(header) = data.model.header.as_ref() {
+        paint_header(
+            hdc,
+            &fonts,
+            m,
+            p,
+            header,
+            rect(left + m.row_left_pad, y, right - m.row_right_pad, y),
+        );
+        y += m.header_h();
+        // Hairline between the segmentation and the rows.
+        fill_rect(
+            hdc,
+            rect(left, y - 1, right, y - 1 + (m.dpi as i32 / 96).max(1)),
+            p.border,
+        );
+    }
+
+    for row in &data.model.rows {
+        let r = rect(left, y, right, y + m.row_h);
+        let override_text = if row.selected { p.selected_text } else { None };
+
+        if row.selected {
+            round_rect(hdc, r, m.select_radius, p.selected_fill, p.selected_fill);
+            if p.selection_bar {
+                let bar = rect(r.left, y + m.bar_inset_y, r.left + m.bar_w, y + m.row_h - m.bar_inset_y);
+                round_rect(hdc, bar, m.bar_w, p.accent, p.accent);
+            }
+        }
+
+        // Digit — the key that picks this row.
+        let num_left = r.left + m.row_left_pad;
+        let (num_font, num_color) = if row.selected {
+            (fonts.small_bold, override_text.unwrap_or(p.accent))
+        } else {
+            (fonts.small, p.faint)
+        };
+        let num_rect = rect(num_left, y, num_left + m.num_w, y + m.row_h);
+        draw_text(hdc, num_font, num_color, &row.number.to_string(), num_rect, DT_RIGHT);
+
+        // Provenance mark.
+        if let Some(mark) = row.mark {
+            let mark_left = num_rect.right + m.col_gap;
+            let mark_rect = rect(mark_left, y, mark_left + m.mark_w, y + m.row_h);
+            let color = override_text.unwrap_or(p.mark(mark));
+            draw_text(hdc, fonts.mark, color, mark.glyph(), mark_rect, DT_CENTER);
+        }
+
+        // Roman spelling, right-aligned. It only gives way when word + roman do not fit, and even
+        // then the word keeps at least half the row (the word is what the user is choosing).
+        let word_left = r.left + m.word_offset();
+        let text_right = r.right - m.row_right_pad;
+        let mut word_right = text_right;
+        if !row.roman.is_empty() {
+            let available = (text_right - word_left - m.roman_gap).max(0);
+            let word_w = text_width(hdc, fonts.word, &row.word);
+            let roman_room = (available - word_w).max(available / 2);
+            let roman_w = text_width(hdc, fonts.small, &row.roman).min(roman_room);
+            let roman_rect = rect(text_right - roman_w, y, text_right, y + m.row_h);
+            let color = override_text.unwrap_or(p.muted);
+            draw_text(
+                hdc,
+                fonts.small,
+                color,
+                &row.roman,
+                roman_rect,
+                DT_RIGHT | DT_END_ELLIPSIS,
+            );
+            word_right = roman_rect.left - m.roman_gap;
+        }
+
+        // The Khmer word.
+        let word_rect = rect(word_left, y, word_right.max(word_left), y + m.row_h);
+        let color = override_text.unwrap_or(p.text);
+        draw_text(hdc, fonts.word, color, &row.word, word_rect, DT_LEFT | DT_END_ELLIPSIS);
+
+        y += m.row_h;
+    }
+
+    // Footer: a hairline, then the mode on the left and the page / keys on the right.
+    fill_rect(hdc, rect(left, y, right, y + (m.dpi as i32 / 96).max(1)), p.border);
+    let footer = rect(left + m.footer_pad_x, y, right - m.footer_pad_x, y + m.footer_h);
+    draw_text(hdc, fonts.footer, p.faint, data.model.mode_label, footer, DT_LEFT);
+    draw_text(hdc, fonts.footer, p.faint, &data.model.footer_right(), footer, DT_RIGHT);
+}
+
+/// Width of each header column: the wider of the segment's Khmer and its roman, plus padding.
+fn header_column_widths(hdc: HDC, fonts: &Fonts, m: &PopupMetrics, header: &Header) -> Vec<i32> {
+    header
+        .segments
+        .iter()
+        .map(|seg| {
+            let khmer = text_width(hdc, fonts.header_khmer, &seg.khmer);
+            let roman = text_width(hdc, fonts.header_roman, &seg.roman);
+            m.header_column_width(khmer, roman)
+        })
+        .collect()
+}
+
+/// The segmentation as columns: each segment's Khmer with the roman typed for it beneath.
+/// `area` gives the left/right bounds and the top; columns past the right edge are cut off and
+/// the one crossing it ellipsizes.
+unsafe fn paint_header(hdc: HDC, fonts: &Fonts, m: &PopupMetrics, p: &Palette, header: &Header, area: RECT) {
+    let widths = header_column_widths(hdc, fonts, m, header);
+    let khmer_bottom = area.top + m.header_khmer_h;
+    let roman_bottom = khmer_bottom + m.header_roman_h;
+    let mut x = area.left;
+    for (seg, width) in header.segments.iter().zip(widths) {
+        if x >= area.right {
+            break;
+        }
+        let col_right = (x + width).min(area.right);
+        // Word mode highlights the segment being edited; in phrase mode the header is context
+        // and never looks selected.
+        let focused = header.emphasize_focus && seg.focused;
+        if focused {
+            round_rect(
+                hdc,
+                rect(x, area.top, col_right, roman_bottom),
+                m.select_radius,
+                p.selected_fill,
+                p.selected_fill,
+            );
+        }
+        let (khmer_color, roman_color) = if focused {
+            (p.selected_text.unwrap_or(p.accent), p.selected_text.unwrap_or(p.muted))
+        } else if header.emphasize_focus {
+            (p.text, p.faint)
+        } else {
+            (p.muted, p.faint)
+        };
+        let inner_left = x + m.header_chip_pad;
+        let inner_right = (col_right - m.header_chip_pad).max(inner_left);
+        draw_text(
+            hdc,
+            fonts.header_khmer,
+            khmer_color,
+            &seg.khmer,
+            rect(inner_left, area.top, inner_right, khmer_bottom),
+            DT_CENTER | DT_END_ELLIPSIS,
+        );
+        draw_text(
+            hdc,
+            fonts.header_roman,
+            roman_color,
+            &seg.roman,
+            rect(inner_left, khmer_bottom, inner_right, roman_bottom),
+            DT_CENTER | DT_END_ELLIPSIS,
+        );
+        x += width + m.header_gap;
+    }
+}
+
+fn rect(left: i32, top: i32, right: i32, bottom: i32) -> RECT {
+    RECT {
+        left,
+        top,
+        right,
+        bottom,
+    }
+}
+
+unsafe fn fill_rect(hdc: HDC, r: RECT, color: COLORREF) {
+    let brush = CreateSolidBrush(color);
+    FillRect(hdc, &r, brush);
+    let _ = DeleteObject(brush);
+}
+
+unsafe fn round_rect(hdc: HDC, r: RECT, radius: i32, fill: COLORREF, outline: COLORREF) {
+    let brush = CreateSolidBrush(fill);
+    let pen = CreatePen(PS_SOLID, 1, outline);
+    let old_brush = SelectObject(hdc, brush);
+    let old_pen = SelectObject(hdc, pen);
+    let _ = RoundRect(hdc, r.left, r.top, r.right, r.bottom, radius, radius);
+    SelectObject(hdc, old_pen);
+    SelectObject(hdc, old_brush);
+    let _ = DeleteObject(pen);
+    let _ = DeleteObject(brush);
+}
+
+/// Single-line text, vertically centred in `r`, with `align` (left / centre / right, plus any
+/// extra DT_ flags).
+unsafe fn draw_text(hdc: HDC, font: HFONT, color: COLORREF, text: &str, r: RECT, align: DRAW_TEXT_FORMAT) {
+    if text.is_empty() {
+        return;
+    }
+    let old = SelectObject(hdc, font);
+    SetTextColor(hdc, color);
+    let mut utf16: Vec<u16> = text.encode_utf16().collect();
+    let mut r = r;
+    DrawTextW(
+        hdc,
+        &mut utf16,
+        &mut r,
+        align | DT_SINGLELINE | DT_VCENTER | DT_NOPREFIX,
+    );
+    SelectObject(hdc, old);
+}
+
+fn text_width(hdc: HDC, font: HFONT, text: &str) -> i32 {
     let utf16 = text.encode_utf16().collect::<Vec<_>>();
     if utf16.is_empty() {
         return 0;
     }
     let mut size = SIZE::default();
     unsafe {
-        if GetTextExtentPoint32W(hdc, &utf16, &mut size).as_bool() {
+        let old = SelectObject(hdc, font);
+        let ok = GetTextExtentPoint32W(hdc, &utf16, &mut size).as_bool();
+        SelectObject(hdc, old);
+        if ok {
             size.cx
         } else {
             0
         }
     }
-}
-
-fn ellipsize_text(hdc: windows::Win32::Graphics::Gdi::HDC, text: &str, max_width: i32) -> String {
-    if measure_text_width(hdc, text) <= max_width {
-        return text.to_owned();
-    }
-
-    const ELLIPSIS: &str = "...";
-    let ellipsis_width = measure_text_width(hdc, ELLIPSIS);
-    if ellipsis_width >= max_width {
-        return ELLIPSIS.to_owned();
-    }
-
-    let mut truncated = String::new();
-    for ch in text.chars() {
-        truncated.push(ch);
-        let candidate = format!("{truncated}{ELLIPSIS}");
-        if measure_text_width(hdc, &candidate) > max_width {
-            truncated.pop();
-            break;
-        }
-    }
-    format!("{truncated}{ELLIPSIS}")
 }
 
 // ---------------------------------------------------------------------------
@@ -516,47 +896,19 @@ pub fn segment_preview_text(entries: &[SegmentPreviewEntry]) -> Option<String> {
     }
 }
 
+/// One-line label per candidate ("✓ ខ្ញុំ (knhom / khnhom)"), for the inline preview. Built on the
+/// same row parts the popup paints, so the marks cannot drift between the two.
 fn display_candidate_rows(surface: &CandidateSurface) -> Vec<String> {
-    let candidates = surface.rows();
-    let candidate_display = surface.display();
-    let use_display = candidate_display.len() == candidates.len();
-    candidates
-        .iter()
-        .enumerate()
-        .map(|(index, candidate)| {
-            if !use_display {
-                return candidate.clone();
-            }
-
-            let entry = &candidate_display[index];
-            let output = if entry.output.trim().is_empty() {
-                candidate.as_str()
-            } else {
-                entry.output.trim()
+    row_parts(surface)
+        .into_iter()
+        .map(|part| {
+            let mut label = match part.mark {
+                Some(mark) => format!("{} {}", mark.glyph(), part.word),
+                None => part.word,
             };
-            let hints = entry
-                .roman_hints
-                .iter()
-                .map(|hint| hint.trim())
-                .filter(|hint| !hint.is_empty())
-                .take(3)
-                .collect::<Vec<_>>();
-
-            let mut label = if entry.from_model {
-                // Provenance outranks the other marks: which engine produced a reading is more
-                // useful to the user than whether ranking prefers it.
-                format!("{MODEL_MARK} {output}")
-            } else if entry.recommended {
-                format!("{RECOMMENDED_MARK} {output}")
-            } else if hints.is_empty() {
-                format!("{DERIVED_MARK} {output}")
-            } else {
-                output.to_owned()
-            };
-
-            if !hints.is_empty() {
+            if !part.hints.is_empty() {
                 label.push_str(" (");
-                label.push_str(&hints.join(" / "));
+                label.push_str(&part.hints.join(" / "));
                 label.push(')');
             }
             label
@@ -567,7 +919,10 @@ fn display_candidate_rows(surface: &CandidateSurface) -> Vec<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use khmerime_session::SessionSnapshot;
+    use khmerime_session::{CandidateDisplayEntry, SessionSnapshot};
+
+    const DERIVED_MARK: &str = "~";
+    const MODEL_MARK: &str = "\u{2726}";
 
     /// Builds a flat-mode surface, the shape display_candidate_rows used to be handed directly.
     fn flat_surface(candidates: &[&str], display: Vec<CandidateDisplayEntry>) -> CandidateSurface {
@@ -766,18 +1121,6 @@ mod tests {
         let rows = display_candidate_rows(&flat_surface(&["ជា", "jea"], vec![]));
 
         assert_eq!(rows, vec!["ជា", "jea"]);
-    }
-
-    #[test]
-    fn candidate_window_width_grows_with_content_and_clamps_to_bounds() {
-        assert_eq!(candidate_window_width_for_text_width(40, 800), MIN_WIN_W);
-        assert_eq!(candidate_window_width_for_text_width(420, 800), 452);
-        assert_eq!(candidate_window_width_for_text_width(2000, 800), MAX_WIN_W);
-    }
-
-    #[test]
-    fn candidate_window_width_respects_small_work_area() {
-        assert_eq!(candidate_window_width_for_text_width(2000, 240), 240);
     }
 
     #[test]
