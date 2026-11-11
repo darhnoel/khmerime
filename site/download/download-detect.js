@@ -1,59 +1,89 @@
+// Download page behaviour. Without this script the page still works: every
+// install panel shows, and the main button downloads the Windows installer.
 (function () {
-  function platformText() {
-    if (navigator.userAgentData && navigator.userAgentData.platform) {
-      return navigator.userAgentData.platform;
-    }
-    return navigator.platform || navigator.userAgent || "";
-  }
+  document.documentElement.classList.add("js");
 
-  function detectedPlatform() {
-    var platform = platformText().toLowerCase();
-    if (platform.indexOf("win") !== -1) {
-      return "windows";
-    }
-    if (platform.indexOf("linux") !== -1 || platform.indexOf("ubuntu") !== -1) {
-      return "linux";
-    }
-    if (platform.indexOf("mac") !== -1) {
-      return "macos";
-    }
+  function detectedOs() {
+    var text = (((navigator.userAgentData && navigator.userAgentData.platform) || navigator.platform || "") +
+      " " + (navigator.userAgent || "")).toLowerCase();
+    if (/android/.test(text)) return "android";
+    if (/iphone|ipad|ipod/.test(text) || (/mac/.test(text) && navigator.maxTouchPoints > 1)) return "ios";
+    if (/win/.test(text)) return "windows";
+    if (/mac/.test(text)) return "macos";
+    if (/linux|x11/.test(text)) return "linux";
     return "";
   }
 
-  function promoteDownload(platform) {
-    if (!platform) {
-      return;
-    }
+  // Tabs: only the chosen panel shows.
+  var tabs = [].slice.call(document.querySelectorAll("[data-tab]"));
+  var panels = [].slice.call(document.querySelectorAll("[data-panel]"));
+  // The demo follows the tab: phone for Android and iOS, desktop otherwise.
+  var video = document.getElementById("demo");
+  var figure = video && video.parentNode;
+  function showDemo(kind) {
+    if (!video || figure.dataset.kind === kind) return;
+    figure.dataset.kind = kind;
+    video.poster = "assets/demo/" + kind + ".png?v=@DEMO_V@";
+    video.src = "assets/demo/" + kind + ".mp4?v=@DEMO_V@";
+    if (!reduceMotion) video.play().catch(function () {});
+  }
+  var reduceMotion = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-    var buttons = document.querySelectorAll("[data-download-platform]");
-    buttons.forEach(function (button) {
-      var isPrimary = button.dataset.downloadPlatform === platform;
-      button.classList.toggle("primary", isPrimary);
-      button.classList.toggle("secondary", !isPrimary);
-      button.style.order = isPrimary ? "0" : "1";
+  // One underline slides to the chosen tab; panels share one slot, so nothing else moves.
+  var ink = document.querySelector(".tab-ink");
+  function moveInk(tab) {
+    if (!ink || !tab) return;
+    ink.style.width = tab.offsetWidth + "px";
+    ink.style.transform = "translateX(" + tab.offsetLeft + "px)";
+  }
+  function show(name) {
+    showDemo(name === "android" || name === "ios" ? "phone" : "desktop");
+    panels.forEach(function (p) {
+      var on = p.dataset.panel === name;
+      p.classList.toggle("is-off", !on);
+      p.setAttribute("aria-hidden", on ? "false" : "true");
+      if (on) p.removeAttribute("inert"); else p.setAttribute("inert", "");
+    });
+    tabs.forEach(function (t) {
+      if (t.dataset.tab === name) { t.setAttribute("aria-current", "true"); moveInk(t); }
+      else t.removeAttribute("aria-current");
     });
   }
+  window.addEventListener("resize", function () { moveInk(document.querySelector("[data-tab][aria-current]")); });
+  if (document.fonts && document.fonts.ready) {
+    document.fonts.ready.then(function () { moveInk(document.querySelector("[data-tab][aria-current]")); });
+  }
+  [].slice.call(document.querySelectorAll("[data-goto]")).forEach(function (link) {
+    link.addEventListener("click", function (event) {
+      event.preventDefault();
+      show(link.dataset.goto);
+    });
+  });
+  tabs.forEach(function (tab) {
+    tab.addEventListener("click", function (event) {
+      event.preventDefault();
+      show(tab.dataset.tab);
+    });
+  });
 
-  function hideScrollHintOnScroll() {
-    var hint = document.querySelector(".scroll-hint");
-    if (!hint) return;
-
-    var hasScrolled = false;
-    window.addEventListener(
-      "scroll",
-      function () {
-        if (!hasScrolled && window.scrollY > 50) {
-          hint.style.animation = "none";
-          hint.style.opacity = "0";
-          hint.style.pointerEvents = "none";
-          hasScrolled = true;
-        }
-      },
-      { once: true }
-    );
+  // Main button: this OS's installer if there is one, otherwise the online beta.
+  var os = detectedOs();
+  show(os || "windows");
+  var button = document.getElementById("primary");
+  var downloadsOn = document.documentElement.dataset.downloads !== "off";
+  if (!downloadsOn) {
+    button.parentNode.hidden = true;
+  } else if (os === "linux") {
+    button.href = button.dataset.linux;
+    button.innerHTML = 'ទាញយកសម្រាប់ <span lang="en">Ubuntu</span>';
+  } else if (os && os !== "windows") {
+    // No installer for this OS yet: its tab explains, so hide the download button.
+    button.parentNode.hidden = true;
   }
 
-  promoteDownload(detectedPlatform());
-  hideScrollHintOnScroll();
+  // Visitors who ask for less motion get the still poster instead of the loop.
+  if (video && reduceMotion) {
+    video.removeAttribute("autoplay");
+    video.pause();
+  }
 })();
-
