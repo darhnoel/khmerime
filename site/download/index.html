@@ -6,7 +6,9 @@
     <title>KhmerIME — វាយអក្សរខ្មែរ ដោយប្រើអក្សរឡាតាំង</title>
     <meta name="description" content="KhmerIME: type Khmer with Latin letters. Free and open source for Windows and Ubuntu, with macOS, Android and iOS coming.">
     <link rel="preload" href="assets/fonts/KantumruyPro-Khmer.woff2" as="font" type="font/woff2" crossorigin>
-    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23b5441b'/%3E%3Ctext x='16' y='23' font-size='20' text-anchor='middle' fill='%23fffdf8' font-family='sans-serif'%3EK%3C/text%3E%3C/svg%3E">
+    <link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="assets/favicon-16.png">
+    <link rel="apple-touch-icon" sizes="180x180" href="assets/apple-touch-icon.png">
     <link rel="stylesheet" href="styles.css">
     <script src="download-detect.js" defer></script>
   </head>
@@ -22,7 +24,7 @@
         <p class="lead">ក្តារចុចឥតគិតថ្លៃ និង <span lang="en">open-source</span>។</p>
 
         <div class="cta">
-          <a class="button" id="primary" href="@WINDOWS_URL@" download data-windows="@WINDOWS_URL@" data-linux="@LINUX_URL@" data-ios="@IOS_APP_URL@">ទាញយកសម្រាប់ <span lang="en">Windows</span></a>
+          <a class="button" id="primary" href="@WINDOWS_URL@" download data-windows="@WINDOWS_URL@" data-linux="@LINUX_URL@" data-macos="@MACOS_URL@" data-ios="@IOS_APP_URL@">ទាញយកសម្រាប់ <span lang="en">Windows</span></a>
         </div>
 
         <section class="install" id="install" aria-label="របៀបដំឡើង">
@@ -40,36 +42,54 @@
           <div id="os-windows" class="panel" data-panel="windows">
             <p class="soon if-no-downloads">មកដល់ឆាប់ៗ។ ពេលនេះ សូមសាកល្បងតាម <a href="#os-web" data-goto="web" lang="en">Web</a>។</p>
             <ol>
-              <li><a href="@WINDOWS_URL@" download>ទាញយក</a> ហើយរត់ឯកសារ <code lang="en">.msi</code> ក្នុងនាមជាអ្នកគ្រប់គ្រង។</li>
-              <li>បើក <span lang="en">Settings → Time &amp; Language → Typing → Advanced keyboard settings</span>។</li>
-              <li>ជ្រើសរើស <strong lang="en">KhmerIME</strong> ជាវិធីបញ្ចូល។</li>
+              <li><a href="@WINDOWS_URL@" download>ទាញយក</a> ហើយបើកឯកសារ <code lang="en">.msi</code> ដើម្បីដំឡើង។</li>
+              <li>បើក <span lang="en">Settings → Time &amp; language → Language &amp; region</span>។ បើមិនទាន់មានភាសាខ្មែរ ចុច <span lang="en">Add a language</span> ហើយបន្ថែម <span lang="en">Khmer</span>។</li>
+              <li>ចុច <kbd lang="en">Win</kbd> + <kbd lang="en">Space</kbd> ហើយជ្រើស <strong lang="en">KhmerIME</strong>។ បើមិនឃើញ៖ <span lang="en">Khmer → ⋯ → Language options → Add a keyboard → KhmerIME</span>។</li>
             </ol>
             <details>
               <summary>លុបចោល</summary>
-              <p><span lang="en">Settings → Apps → Installed apps → KhmerIME → Uninstall</span> ឬ <code lang="en">msiexec /x @WINDOWS_FILE@</code></p>
+              <p><span lang="en">Settings → Apps → Installed apps → KhmerIME → Uninstall</span> ឬ <code lang="en">msiexec /x @WINDOWS_STABLE@</code></p>
+            </details>
+            <details class="verify">
+              <summary>ផ្ទៀងផ្ទាត់ការទាញយក (<span lang="en">SHA-256</span>)</summary>
+              <p class="hash"><code lang="en">@WINDOWS_SHA@</code></p>
+              <p><code lang="en">certutil -hashfile @WINDOWS_STABLE@ SHA256</code></p>
+              <p class="verify-links" lang="en"><a href="@SUMS_URL@" download>SHA256SUMS</a> · <a href="@SUMS_ASC_URL@" download>GPG</a> · <a href="@GPGKEY_URL@" download>key</a></p>
             </details>
           </div>
 
           <div id="os-ubuntu" class="panel" data-panel="linux">
             <p class="soon if-no-downloads">មកដល់ឆាប់ៗ។ ពេលនេះ សូមសាកល្បងតាម <a href="#os-web" data-goto="web" lang="en">Web</a>។</p>
             <ol>
-              <li><a href="@LINUX_URL@" download>ទាញយក</a> ហើយដំឡើង៖ <code lang="en">sudo apt install ./@LINUX_FILE@ &amp;&amp; ibus restart</code></li>
-              <li>បើក <span lang="en">Settings → Keyboard → Input Sources</span>។</li>
-              <li>ចុច <strong>+</strong> ហើយបន្ថែម <strong lang="en">KhmerIME</strong>។</li>
+              <li><a href="@LINUX_URL@" download>ទាញយក</a> ហើយដំឡើង៖ <code lang="en">sudo apt install ./@LINUX_STABLE@ &amp;&amp; ibus restart</code></li>
+              <li>បើក <span lang="en">Settings → Keyboard → Input Sources</span> ចុច <strong>+</strong> ជ្រើស <span lang="en">Khmer</span> ហើយបន្ថែម <strong lang="en">KhmerIME</strong>។</li>
+              <li>ចុច <kbd lang="en">Super</kbd> + <kbd lang="en">Space</kbd> ដើម្បីប្តូរទៅ <strong lang="en">KhmerIME</strong>។</li>
             </ol>
             <details>
               <summary>លុបចោល</summary>
               <p><code lang="en">sudo apt remove khmerime</code></p>
             </details>
+            <details class="verify">
+              <summary>ផ្ទៀងផ្ទាត់ការទាញយក (<span lang="en">SHA-256</span>)</summary>
+              <p class="hash"><code lang="en">@LINUX_SHA@</code></p>
+              <p><code lang="en">sha256sum @LINUX_STABLE@</code></p>
+              <p class="verify-links" lang="en"><a href="@SUMS_URL@" download>SHA256SUMS</a> · <a href="@SUMS_ASC_URL@" download>GPG</a> · <a href="@GPGKEY_URL@" download>key</a></p>
+            </details>
           </div>
 
           <div id="os-macos" class="panel" data-panel="macos">
-            <p class="soon">មកដល់ឆាប់ៗ។ ពេលនេះ សូមសាកល្បងតាម <a href="#os-web" data-goto="web" lang="en">Web</a>។</p>
+            <p class="soon if-no-downloads">មកដល់ឆាប់ៗ។ ពេលនេះ សូមសាកល្បងតាម <a href="#os-web" data-goto="web" lang="en">Web</a>។</p>
             <ol>
-              <li>ទាញយក ហើយបើកកម្មវិធីដំឡើង <code lang="en">.pkg</code>។</li>
-              <li>ទៅ <span lang="en">System Settings → Keyboard → Input Sources</span>។</li>
-              <li>ចុច <strong>+</strong> ហើយបន្ថែម <strong lang="en">KhmerIME</strong>។</li>
+              <li><a href="@MACOS_URL@" download>ទាញយក</a> ហើយបើកកម្មវិធីដំឡើង <code lang="en">.pkg</code>។</li>
+              <li>ចាកចេញពីគណនី (<span lang="en">Log Out</span>) ហើយចូលវិញម្តងទៀត។</li>
+              <li>ទៅ <span lang="en">System Settings → Keyboard → Text Input → Edit</span> ចុច <strong>+</strong> ស្វែងរក <strong lang="en">Khmer IME</strong> ហើយចុច <span lang="en">Add</span>។</li>
             </ol>
+            <details class="verify">
+              <summary>ផ្ទៀងផ្ទាត់ការទាញយក (<span lang="en">SHA-256</span>)</summary>
+              <p class="hash"><code lang="en">@MACOS_SHA@</code></p>
+              <p><code lang="en">shasum -a 256 @MACOS_STABLE@</code></p>
+              <p class="verify-links" lang="en"><a href="@SUMS_URL@" download>SHA256SUMS</a> · <a href="@SUMS_ASC_URL@" download>GPG</a> · <a href="@GPGKEY_URL@" download>key</a></p>
+            </details>
           </div>
 
           <div id="os-android" class="panel" data-panel="android">

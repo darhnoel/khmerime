@@ -350,3 +350,31 @@ details p {
   text-decoration: none;
   pointer-events: none;
 }
+
+/* Download verification (per-package SHA-256). Hidden until installers are public,
+   mirroring the download links, then revealed with [data-downloads="on"]. */
+.verify {
+  display: none;
+  margin-top: 0.5rem;
+}
+
+[data-downloads="on"] .verify {
+  display: block;
+}
+
+.verify summary {
+  cursor: pointer;
+}
+
+.verify p {
+  margin: 0.4rem 0;
+}
+
+/* The 64-char digest and verify commands must wrap, not overflow, on phones. */
+.verify code {
+  word-break: break-all;
+}
+
+.verify-links a {
+  white-space: nowrap;
+}

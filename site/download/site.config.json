@@ -1,5 +1,8 @@
 {
   "online_beta_url": "https://pheasa.xyz/khmerime-beta/",
   "downloads_enabled": "false",
-  "ios_app_url": "https://apps.apple.com/app/khmerime/id6781253596"
+  "ios_app_url": "https://apps.apple.com/app/khmerime/id6781253596",
+  "checksum_windows": "e8047e0ee1961b0e896b59aa7e05e5ccad15c72723e87f5c2918a9e8d416e680",
+  "checksum_linux": "1919c8e0181387752c3fbab4d4c979992163903e785f9d21684308653364edcd",
+  "checksum_macos": "e2762d764190d3d82942725d8a354bb48f1da9e86dc9514679031712e1e9e670"
 }

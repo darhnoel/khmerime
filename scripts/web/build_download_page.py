@@ -19,6 +19,12 @@ CONFIG_FILE = SOURCE_DIR / "site.config.json"
 # installer is published.
 LATEST_WINDOWS_FILE = "KhmerIME-windows-x64.msi"
 LATEST_LINUX_FILE = "khmerime-linux-amd64.deb"
+LATEST_MACOS_FILE = "KhmerIME-macos.pkg"
+
+# Checksum manifest + GPG material published next to the installers under <base>/latest/.
+SUMS_FILE = "SHA256SUMS"
+SUMS_ASC_FILE = "SHA256SUMS.asc"
+GPGKEY_FILE = "KhmerIME-signing-key.asc"
 
 
 def package_version() -> str:
@@ -60,18 +66,29 @@ def main() -> None:
         "KHMERIME_ONLINE_URL",
         config.get("online_beta_url", "/khmerime-beta/"),
     )
+    macos_file = f"KhmerIME-{version}-macos.pkg"
     windows_src = Path(os.environ.get("KHMERIME_WINDOWS_MSI", ROOT / "dist" / "windows" / windows_file))
     linux_src = Path(os.environ.get("KHMERIME_LINUX_DEB", ROOT / "dist" / "linux" / linux_file))
+    macos_src = Path(os.environ.get("KHMERIME_MACOS_PKG", ROOT / "dist" / "macos" / macos_file))
     # Set when installers are served from a separate download host; the page then
     # links to <base>/latest/<stable name> and carries no installers itself.
     download_base_url = os.environ.get("KHMERIME_DOWNLOAD_BASE_URL", "").rstrip("/")
 
     if download_base_url:
-        windows_url = f"{download_base_url}/latest/{LATEST_WINDOWS_FILE}"
-        linux_url = f"{download_base_url}/latest/{LATEST_LINUX_FILE}"
+        latest = f"{download_base_url}/latest"
+        windows_url = f"{latest}/{LATEST_WINDOWS_FILE}"
+        linux_url = f"{latest}/{LATEST_LINUX_FILE}"
+        macos_url = f"{latest}/{LATEST_MACOS_FILE}"
+        sums_url = f"{latest}/{SUMS_FILE}"
+        sums_asc_url = f"{latest}/{SUMS_ASC_FILE}"
+        gpgkey_url = f"{latest}/{GPGKEY_FILE}"
     else:
         windows_url = f"downloads/windows/{windows_file}"
         linux_url = f"downloads/linux/{linux_file}"
+        macos_url = f"downloads/macos/{macos_file}"
+        sums_url = f"downloads/{SUMS_FILE}"
+        sums_asc_url = f"downloads/{SUMS_ASC_FILE}"
+        gpgkey_url = f"downloads/{GPGKEY_FILE}"
 
     # Download buttons stay hidden until installers are published somewhere public.
     downloads_enabled = os.environ.get("KHMERIME_DOWNLOADS_ENABLED", config.get("downloads_enabled", "true"))
@@ -94,8 +111,21 @@ def main() -> None:
         "@VERSION@": version,
         "@WINDOWS_FILE@": windows_file,
         "@LINUX_FILE@": linux_file,
+        "@MACOS_FILE@": macos_file,
         "@WINDOWS_URL@": windows_url,
         "@LINUX_URL@": linux_url,
+        "@MACOS_URL@": macos_url,
+        # Stable (served) filenames the download saves as — used in verify commands.
+        "@WINDOWS_STABLE@": LATEST_WINDOWS_FILE,
+        "@LINUX_STABLE@": LATEST_LINUX_FILE,
+        "@MACOS_STABLE@": LATEST_MACOS_FILE,
+        # SHA-256 of each published installer (from site.config.json).
+        "@WINDOWS_SHA@": config.get("checksum_windows", ""),
+        "@LINUX_SHA@": config.get("checksum_linux", ""),
+        "@MACOS_SHA@": config.get("checksum_macos", ""),
+        "@SUMS_URL@": sums_url,
+        "@SUMS_ASC_URL@": sums_asc_url,
+        "@GPGKEY_URL@": gpgkey_url,
         "@ONLINE_BETA_URL@": online_beta_url,
     }
     copy_with_tokens(SOURCE_DIR / "index.html", OUT_DIR / "index.html", tokens)
@@ -111,6 +141,7 @@ def main() -> None:
     else:
         (OUT_DIR / "downloads" / "windows").mkdir(parents=True, exist_ok=True)
         (OUT_DIR / "downloads" / "linux").mkdir(parents=True, exist_ok=True)
+        (OUT_DIR / "downloads" / "macos").mkdir(parents=True, exist_ok=True)
         if windows_src.is_file():
             shutil.copy2(windows_src, OUT_DIR / "downloads" / "windows" / windows_file)
         else:
@@ -119,6 +150,10 @@ def main() -> None:
             shutil.copy2(linux_src, OUT_DIR / "downloads" / "linux" / linux_file)
         else:
             print(f"[khmerime] Linux .deb not copied. Upload manually to: downloads/linux/{linux_file}")
+        if macos_src.is_file():
+            shutil.copy2(macos_src, OUT_DIR / "downloads" / "macos" / macos_file)
+        else:
+            print(f"[khmerime] macOS .pkg not copied. Upload manually to: downloads/macos/{macos_file}")
 
     print(f"[khmerime] Download page written to: {OUT_DIR}")
 

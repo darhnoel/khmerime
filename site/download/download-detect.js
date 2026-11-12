@@ -84,6 +84,9 @@
   } else if (os === "linux") {
     button.href = button.dataset.linux;
     button.innerHTML = 'ទាញយកសម្រាប់ <span lang="en">Ubuntu</span>';
+  } else if (os === "macos") {
+    button.href = button.dataset.macos;
+    button.innerHTML = 'ទាញយកសម្រាប់ <span lang="en">macOS</span>';
   } else if (os && os !== "windows") {
     // No installer for this OS yet: its tab explains, so hide the download button.
     button.parentNode.hidden = true;
