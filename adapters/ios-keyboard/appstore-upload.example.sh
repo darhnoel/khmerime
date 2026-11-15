@@ -16,6 +16,12 @@ KHMERIME_ASC_KEY_ID="<key-id>"
 # The Issuer ID (a UUID) shown above the key list. Same for every key on the account.
 KHMERIME_ASC_ISSUER_ID="<issuer-id>"
 
+# Optional: files the .ipa must contain before it may be uploaded, as paths inside
+# Payload/, space-separated. When the App Store build differs from the open-source one,
+# list what only the store build has; export_ipa.sh then refuses any other build
+# (scripts/platforms/ios/keyboard/check_ipa.sh).
+# KHMERIME_IPA_REQUIRE="KhmerIME.app/PlugIns/KhmerIMEKeyboard.appex/<file>"
+
 # Path to the downloaded private key. `xcrun altool` also finds it automatically if
 # it is placed at ~/.appstoreconnect/private_keys/AuthKey_<KEY_ID>.p8.
 KHMERIME_ASC_KEY_PATH="${HOME}/.appstoreconnect/private_keys/AuthKey_<key-id>.p8"

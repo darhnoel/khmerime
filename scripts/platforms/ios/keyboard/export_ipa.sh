@@ -81,6 +81,12 @@ case "${KHMERIME_ASC_KEY_ID}${KHMERIME_ASC_ISSUER_ID}" in
 	*"<"*) echo "error: replace the placeholder values in ${UPLOAD_CONFIG}" >&2; exit 2 ;;
 esac
 
+# Files only the store build carries (KHMERIME_IPA_REQUIRE in the upload config, paths
+# inside Payload/): an .ipa without them is the wrong build and must not be uploaded.
+echo "==> checking this is the store build"
+# shellcheck disable=SC2086  # a space-separated list, split on purpose
+bash "${ROOT_DIR}/scripts/platforms/ios/keyboard/check_ipa.sh" "${IPA}" ${KHMERIME_IPA_REQUIRE:-}
+
 echo "==> validating before upload"
 xcrun altool --validate-app -f "${IPA}" --type ios \
 	--apiKey "${KHMERIME_ASC_KEY_ID}" --apiIssuer "${KHMERIME_ASC_ISSUER_ID}"
