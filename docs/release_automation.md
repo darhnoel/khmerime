@@ -107,3 +107,7 @@ scripts/release/prepare_draft_release.sh --tag v1.0.0-rc.1 --create
 - Keep mobile store upload separate from GitHub desktop downloads.
 - Do not put private certificates, keystores, or passwords in the repository.
 - Add signing one platform at a time, after unsigned package generation works in CI.
+- When the App Store build is not the open-source one, set `KHMERIME_IPA_REQUIRE` in
+  `adapters/ios-keyboard/appstore-upload.local.sh` to the files only the store build has.
+  `export_ipa.sh` then refuses to upload any other build (`check_ipa.sh`), since xcodebuild
+  and altool report success either way.
